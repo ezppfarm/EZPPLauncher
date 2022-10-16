@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "app.js",
   "license": "MIT",
+  "author": "HorizonCode",
   "build": {
     "appId": "farm.ezpp.ezppfarm.launcher",
     "productName": "ezpplauncher",
