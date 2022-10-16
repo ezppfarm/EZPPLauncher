@@ -16,7 +16,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const $ = require('jquery');
 
     $("#folder-btn").on('click', async () => {
-        const folderLoc = await ipcRenderer.invoke('open-folder-dialog');
-        alert(folderLoc);
+        const success = await ipcRenderer.invoke('set-osu-dir');
+        if (success == undefined)
+            return;
+        alert(success);
     });
 })
