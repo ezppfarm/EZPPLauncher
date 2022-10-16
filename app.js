@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { setupTitlebar, attachTitlebarToWindow } = require('custom-electron-titlebar/main');
 const windowManager = require('./ui/windowManager');
+const osuUtil = require('./osuUtil');
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -20,11 +21,14 @@ const run = () => {
         app.on('window-all-closed', () => {
             app.quit()
         })
-        ipcMain.handle('open-folder-dialog', async (event) => {
+        ipcMain.handle('set-osu-dir', async (event) => {
             const yes = await dialog.showOpenDialog({
                 properties: ['openDirectory']
             })
-            return yes.filePaths;
+            if (yes.filePaths.length <= 0)
+                return undefined;
+            const folderPath = yes.filePaths[0];
+            return osuUtil.isValidOsuFolder(folderPath);
         })
     })
 }
