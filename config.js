@@ -4,7 +4,7 @@ const fs = require('fs');
 const configFolder = path.join(process.env['LOCALAPPDATA'], 'EZPPLauncher');
 if (!fs.existsSync(configFolder)) fs.mkdirSync(configFolder);
 
-const configLocation = path.join(configFolder, `ezpplauncher.${path.basename(process.env['HOME'])}.cfg`);
+const configLocation = path.join(configFolder, `ezpplauncher.${path.basename(process.env['USERNAME'])}.cfg`);
 if (!fs.existsSync(configLocation)) fs.writeFileSync(configLocation, "");
 
 

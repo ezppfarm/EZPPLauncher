@@ -1,6 +1,10 @@
 const fs = require('fs');
+const fu = require('./fileUtil');
 const path = require('path');
+const crypto = require('crypto');
 const axios = require('axios').default;
+const { EventEmitter } = require('events');
+const { DownloaderHelper } = require('node-downloader-helper');
 
 const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
 const osuEntities = [
@@ -82,4 +86,55 @@ async function getUpdateFiles(releaseStream) {
     return releaseData.data;
 }
 
-module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles }
+async function filesThatNeedUpdate(osuPath, updateFiles) {
+    const filesToDownload = [];
+    for (const updatedFile of updateFiles) {
+        const fileName = updatedFile.filename;
+        const fileHash = updatedFile.file_hash;
+        const fileURL = updatedFile.url_full;
+
+        const fileOnDisk = path.join(osuPath, fileName);
+        if (await fu.existsAsync(fileOnDisk)) {
+            const binaryFileContents = await fs.promises.readFile(fileOnDisk);
+            const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
+            if (existingFileMD5.toLowerCase() != fileHash.toLowerCase()) {
+                filesToDownload.push({
+                    fileName,
+                    fileURL
+                })
+                console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
+            }
+        } else {
+            filesToDownload.push({
+                fileName,
+                fileURL
+            });
+            console.log("new file " + fileName);
+        }
+    }
+    return filesToDownload;
+}
+
+async function downloadUpdateFiles(osuPath, filesToUpdate) {
+    const eventEmitter = new EventEmitter();
+    let completedIndex = 0;
+    filesToUpdate.forEach(async (fileToUpdate) => {
+        const filePath = path.join(osuPath, fileToUpdate.fileName);
+        await fs.promises.rm(filePath);
+        const fileDownload = new DownloaderHelper(fileToUpdate.fileURL, osuPath, {
+            fileName: fileToUpdate.fileName,
+            override: true,
+        });
+        fileDownload.on('end', () => {
+            completedIndex = completedIndex + 1;
+            if (completedIndex >= filesToUpdate.length)
+                eventEmitter.emit('completed');
+        });
+
+        fileDownload.start().catch(err => console.error(err));
+    });
+
+    return eventEmitter;
+}
+
+module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles }

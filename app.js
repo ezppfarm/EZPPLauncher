@@ -31,10 +31,16 @@ const run = () => {
                     releaseStream = "cuttingedge"
                 else if (lastVersion.endsWith("beta"))
                     releaseStream = "beta";
-                
+
                 const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
-                console.log(releaseFiles);
-                //Do update check
+                const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
+                /*                 const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
+                                downloadTask.on('completed', () => {
+                                    console.log("done!");
+                                }); */
+                mainWindow.webContents.send('status_update', {
+                    type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
+                })
             }
         })
         app.on('activate', function () {
