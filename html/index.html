@@ -6,6 +6,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="../assets/mdb.min.css" rel="stylesheet" />
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
 </head>
 
 <body class="fixed-sn mdb-skin-custom" data-spy="scroll" data-target="#scrollspy" data-offset="15"
@@ -30,7 +37,7 @@
                                             </h5>
                                             <div class="pt-1 mb-4">
                                                 <button id="launch-btn" class="btn btn-primary btn-lg btn-block"
-                                                    type="button" style="background-color:#d6016f">Launch</button>
+                                                    type="button" style="background-color:#d6016f" disabled>Launch</button>
                                             </div>
                                             <button class="btn btn-dark btn-sm float-start" id="folder-btn">
                                                 set osu! directory
