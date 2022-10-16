@@ -1,4 +1,5 @@
 const path = require("path");
+const appInfo = require('../appInfo');
 const { BrowserWindow } = require('electron');
 const { attachTitlebarToWindow } = require('custom-electron-titlebar/main');
 
@@ -31,7 +32,7 @@ module.exports = {
             window.show();
         });
 
-        window.webContents.setUserAgent("EZPPLauncher");
+        window.webContents.setUserAgent(`${appInfo.appName} ${appInfo.appVersion}`);
         attachTitlebarToWindow(window);
         // window.webContents.openDevTools({
         //     mode: "detach"

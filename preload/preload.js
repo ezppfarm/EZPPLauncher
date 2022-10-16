@@ -1,5 +1,6 @@
 const { ipcRenderer } = require('electron');
 const { Titlebar, Color } = require('custom-electron-titlebar');
+const appInfo = require('../appInfo');
 let titlebar;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -10,7 +11,7 @@ window.addEventListener('DOMContentLoaded', () => {
         maximizable: false
     });
 
-    titlebar.updateTitle("EZPPLauncher");
+    titlebar.updateTitle(`${appInfo.appName} ${appInfo.appVersion}`);
 
     const $ = require('jquery');
     const Swal = require('sweetalert2');
