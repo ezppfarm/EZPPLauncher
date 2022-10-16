@@ -67,7 +67,7 @@ const run = () => {
 
 function createWindow() {
     // Create the browser window.
-    const win = windowManager.createWindow(480, 350);
+    const win = windowManager.createWindow(520, 420);
 
     win.loadFile('./html/index.html');
 

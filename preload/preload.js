@@ -13,15 +13,26 @@ window.addEventListener('DOMContentLoaded', () => {
     titlebar.updateTitle("EZPPLauncher");
 
     const $ = require('jquery');
+    const Swal = require('sweetalert2');
 
     $("#folder-btn").on('click', async () => {
         const success = await ipcRenderer.invoke('set-osu-dir');
         if (success == undefined)
             return;
         if (success) {
-            //TODO: Alert User, folder set.
+            Swal.fire({
+                title: 'Success!',
+                text: 'osu! folder set!',
+                icon: 'success',
+                confirmButtonText: 'Cool'
+            })
         } else {
-            //TODO: Alert User, invalid osu folder selected
+            Swal.fire({
+                title: 'Uh oh!',
+                text: 'failed to set osu! folder.',
+                icon: 'error',
+                confirmButtonText: 'Cool'
+            })
         }
     });
 
