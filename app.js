@@ -22,6 +22,13 @@ const run = () => {
         mainWindow = createWindow();
         mainWindow.on('show', async () => {
             const osuPath = await config.get("osuPath", "");
+            const isValid = await osuUtil.isValidOsuFolder(osuPath);
+            if (osuPath.trim == "" || !isValid) {
+                mainWindow.webContents.send('status_update', {
+                    type: "missing-folder"
+                })
+                return;
+            }
             if (fs.existsSync(osuPath)) {
                 tempOsuPath = osuPath;
                 const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
@@ -34,14 +41,17 @@ const run = () => {
 
                 const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
                 const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
-                /*                 const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
-                                downloadTask.on('completed', () => {
-                                    console.log("done!");
-                                }); */
+                // const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
+                // downloadTask.on('completed', () => {
+                //     console.log("done!");
+                // });
                 mainWindow.webContents.send('status_update', {
                     type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
                 })
-            }
+            } else
+                mainWindow.webContents.send('status_update', {
+                    type: "missing-folder"
+                })
         })
         app.on('activate', function () {
             if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
@@ -56,7 +66,7 @@ const run = () => {
             if (yes.filePaths.length <= 0)
                 return undefined;
             const folderPath = yes.filePaths[0];
-            const validOsuDir = osuUtil.isValidOsuFolder(folderPath);
+            const validOsuDir = await osuUtil.isValidOsuFolder(folderPath);
 
             if (validOsuDir) await config.set("osuPath", folderPath);
 
