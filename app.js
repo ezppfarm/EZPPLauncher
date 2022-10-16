@@ -31,14 +31,12 @@ const run = () => {
 
 function createWindow() {
     // Create the browser window.
-    const win = windowManager.createWindow(480, 320);
+    const win = windowManager.createWindow(480, 420);
 
     win.loadFile('./html/index.html');
 
     attachTitlebarToWindow(win);
-    win.webContents.on('new-window', function (e, url) {
-        e.preventDefault();
-    });
+    win.webContents.setWindowOpenHandler(() => "deny");
     win.webContents.on('did-finish-load', function () {
         if (win.webContents.getZoomFactor() != 0.9)
             win.webContents.setZoomFactor(0.9)
