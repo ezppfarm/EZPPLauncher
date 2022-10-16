@@ -1,0 +1,51 @@
+{
+  "name": "ezpplauncher",
+  "version": "1.0.0",
+  "main": "app.js",
+  "license": "MIT",
+  "build": {
+    "appId": "farm.ezpp.ezppfarm.launcher",
+    "productName": "ezpplauncher",
+    "directories": {
+      "output": "release",
+      "buildResources": "dist"
+    },
+    "asar": true,
+    "win": {
+      "icon": "./assets/logo.png",
+      "target": [
+        "portable"
+      ]
+    },
+    "nsis": {
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "EZPPLauncher.exe"
+    }
+  },
+  "frontend": {
+    "config": {
+      "applicationName": "EZPPLauncher"
+    }
+  },
+  "scripts": {
+    "start": "electron .",
+    "pack-win": "electron-builder --x64",
+    "pack-win32": "electron-builder --ia32",
+    "pack-winarm": "electron-builder --arm64",
+    "pack-linux": "electron-builder --dir --linux --ia32 --arm64 --x64",
+    "pack-mac": "electron-builder --dir --mac --ia32 --arm64 --x64",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^17.4.3",
+    "electron-builder": "^23.0.3",
+    "electron-packager": "^15.5.1"
+  },
+  "dependencies": {
+    "axios": "^0.27.2",
+    "custom-electron-titlebar": "^4.1.1",
+    "jquery": "^3.6.0"
+  }
+}
