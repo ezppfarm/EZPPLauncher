@@ -39,4 +39,44 @@ async function isValidOsuFolder(path) {
     return Math.round((matches / osuEntities.length) * 100) >= 60;
 }
 
-module.exports = { isValidOsuFolder }
+async function getLatestConfig(osuPath) {
+    const allFiles = await fs.promises.readdir(osuPath);
+    const configFileInfo = {
+        name: "",
+        path: "",
+        lastModified: 0,
+        get: async (key) => {
+            const fileStream = await fs.promises.readFile(configFileInfo.path, "utf-8");
+            const lines = fileStream.split(/\r?\n/)
+            for (const line of lines) {
+                if (line.includes(' = ')) {
+                    const argsPair = line.split(' = ', 2);
+                    const keyname = argsPair[0]
+                    const value = argsPair[1];
+                    if (keyname == key) {
+                        return value;
+                    }
+                }
+            }
+        }
+    }
+    for (const file of allFiles) {
+        if (file.startsWith('osu!.') && file.endsWith('.cfg') && file !== "osu!.cfg") {
+            const fullFilePath = path.join(osuPath, file);
+            const fileStats = await fs.promises.stat(fullFilePath);
+            const lastModified = fileStats.mtimeMs;
+            if (lastModified > configFileInfo.lastModified) {
+                configFileInfo.name = file;
+                configFileInfo.path = fullFilePath;
+                configFileInfo.lastModified = lastModified;
+            }
+        }
+    }
+    return configFileInfo;
+}
+
+async function checkForUpdate(path) {
+
+}
+
+module.exports = { isValidOsuFolder, getLatestConfig }
