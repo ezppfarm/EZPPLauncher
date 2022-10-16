@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios').default;
 
+const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
 const osuEntities = [
     'avcodec-51.dll',
     'avformat-52.dll',
@@ -75,8 +77,9 @@ async function getLatestConfig(osuPath) {
     return configFileInfo;
 }
 
-async function checkForUpdate(path) {
-
+async function getUpdateFiles(releaseStream) {
+    const releaseData = await axios.get(checkUpdateURL + releaseStream, {});
+    return releaseData.data;
 }
 
-module.exports = { isValidOsuFolder, getLatestConfig }
+module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles }

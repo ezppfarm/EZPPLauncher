@@ -22,12 +22,18 @@ const run = () => {
         mainWindow = createWindow();
         mainWindow.on('show', async () => {
             const osuPath = await config.get("osuPath", "");
-            if(fs.existsSync(osuPath)){
+            if (fs.existsSync(osuPath)) {
                 tempOsuPath = osuPath;
                 const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
-                console.log(osuConfig);
                 const lastVersion = await osuConfig.get("LastVersion");
-                console.log(lastVersion);
+                let releaseStream = "stable40";
+                if (lastVersion.endsWith("cuttingedge"))
+                    releaseStream = "cuttingedge"
+                else if (lastVersion.endsWith("beta"))
+                    releaseStream = "beta";
+                
+                const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
+                console.log(releaseFiles);
                 //Do update check
             }
         })
