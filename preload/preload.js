@@ -22,16 +22,16 @@ window.addEventListener('DOMContentLoaded', () => {
         if (success) {
             Swal.fire({
                 title: 'Success!',
-                text: 'osu! folder set!',
+                text: 'osu! folder set.',
                 icon: 'success',
                 confirmButtonText: 'Cool'
             })
         } else {
             Swal.fire({
                 title: 'Uh oh!',
-                text: 'failed to set osu! folder.',
+                text: 'The selected folder is not a osu! directory.',
                 icon: 'error',
-                confirmButtonText: 'Cool'
+                confirmButtonText: 'Oops.. my bad!'
             })
         }
     });
@@ -46,6 +46,11 @@ window.addEventListener('DOMContentLoaded', () => {
                 $("#launch-btn").attr('disabled', false);
                 $('#launch-btn').html('Update');
                 break;
+            case "missing-folder":
+                $('#launch-btn').html('Please set your osu folder!');
         }
     })
+
+    // workaround for the dark theme
+    $('head').append($('<link href="../assets/sweetalert2.dark.css" rel="stylesheet" />'));
 })
