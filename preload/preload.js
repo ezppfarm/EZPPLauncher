@@ -19,6 +19,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const success = await ipcRenderer.invoke('set-osu-dir');
         if (success == undefined)
             return;
-        alert(success);
+        if (success) {
+
+        } else {
+            //TODO: Alert User, invalid osu folder selected
+        }
     });
 })
