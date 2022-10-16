@@ -3,6 +3,7 @@ const fu = require('./fileUtil');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios').default;
+const executeUtil = require('./executeUtil');
 const { EventEmitter } = require('events');
 const { DownloaderHelper } = require('node-downloader-helper');
 
@@ -122,7 +123,7 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
         const filePath = path.join(osuPath, fileToUpdate.fileName);
         if (await fu.existsAsync(filePath))
             await fs.promises.rm(filePath);
-        
+
         const fileDownload = new DownloaderHelper(fileToUpdate.fileURL, osuPath, {
             fileName: fileToUpdate.fileName,
             override: true,
@@ -139,4 +140,12 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
     return eventEmitter;
 }
 
-module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles }
+async function startWithDevServer(osuPath, serverDomain, onExit) {
+    const osuExe = path.join(osuPath, "osu!.exe");
+    console.log(osuExe);
+    if (!await fu.existsAsync(osuExe)) return false;
+    executeUtil.runFile(osuPath, osuExe, ["-devserver", serverDomain], onExit);
+    return true;
+}
+
+module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles, startOsuWithDevServer: startWithDevServer }

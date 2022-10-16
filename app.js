@@ -29,6 +29,13 @@ const run = () => {
         app.on('window-all-closed', () => {
             app.quit()
         })
+        ipcMain.handle('launch', async () => {
+            const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
+                await doUpdateCheck(mainWindow);
+            });
+            console.log(result);
+            return result;
+        })
         ipcMain.on('do-update-check', async () => {
             await doUpdateCheck(mainWindow);
         })

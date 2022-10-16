@@ -20,7 +20,22 @@ window.addEventListener('DOMContentLoaded', () => {
     $("#launch-btn").on('click', async () => {
         switch (currentState) {
             case "up-to-date":
-                //TODO: launch client
+                $("#launch-btn").attr('disabled', true);
+                $('#launch-btn').html('Launching...');
+                const result = await ipcRenderer.invoke("launch");
+                if (!result) {
+                    Swal.fire({
+                        title: 'Uh oh!',
+                        text: "Something went wrong while launching!",
+                        icon: 'error',
+                        confirmButtonText: 'Okay'
+                    });
+                    $("#launch-btn").attr('disabled', false);
+                    $('#launch-btn').html('Launch');
+                } else {
+                    $("#launch-btn").attr('disabled', true);
+                    $('#launch-btn').html('Running...');
+                }
                 break;
             case "update-available":
                 $("#launch-btn").attr('disabled', true);
