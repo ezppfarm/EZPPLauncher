@@ -26,7 +26,6 @@ async function get(key, defaultValue) {
 }
 
 async function set(key, value) {
-    console.log("setting " + key + " to " + value);
     const configValues = new Map();
     const fileStream = await fs.promises.readFile(configLocation, "utf-8");
     const lines = fileStream.split(/\r?\n/)

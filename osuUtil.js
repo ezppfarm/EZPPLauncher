@@ -103,14 +103,14 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
                     fileName,
                     fileURL
                 })
-                console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
+                // console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
             }
         } else {
             filesToDownload.push({
                 fileName,
                 fileURL
             });
-            console.log("new file " + fileName);
+            // console.log("new file " + fileName);
         }
     }
     return filesToDownload;
@@ -142,7 +142,6 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
 
 async function startWithDevServer(osuPath, serverDomain, onExit) {
     const osuExe = path.join(osuPath, "osu!.exe");
-    console.log(osuExe);
     if (!await fu.existsAsync(osuExe)) return false;
     executeUtil.runFile(osuPath, osuExe, ["-devserver", serverDomain], onExit);
     return true;

@@ -33,7 +33,6 @@ const run = () => {
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 await doUpdateCheck(mainWindow);
             });
-            console.log(result);
             return result;
         })
         ipcMain.on('do-update-check', async () => {
@@ -111,7 +110,6 @@ async function doUpdateCheck(window) {
 
         const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
         const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
-        console.log("sending update check " + (filesToDownload.length > 0 ? "update-available" : "up-to-date"))
         window.webContents.send('status_update', {
             type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
         })
