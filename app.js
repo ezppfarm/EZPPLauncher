@@ -21,12 +21,25 @@ const run = () => {
 
         mainWindow = createWindow();
         mainWindow.on('show', async () => {
+            await doUpdateCheck(mainWindow);
+        })
+        app.on('activate', function () {
+            if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+        })
+        app.on('window-all-closed', () => {
+            app.quit()
+        })
+        ipcMain.on('do-update-check', async () => {
+            await doUpdateCheck(mainWindow);
+        })
+        ipcMain.on('do-update', async () => {
             const osuPath = await config.get("osuPath", "");
             const isValid = await osuUtil.isValidOsuFolder(osuPath);
             if (osuPath.trim == "" || !isValid) {
                 mainWindow.webContents.send('status_update', {
-                    type: "missing-folder"
-                })
+                    type: "error",
+                    message: "Invalid osu! folder"
+                });
                 return;
             }
             if (fs.existsSync(osuPath)) {
@@ -41,23 +54,18 @@ const run = () => {
 
                 const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
                 const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
-                // const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
-                // downloadTask.on('completed', () => {
-                //     console.log("done!");
-                // });
-                mainWindow.webContents.send('status_update', {
-                    type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
-                })
+                const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
+                downloadTask.on('completed', () => {
+                    mainWindow.webContents.send('status_update', {
+                        type: "update-complete"
+                    })
+                });
+
             } else
                 mainWindow.webContents.send('status_update', {
-                    type: "missing-folder"
-                })
-        })
-        app.on('activate', function () {
-            if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
-        })
-        app.on('window-all-closed', () => {
-            app.quit()
+                    type: "error",
+                    message: "Invalid osu! folder"
+                });
         })
         ipcMain.handle('set-osu-dir', async (event) => {
             const yes = await dialog.showOpenDialog({
@@ -73,6 +81,37 @@ const run = () => {
             return validOsuDir;
         })
     })
+}
+
+async function doUpdateCheck(window) {
+    const osuPath = await config.get("osuPath", "");
+    const isValid = await osuUtil.isValidOsuFolder(osuPath);
+    if (osuPath.trim == "" || !isValid) {
+        window.webContents.send('status_update', {
+            type: "missing-folder"
+        })
+        return;
+    }
+    if (fs.existsSync(osuPath)) {
+        tempOsuPath = osuPath;
+        const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
+        const lastVersion = await osuConfig.get("LastVersion");
+        let releaseStream = "stable40";
+        if (lastVersion.endsWith("cuttingedge"))
+            releaseStream = "cuttingedge"
+        else if (lastVersion.endsWith("beta"))
+            releaseStream = "beta";
+
+        const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
+        const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
+        console.log("sending update check " + (filesToDownload.length > 0 ? "update-available" : "up-to-date"))
+        window.webContents.send('status_update', {
+            type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
+        })
+    } else
+        window.webContents.send('status_update', {
+            type: "missing-folder"
+        })
 }
 
 function createWindow() {

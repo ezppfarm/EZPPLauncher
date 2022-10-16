@@ -120,7 +120,9 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
     let completedIndex = 0;
     filesToUpdate.forEach(async (fileToUpdate) => {
         const filePath = path.join(osuPath, fileToUpdate.fileName);
-        await fs.promises.rm(filePath);
+        if (await fu.existsAsync(filePath))
+            await fs.promises.rm(filePath);
+        
         const fileDownload = new DownloaderHelper(fileToUpdate.fileURL, osuPath, {
             fileName: fileToUpdate.fileName,
             override: true,

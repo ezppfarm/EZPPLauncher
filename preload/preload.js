@@ -15,6 +15,21 @@ window.addEventListener('DOMContentLoaded', () => {
     const $ = require('jquery');
     const Swal = require('sweetalert2');
 
+    let currentState;
+
+    $("#launch-btn").on('click', async () => {
+        switch (currentState) {
+            case "up-to-date":
+                //TODO: launch client
+                break;
+            case "update-available":
+                $("#launch-btn").attr('disabled', true);
+                $('#launch-btn').html('Updating...');
+                ipcRenderer.send("do-update");
+                break;
+        }
+    });
+
     $("#folder-btn").on('click', async () => {
         const success = await ipcRenderer.invoke('set-osu-dir');
         if (success == undefined)
@@ -26,6 +41,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 icon: 'success',
                 confirmButtonText: 'Cool'
             })
+            ipcRenderer.send("do-update-check");
         } else {
             Swal.fire({
                 title: 'Uh oh!',
@@ -37,6 +53,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     ipcRenderer.on('status_update', (event, status) => {
+        currentState = status.type;
         switch (status.type) {
             case "up-to-date":
                 $("#launch-btn").attr('disabled', false);
@@ -47,7 +64,26 @@ window.addEventListener('DOMContentLoaded', () => {
                 $('#launch-btn').html('Update');
                 break;
             case "missing-folder":
-                $('#launch-btn').html('Please set your osu folder!');
+                $('#launch-btn').html('Please set your osu! folder');
+                break;
+            case "error":
+                Swal.fire({
+                    title: 'Uh oh!',
+                    text: status.message,
+                    icon: 'error',
+                    confirmButtonText: 'Okay'
+                });
+                ipcRenderer.send("do-update-check");
+                break;
+            case "update-complete":
+                Swal.fire({
+                    title: 'Yaaay!',
+                    text: "Your osu! client has been successfully updated!",
+                    icon: 'success',
+                    confirmButtonText: 'Thanks :3'
+                });
+                ipcRenderer.send("do-update-check");
+                break;
         }
     })
 

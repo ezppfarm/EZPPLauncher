@@ -33,9 +33,9 @@ module.exports = {
 
         window.webContents.setUserAgent("EZPPLauncher");
         attachTitlebarToWindow(window);
-        window.webContents.openDevTools({
-            mode: "detach"
-        });
+        // window.webContents.openDevTools({
+        //     mode: "detach"
+        // });
 
         return window;
     },
