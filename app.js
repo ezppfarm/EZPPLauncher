@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { setupTitlebar, attachTitlebarToWindow } = require('custom-electron-titlebar/main');
 const windowManager = require('./ui/windowManager');
 const osuUtil = require('./osuUtil');
+const ezppUtil = require('./ezppUtil');
 const config = require('./config');
 const fs = require('fs');
 
@@ -23,6 +24,7 @@ const run = () => {
         mainWindow.on('show', async () => {
             await updateConfigVars(mainWindow);
             await tryLogin(mainWindow);
+            await doUpdateCheck(mainWindow);
         })
         app.on('activate', function () {
             if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
@@ -31,6 +33,19 @@ const run = () => {
             app.quit()
         })
         ipcMain.handle('launch', async () => {
+            const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
+            const username = await config.get('username');
+            const password = await config.get('password');
+            if (password && username) {
+                await osuUtil.setConfigValue(osuConfig.path, "SaveUsername", "1");
+                await osuUtil.setConfigValue(osuConfig.path, "SavePassword", "1");
+                await osuUtil.setConfigValue(osuConfig.path, "Username", username);
+                await osuUtil.setConfigValue(osuConfig.path, "Password", await osuUtil.decryptString(password));
+                await osuUtil.setConfigValue(osuConfig.path, "CredentialEndpoint", "ez-pp.farm");
+            } else {
+                await osuUtil.setConfigValue(osuConfig.path, "Username", "");
+                await osuUtil.setConfigValue(osuConfig.path, "Password", "");
+            }
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 await doUpdateCheck(mainWindow);
             });
@@ -85,23 +100,47 @@ const run = () => {
 
             if (validOsuDir) await config.set("osuPath", folderPath);
 
-            return validOsuDir;
+            return { validOsuDir, folderPath };
+        })
+        ipcMain.handle('perform-login', async (event, data) => {
+            const { username, password } = data;
+            const loginData = await ezppUtil.performLogin(username, password);
+            if (loginData && loginData.code === 200) {
+                await config.set("username", username);
+                await config.set("password", await osuUtil.encryptString(password));
+            }
+            return loginData;
+        })
+        ipcMain.on('perform-logout', async (event) => {
+            await config.remove("username");
+            await config.remove("password");
         })
     })
 }
 
 async function updateConfigVars(window) {
-    const osuPath = JSON.stringify(config.get("osuPath", ""));
+    const osuPath = await config.get("osuPath", "");
     window.webContents.send('config_update', {
         osuPath: osuPath
     })
 }
 
 async function tryLogin(window) {
-    const username = config.get("username", "");
-    const password = config.get("password", "");
+    const username = await config.get("username", "");
+    const password = await config.get("password", "");
     if ((username && username.length > 0) && (password && password.length > 0)) {
-
+        const passwordPlain = await osuUtil.decryptString(password);
+        const loginResponse = await ezppUtil.performLogin(username, passwordPlain);
+        if (loginResponse && loginResponse.code === 200) {
+            window.webContents.send('account_update', {
+                type: "loggedin",
+                user: loginResponse.user
+            })
+        } else {
+            window.webContents.send('account_update', {
+                type: "login-failed"
+            })
+        }
     } else {
         window.webContents.send('account_update', {
             type: "not-loggedin"
@@ -110,9 +149,15 @@ async function tryLogin(window) {
 }
 
 async function doUpdateCheck(window) {
-    const osuPath = await config.get("osuPath", "");
+    const osuPath = await config.get("osuPath");
+    if (!osuPath || osuPath.trim == "") {
+        window.webContents.send('status_update', {
+            type: "missing-folder"
+        })
+        return;
+    }
     const isValid = await osuUtil.isValidOsuFolder(osuPath);
-    if (osuPath.trim == "" || !isValid) {
+    if (!isValid) {
         window.webContents.send('status_update', {
             type: "missing-folder"
         })

@@ -2,8 +2,8 @@ const { ipcRenderer } = require('electron');
 const { Titlebar, Color } = require('custom-electron-titlebar');
 const appInfo = require('../appInfo');
 let titlebar;
-
-const currentPage = "loading-page";
+let currentPage = "loading";
+let loggedIn = false;
 
 window.addEventListener('DOMContentLoaded', () => {
     titlebar = new Titlebar({
@@ -19,11 +19,21 @@ window.addEventListener('DOMContentLoaded', () => {
     const axios = require('axios').default;
     const Swal = require('sweetalert2');
 
-    const loggedIn = false;
-
     $('#account-action').on('click', () => {
         if (!loggedIn) {
             changePage('login');
+        } else {
+            $('#welcome-text').text(`Nice to see you!`);
+            $('#account-action').text('Click to login');
+            $('#user-img').prop('src', `https://a.ez-pp.farm/0`)
+            loggedIn = false;
+            ipcRenderer.send("perform-logout");
+            Swal.fire({
+                title: 'See ya soon!',
+                text: "Successfully logged out!",
+                icon: 'success',
+                confirmButtonText: 'Okay'
+            });
         }
     });
 
@@ -62,17 +72,46 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    $("#folder-btn").on('click', async () => {
-        const success = await ipcRenderer.invoke('set-osu-dir');
-        if (success == undefined)
+    $("#action-login").on('click', async () => {
+        const username = $('#login-username').val();
+        const password = $('#login-password').val();
+        $("#action-login").attr('disabled', true);
+        $("#action-cancel").attr('disabled', true);
+        const responseData = await ipcRenderer.invoke('perform-login', { username, password });
+        $("#action-login").attr('disabled', false);
+        $("#action-cancel").attr('disabled', false);
+        if (!responseData)
             return;
-        if (success) {
+        if (responseData.code != 200) {
+            Swal.fire({
+                title: 'Uh oh!',
+                text: responseData.message,
+                icon: 'error',
+                confirmButtonText: 'Oops.. my bad!'
+            })
+            return;
+        }
+        $('#login-username').val("");
+        $('#login-password').val("");
+        $('#welcome-text').text(`Welcome back, ${responseData.user.name}!`);
+        $('#account-action').text('Not you?');
+        $('#user-img').prop('src', `https://a.ez-pp.farm/${responseData.user.id}`);
+        loggedIn = true;
+        changePage('launch');
+    })
+
+    $("#change-folder-btn").on('click', async () => {
+        const responseData = await ipcRenderer.invoke('set-osu-dir');
+        if (!responseData)
+            return;
+        if (responseData.validOsuDir) {
             Swal.fire({
                 title: 'Success!',
                 text: 'osu! folder set.',
                 icon: 'success',
                 confirmButtonText: 'Cool'
             })
+            $('#currentOsuPath').text(responseData.folderPath);
             ipcRenderer.send("do-update-check");
         } else {
             Swal.fire({
@@ -84,10 +123,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    ipcRenderer.on('config_update', (event, data) => {
+        if (data.osuPath) {
+            $('#currentOsuPath').text(data.osuPath);
+        }
+    })
+
     ipcRenderer.on('account_update', (event, data) => {
         switch (data.type) {
             case "not-loggedin":
                 changePage("launch");
+                break;
+            case "loggedin":
+                changePage("launch");
+                $('#welcome-text').text(`Welcome back, ${data.user.name}!`);
+                $('#account-action').text('Not you?');
+                $('#user-img').prop('src', `https://a.ez-pp.farm/${data.user.id}`)
+                loggedIn = true;
                 break;
         }
     })
@@ -104,7 +156,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 $('#launch-btn').html('Update');
                 break;
             case "missing-folder":
-                $('#launch-btn').html('Please set your osu! folder');
+                $("#launch-btn").attr('disabled', true);
+                $('#launch-btn').html('set your osu! folder');
                 break;
             case "error":
                 Swal.fire({
@@ -128,9 +181,10 @@ window.addEventListener('DOMContentLoaded', () => {
     })
 
     function changePage(page) {
-        $(`#${currentPage}`).fadeOut(50, "swing", () => {
+        $(`#${currentPage}-page`).fadeOut(50, "swing", () => {
             $(`#${page}-page`).fadeIn(350);
         });
+        currentPage = page;
     }
 
     // workaround for the dark theme

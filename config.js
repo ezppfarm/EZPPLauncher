@@ -47,4 +47,26 @@ async function set(key, value) {
     await fs.promises.writeFile(configLocation, arr.join('\n'));
 }
 
-module.exports = { get, set }
+async function remove(key) {
+    const configValues = new Map();
+    const fileStream = await fs.promises.readFile(configLocation, "utf-8");
+    const lines = fileStream.split(/\r?\n/)
+    for (const line of lines) {
+        if (line.includes('=')) {
+            const argsPair = line.split('=', 2);
+            const keyname = argsPair[0]
+            const value = argsPair[1];
+            configValues.set(keyname, value);
+        }
+    }
+
+    const arr = [];
+    for (var [storkey, storvalue] of configValues.entries()) {
+        if (storkey != key)
+            arr.push(`${storkey}=${storvalue}`);
+    }
+
+    await fs.promises.writeFile(configLocation, arr.join('\n'));
+}
+
+module.exports = { get, set, remove }

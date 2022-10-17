@@ -49,12 +49,12 @@ async function isValidOsuFolder(path) {
 }
 
 async function getLatestConfig(osuPath) {
-    const allFiles = await fs.promises.readdir(osuPath);
     const configFileInfo = {
         name: "",
         path: "",
-        lastModified: 0,
         get: async (key) => {
+            if (!configFileInfo.path)
+                return "";
             const fileStream = await fs.promises.readFile(configFileInfo.path, "utf-8");
             const lines = fileStream.split(/\r?\n/)
             for (const line of lines) {
@@ -69,17 +69,10 @@ async function getLatestConfig(osuPath) {
             }
         }
     }
-    for (const file of allFiles) {
-        if (file.startsWith('osu!.') && file.endsWith('.cfg') && file !== "osu!.cfg") {
-            const fullFilePath = path.join(osuPath, file);
-            const fileStats = await fs.promises.stat(fullFilePath);
-            const lastModified = fileStats.mtimeMs;
-            if (lastModified > configFileInfo.lastModified) {
-                configFileInfo.name = file;
-                configFileInfo.path = fullFilePath;
-                configFileInfo.lastModified = lastModified;
-            }
-        }
+    const userOsuConfig = path.join(osuPath, `osu!.${process.env['USERNAME']}.cfg`)
+    if (fs.existsSync(userOsuConfig)) {
+        configFileInfo.name = `osu!.${process.env['USERNAME']}.cfg`;
+        configFileInfo.path = userOsuConfig;
     }
     return configFileInfo;
 }
@@ -149,8 +142,13 @@ async function startWithDevServer(osuPath, serverDomain, onExit) {
     return true;
 }
 
-function encryptString(value) {
-    return dpapi.protect(Buffer.from(value, 'utf-8'), osuEncryptBuffer, 'CurrentUser');
+async function encryptString(value) {
+    return Buffer.from(await dpapi.protect(Buffer.from(value, 'utf-8'), osuEncryptBuffer, 'CurrentUser'), 'utf-8').toString('base64');
+}
+
+async function decryptString(value) {
+    const decrypted = await dpapi.unprotect(Buffer.from(value, 'base64'), osuEncryptBuffer, 'CurrentUser');
+    return decrypted.toString();
 }
 
 async function setConfigValue(configPath, key, value) {
@@ -159,9 +157,8 @@ async function setConfigValue(configPath, key, value) {
     const lines = fileStream.split(/\r?\n/)
     for (const line of lines) {
         if (line.includes(' = ')) {
-            const argsPair = line.split('=', 2);
-            const keyname = argsPair[0]
-            const value = argsPair[1];
+            const argsPair = line.split(' = ', 2);
+            const keyname = argsPair[0].trim();
             if (key == keyname) {
                 configLines.push(`${keyname} = ${value}`);
             } else {
@@ -171,6 +168,11 @@ async function setConfigValue(configPath, key, value) {
             configLines.push(line);
         }
     }
+    await fs.promises.writeFile(configPath, configLines.join("\n"), 'utf-8');
 }
 
-module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue }
+module.exports = {
+    isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate,
+    downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue,
+    encryptString, decryptString
+}
