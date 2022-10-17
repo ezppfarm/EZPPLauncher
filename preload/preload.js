@@ -120,12 +120,14 @@ window.addEventListener('DOMContentLoaded', () => {
     function changePage(page) {
         switch (page) {
             case "login":
-                $("#launch-page").hide();
-                $("#login-page").fadeIn(350);
+                $("#launch-page").fadeOut(50, "swing", () => {
+                    $("#login-page").fadeIn(350);
+                });
                 break;
             case "launch":
-                $("#login-page").hide();
-                $("#launch-page").fadeIn(350);
+                $("#login-page").fadeOut(50, "swing", () => {
+                    $("#launch-page").fadeIn(350);
+                });
                 break;
         }
     }
