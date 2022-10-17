@@ -19,5 +19,14 @@ The Launcher is a "plug and play thing", download it, place it on the desktop an
 * [axios](https://www.npmjs.com/package/axios)
 * [jquery](https://www.npmjs.com/package/jquery)
 
+## Build from source
+
+- clone repo
+- cd into the repo
+- use `yarn install` to install all dependencies
+- (if node-gyp cant build the natives try clearing the cache at `%localappdata%\node-gyp\Cache\`)
+- run `yarn rebuild` to rebuild the natives to the current `NODE_MODULE_VERSION`
+- use the buildscript `pack-win` to build a executeable
+
 ## License
 [AGPL-3.0](https://choosealicense.com/licenses/agpl-3.0/)
