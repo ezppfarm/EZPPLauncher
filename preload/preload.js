@@ -3,6 +3,8 @@ const { Titlebar, Color } = require('custom-electron-titlebar');
 const appInfo = require('../appInfo');
 let titlebar;
 
+const currentPage = "loading-page";
+
 window.addEventListener('DOMContentLoaded', () => {
     titlebar = new Titlebar({
         backgroundColor: Color.fromHex("#303030"),
@@ -82,6 +84,14 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    ipcRenderer.on('account_update', (event, data) => {
+        switch (data.type) {
+            case "not-loggedin":
+                changePage("launch");
+                break;
+        }
+    })
+
     ipcRenderer.on('status_update', (event, status) => {
         currentState = status.type;
         switch (status.type) {
@@ -118,18 +128,9 @@ window.addEventListener('DOMContentLoaded', () => {
     })
 
     function changePage(page) {
-        switch (page) {
-            case "login":
-                $("#launch-page").fadeOut(50, "swing", () => {
-                    $("#login-page").fadeIn(350);
-                });
-                break;
-            case "launch":
-                $("#login-page").fadeOut(50, "swing", () => {
-                    $("#launch-page").fadeIn(350);
-                });
-                break;
-        }
+        $(`#${currentPage}`).fadeOut(50, "swing", () => {
+            $(`#${page}-page`).fadeIn(350);
+        });
     }
 
     // workaround for the dark theme

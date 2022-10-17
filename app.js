@@ -21,7 +21,8 @@ const run = () => {
 
         mainWindow = createWindow();
         mainWindow.on('show', async () => {
-            await doUpdateCheck(mainWindow);
+            await updateConfigVars(mainWindow);
+            await tryLogin(mainWindow);
         })
         app.on('activate', function () {
             if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
@@ -87,6 +88,25 @@ const run = () => {
             return validOsuDir;
         })
     })
+}
+
+async function updateConfigVars(window) {
+    const osuPath = JSON.stringify(config.get("osuPath", ""));
+    window.webContents.send('config_update', {
+        osuPath: osuPath
+    })
+}
+
+async function tryLogin(window) {
+    const username = config.get("username", "");
+    const password = config.get("password", "");
+    if ((username && username.length > 0) && (password && password.length > 0)) {
+
+    } else {
+        window.webContents.send('account_update', {
+            type: "not-loggedin"
+        })
+    }
 }
 
 async function doUpdateCheck(window) {
