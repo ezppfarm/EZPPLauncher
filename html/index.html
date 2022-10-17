@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" href="../assets/logo.png" />
     <link href="../assets/mdb.min.css" rel="stylesheet" />
+    <link href="../assets/launcher.css" rel="stylesheet" />
     <style>
         * {
             user-select: none;
@@ -19,35 +20,67 @@
     oncontextmenu="return false;">
     <main>
         <div class="noselect">
-            <div class="position-relative overflow-hidden p-3 p-md-5 m-md-3 text-center text-lg-end d-flex align-items-center justify-content-center"
+            <div class="position-relative overflow-hidden p-1 w-100 text-center text-lg-end d-flex align-items-center justify-content-center"
                 style="border-radius: 0.5em;">
-                <div class="position-relative overflow-hidden p-3 p-md-5 m-md-3">
-                    <div class="container py-2 h-100">
+                <div class="launcher-window position-relative overflow-hidden">
+                    <div class="container px-1 py-2 w-100 mw-100 h-100">
                         <div class="row d-flex justify-content-center align-items-center h-100">
-                            <div class="col col-xl-10">
-                                <div class="card" style="border-radius: 1rem;">
-                                    <div class="row g-0">
-                                        <div class="card-body p-4 p-lg-5 text-black">
-                                            <div class="d-flex align-items-center mb-2 pb-1 text-white">
-                                                <span class="h1 fw-bold mb-0">EZPPLauncher</span>
-                                            </div>
-                                            <h5 class="fw-lighter fs-5 mb-3 pb-3 text-white text-start"
-                                                style="letter-spacing: 1px;">
-                                                Launch osu! with connection to the EZPPFarm server
-                                            </h5>
-                                            <div class="pt-1 mb-4">
-                                                <button id="launch-btn" class="btn btn-primary btn-lg btn-block"
-                                                    type="button" style="background-color:#d6016f" disabled>Looking for
-                                                    updates...</button>
-                                            </div>
-                                            <button class="btn btn-dark btn-sm float-start" id="account-btn" disabled>
-                                                set account
-                                            </button>
-                                            <button class="btn btn-dark btn-sm float-end" id="folder-btn">
-                                                set osu! directory
-                                            </button>
+                            <div id="launch-page" class="sections col col-xl-10">
+                                <div class="account-section">
+                                    <div class="user-image">
+                                        <img id="user-img" src="https://a.ez-pp.farm/0">
+                                    </div>
+                                    <div class="user-info">
+                                        <div class="welcome-text" id="welcome-text">
+                                            Nice to see you!
+                                        </div>
+                                        <div class="account-action" id="account-action">
+                                            Click to login
                                         </div>
                                     </div>
+                                </div>
+                                <div class="launch-section">
+                                    <div class="server-logo">
+                                        <img src="../assets/logo.png" height="120">
+                                    </div>
+                                    <div class="launch-button">
+                                        <button class="btn btn-lg btn-launch btn-accent">Launch</button>
+                                    </div>
+                                </div>
+                                <div class="folder-section">
+                                    <div class="folder-location">
+                                        Current osu! directory: C:\Users\Thomas\AppData\Local\osu!
+                                    </div>
+                                    <div class="folder-action">
+                                        Not right?
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="login-page" class="sections col col-xl-10" style="display: none;">
+                                <div class="launch-section flex-row">
+                                    <div class="server-logo">
+                                        <img src="../assets/logo.png" height="120">
+                                    </div>
+                                    <div class="app-name">EZPPLauncher</div>
+                                </div>
+                                <div class="login-section">
+                                    <div class="form-outline mb-3 w-50">
+                                        <input type="text" id="username" class="form-control form-control-lg" />
+                                        <label class="form-label" for="username">Username</label>
+                                    </div>
+                                    <div class="form-outline mb-3 w-50">
+                                        <input type="password" id="password" class="form-control form-control-lg" />
+                                        <label class="form-label" for="password">Password</label>
+                                    </div>
+                                    <div class="pt-1 mb-4">
+                                        <div class="btn-grouped">
+                                            <button id="action-cancel" class="btn btn-grey btn-lg"
+                                                type="button">Cancel</button>
+                                            <button id="login" class="btn btn-accent btn-lg"
+                                                type="button">Login</button>
+                                        </div>
+                                    </div>
+                                    <p class="text-muted clickable" id="register">Don't have an account?</p>
                                 </div>
                             </div>
                         </div>

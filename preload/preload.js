@@ -14,10 +14,24 @@ window.addEventListener('DOMContentLoaded', () => {
     titlebar.updateTitle(`${appInfo.appName} ${appInfo.appVersion}`);
 
     const $ = require('jquery');
+    const axios = require('axios').default;
     const Swal = require('sweetalert2');
 
-    let currentState;
+    const loggedIn = false;
 
+    $('#account-action').on('click', () => {
+        if (!loggedIn) {
+            changePage('login');
+        }
+    });
+
+    $('#action-cancel').on('click', () => {
+        if (!loggedIn) {
+            changePage('launch');
+        }
+    });
+
+    let currentState;
     $("#launch-btn").on('click', async () => {
         switch (currentState) {
             case "up-to-date":
@@ -102,6 +116,19 @@ window.addEventListener('DOMContentLoaded', () => {
                 break;
         }
     })
+
+    function changePage(page) {
+        switch (page) {
+            case "login":
+                $("#launch-page").hide();
+                $("#login-page").fadeIn(350);
+                break;
+            case "launch":
+                $("#login-page").hide();
+                $("#launch-page").fadeIn(350);
+                break;
+        }
+    }
 
     // workaround for the dark theme
     $('head').append($('<link href="../assets/sweetalert2.dark.css" rel="stylesheet" />'));

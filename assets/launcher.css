@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+:root {
+    --main-accent: 335deg;
+}
+
+* {
+    font-family: 'Exo 2', 'Roboto' !important;
+}
+
+.sections {
+    display: flex;
+    flex-flow: column;
+}
+
+.app-name {
+    font-size: 40px;
+    font-weight: 500;
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.37);
+}
+
+.launcher-window {
+    width: 100%;
+}
+
+.login-section {
+    margin-top: 35px;
+    display: flex;
+    flex-flow: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.folder-section {
+    margin-top: 80px;
+    display: flex;
+    flex-flow: column;
+    justify-content: center;
+    align-items: center;
+    color: #aaa;
+    font-weight: 500;
+}
+
+.folder-action {
+    font-style: italic;
+    cursor: pointer;
+    width: fit-content;
+    line-height: .9;
+}
+
+.launch-section {
+    width: 100%;
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn.btn-launch {
+    margin-top: 10px;
+    width: 300px;
+    font-size: 23px;
+    text-transform: none;
+}
+
+.account-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.user-info {
+    text-align: start;
+    display: flex;
+    flex-flow: column;
+    justify-content: center;
+    align-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-info .welcome-text {
+    font-size: 31px;
+    letter-spacing: .02rem;
+    height: 30px;
+    line-height: .8;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.349);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-info .account-action {
+    font-size: 21px;
+    letter-spacing: .05rem;
+    font-weight: 500;
+    font-style: italic;
+    color: #aaa;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.349);
+    cursor: pointer;
+    line-height: 1.2;
+    width: fit-content;
+}
+
+#user-img {
+    border-radius: .2rem;
+    width: 80px;
+    border: 3px solid white;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.349);
+}
+
+.form-outline .form-control:focus~.form-notch .form-notch-leading {
+    border-color: hsl(var(--main-accent), 93%, 48%);
+    box-shadow: -1px 0 0 0 hsl(var(--main-accent), 93%, 48%), 0 1px 0 0 hsl(var(--main-accent), 93%, 48%), 0 -1px 0 0 hsl(var(--main-accent), 93%, 48%);
+}
+
+.form-outline .form-control:focus~.form-notch .form-notch-middle {
+    border-color: hsl(var(--main-accent), 93%, 48%);
+    box-shadow: 0 1px 0 0 hsl(var(--main-accent), 93%, 48%);
+    border-top: 1px solid transparent;
+}
+
+.form-outline .form-control:focus~.form-notch .form-notch-trailing {
+    border-color: hsl(var(--main-accent), 93%, 48%);
+    box-shadow: 1px 0 0 0 hsl(var(--main-accent), 93%, 48%), 0 -1px 0 0 hsl(var(--main-accent), 93%, 48%), 0 1px 0 0 hsl(var(--main-accent), 93%, 48%);
+}
+
+.form-outline .form-control:focus~.form-label {
+    color: hsl(var(--main-accent), 93%, 48%);
+}
+
+.btn-accent,
+.btn-accent:active {
+    background: hsl(var(--main-accent), 93%, 48%);
+    color: #fff;
+}
+
+.btn-accent:hover {
+    background: hsl(var(--main-accent), 93%, 42%);
+    color: #fff;
+}
+
+.btn-grey,
+.btn-grey:active {
+    background: #727272;
+    color: #fff;
+}
+
+.btn-grey:hover {
+    background: #626262;
+    color: #fff;
+}
+
+.btn-grouped {
+    display: flex;
+    gap: 50px;
+}
+
+.clickable {
+    cursor: pointer;
+}
