@@ -32,6 +32,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "rebuild": "electron-rebuild -f -w wincrypt",
     "pack-win": "electron-builder --x64",
     "pack-win32": "electron-builder --ia32",
     "pack-winarm": "electron-builder --arm64",
@@ -40,15 +41,17 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^21.1.1",
+    "electron": "^20.3.2",
     "electron-builder": "^23.0.3",
-    "electron-packager": "^15.5.1"
+    "electron-packager": "^15.5.1",
+    "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
     "axios": "^0.27.2",
     "custom-electron-titlebar": "^4.1.1",
     "jquery": "^3.6.0",
     "node-downloader-helper": "^2.1.4",
-    "sweetalert2": "^11.5.2"
+    "sweetalert2": "^11.5.2",
+    "wincrypt": "^1.5.0"
   }
 }
