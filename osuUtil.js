@@ -3,11 +3,13 @@ const fu = require('./fileUtil');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios').default;
+const dpapi = require('wincrypt');
 const executeUtil = require('./executeUtil');
 const { EventEmitter } = require('events');
 const { DownloaderHelper } = require('node-downloader-helper');
 
 const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
+const osuEncryptBuffer = Buffer.from('cu24180ncjeiu0ci1nwui', "utf-8")
 const osuEntities = [
     'avcodec-51.dll',
     'avformat-52.dll',
@@ -147,4 +149,28 @@ async function startWithDevServer(osuPath, serverDomain, onExit) {
     return true;
 }
 
-module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles, startOsuWithDevServer: startWithDevServer }
+function encryptString(value) {
+    return dpapi.protect(Buffer.from(value, 'utf-8'), osuEncryptBuffer, 'CurrentUser');
+}
+
+async function setConfigValue(configPath, key, value) {
+    const configLines = new Array();
+    const fileStream = await fs.promises.readFile(configPath, "utf-8");
+    const lines = fileStream.split(/\r?\n/)
+    for (const line of lines) {
+        if (line.includes(' = ')) {
+            const argsPair = line.split('=', 2);
+            const keyname = argsPair[0]
+            const value = argsPair[1];
+            if (key == keyname) {
+                configLines.push(`${keyname} = ${value}`);
+            } else {
+                configLines.push(line);
+            }
+        } else {
+            configLines.push(line);
+        }
+    }
+}
+
+module.exports = { isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate, downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue }
