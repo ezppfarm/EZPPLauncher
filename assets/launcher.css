@@ -102,11 +102,17 @@
     width: fit-content;
 }
 
+.user-image {
+    border: 5px solid white;
+    border-radius: 0.4rem;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.349);
+}
+
 #user-img {
     border-radius: .2rem;
     width: 80px;
-    border: 3px solid white;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.349);
+    /* somehow its misplaced without that */
+    transform: translate(-0.25px, 0.25px) scale(1.05);
 }
 
 .form-outline .form-control:focus~.form-notch .form-notch-leading {
