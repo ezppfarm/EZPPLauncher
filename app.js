@@ -5,8 +5,11 @@ const osuUtil = require('./osuUtil');
 const ezppUtil = require('./ezppUtil');
 const config = require('./config');
 const fs = require('fs');
+const rpc = require('./discordPresence');
+const windowName = require('get-window-by-name');
 
 let tempOsuPath;
+let osuWindowInfo;
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -15,7 +18,42 @@ const run = () => {
         return;
     }
 
+    setInterval(() => {
+        osuWindowInfo = windowName.getWindowText("osu!.exe");
+        const firstInstance = osuWindowInfo[0];
+        if (firstInstance) {
+            if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
+                const windowTitle = firstInstance.processTitle;
+                let rpcOsuVersion = "";
+                let currentMap = undefined;
+                if (!windowTitle.includes("-")) {
+                    rpcOsuVersion = windowTitle;
+                    rpc.updateState("Idle...");
+                } else {
+                    var string = windowTitle;
+                    var components = string.split(' - ');
+                    const splitArray = [components.shift(), components.join(' - ')];
+                    rpcOsuVersion = splitArray[0];
+                    currentMap = splitArray[1];
+                    rpc.updateState("Playing...");
+                }
+
+                rpc.updateStatus(currentMap, rpcOsuVersion);
+            } else {
+                rpc.updateState("Idle in Launcher...");
+                rpc.updateStatus(undefined, undefined);
+            }
+        } else {
+            rpc.updateState("Idle in Launcher...");
+            rpc.updateStatus(undefined, undefined);
+        }
+        console.log(osuWindowInfo);
+    }, 2000);
+
     setupTitlebar();
+
+    rpc.connect();
+
 
     let mainWindow;
     app.whenReady().then(() => {
@@ -46,6 +84,7 @@ const run = () => {
                 await osuUtil.setConfigValue(osuConfig.path, "Username", "");
                 await osuUtil.setConfigValue(osuConfig.path, "Password", "");
             }
+            rpc.updateState("Launching osu!...");
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 await doUpdateCheck(mainWindow);
             });
