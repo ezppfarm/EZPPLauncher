@@ -47,7 +47,6 @@ const run = () => {
             rpc.updateState("Idle in Launcher...");
             rpc.updateStatus(undefined, undefined);
         }
-        console.log(osuWindowInfo);
     }, 2000);
 
     setupTitlebar();
