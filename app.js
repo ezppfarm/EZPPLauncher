@@ -82,6 +82,12 @@ const run = () => {
                         type: "update-complete"
                     })
                 });
+                downloadTask.on('error', () => {
+                    mainWindow.webContents.send('status_update', {
+                        type: "error",
+                        message: "An error occured while updating."
+                    });
+                });
 
             } else
                 mainWindow.webContents.send('status_update', {

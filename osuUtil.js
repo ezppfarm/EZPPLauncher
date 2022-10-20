@@ -98,14 +98,14 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
                     fileName,
                     fileURL
                 })
-                // console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
+                //console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
             }
         } else {
             filesToDownload.push({
                 fileName,
                 fileURL
             });
-            // console.log("new file " + fileName);
+            //console.log("new file " + fileName);
         }
     }
     return filesToDownload;
@@ -116,6 +116,7 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
     let completedIndex = 0;
     filesToUpdate.forEach(async (fileToUpdate) => {
         const filePath = path.join(osuPath, fileToUpdate.fileName);
+        console.log(filePath);
         if (await fu.existsAsync(filePath))
             await fs.promises.rm(filePath);
 
@@ -127,6 +128,10 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
             completedIndex = completedIndex + 1;
             if (completedIndex >= filesToUpdate.length)
                 eventEmitter.emit('completed');
+        });
+        fileDownload.on('error', (err) => {
+            console.log(err);
+            eventEmitter.emit('error');
         });
 
         fileDownload.start().catch(err => console.error(err));
