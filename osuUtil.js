@@ -3,13 +3,11 @@ const fu = require('./fileUtil');
 const path = require('path');
 const crypto = require('crypto');
 const axios = require('axios').default;
-const dpapi = require('wincrypt');
 const executeUtil = require('./executeUtil');
 const { EventEmitter } = require('events');
 const { DownloaderHelper } = require('node-downloader-helper');
 
 const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
-const osuEncryptBuffer = Buffer.from('cu24180ncjeiu0ci1nwui', "utf-8")
 const osuEntities = [
     'avcodec-51.dll',
     'avformat-52.dll',
@@ -143,17 +141,15 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
 async function startWithDevServer(osuPath, serverDomain, onExit) {
     const osuExe = path.join(osuPath, "osu!.exe");
     if (!await fu.existsAsync(osuExe)) return false;
-    executeUtil.runFile(osuPath, osuExe, ["-devserver", serverDomain], onExit);
-    return true;
-}
-
-async function encryptString(value) {
-    return Buffer.from(await dpapi.protect(Buffer.from(value, 'utf-8'), osuEncryptBuffer, 'CurrentUser'), 'utf-8').toString('base64');
-}
-
-async function decryptString(value) {
-    const decrypted = await dpapi.unprotect(Buffer.from(value, 'base64'), osuEncryptBuffer, 'CurrentUser');
-    return decrypted.toString();
+    switch (process.platform) {
+        case "linux":
+            executeUtil.runFile(osuPath, 'osu-stable', ["-devserver", serverDomain], onExit);
+            return true;
+        case "win32":
+            executeUtil.runFile(osuPath, osuExe, ["-devserver", serverDomain], onExit);
+            return true;
+    }
+    return false;
 }
 
 async function setConfigValue(configPath, key, value) {
@@ -178,6 +174,5 @@ async function setConfigValue(configPath, key, value) {
 
 module.exports = {
     isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate,
-    downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue,
-    encryptString, decryptString
+    downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue
 }

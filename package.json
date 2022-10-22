@@ -55,7 +55,6 @@
     "get-window-by-name": "^2.0.0",
     "jquery": "^3.6.0",
     "node-downloader-helper": "^2.1.4",
-    "sweetalert2": "^11.5.2",
-    "wincrypt": "^1.5.0"
+    "sweetalert2": "^11.5.2"
   }
 }

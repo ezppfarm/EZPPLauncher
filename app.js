@@ -10,6 +10,8 @@ const windowName = require('get-window-by-name');
 
 let tempOsuPath;
 let osuWindowInfo;
+let isIngame;
+const platform = process.platform;
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -18,34 +20,44 @@ const run = () => {
         return;
     }
 
-    setInterval(() => {
-        osuWindowInfo = windowName.getWindowText("osu!.exe");
-        const firstInstance = osuWindowInfo[0];
-        if (firstInstance) {
-            if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
-                const windowTitle = firstInstance.processTitle;
-                let rpcOsuVersion = "";
-                let currentMap = undefined;
-                if (!windowTitle.includes("-")) {
-                    rpcOsuVersion = windowTitle;
-                    rpc.updateState("Idle...");
-                } else {
-                    var string = windowTitle;
-                    var components = string.split(' - ');
-                    const splitArray = [components.shift(), components.join(' - ')];
-                    rpcOsuVersion = splitArray[0];
-                    currentMap = splitArray[1];
-                    rpc.updateState("Playing...");
-                }
+    setInterval(async () => {
+        if (platform == "win32") {
+            osuWindowInfo = windowName.getWindowText("osu!.exe");
+            const firstInstance = osuWindowInfo[0];
+            if (firstInstance) {
+                if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
+                    const windowTitle = firstInstance.processTitle;
+                    let rpcOsuVersion = "";
+                    let currentMap = undefined;
+                    if (!windowTitle.includes("-")) {
+                        rpcOsuVersion = windowTitle;
+                        rpc.updateState("Idle...");
+                    } else {
+                        var string = windowTitle;
+                        var components = string.split(' - ');
+                        const splitArray = [components.shift(), components.join(' - ')];
+                        rpcOsuVersion = splitArray[0];
+                        currentMap = splitArray[1];
+                        rpc.updateState("Playing...");
+                    }
 
-                rpc.updateStatus(currentMap, rpcOsuVersion);
+                    rpc.updateStatus(currentMap, rpcOsuVersion);
+                } else {
+                    rpc.updateState("Idle in Launcher...");
+                    rpc.updateStatus(undefined, undefined);
+                }
             } else {
                 rpc.updateState("Idle in Launcher...");
                 rpc.updateStatus(undefined, undefined);
             }
         } else {
-            rpc.updateState("Idle in Launcher...");
-            rpc.updateStatus(undefined, undefined);
+            if(isIngame){
+                rpc.updateState("Playing...");
+                rpc.updateStatus("Clicking circles!", "runningunderwine");
+            }else{
+                rpc.updateState("Idle in Launcher...");
+                rpc.updateStatus(undefined, undefined);
+            }
         }
     }, 2000);
 
@@ -77,14 +89,16 @@ const run = () => {
                 await osuUtil.setConfigValue(osuConfig.path, "SaveUsername", "1");
                 await osuUtil.setConfigValue(osuConfig.path, "SavePassword", "1");
                 await osuUtil.setConfigValue(osuConfig.path, "Username", username);
-                await osuUtil.setConfigValue(osuConfig.path, "Password", await osuUtil.decryptString(password));
+                await osuUtil.setConfigValue(osuConfig.path, "Password", password);
                 await osuUtil.setConfigValue(osuConfig.path, "CredentialEndpoint", "ez-pp.farm");
             } else {
                 await osuUtil.setConfigValue(osuConfig.path, "Username", "");
                 await osuUtil.setConfigValue(osuConfig.path, "Password", "");
             }
             rpc.updateState("Launching osu!...");
+            isIngame = true;
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
+                isIngame = false;
                 await doUpdateCheck(mainWindow);
             });
             return result;
@@ -151,7 +165,7 @@ const run = () => {
             const loginData = await ezppUtil.performLogin(username, password);
             if (loginData && loginData.code === 200) {
                 await config.set("username", username);
-                await config.set("password", await osuUtil.encryptString(password));
+                await config.set("password", password);
             }
             return loginData;
         })
@@ -173,7 +187,7 @@ async function tryLogin(window) {
     const username = await config.get("username", "");
     const password = await config.get("password", "");
     if ((username && username.length > 0) && (password && password.length > 0)) {
-        const passwordPlain = await osuUtil.decryptString(password);
+        const passwordPlain = password;
         const loginResponse = await ezppUtil.performLogin(username, passwordPlain);
         if (loginResponse && loginResponse.code === 200) {
             window.webContents.send('account_update', {
