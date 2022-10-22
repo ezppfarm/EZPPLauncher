@@ -25,7 +25,7 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
             $('#welcome-text').text(`Nice to see you!`);
             $('#account-action').text('Click to login');
-            $('#user-img').prop('src', `https://a.ez-pp.farm/0`)
+            $('.user-image').css('background-image', `url(https://a.ez-pp.farm/0)`)
             loggedIn = false;
             ipcRenderer.send("perform-logout");
             Swal.fire({
@@ -95,7 +95,7 @@ window.addEventListener('DOMContentLoaded', () => {
         $('#login-password').val("");
         $('#welcome-text').text(`Welcome back, ${responseData.user.name}!`);
         $('#account-action').text('Not you?');
-        $('#user-img').prop('src', `https://a.ez-pp.farm/${responseData.user.id}`);
+        $('.user-image').css('background-image', `url(https://a.ez-pp.farm/${responseData.user.id})`);
         loggedIn = true;
         changePage('launch');
     })
@@ -138,7 +138,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 changePage("launch");
                 $('#welcome-text').text(`Welcome back, ${data.user.name}!`);
                 $('#account-action').text('Not you?');
-                $('#user-img').prop('src', `https://a.ez-pp.farm/${data.user.id}`)
+                $('.user-image').css('background-image', `url(https://a.ez-pp.farm/${data.user.id})`);
                 loggedIn = true;
                 break;
         }

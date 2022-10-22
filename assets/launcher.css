@@ -122,13 +122,11 @@
     border: 5px solid white;
     border-radius: 0.4rem;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.349);
-}
-
-#user-img {
-    border-radius: .2rem;
-    width: 80px;
-    /* somehow its misplaced without that */
-    transform: translate(-0.25px, 0.25px) scale(1.05);
+    background-image: url(https://a.ez-pp.farm/0);
+    width: 100px;
+    height: 100px;
+    background-size: cover;
+    background-position: center;
 }
 
 .form-outline .form-control:focus~.form-notch .form-notch-leading {
