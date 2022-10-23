@@ -346,12 +346,17 @@
     border: 0;
     border-radius: 0.25em;
     background: initial;
-    background-color: #7066e0;
+    background: hsl(var(--main-accent), 93%, 48%);
     color: #fff;
+    transition: all .35s ease;
     font-size: 1em;
   }
+  .swal2-styled.swal2-confirm:hover {
+    background: hsl(var(--main-accent), 93%, 42%);
+    color: #fff;
+  }
   .swal2-styled.swal2-confirm:focus {
-    box-shadow: 0 0 0 3px rgba(112, 102, 224, 0.5);
+    box-shadow: 0 0 0 0px rgba(112, 102, 224, 0.0);
   }
   .swal2-styled.swal2-deny {
     border: 0;

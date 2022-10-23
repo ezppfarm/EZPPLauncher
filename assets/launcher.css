@@ -157,7 +157,7 @@
 
 .btn-accent:hover {
     background: hsl(var(--main-accent), 93%, 42%);
-    color: #fff;
+    color: #fff ;
 }
 
 .btn-grey,

@@ -75,7 +75,6 @@ const run = () => {
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
             if (platform === "linux") {
-                console.log("yes");
                 mainWindow.webContents.send('status_update', {
                     type: "info",
                     message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch and the osu AUR package!"
