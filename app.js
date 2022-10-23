@@ -51,10 +51,10 @@ const run = () => {
                 rpc.updateStatus(undefined, undefined);
             }
         } else {
-            if(isIngame){
+            if (isIngame) {
                 rpc.updateState("Playing...");
                 rpc.updateStatus("Clicking circles!", "runningunderwine");
-            }else{
+            } else {
                 rpc.updateState("Idle in Launcher...");
                 rpc.updateStatus(undefined, undefined);
             }
@@ -74,6 +74,13 @@ const run = () => {
             await updateConfigVars(mainWindow);
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
+            if (platform === "linux") {
+                console.log("yes");
+                mainWindow.webContents.send('status_update', {
+                    type: "info",
+                    message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch and the osu AUR package!"
+                });
+            }
         })
         app.on('activate', function () {
             if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();

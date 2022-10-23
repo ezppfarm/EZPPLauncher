@@ -168,6 +168,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
                 ipcRenderer.send("do-update-check");
                 break;
+            case "info":
+                Swal.fire({
+                    title: 'Info!',
+                    text: status.message,
+                    icon: 'info',
+                    confirmButtonText: 'Okay'
+                });
+                break;
             case "update-complete":
                 Swal.fire({
                     title: 'Yaaay!',
