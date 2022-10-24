@@ -145,19 +145,21 @@ window.addEventListener('DOMContentLoaded', () => {
     })
 
     ipcRenderer.on('status_update', (event, status) => {
-        currentState = status.type;
         switch (status.type) {
             case "up-to-date":
                 $("#launch-btn").attr('disabled', false);
                 $('#launch-btn').html('Launch');
+                currentState = status.type;
                 break;
             case "update-available":
                 $("#launch-btn").attr('disabled', false);
                 $('#launch-btn').html('Update');
+                currentState = status.type;
                 break;
             case "missing-folder":
                 $("#launch-btn").attr('disabled', true);
                 $('#launch-btn').html('set your osu! folder');
+                currentState = status.type;
                 break;
             case "error":
                 Swal.fire({
