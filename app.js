@@ -7,11 +7,13 @@ const config = require('./config');
 const fs = require('fs');
 const rpc = require('./discordPresence');
 const windowName = require('get-window-by-name');
+const terminalUtil = require('./terminalUtil');
 
 let tempOsuPath;
 let osuWindowInfo;
 let isIngame;
 const platform = process.platform;
+let linuxWMCtrlFound = false;
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -50,6 +52,41 @@ const run = () => {
                 rpc.updateState("Idle in Launcher...");
                 rpc.updateStatus(undefined, undefined);
             }
+        } else if (platform == "linux") {
+            if (!linuxWMCtrlFound) {
+                if (isIngame) {
+                    rpc.updateState("Playing...");
+                    rpc.updateStatus("Clicking circles!", "runningunderwine");
+                } else {
+                    rpc.updateState("Idle in Launcher...");
+                    rpc.updateStatus(undefined, undefined);
+                }
+                return;
+            }
+            const processesOutput = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
+            const allLines = processesOutput.split("\n");
+            const filteredProcesses = allLines.filter((line) => line.trim().startsWith("osu!"));
+            if (filteredProcesses.length > 0) {
+                const windowTitle = filteredProcesses[0].trim();
+                let rpcOsuVersion = "";
+                let currentMap = undefined;
+                if (!windowTitle.includes("-")) {
+                    rpcOsuVersion = windowTitle;
+                    rpc.updateState("Idle...");
+                } else {
+                    var string = windowTitle;
+                    var components = string.split(' - ');
+                    const splitArray = [components.shift(), components.join(' - ')];
+                    rpcOsuVersion = splitArray[0];
+                    currentMap = splitArray[1];
+                    rpc.updateState("Playing...");
+                }
+
+                rpc.updateStatus(currentMap, rpcOsuVersion);
+            } else {
+                rpc.updateState("Idle in Launcher...");
+                rpc.updateStatus(undefined, undefined);
+            }
         } else {
             if (isIngame) {
                 rpc.updateState("Playing...");
@@ -75,10 +112,18 @@ const run = () => {
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
             if (platform === "linux") {
-                mainWindow.webContents.send('status_update', {
+                /* mainWindow.webContents.send('status_update', {
                     type: "info",
                     message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch and the osu AUR package!"
-                });
+                }); */
+                const terminalTest = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
+                const isFailed = terminalTest.trim() == "";
+                if (isFailed) {
+                    mainWindow.webContents.send('status_update', {
+                        type: "info",
+                        message: "Seems like you are missing the wmctrl package, please install it for the RPC to work!"
+                    });
+                } else linuxWMCtrlFound = true;
             }
         })
         app.on('activate', function () {
