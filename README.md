@@ -1,8 +1,10 @@
 # EZPPLauncher
-
 Welcome to the EZPPLauncher! A new way to connect to the EZPPFarm server.
 
 Just one click and you are ready to go!
+
+## Preview Image
+![preview](https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/raw/branch/master/preview/EZPPLauncher.png)
 
 ## Installation
 The Launcher is a "plug and play thing", download it, place it on the desktop and execute!
