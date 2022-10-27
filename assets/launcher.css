@@ -23,6 +23,15 @@
     width: 100%;
 }
 
+.launch-button-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.launch-button-section button {
+    margin-bottom: 10px;
+}
+
 .loading-section,
 .login-section {
     margin-top: 35px;
@@ -48,7 +57,7 @@
 }
 
 .folder-section {
-    margin-top: 45px;
+    margin-top: 13px;
     display: flex;
     flex-flow: column;
     justify-content: center;

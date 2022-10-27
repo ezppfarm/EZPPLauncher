@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="../assets/logo.png" />
     <link href="../assets/mdb.min.css" rel="stylesheet" />
     <link href="../assets/launcher.css" rel="stylesheet" />
+    <link href="../assets/checkbox.css" rel="stylesheet" />
     <style>
         * {
             user-select: none;
@@ -25,7 +26,7 @@
                 <div class="launcher-window position-relative overflow-hidden">
                     <div class="container px-1 py-2 w-100 mw-100 h-100">
                         <div class="row d-flex justify-content-center align-items-center h-100">
-                            <div id="loading-page" class="sections col col-xl-10">
+                            <div id="loading-page" class="sections col col-xl-10" style="display: none">
                                 <div class="launch-section flex-row">
                                     <div class="server-logo">
                                         <img src="../assets/logo.png" height="120">
@@ -44,7 +45,7 @@
                                     <div class="loading-indicator-text">Loading... Please wait</div>
                                 </div>
                             </div>
-                            <div id="launch-page" class="sections col col-xl-10" style="display: none;">
+                            <div id="launch-page" class="sections col col-xl-10" style="//display: none;">
                                 <div class="account-section">
                                     <div class="user-image">
                                     </div>
@@ -61,8 +62,12 @@
                                     <div class="server-logo">
                                         <img src="../assets/logo.png" height="150">
                                     </div>
-                                    <div class="launch-button">
+                                    <div class="launch-button-section">
                                         <button class="btn btn-lg btn-launch btn-accent" id="launch-btn">Launch</button>
+                                        <div class="patch-checkbox">
+                                            <input type="checkbox" id="enablePatching" checked/>
+                                            <label for="enablePatching" style="display: initial;">enable Patching</label>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="folder-section">
@@ -87,7 +92,8 @@
                                         <label class="form-label" for="login-username">Username</label>
                                     </div>
                                     <div class="form-outline mb-3 w-50">
-                                        <input type="password" id="login-password" class="form-control form-control-lg" />
+                                        <input type="password" id="login-password"
+                                            class="form-control form-control-lg" />
                                         <label class="form-label" for="login-password">Password</label>
                                     </div>
                                     <div class="pt-1 mb-4">
