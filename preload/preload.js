@@ -178,6 +178,16 @@ window.addEventListener('DOMContentLoaded', () => {
                     confirmButtonText: 'Okay'
                 });
                 break;
+            case "package-issue":
+                Swal.fire({
+                    title: 'Uh oh!',
+                    text: status.message,
+                    icon: 'error',
+                    confirmButtonText: 'Okay'
+                });
+                $("#launch-btn").attr('disabled', true);
+                $('#launch-btn').html('missing packages');
+                break;
             case "update-complete":
                 Swal.fire({
                     title: 'Yaaay!',
