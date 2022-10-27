@@ -85,6 +85,11 @@
     gap: 20px;
 }
 
+.server-logo img {
+    user-select: none;
+    pointer-events: none;
+}
+
 .user-info {
     text-align: start;
     display: flex;
