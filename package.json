@@ -32,6 +32,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "rebuild": "electron-rebuild -f -w get-window-by-name",
     "pack-win": "electron-builder --x64",
     "pack-win32": "electron-builder --ia32",
     "pack-winarm": "electron-builder --arm64",
