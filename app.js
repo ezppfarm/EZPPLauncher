@@ -14,6 +14,7 @@ let osuWindowInfo;
 let isIngame;
 const platform = process.platform;
 let linuxWMCtrlFound = false;
+let osuLoaded = false;
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -28,6 +29,10 @@ const run = () => {
             const firstInstance = osuWindowInfo[0];
             if (firstInstance) {
                 if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
+                    if (!osuLoaded) {
+                        osuLoaded = true;
+                        //TODO: do patch
+                    }
                     const windowTitle = firstInstance.processTitle;
                     let rpcOsuVersion = "";
                     let currentMap = undefined;
@@ -40,7 +45,7 @@ const run = () => {
                         const splitArray = [components.shift(), components.join(' - ')];
                         rpcOsuVersion = splitArray[0];
                         currentMap = splitArray[1];
-                        if(currentMap.endsWith(".osu")){
+                        if (currentMap.endsWith(".osu")) {
                             rpc.updateState("Editing...");
                             currentMap = currentMap.substring(0, currentMap.length - 4);
                         } else rpc.updateState("Playing...");
@@ -48,10 +53,12 @@ const run = () => {
 
                     rpc.updateStatus(currentMap, rpcOsuVersion);
                 } else {
+                    if (osuLoaded) osuLoaded = false;
                     rpc.updateState("Idle in Launcher...");
                     rpc.updateStatus(undefined, undefined);
                 }
             } else {
+                if (osuLoaded) osuLoaded = false;
                 rpc.updateState("Idle in Launcher...");
                 rpc.updateStatus(undefined, undefined);
             }
@@ -82,10 +89,10 @@ const run = () => {
                     const splitArray = [components.shift(), components.join(' - ')];
                     rpcOsuVersion = splitArray[0];
                     currentMap = splitArray[1];
-                    if(currentMap.endsWith(".osu")){
+                    if (currentMap.endsWith(".osu")) {
                         rpc.updateState("Editing...");
                         currentMap = currentMap.substring(0, currentMap.length - 4);
-                    } 
+                    }
                     else rpc.updateState("Playing...");
                 }
 
@@ -119,9 +126,9 @@ const run = () => {
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
             if (platform === "linux") {
-                try{
-                await terminalUtil.execCommand(`osu-stable -h`);
-                }catch(err){
+                try {
+                    await terminalUtil.execCommand(`osu-stable -h`);
+                } catch (err) {
                     mainWindow.webContents.send('status_update', {
                         type: "package-issue",
                         message: "Seems like you dont have the osu AUR Package installed, please install it."
