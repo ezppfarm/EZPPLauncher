@@ -318,7 +318,7 @@ async function doUpdateCheck(window) {
 
 function createWindow() {
     // Create the browser window.
-    const win = windowManager.createWindow(700, 420);
+    const win = windowManager.createWindow(700, 460);
 
     win.loadFile('./html/index.html');
 
