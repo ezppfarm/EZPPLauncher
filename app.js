@@ -147,6 +147,12 @@ const run = () => {
                         message: "Seems like you are missing the wmctrl package, please install it for the RPC to work!"
                     });
                 } else linuxWMCtrlFound = true;
+            } else {
+                const osuFolder = await config.get("osuPath");
+                if (!osuFolder || osuFolder == "") {
+                    const foundFolder = await osuUtil.findOsuInstallation();
+                    console.log("osu! Installation located at: ",foundFolder);
+                }
             }
         })
         app.on('activate', function () {
@@ -171,8 +177,10 @@ const run = () => {
             }
             rpc.updateState("Launching osu!...");
             isIngame = true;
+            mainWindow.hide();
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 isIngame = false;
+                mainWindow.show();
                 await doUpdateCheck(mainWindow);
             });
             return result;
