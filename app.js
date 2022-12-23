@@ -8,6 +8,7 @@ const fs = require('fs');
 const rpc = require('./discordPresence');
 const windowName = require('get-window-by-name');
 const terminalUtil = require('./terminalUtil');
+const osUtil = require('./osUtil');
 
 let tempOsuPath;
 let osuWindowInfo;
@@ -40,7 +41,7 @@ const run = () => {
                         const splitArray = [components.shift(), components.join(' - ')];
                         rpcOsuVersion = splitArray[0];
                         currentMap = splitArray[1];
-                        if(currentMap.endsWith(".osu")){
+                        if (currentMap.endsWith(".osu")) {
                             rpc.updateState("Editing...");
                             currentMap = currentMap.substring(0, currentMap.length - 4);
                         } else rpc.updateState("Playing...");
@@ -82,10 +83,10 @@ const run = () => {
                     const splitArray = [components.shift(), components.join(' - ')];
                     rpcOsuVersion = splitArray[0];
                     currentMap = splitArray[1];
-                    if(currentMap.endsWith(".osu")){
+                    if (currentMap.endsWith(".osu")) {
                         rpc.updateState("Editing...");
                         currentMap = currentMap.substring(0, currentMap.length - 4);
-                    } 
+                    }
                     else rpc.updateState("Playing...");
                 }
 
@@ -119,9 +120,18 @@ const run = () => {
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
             if (platform === "linux") {
-                try{
-                await terminalUtil.execCommand(`osu-stable -h`);
-                }catch(err){
+                const linuxDistroInfo = await osUtil.getLinuxDistroInfo();
+                if (linuxDistroInfo?.id != "arch") {
+                    if (linuxDistroInfo?.id_like != "arch") {
+                        mainWindow.webContents.send('status_update', {
+                            type: "info",
+                            message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch like distributions!"
+                        });
+                    }
+                }
+                try {
+                    await terminalUtil.execCommand(`osu-stable -h`);
+                } catch (err) {
                     mainWindow.webContents.send('status_update', {
                         type: "package-issue",
                         message: "Seems like you dont have the osu AUR Package installed, please install it."
