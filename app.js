@@ -15,6 +15,7 @@ let osuWindowInfo;
 let isIngame;
 const platform = process.platform;
 let linuxWMCtrlFound = false;
+let osuLoaded = false;
 
 const run = () => {
     const gotTheLock = app.requestSingleInstanceLock()
@@ -29,6 +30,10 @@ const run = () => {
             const firstInstance = osuWindowInfo[0];
             if (firstInstance) {
                 if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
+                    if (!osuLoaded) {
+                        osuLoaded = true;
+                        //TODO: do patch
+                    }
                     const windowTitle = firstInstance.processTitle;
                     let rpcOsuVersion = "";
                     let currentMap = undefined;
@@ -49,10 +54,12 @@ const run = () => {
 
                     rpc.updateStatus(currentMap, rpcOsuVersion);
                 } else {
+                    if (osuLoaded) osuLoaded = false;
                     rpc.updateState("Idle in Launcher...");
                     rpc.updateStatus(undefined, undefined);
                 }
             } else {
+                if (osuLoaded) osuLoaded = false;
                 rpc.updateState("Idle in Launcher...");
                 rpc.updateStatus(undefined, undefined);
             }
@@ -150,6 +157,12 @@ const run = () => {
                         message: "Seems like you are missing the wmctrl package, please install it for the RPC to work!"
                     });
                 } else linuxWMCtrlFound = true;
+            } else {
+                const osuFolder = await config.get("osuPath");
+                if (!osuFolder || osuFolder == "") {
+                    const foundFolder = await osuUtil.findOsuInstallation();
+                    console.log("osu! Installation located at: ",foundFolder);
+                }
             }
         })
         app.on('activate', function () {
@@ -174,8 +187,10 @@ const run = () => {
             }
             rpc.updateState("Launching osu!...");
             isIngame = true;
+            mainWindow.hide();
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 isIngame = false;
+                mainWindow.show();
                 await doUpdateCheck(mainWindow);
             });
             return result;
@@ -321,7 +336,7 @@ async function doUpdateCheck(window) {
 
 function createWindow() {
     // Create the browser window.
-    const win = windowManager.createWindow(700, 420);
+    const win = windowManager.createWindow(700, 460);
 
     win.loadFile('./html/index.html');
 

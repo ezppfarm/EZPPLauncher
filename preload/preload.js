@@ -16,7 +16,6 @@ window.addEventListener('DOMContentLoaded', () => {
     titlebar.updateTitle(`${appInfo.appName} ${appInfo.appVersion}`);
 
     const $ = require('jquery');
-    const axios = require('axios').default;
     const Swal = require('sweetalert2');
 
     $('#account-action').on('click', () => {
@@ -68,6 +67,28 @@ window.addEventListener('DOMContentLoaded', () => {
                 $("#launch-btn").attr('disabled', true);
                 $('#launch-btn').html('Updating...');
                 ipcRenderer.send("do-update");
+                break;
+            case "missing-folder":
+                const responseData = await ipcRenderer.invoke('set-osu-dir');
+                if (!responseData)
+                    return;
+                if (responseData.validOsuDir) {
+                    Swal.fire({
+                        title: 'Success!',
+                        text: 'osu! folder set.',
+                        icon: 'success',
+                        confirmButtonText: 'Cool'
+                    })
+                    $('#currentOsuPath').text(responseData.folderPath);
+                    ipcRenderer.send("do-update-check");
+                } else {
+                    Swal.fire({
+                        title: 'Uh oh!',
+                        text: 'The selected folder is not a osu! directory.',
+                        icon: 'error',
+                        confirmButtonText: 'Oops.. my bad!'
+                    })
+                }
                 break;
         }
     });
@@ -157,7 +178,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 currentState = status.type;
                 break;
             case "missing-folder":
-                $("#launch-btn").attr('disabled', true);
+                $("#launch-btn").attr('disabled', false);
                 $('#launch-btn').html('set your osu! folder');
                 currentState = status.type;
                 break;

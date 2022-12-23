@@ -32,6 +32,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "rebuild": "electron-rebuild -f -w get-window-by-name",
     "pack-win": "electron-builder --x64",
     "pack-win32": "electron-builder --ia32",
     "pack-winarm": "electron-builder --arm64",
@@ -53,6 +54,7 @@
     "get-window-by-name": "^2.0.0",
     "jquery": "^3.6.0",
     "node-downloader-helper": "^2.1.4",
+    "qiao-regedit": "^0.1.5",
     "sweetalert2": "^11.5.2"
   }
 }

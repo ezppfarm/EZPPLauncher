@@ -171,8 +171,23 @@ async function setConfigValue(configPath, key, value) {
     }
     await fs.promises.writeFile(configPath, configLines.join("\n"), 'utf-8');
 }
+async function findOsuInstallation() {
+    const regedit = require('qiao-regedit');
+
+    const osuLocationFromDefaultIcon = "HKLM\\SOFTWARE\\Classes\\osu\\DefaultIcon";
+    const osuStruct = await regedit.listValuesSync(osuLocationFromDefaultIcon);
+    for (const line of osuStruct.split("\n")) {
+        if (line.includes("REG_SZ")) {
+            let value = (line.trim().split("    ")[2]);
+            value = value.substring(1, value.length - 3);
+            return value.trim();
+        }
+    }
+    return undefined;
+}
 
 module.exports = {
     isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate,
-    downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue
+    downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue,
+    findOsuInstallation
 }
