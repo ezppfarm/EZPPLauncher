@@ -7,7 +7,7 @@ let loggedIn = false;
 
 window.addEventListener('DOMContentLoaded', () => {
     titlebar = new Titlebar({
-        backgroundColor: Color.fromHex("#303030"),
+        backgroundColor: Color.fromHex("#24283B"),
         itemBackgroundColor: Color.fromHex("#121212"),
         menu: null,
         maximizable: false

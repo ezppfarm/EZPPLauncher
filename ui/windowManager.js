@@ -12,7 +12,7 @@ module.exports = {
             minWidth: windowWidth / 1.25,
             frame: false,
             titleBarStyle: 'hidden',
-            backgroundColor: "#121212",
+            backgroundColor: "#24283B",
             resizable: false,
             maximizable: false,
             minimizable: true,
@@ -34,9 +34,6 @@ module.exports = {
 
         window.webContents.setUserAgent(`${appInfo.appName} ${appInfo.appVersion}`);
         attachTitlebarToWindow(window);
-        // window.webContents.openDevTools({
-        //     mode: "detach"
-        // });
 
         return window;
     },

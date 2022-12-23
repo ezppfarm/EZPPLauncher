@@ -8,6 +8,10 @@
     font-family: 'Exo 2', 'Roboto' !important;
 }
 
+body {
+    background-color: #24283B;
+}
+
 .sections {
     display: flex;
     flex-flow: column;
