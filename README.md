@@ -12,7 +12,7 @@ The Launcher is a "plug and play thing", download it, place it on the desktop an
 ## Features
 
 * Automatic osu! client updating before Launch
-* Account saving (soon)
+* Account saving
 
 ## Used Libraries
 
