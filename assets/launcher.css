@@ -2,6 +2,7 @@
 
 :root {
     --main-accent: 335deg;
+    --main-bg: 230deg;
 }
 
 * {
@@ -9,7 +10,7 @@
 }
 
 body {
-    background-color: #24283B;
+    background-color: hsl(var(--main-bg), 24%, 19%);
 }
 
 .sections {
