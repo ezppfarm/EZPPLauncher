@@ -90,8 +90,10 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
         const fileHash = updatedFile.file_hash;
         const fileURL = updatedFile.url_full;
 
+        if (ignoredOsuEntities.includes(fileName)) continue;
+
         const fileOnDisk = path.join(osuPath, fileName);
-        if (await fu.existsAsync(fileOnDisk) && !ignoredOsuEntities.includes(fileName)) {
+        if (await fu.existsAsync(fileOnDisk)) {
             const binaryFileContents = await fs.promises.readFile(fileOnDisk);
             const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
             if (existingFileMD5.toLowerCase() != fileHash.toLowerCase()) {
