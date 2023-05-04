@@ -65,8 +65,9 @@
                                     <div class="launch-button-section">
                                         <button class="btn btn-lg btn-launch btn-accent" id="launch-btn">Launch</button>
                                         <div class="patch-checkbox" style="display: none;">
-                                            <input type="checkbox" id="enablePatching" disabled/>
-                                            <label for="enablePatching" style="display: initial;">enable Patching</label>
+                                            <input type="checkbox" id="enablePatching" disabled />
+                                            <label for="enablePatching" style="display: initial;">enable
+                                                Patching</label>
                                         </div>
                                     </div>
                                 </div>
@@ -115,5 +116,40 @@
     </main>
 </body>
 <script type="text/javascript" src="../assets/mdb.min.js"></script>
+<script>
+    function createElement(type, callback) {
+        var element = document.createElement(type);
+        callback(element);
+        return element;
+    }
+
+    function freezeGif(img) {
+        var width = img.width,
+            height = img.height,
+            canvas = createElement('canvas', function (clone) {
+                clone.width = width;
+                clone.height = height;
+            }),
+            attr,
+            i = 0;
+
+        var freeze = function () {
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+            for (i = 0; i < img.attributes.length; i++) {
+                attr = img.attributes[i];
+
+                if (attr.name !== '"') {
+                    canvas.setAttribute(attr.name, attr.value);
+                }
+            }
+
+            canvas.style.position = 'absolute';
+
+            img.parentNode.insertBefore(canvas, img);
+            img.style.opacity = 0;
+        };
+    }
+</script>
 
 </html>
