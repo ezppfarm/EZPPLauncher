@@ -33,9 +33,9 @@
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w get-window-by-name",
-    "pack-win": "electron-builder --win --arm64 --x64",
-    "pack-linux": "electron-builder --linux --arm64 --x64",
-    "pack-mac": "electron-builder --mac --arm64 --x64",
+    "pack-win": "electron-builder --win --x64",
+    "pack-linux": "electron-builder --linux --x64",
+    "pack-mac": "electron-builder --mac --x64",
     "dist": "electron-builder"
   },
   "devDependencies": {
