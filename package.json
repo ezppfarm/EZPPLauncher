@@ -33,17 +33,15 @@
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w get-window-by-name",
-    "pack-win": "electron-builder --x64",
-    "pack-win32": "electron-builder --ia32",
-    "pack-winarm": "electron-builder --arm64",
-    "pack-linux": "electron-builder --dir --linux --ia32 --arm64 --x64",
-    "pack-mac": "electron-builder --dir --mac --ia32 --arm64 --x64",
+    "pack-win": "electron-builder --win --arm64 --x64",
+    "pack-linux": "electron-builder --linux --arm64 --x64",
+    "pack-mac": "electron-builder --mac --arm64 --x64",
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^21.1.1",
-    "electron-builder": "^23.0.3",
-    "electron-packager": "^15.5.1",
+    "electron": "^24.2.0",
+    "electron-builder": "^23.6.0",
+    "electron-packager": "^17.1.1",
     "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
