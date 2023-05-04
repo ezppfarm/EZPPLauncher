@@ -7,22 +7,23 @@ let client = undefined;
 let lastState = "Idle in Launcher...";
 let presenceEnabled = true;
 let startDate = new Date();
+const actionButtons = [
+    {
+        label: "Download the Launcher",
+        url: "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest"
+    },
+    {
+        label: "Join EZPPFarm",
+        url: "https://ez-pp.farm/discord"
+    }
+]
 let lastActivity = {
     details: "  ",
     state: lastState,
     startTimestamp: startDate,
     largeImageKey: "ezppfarm",
     largeImageText: appInfo.appName + " " + appInfo.appVersion,
-    buttons: [
-        {
-            label: "Download the Launcher",
-            url: "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest"
-        },
-        {
-            label: "Join EZPPFarm",
-            url: "https://ez-pp.farm/discord"
-        }
-    ],
+    buttons: actionButtons,
     instance: false,
 };
 
@@ -53,16 +54,7 @@ module.exports = {
             smallImageText: osuVersion ? osuVersion : "  ",
             largeImageKey: "ezppfarm",
             largeImageText: appInfo.appName + " " + appInfo.appVersion,
-            buttons: [
-                {
-                    label: "Download the Launcher",
-                    url: "https://ez-pp.farm/download"
-                },
-                {
-                    label: "Join EZPPFarm",
-                    url: "https://discord.com/invite/g8Bh7RaKPg"
-                }
-            ],
+            buttons: actionButtons,
             instance: false,
         }
     }
