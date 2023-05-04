@@ -16,11 +16,11 @@ let lastActivity = {
     buttons: [
         {
             label: "Download the Launcher",
-            url: "https://ez-pp.farm/download"
+            url: "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest"
         },
         {
             label: "Join EZPPFarm",
-            url: "https://discord.com/invite/g8Bh7RaKPg"
+            url: "https://ez-pp.farm/discord"
         }
     ],
     instance: false,
