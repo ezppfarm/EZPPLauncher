@@ -91,7 +91,7 @@ const run = () => {
                     rpcOsuVersion = splitArray[0];
                     currentMap = splitArray[1];
                     if (currentMap.endsWith(".osu")) {
-                        rpc.updateState("Editing...");
+                        rpc.updateState("Editing/Modding...");
                         currentMap = currentMap.substring(0, currentMap.length - 4);
                     }
                     else rpc.updateState("Playing...");
