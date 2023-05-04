@@ -8,6 +8,9 @@ const { EventEmitter } = require('events');
 const { DownloaderHelper } = require('node-downloader-helper');
 
 const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
+const ignoredOsuEntities = [
+    'osu!auth.dll'
+]
 const osuEntities = [
     'avcodec-51.dll',
     'avformat-52.dll',
@@ -88,7 +91,7 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
         const fileURL = updatedFile.url_full;
 
         const fileOnDisk = path.join(osuPath, fileName);
-        if (await fu.existsAsync(fileOnDisk)) {
+        if (await fu.existsAsync(fileOnDisk) && !ignoredOsuEntities.includes(fileName)) {
             const binaryFileContents = await fs.promises.readFile(fileOnDisk);
             const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
             if (existingFileMD5.toLowerCase() != fileHash.toLowerCase()) {
@@ -96,14 +99,12 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
                     fileName,
                     fileURL
                 })
-                //console.log("hashes are not matching", `(${existingFileMD5} - ${fileHash})`);
             }
         } else {
             filesToDownload.push({
                 fileName,
                 fileURL
             });
-            //console.log("new file " + fileName);
         }
     }
     return filesToDownload;
