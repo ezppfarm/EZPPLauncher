@@ -152,6 +152,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
     ipcRenderer.on('account_update', (event, data) => {
         switch (data.type) {
+            case "login-failed":
+                console.log(data);
+                Swal.fire({
+                    title: 'Uh oh!',
+                    text: data.message,
+                    icon: 'error',
+                    confirmButtonText: 'Okay'
+                });
+                changePage("launch");
+                break;
             case "not-loggedin":
                 changePage("launch");
                 break;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu } = require('electron');
 const { setupTitlebar, attachTitlebarToWindow } = require('custom-electron-titlebar/main');
 const windowManager = require('./ui/windowManager');
 const osuUtil = require('./osuUtil');
@@ -9,6 +9,7 @@ const rpc = require('./discordPresence');
 const windowName = require('get-window-by-name');
 const terminalUtil = require('./terminalUtil');
 const osUtil = require('./osUtil');
+const appInfo = require('./appInfo');
 
 let tempOsuPath;
 let osuWindowInfo;
@@ -119,10 +120,37 @@ const run = () => {
 
 
     let mainWindow;
+    let tray = null
     app.whenReady().then(() => {
 
+        tray = new Tray('./assets/logo.png');
+        const trayMenuTemplate = [
+            {
+                label: `EZPPLauncher ${appInfo.appVersion}`,
+                enabled: false
+            },
+
+            {
+                label: "Show/Hide",
+                click: function () {
+                    if (mainWindow.isVisible()) mainWindow.hide();
+                    else mainWindow.show();
+                }
+            },
+
+            {
+                label: 'Exit',
+                click: function () {
+                    app.exit(0);
+                }
+            }
+        ]
+
+        let trayMenu = Menu.buildFromTemplate(trayMenuTemplate)
+        tray.setContextMenu(trayMenu)
+
         mainWindow = createWindow();
-        mainWindow.on('show', async () => {
+        mainWindow.once('show', async () => {
             await updateConfigVars(mainWindow);
             await tryLogin(mainWindow);
             await doUpdateCheck(mainWindow);
@@ -161,7 +189,7 @@ const run = () => {
                 const osuFolder = await config.get("osuPath");
                 if (!osuFolder || osuFolder == "") {
                     const foundFolder = await osuUtil.findOsuInstallation();
-                    console.log("osu! Installation located at: ",foundFolder);
+                    console.log("osu! Installation located at: ", foundFolder);
                 }
             }
         })
@@ -187,10 +215,10 @@ const run = () => {
             }
             rpc.updateState("Launching osu!...");
             isIngame = true;
-            mainWindow.hide();
+            if (mainWindow.isVisible()) mainWindow.hide();
             const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
                 isIngame = false;
-                mainWindow.show();
+                if (!mainWindow.isVisible()) mainWindow.show();
                 await doUpdateCheck(mainWindow);
             });
             return result;
@@ -287,8 +315,11 @@ async function tryLogin(window) {
                 user: loginResponse.user
             })
         } else {
+            await config.remove("username");
+            await config.remove("password");
             window.webContents.send('account_update', {
-                type: "login-failed"
+                type: "login-failed",
+                message: loginResponse.message
             })
         }
     } else {
