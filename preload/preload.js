@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, shell } = require('electron');
 const { Titlebar, Color } = require('custom-electron-titlebar');
 const appInfo = require('../appInfo');
 let titlebar;
@@ -150,10 +150,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     })
 
+    ipcRenderer.on('launcher_update', async (event, data) => {
+        const res = await Swal.fire({
+            title: 'Update available!',
+            text: `Version ${data.version} has been released!`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Download',
+            cancelButtonText: 'Remind me later',
+        });
+        if (res.isConfirmed) {
+            shell.openExternal(data.url);
+        }
+    })
+
     ipcRenderer.on('account_update', (event, data) => {
         switch (data.type) {
             case "login-failed":
-                console.log(data);
                 Swal.fire({
                     title: 'Uh oh!',
                     text: data.message,

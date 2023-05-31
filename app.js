@@ -313,7 +313,7 @@ async function tryLogin(window) {
             window.webContents.send('account_update', {
                 type: "loggedin",
                 user: loginResponse.user
-            })
+            });
         } else {
             await config.remove("username");
             await config.remove("password");
@@ -326,6 +326,11 @@ async function tryLogin(window) {
         window.webContents.send('account_update', {
             type: "not-loggedin"
         })
+    }
+
+    const checkUpdate = await appInfo.hasUpdate();
+    if(checkUpdate){
+        window.webContents.send('launcher_update', checkUpdate);
     }
 }
 
