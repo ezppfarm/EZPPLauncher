@@ -1,7 +1,5 @@
 const appInfo = require('./appInfo.js');
 const DiscordAutoRPC = require("discord-auto-rpc");
-const { app } = require('electron');
-const DiscordRPC = require("discord-rpc").default;
 const clientId = "1032772293220384808";
 let client = undefined;
 let lastState = "Idle in Launcher...";
