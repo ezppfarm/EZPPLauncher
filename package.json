@@ -22,7 +22,7 @@
       "runAfterFinish": true
     },
     "portable": {
-      "artifactName": "EZPPLauncher.exe"
+      "artifactName": "ezpplauncher-${version}.exe"
     }
   },
   "frontend": {
