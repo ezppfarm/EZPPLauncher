@@ -5,11 +5,13 @@ const osuUtil = require('./osuUtil');
 const ezppUtil = require('./ezppUtil');
 const config = require('./config');
 const fs = require('fs');
+const path = require('path');
 const rpc = require('./discordPresence');
 const windowName = require('get-window-by-name');
 const terminalUtil = require('./terminalUtil');
 const osUtil = require('./osUtil');
 const appInfo = require('./appInfo');
+const { DownloaderHelper } = require('node-downloader-helper');
 
 let tempOsuPath;
 let osuWindowInfo;
@@ -19,370 +21,376 @@ let linuxWMCtrlFound = false;
 let osuLoaded = false;
 
 const run = () => {
-    const gotTheLock = app.requestSingleInstanceLock()
-    if (!gotTheLock) {
-        app.quit();
+  const gotTheLock = app.requestSingleInstanceLock()
+  if (!gotTheLock) {
+    app.quit();
+    return;
+  }
+
+  setInterval(async () => {
+    if (platform == "win32") {
+      osuWindowInfo = windowName.getWindowText("osu!.exe");
+      const firstInstance = osuWindowInfo[0];
+      if (firstInstance) {
+        if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
+          if (!osuLoaded) {
+            osuLoaded = true;
+            //TODO: do patch
+          }
+          const windowTitle = firstInstance.processTitle;
+          let rpcOsuVersion = "";
+          let currentMap = undefined;
+          if (!windowTitle.includes("-")) {
+            rpcOsuVersion = windowTitle;
+            rpc.updateState("Idle...");
+          } else {
+            var string = windowTitle;
+            var components = string.split(' - ');
+            const splitArray = [components.shift(), components.join(' - ')];
+            rpcOsuVersion = splitArray[0];
+            currentMap = splitArray[1];
+            if (currentMap.endsWith(".osu")) {
+              rpc.updateState("Editing...");
+              currentMap = currentMap.substring(0, currentMap.length - 4);
+            } else rpc.updateState("Playing...");
+          }
+
+          rpc.updateStatus(currentMap, rpcOsuVersion);
+        } else {
+          if (osuLoaded) osuLoaded = false;
+          rpc.updateState("Idle in Launcher...");
+          rpc.updateStatus(undefined, undefined);
+        }
+      } else {
+        if (osuLoaded) osuLoaded = false;
+        rpc.updateState("Idle in Launcher...");
+        rpc.updateStatus(undefined, undefined);
+      }
+    } else if (platform == "linux") {
+      if (!linuxWMCtrlFound) {
+        if (isIngame) {
+          rpc.updateState("Playing...");
+          rpc.updateStatus("Clicking circles!", "runningunderwine");
+        } else {
+          rpc.updateState("Idle in Launcher...");
+          rpc.updateStatus(undefined, undefined);
+        }
         return;
-    }
-
-    setInterval(async () => {
-        if (platform == "win32") {
-            osuWindowInfo = windowName.getWindowText("osu!.exe");
-            const firstInstance = osuWindowInfo[0];
-            if (firstInstance) {
-                if (firstInstance.processTitle && firstInstance.processTitle.length > 0) {
-                    if (!osuLoaded) {
-                        osuLoaded = true;
-                        //TODO: do patch
-                    }
-                    const windowTitle = firstInstance.processTitle;
-                    let rpcOsuVersion = "";
-                    let currentMap = undefined;
-                    if (!windowTitle.includes("-")) {
-                        rpcOsuVersion = windowTitle;
-                        rpc.updateState("Idle...");
-                    } else {
-                        var string = windowTitle;
-                        var components = string.split(' - ');
-                        const splitArray = [components.shift(), components.join(' - ')];
-                        rpcOsuVersion = splitArray[0];
-                        currentMap = splitArray[1];
-                        if (currentMap.endsWith(".osu")) {
-                            rpc.updateState("Editing...");
-                            currentMap = currentMap.substring(0, currentMap.length - 4);
-                        } else rpc.updateState("Playing...");
-                    }
-
-                    rpc.updateStatus(currentMap, rpcOsuVersion);
-                } else {
-                    if (osuLoaded) osuLoaded = false;
-                    rpc.updateState("Idle in Launcher...");
-                    rpc.updateStatus(undefined, undefined);
-                }
-            } else {
-                if (osuLoaded) osuLoaded = false;
-                rpc.updateState("Idle in Launcher...");
-                rpc.updateStatus(undefined, undefined);
-            }
-        } else if (platform == "linux") {
-            if (!linuxWMCtrlFound) {
-                if (isIngame) {
-                    rpc.updateState("Playing...");
-                    rpc.updateStatus("Clicking circles!", "runningunderwine");
-                } else {
-                    rpc.updateState("Idle in Launcher...");
-                    rpc.updateStatus(undefined, undefined);
-                }
-                return;
-            }
-            const processesOutput = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
-            const allLines = processesOutput.split("\n");
-            const filteredProcesses = allLines.filter((line) => line.trim().startsWith("osu!"));
-            if (filteredProcesses.length > 0) {
-                const windowTitle = filteredProcesses[0].trim();
-                let rpcOsuVersion = "";
-                let currentMap = undefined;
-                if (!windowTitle.includes("-")) {
-                    rpcOsuVersion = windowTitle;
-                    rpc.updateState("Idle...");
-                } else {
-                    var string = windowTitle;
-                    var components = string.split(' - ');
-                    const splitArray = [components.shift(), components.join(' - ')];
-                    rpcOsuVersion = splitArray[0];
-                    currentMap = splitArray[1];
-                    if (currentMap.endsWith(".osu")) {
-                        rpc.updateState("Editing/Modding...");
-                        currentMap = currentMap.substring(0, currentMap.length - 4);
-                    }
-                    else rpc.updateState("Playing...");
-                }
-
-                rpc.updateStatus(currentMap, rpcOsuVersion);
-            } else {
-                rpc.updateState("Idle in Launcher...");
-                rpc.updateStatus(undefined, undefined);
-            }
+      }
+      const processesOutput = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
+      const allLines = processesOutput.split("\n");
+      const filteredProcesses = allLines.filter((line) => line.trim().startsWith("osu!"));
+      if (filteredProcesses.length > 0) {
+        const windowTitle = filteredProcesses[0].trim();
+        let rpcOsuVersion = "";
+        let currentMap = undefined;
+        if (!windowTitle.includes("-")) {
+          rpcOsuVersion = windowTitle;
+          rpc.updateState("Idle...");
         } else {
-            if (isIngame) {
-                rpc.updateState("Playing...");
-                rpc.updateStatus("Clicking circles!", "runningunderwine");
-            } else {
-                rpc.updateState("Idle in Launcher...");
-                rpc.updateStatus(undefined, undefined);
-            }
+          var string = windowTitle;
+          var components = string.split(' - ');
+          const splitArray = [components.shift(), components.join(' - ')];
+          rpcOsuVersion = splitArray[0];
+          currentMap = splitArray[1];
+          if (currentMap.endsWith(".osu")) {
+            rpc.updateState("Editing/Modding...");
+            currentMap = currentMap.substring(0, currentMap.length - 4);
+          }
+          else rpc.updateState("Playing...");
         }
-    }, 2000);
 
-    setupTitlebar();
-
-    rpc.connect();
-
-
-    let mainWindow;
-    let tray = null
-    app.whenReady().then(() => {
-
-        tray = new Tray('./assets/logo.png');
-        const trayMenuTemplate = [
-            {
-                label: `EZPPLauncher ${appInfo.appVersion}`,
-                enabled: false
-            },
-
-            {
-                label: "Show/Hide",
-                click: function () {
-                    if (mainWindow.isVisible()) mainWindow.hide();
-                    else mainWindow.show();
-                }
-            },
-
-            {
-                label: 'Exit',
-                click: function () {
-                    app.exit(0);
-                }
-            }
-        ]
-
-        let trayMenu = Menu.buildFromTemplate(trayMenuTemplate)
-        tray.setContextMenu(trayMenu)
-
-        mainWindow = createWindow();
-        mainWindow.once('show', async () => {
-            await updateConfigVars(mainWindow);
-            await tryLogin(mainWindow);
-            await doUpdateCheck(mainWindow);
-            if (platform === "linux") {
-                const linuxDistroInfo = await osUtil.getLinuxDistroInfo();
-                if (linuxDistroInfo?.id != "arch") {
-                    if (linuxDistroInfo?.id_like != "arch") {
-                        mainWindow.webContents.send('status_update', {
-                            type: "info",
-                            message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch like distributions!"
-                        });
-                    }
-                }
-                try {
-                    await terminalUtil.execCommand(`osu-stable -h`);
-                } catch (err) {
-                    mainWindow.webContents.send('status_update', {
-                        type: "package-issue",
-                        message: "Seems like you dont have the osu AUR Package installed, please install it."
-                    });
-                    return;
-                }
-                /* mainWindow.webContents.send('status_update', {
-                    type: "info",
-                    message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch and the osu AUR package!"
-                }); */
-                const terminalTest = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
-                const isFailed = terminalTest.trim() == "";
-                if (isFailed) {
-                    mainWindow.webContents.send('status_update', {
-                        type: "info",
-                        message: "Seems like you are missing the wmctrl package, please install it for the RPC to work!"
-                    });
-                } else linuxWMCtrlFound = true;
-            } else {
-                const osuFolder = await config.get("osuPath");
-                if (!osuFolder || osuFolder == "") {
-                    const foundFolder = await osuUtil.findOsuInstallation();
-                    console.log("osu! Installation located at: ", foundFolder);
-                }
-            }
-        })
-        app.on('activate', function () {
-            if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
-        })
-        app.on('window-all-closed', () => {
-            app.quit()
-        })
-        ipcMain.handle('launch', async () => {
-            const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
-            const username = await config.get('username');
-            const password = await config.get('password');
-            if (password && username) {
-                await osuUtil.setConfigValue(osuConfig.path, "SaveUsername", "1");
-                await osuUtil.setConfigValue(osuConfig.path, "SavePassword", "1");
-                await osuUtil.setConfigValue(osuConfig.path, "Username", username);
-                await osuUtil.setConfigValue(osuConfig.path, "Password", password);
-                await osuUtil.setConfigValue(osuConfig.path, "CredentialEndpoint", "ez-pp.farm");
-            } else {
-                await osuUtil.setConfigValue(osuConfig.path, "Username", "");
-                await osuUtil.setConfigValue(osuConfig.path, "Password", "");
-            }
-            rpc.updateState("Launching osu!...");
-            isIngame = true;
-            if (mainWindow.isVisible()) mainWindow.hide();
-            const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
-                isIngame = false;
-                if (!mainWindow.isVisible()) mainWindow.show();
-                await doUpdateCheck(mainWindow);
-            });
-            return result;
-        })
-        ipcMain.on('do-update-check', async () => {
-            await doUpdateCheck(mainWindow);
-        })
-        ipcMain.on('do-update', async () => {
-            const osuPath = await config.get("osuPath", "");
-            const isValid = await osuUtil.isValidOsuFolder(osuPath);
-            if (osuPath.trim == "" || !isValid) {
-                mainWindow.webContents.send('status_update', {
-                    type: "error",
-                    message: "Invalid osu! folder"
-                });
-                return;
-            }
-            if (fs.existsSync(osuPath)) {
-                tempOsuPath = osuPath;
-                const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
-                const lastVersion = await osuConfig.get("LastVersion");
-                let releaseStream = "stable40";
-                if (lastVersion.endsWith("cuttingedge"))
-                    releaseStream = "cuttingedge"
-                else if (lastVersion.endsWith("beta"))
-                    releaseStream = "beta";
-
-                const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
-                const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
-                const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
-                downloadTask.on('completed', () => {
-                    mainWindow.webContents.send('status_update', {
-                        type: "update-complete"
-                    })
-                });
-                downloadTask.on('error', () => {
-                    mainWindow.webContents.send('status_update', {
-                        type: "error",
-                        message: "An error occured while updating."
-                    });
-                });
-
-            } else
-                mainWindow.webContents.send('status_update', {
-                    type: "error",
-                    message: "Invalid osu! folder"
-                });
-        })
-        ipcMain.handle('set-osu-dir', async (event) => {
-            const yes = await dialog.showOpenDialog({
-                properties: ['openDirectory']
-            })
-            if (yes.filePaths.length <= 0)
-                return undefined;
-            const folderPath = yes.filePaths[0];
-            const validOsuDir = await osuUtil.isValidOsuFolder(folderPath);
-
-            if (validOsuDir) await config.set("osuPath", folderPath);
-
-            return { validOsuDir, folderPath };
-        })
-        ipcMain.handle('perform-login', async (event, data) => {
-            const { username, password } = data;
-            const loginData = await ezppUtil.performLogin(username, password);
-            if (loginData && loginData.code === 200) {
-                await config.set("username", username);
-                await config.set("password", password);
-            }
-            return loginData;
-        })
-        ipcMain.on('perform-logout', async (event) => {
-            await config.remove("username");
-            await config.remove("password");
-        })
-    })
-}
-
-async function updateConfigVars(window) {
-    const osuPath = await config.get("osuPath", "");
-    window.webContents.send('config_update', {
-        osuPath: osuPath
-    })
-}
-
-async function tryLogin(window) {
-    const username = await config.get("username", "");
-    const password = await config.get("password", "");
-    if ((username && username.length > 0) && (password && password.length > 0)) {
-        const passwordPlain = password;
-        const loginResponse = await ezppUtil.performLogin(username, passwordPlain);
-        if (loginResponse && loginResponse.code === 200) {
-            window.webContents.send('account_update', {
-                type: "loggedin",
-                user: loginResponse.user
-            });
-        } else {
-            await config.remove("username");
-            await config.remove("password");
-            window.webContents.send('account_update', {
-                type: "login-failed",
-                message: loginResponse.message
-            })
-        }
+        rpc.updateStatus(currentMap, rpcOsuVersion);
+      } else {
+        rpc.updateState("Idle in Launcher...");
+        rpc.updateStatus(undefined, undefined);
+      }
     } else {
-        window.webContents.send('account_update', {
-            type: "not-loggedin"
-        })
+      if (isIngame) {
+        rpc.updateState("Playing...");
+        rpc.updateStatus("Clicking circles!", "runningunderwine");
+      } else {
+        rpc.updateState("Idle in Launcher...");
+        rpc.updateStatus(undefined, undefined);
+      }
     }
+  }, 2000);
 
-    const checkUpdate = await appInfo.hasUpdate();
-    if(checkUpdate){
-        window.webContents.send('launcher_update', checkUpdate);
-    }
-}
+  setupTitlebar();
 
-async function doUpdateCheck(window) {
-    const osuPath = await config.get("osuPath");
-    if (!osuPath || osuPath.trim == "") {
-        window.webContents.send('status_update', {
-            type: "missing-folder"
-        })
-        return;
+  rpc.connect();
+
+
+  let mainWindow;
+  let tray = null
+  app.whenReady().then(async () => {
+    const logoFile = path.join(config.configFolder, "logo.png");
+    if (!fs.existsSync(logoFile)) {
+      const logoDownload = new DownloaderHelper("https://ez-pp.farm/assets/img/icon.png", config.configFolder, {
+        fileName: "logo.png",
+      })
+      await logoDownload.start();
     }
-    const isValid = await osuUtil.isValidOsuFolder(osuPath);
-    if (!isValid) {
-        window.webContents.send('status_update', {
-            type: "missing-folder"
-        })
+    tray = new Tray(logoFile);
+    const trayMenuTemplate = [
+      {
+        label: `EZPPLauncher ${appInfo.appVersion}`,
+        enabled: false
+      },
+
+      {
+        label: "Show/Hide",
+        click: function () {
+          if (mainWindow.isVisible()) mainWindow.hide();
+          else mainWindow.show();
+        }
+      },
+
+      {
+        label: 'Exit',
+        click: function () {
+          app.exit(0);
+        }
+      }
+    ]
+
+    let trayMenu = Menu.buildFromTemplate(trayMenuTemplate)
+    tray.setContextMenu(trayMenu)
+
+    mainWindow = createWindow();
+    mainWindow.once('show', async () => {
+      await updateConfigVars(mainWindow);
+      await tryLogin(mainWindow);
+      await doUpdateCheck(mainWindow);
+      if (platform === "linux") {
+        const linuxDistroInfo = await osUtil.getLinuxDistroInfo();
+        if (linuxDistroInfo?.id != "arch") {
+          if (linuxDistroInfo?.id_like != "arch") {
+            mainWindow.webContents.send('status_update', {
+              type: "info",
+              message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch like distributions!"
+            });
+          }
+        }
+        try {
+          await terminalUtil.execCommand(`osu-stable -h`);
+        } catch (err) {
+          mainWindow.webContents.send('status_update', {
+            type: "package-issue",
+            message: "Seems like you dont have the osu AUR Package installed, please install it."
+          });
+          return;
+        }
+        /* mainWindow.webContents.send('status_update', {
+            type: "info",
+            message: "We detected that you are running the Launcher under Linux. It's currently just compatible with Arch and the osu AUR package!"
+        }); */
+        const terminalTest = await terminalUtil.execCommand(`wmctrl -l|awk '{$3=""; $2=""; $1=""; print $0}'`);
+        const isFailed = terminalTest.trim() == "";
+        if (isFailed) {
+          mainWindow.webContents.send('status_update', {
+            type: "info",
+            message: "Seems like you are missing the wmctrl package, please install it for the RPC to work!"
+          });
+        } else linuxWMCtrlFound = true;
+      } else {
+        const osuFolder = await config.get("osuPath");
+        if (!osuFolder || osuFolder == "") {
+          const foundFolder = await osuUtil.findOsuInstallation();
+          console.log("osu! Installation located at: ", foundFolder);
+        }
+      }
+    })
+    app.on('activate', function () {
+      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+    })
+    app.on('window-all-closed', () => {
+      app.quit()
+    })
+    ipcMain.handle('launch', async () => {
+      const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
+      const username = await config.get('username');
+      const password = await config.get('password');
+      if (password && username) {
+        await osuUtil.setConfigValue(osuConfig.path, "SaveUsername", "1");
+        await osuUtil.setConfigValue(osuConfig.path, "SavePassword", "1");
+        await osuUtil.setConfigValue(osuConfig.path, "Username", username);
+        await osuUtil.setConfigValue(osuConfig.path, "Password", password);
+        await osuUtil.setConfigValue(osuConfig.path, "CredentialEndpoint", "ez-pp.farm");
+      } else {
+        await osuUtil.setConfigValue(osuConfig.path, "Username", "");
+        await osuUtil.setConfigValue(osuConfig.path, "Password", "");
+      }
+      rpc.updateState("Launching osu!...");
+      isIngame = true;
+      if (mainWindow.isVisible()) mainWindow.hide();
+      const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
+        isIngame = false;
+        if (!mainWindow.isVisible()) mainWindow.show();
+        await doUpdateCheck(mainWindow);
+      });
+      return result;
+    })
+    ipcMain.on('do-update-check', async () => {
+      await doUpdateCheck(mainWindow);
+    })
+    ipcMain.on('do-update', async () => {
+      const osuPath = await config.get("osuPath", "");
+      const isValid = await osuUtil.isValidOsuFolder(osuPath);
+      if (osuPath.trim == "" || !isValid) {
+        mainWindow.webContents.send('status_update', {
+          type: "error",
+          message: "Invalid osu! folder"
+        });
         return;
-    }
-    if (fs.existsSync(osuPath)) {
+      }
+      if (fs.existsSync(osuPath)) {
         tempOsuPath = osuPath;
         const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
         const lastVersion = await osuConfig.get("LastVersion");
         let releaseStream = "stable40";
         if (lastVersion.endsWith("cuttingedge"))
-            releaseStream = "cuttingedge"
+          releaseStream = "cuttingedge"
         else if (lastVersion.endsWith("beta"))
-            releaseStream = "beta";
+          releaseStream = "beta";
 
         const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
         const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
-        window.webContents.send('status_update', {
-            type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
-        })
-    } else
-        window.webContents.send('status_update', {
-            type: "missing-folder"
-        })
+        const downloadTask = await osuUtil.downloadUpdateFiles(osuPath, filesToDownload);
+        downloadTask.on('completed', () => {
+          mainWindow.webContents.send('status_update', {
+            type: "update-complete"
+          })
+        });
+        downloadTask.on('error', () => {
+          mainWindow.webContents.send('status_update', {
+            type: "error",
+            message: "An error occured while updating."
+          });
+        });
+
+      } else
+        mainWindow.webContents.send('status_update', {
+          type: "error",
+          message: "Invalid osu! folder"
+        });
+    })
+    ipcMain.handle('set-osu-dir', async (event) => {
+      const yes = await dialog.showOpenDialog({
+        properties: ['openDirectory']
+      })
+      if (yes.filePaths.length <= 0)
+        return undefined;
+      const folderPath = yes.filePaths[0];
+      const validOsuDir = await osuUtil.isValidOsuFolder(folderPath);
+
+      if (validOsuDir) await config.set("osuPath", folderPath);
+
+      return { validOsuDir, folderPath };
+    })
+    ipcMain.handle('perform-login', async (event, data) => {
+      const { username, password } = data;
+      const loginData = await ezppUtil.performLogin(username, password);
+      if (loginData && loginData.code === 200) {
+        await config.set("username", username);
+        await config.set("password", password);
+      }
+      return loginData;
+    })
+    ipcMain.on('perform-logout', async (event) => {
+      await config.remove("username");
+      await config.remove("password");
+    })
+  })
+}
+
+async function updateConfigVars(window) {
+  const osuPath = await config.get("osuPath", "");
+  window.webContents.send('config_update', {
+    osuPath: osuPath
+  })
+}
+
+async function tryLogin(window) {
+  const username = await config.get("username", "");
+  const password = await config.get("password", "");
+  if ((username && username.length > 0) && (password && password.length > 0)) {
+    const passwordPlain = password;
+    const loginResponse = await ezppUtil.performLogin(username, passwordPlain);
+    if (loginResponse && loginResponse.code === 200) {
+      window.webContents.send('account_update', {
+        type: "loggedin",
+        user: loginResponse.user
+      });
+    } else {
+      await config.remove("username");
+      await config.remove("password");
+      window.webContents.send('account_update', {
+        type: "login-failed",
+        message: loginResponse.message
+      })
+    }
+  } else {
+    window.webContents.send('account_update', {
+      type: "not-loggedin"
+    })
+  }
+
+  const checkUpdate = await appInfo.hasUpdate();
+  if (checkUpdate) {
+    window.webContents.send('launcher_update', checkUpdate);
+  }
+}
+
+async function doUpdateCheck(window) {
+  const osuPath = await config.get("osuPath");
+  if (!osuPath || osuPath.trim == "") {
+    window.webContents.send('status_update', {
+      type: "missing-folder"
+    })
+    return;
+  }
+  const isValid = await osuUtil.isValidOsuFolder(osuPath);
+  if (!isValid) {
+    window.webContents.send('status_update', {
+      type: "missing-folder"
+    })
+    return;
+  }
+  if (fs.existsSync(osuPath)) {
+    tempOsuPath = osuPath;
+    const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
+    const lastVersion = await osuConfig.get("LastVersion");
+    let releaseStream = "stable40";
+    if (lastVersion.endsWith("cuttingedge"))
+      releaseStream = "cuttingedge"
+    else if (lastVersion.endsWith("beta"))
+      releaseStream = "beta";
+
+    const releaseFiles = await osuUtil.getUpdateFiles(releaseStream);
+    const filesToDownload = await osuUtil.filesThatNeedUpdate(tempOsuPath, releaseFiles);
+    window.webContents.send('status_update', {
+      type: filesToDownload.length > 0 ? "update-available" : "up-to-date"
+    })
+  } else
+    window.webContents.send('status_update', {
+      type: "missing-folder"
+    })
 }
 
 function createWindow() {
-    // Create the browser window.
-    const win = windowManager.createWindow(700, 460);
+  // Create the browser window.
+  const win = windowManager.createWindow(700, 460);
 
-    win.loadFile('./html/index.html');
+  win.loadFile('./html/index.html');
 
-    win.webContents.setWindowOpenHandler(() => "deny");
-    win.webContents.on('did-finish-load', function () {
-        if (win.webContents.getZoomFactor() != 0.9)
-            win.webContents.setZoomFactor(0.9)
-    });
+  win.webContents.setWindowOpenHandler(() => "deny");
+  win.webContents.on('did-finish-load', function () {
+    if (win.webContents.getZoomFactor() != 0.9)
+      win.webContents.setZoomFactor(0.9)
+  });
 
-    return win;
+  return win;
 }
 
 run();

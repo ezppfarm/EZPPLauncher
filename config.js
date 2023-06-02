@@ -68,4 +68,4 @@ async function remove(key) {
     await fs.promises.writeFile(configLocation, arr.join('\n'));
 }
 
-module.exports = { get, set, remove }
+module.exports = { get, set, remove, configFolder }
