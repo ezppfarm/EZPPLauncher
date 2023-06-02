@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu } = require('electron');
-const { setupTitlebar, attachTitlebarToWindow } = require('custom-electron-titlebar/main');
+const { setupTitlebar } = require('custom-electron-titlebar/main');
 const windowManager = require('./ui/windowManager');
 const osuUtil = require('./osuUtil');
 const ezppUtil = require('./ezppUtil');
@@ -376,7 +376,6 @@ function createWindow() {
 
     win.loadFile('./html/index.html');
 
-    attachTitlebarToWindow(win);
     win.webContents.setWindowOpenHandler(() => "deny");
     win.webContents.on('did-finish-load', function () {
         if (win.webContents.getZoomFactor() != 0.9)

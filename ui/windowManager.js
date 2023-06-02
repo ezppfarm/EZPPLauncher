@@ -1,6 +1,6 @@
 const path = require("path");
 const appInfo = require('../appInfo');
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, Menu } = require('electron');
 const { attachTitlebarToWindow } = require('custom-electron-titlebar/main');
 
 module.exports = {
@@ -26,6 +26,10 @@ module.exports = {
             },
             icon: './assets/logo.png'
         })
+
+        const menu = Menu.buildFromTemplate([])
+        Menu.setApplicationMenu(menu);
+
         window.hide();
 
         window.webContents.once("did-finish-load", function (event, input) {
@@ -33,6 +37,7 @@ module.exports = {
         });
 
         window.webContents.setUserAgent(`${appInfo.appName} ${appInfo.appVersion}`);
+
         attachTitlebarToWindow(window);
 
         return window;
