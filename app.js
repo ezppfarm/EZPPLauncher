@@ -120,7 +120,6 @@ const run = () => {
 
   rpc.connect();
 
-
   let mainWindow;
   let tray = null
   app.whenReady().then(async () => {
@@ -195,18 +194,15 @@ const run = () => {
         } else linuxWMCtrlFound = true;
       } else {
         const osuFolder = await config.get("osuPath");
-        console.log(osuFolder, !osuFolder || osuFolder == "");
         if (!osuFolder || osuFolder == "") {
           const foundFolder = await osuUtil.findOsuInstallation();
           if (foundFolder && osuUtil.isValidOsuFolder(foundFolder)) {
             mainWindow.webContents.send('alert_message', foundFolder);
           }
-          console.log("osu! Installation located at: ", foundFolder);
         }
       }
     });
     ipcMain.on("alert_response", async (event, path) => {
-      console.log("yes");
       await config.set("osuPath", path);
     })
     app.on('activate', function () {
@@ -358,7 +354,6 @@ async function tryLogin(window) {
 
 async function doUpdateCheck(window) {
   const osuPath = await config.get("osuPath");
-  console.log("osuPath:", osuPath);
   if (!osuPath || osuPath.trim == "") {
     window.webContents.send('status_update', {
       type: "missing-folder"

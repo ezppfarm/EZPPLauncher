@@ -8,7 +8,8 @@ const { EventEmitter } = require('events');
 const { DownloaderHelper } = require('node-downloader-helper');
 
 const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
-const customUIDLLPath = "";
+const customUIDLLPath = "https://ez-pp.farm/assets/ezpp!ui.dll";
+const customUIDLLHash = "https://ez-pp.farm/assets/ezpp!ui.md5";
 const customUIDLLName = "ezpp!ui.dll";
 const ignoredOsuEntities = [
   'osu!auth.dll',
@@ -85,6 +86,11 @@ async function getUpdateFiles(releaseStream) {
   return releaseData.data;
 }
 
+async function getEZPPUIMD5() {
+  const releaseData = await axios.get(customUIDLLHash, {});
+  return releaseData.data;
+}
+
 async function filesThatNeedUpdate(osuPath, updateFiles) {
   const filesToDownload = [];
   for (const updatedFile of updateFiles) {
@@ -111,6 +117,24 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
       });
     }
   }
+
+  const ezppUI = path.join(osuPath, customUIDLLName);
+  if (fs.existsSync(ezppUI)) {
+    const latestMd5Hash = await getEZPPUIMD5();
+    const binaryUIContents = await fs.promises.readFile(ezppUI);
+    const existingUIMD5 = crypto.createHash("md5").update(binaryUIContents).digest("hex");
+    if (existingUIMD5 != latestMd5Hash) {
+      filesToDownload.push({
+        fileName: "ezpp!ui.dll",
+        fileURL: customUIDLLPath
+      })
+    }
+  } else
+    filesToDownload.push({
+      fileName: "ezpp!ui.dll",
+      fileURL: customUIDLLPath
+    })
+
   return filesToDownload;
 }
 
@@ -119,7 +143,6 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
   let completedIndex = 0;
   filesToUpdate.forEach(async (fileToUpdate) => {
     const filePath = path.join(osuPath, fileToUpdate.fileName);
-    console.log(filePath);
     if (await fu.existsAsync(filePath))
       await fs.promises.rm(filePath);
 
@@ -240,5 +263,5 @@ async function replaceUI(folder, isStart) {
 module.exports = {
   isValidOsuFolder, getLatestConfig, getUpdateFiles, filesThatNeedUpdate,
   downloadUpdateFiles, startOsuWithDevServer: startWithDevServer, setConfigValue,
-  findOsuInstallation, replaceUI, updateOsuCfg
+  findOsuInstallation, replaceUI, updateOsuCfg, getEZPPUIMD5
 }
