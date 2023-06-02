@@ -188,6 +188,28 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })
 
+  ipcRenderer.on('alert_message', async (event, path) => {
+    const res = await Swal.fire({
+      title: 'Hey!',
+      html: `<p class="text-white">Detected a osu! installation at</p><span class="quotetext">${path}</span><p class="text-white">Is this correct?</p>`,
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Yes',
+      cancelButtonText: 'No',
+    });
+    if (res.isConfirmed) {
+      $('#currentOsuPath').text(path);
+      ipcRenderer.send('alert_response', path);
+      Swal.fire({
+        title: 'Success!',
+        text: 'osu! folder set.',
+        icon: 'success',
+        confirmButtonText: 'Cool'
+      })
+      ipcRenderer.send("do-update-check");
+    }
+  })
+
   ipcRenderer.on('status_update', (event, status) => {
     switch (status.type) {
       case "up-to-date":

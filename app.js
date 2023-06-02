@@ -195,11 +195,19 @@ const run = () => {
         } else linuxWMCtrlFound = true;
       } else {
         const osuFolder = await config.get("osuPath");
+        console.log(osuFolder, !osuFolder || osuFolder == "");
         if (!osuFolder || osuFolder == "") {
           const foundFolder = await osuUtil.findOsuInstallation();
+          if (foundFolder && osuUtil.isValidOsuFolder(foundFolder)) {
+            mainWindow.webContents.send('alert_message', foundFolder);
+          }
           console.log("osu! Installation located at: ", foundFolder);
         }
       }
+    });
+    ipcMain.on("alert_response", async (event, path) => {
+      console.log("yes");
+      await config.set("osuPath", path);
     })
     app.on('activate', function () {
       if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
@@ -208,6 +216,8 @@ const run = () => {
       app.quit()
     })
     ipcMain.handle('launch', async () => {
+      const osuFolder = await config.get("osuPath");
+      await osuUtil.updateOsuCfg(path.join(osuFolder, "osu!.cfg"));
       const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
       const username = await config.get('username');
       const password = await config.get('password');
@@ -221,13 +231,17 @@ const run = () => {
         await osuUtil.setConfigValue(osuConfig.path, "Username", "");
         await osuUtil.setConfigValue(osuConfig.path, "Password", "");
       }
+      await osuUtil.replaceUI(osuFolder, true);
       rpc.updateState("Launching osu!...");
       isIngame = true;
       if (mainWindow.isVisible()) mainWindow.hide();
       const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
-        isIngame = false;
         if (!mainWindow.isVisible()) mainWindow.show();
-        await doUpdateCheck(mainWindow);
+        setTimeout(async () => {
+          isIngame = false;
+          await osuUtil.replaceUI(osuFolder, false);
+          await doUpdateCheck(mainWindow);
+        }, 2000);
       });
       return result;
     })
@@ -344,6 +358,7 @@ async function tryLogin(window) {
 
 async function doUpdateCheck(window) {
   const osuPath = await config.get("osuPath");
+  console.log("osuPath:", osuPath);
   if (!osuPath || osuPath.trim == "") {
     window.webContents.send('status_update', {
       type: "missing-folder"
