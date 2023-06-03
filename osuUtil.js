@@ -22,11 +22,8 @@ const osuEntities = [
   'bass_fx.dll',
   'collection.db',
   'd3dcompiler_47.dll',
-  'Data',
-  'Downloads',
   'libEGL.dll',
   'libGLESv2.dll',
-  'Logs',
   'Microsoft.Ink.dll',
   'OpenTK.dll',
   'osu!.cfg',
@@ -39,8 +36,6 @@ const osuEntities = [
   'presence.db',
   'pthreadGC2.dll',
   'scores.db',
-  'Skins',
-  'Songs'
 ]
 
 async function isValidOsuFolder(path) {
@@ -118,22 +113,27 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
     }
   }
 
-  const ezppUI = path.join(osuPath, customUIDLLName);
-  if (fs.existsSync(ezppUI)) {
+  const ezppUI = path.join(osuPath, "EZPPLauncher", customUIDLLName);
+  if (await fu.existsAsync(ezppUI)) {
     const latestMd5Hash = await getEZPPUIMD5();
     const binaryUIContents = await fs.promises.readFile(ezppUI);
     const existingUIMD5 = crypto.createHash("md5").update(binaryUIContents).digest("hex");
     if (existingUIMD5 != latestMd5Hash) {
+      console.log("MD5 Hashes dont match");
       filesToDownload.push({
+        folder: "EZPPLauncher",
         fileName: "ezpp!ui.dll",
         fileURL: customUIDLLPath
       })
     }
-  } else
+  } else {
+    console.log("Does not exist");
     filesToDownload.push({
+      folder: "EZPPLauncher",
       fileName: "ezpp!ui.dll",
       fileURL: customUIDLLPath
     })
+  }
 
   return filesToDownload;
 }
@@ -142,6 +142,12 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
   const eventEmitter = new EventEmitter();
   let completedIndex = 0;
   filesToUpdate.forEach(async (fileToUpdate) => {
+
+    if ("folder" in fileToUpdate) {
+      osuPath = path.join(osuPath, fileToUpdate.folder);
+      if (!(await fu.existsAsync(osuPath))) await fs.promises.mkdir(osuPath);
+    }
+
     const filePath = path.join(osuPath, fileToUpdate.fileName);
     if (await fu.existsAsync(filePath))
       await fs.promises.rm(filePath);
@@ -224,6 +230,13 @@ async function updateOsuCfg(cfgPath) {
       }
     }
   }
+
+  const ezppUI = path.join(osuFolder, customUIDLLName);
+  if (fs.existsSync(ezppUI)) {
+    const binaryFileContents = await fs.promises.readFile(ezppUI);
+    const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
+    newLines.push(`h_${customUIDLLName} = ${existingFileMD5}`);
+  }
   await fs.promises.writeFile(cfgPath, newLines.join("\n"), 'utf-8');
 }
 
@@ -243,17 +256,17 @@ async function findOsuInstallation() {
 }
 
 async function replaceUI(folder, isStart) {
-  const ezppUIFile = path.join(folder, customUIDLLName);
+  const ezppUIFile = path.join(folder, "EZPPLauncher", customUIDLLName);
   const osuUIFile = path.join(folder, "osu!ui.dll");
   const osuUIFileBackup = path.join(folder, "osu!ui.dll.bak");
   if (isStart) {
     if (fs.existsSync(osuUIFileBackup)) await fs.promises.unlink(osuUIFileBackup);
     await fs.promises.rename(osuUIFile, osuUIFileBackup);
     await new Promise((res) => setTimeout(res, 1000));
-    await fs.promises.rename(ezppUIFile, osuUIFile);
+    await fs.promises.copyFile(ezppUIFile, osuUIFile);
   } else {
     if (!fs.existsSync(osuUIFileBackup)) return;
-    await fs.promises.rename(osuUIFile, ezppUIFile);
+    await fs.promises.unlink(osuUIFile);
     await new Promise((res) => setTimeout(res, 1000));
     await fs.promises.rename(osuUIFileBackup, osuUIFile);
   }
