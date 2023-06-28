@@ -148,6 +148,7 @@ const run = () => {
       {
         label: 'Exit',
         click: function () {
+          if (isIngame) return;
           app.exit(0);
         }
       }
