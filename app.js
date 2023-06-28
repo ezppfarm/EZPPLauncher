@@ -157,6 +157,9 @@ const run = () => {
     tray.setContextMenu(trayMenu)
 
     mainWindow = createWindow();
+    mainWindow.on('close', (e) => {
+      if (isIngame) e.preventDefault();
+    });
     mainWindow.once('show', async () => {
       await updateConfigVars(mainWindow);
       await tryLogin(mainWindow);
@@ -230,6 +233,7 @@ const run = () => {
       await osuUtil.replaceUI(osuFolder, true);
       rpc.updateState("Launching osu!...");
       isIngame = true;
+      mainWindow.closable = false;
       if (mainWindow.isVisible()) mainWindow.hide();
       const result = await osuUtil.startOsuWithDevServer(tempOsuPath, "ez-pp.farm", async () => {
         if (!mainWindow.isVisible()) mainWindow.show();
@@ -237,6 +241,7 @@ const run = () => {
           isIngame = false;
           await osuUtil.replaceUI(osuFolder, false);
           await doUpdateCheck(mainWindow);
+          mainWindow.closable = true;
         }, 2000);
       });
       return result;
