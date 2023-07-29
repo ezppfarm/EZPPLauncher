@@ -89,9 +89,17 @@ async function getEZPPUIMD5() {
 async function filesThatNeedUpdate(osuPath, updateFiles) {
   const filesToDownload = [];
   for (const updatedFile of updateFiles) {
-    const fileName = updatedFile.filename;
-    const fileHash = updatedFile.file_hash;
-    const fileURL = updatedFile.url_full;
+    let fileName = updatedFile.filename;
+    let fileHash = updatedFile.file_hash;
+    let fileURL = updatedFile.url_full;
+
+    if ("url_patch" in updatedFile && updatedFile.url_patch != undefined) {
+      const stripped = updatedFile.url_patch.split("_");
+      fileHash = stripped[stripped.length - 1];
+      const lastIndex = fileURL.lastIndexOf("/");
+      const baseUrl = fileURL.slice(0, lastIndex);
+      fileURL = baseUrl + "/f_" + fileHash;
+    }
 
     if (ignoredOsuEntities.includes(fileName)) continue;
 
@@ -103,7 +111,7 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
         filesToDownload.push({
           fileName,
           fileURL
-        })
+        });
       }
     } else {
       filesToDownload.push({
@@ -119,7 +127,6 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
     const binaryUIContents = await fs.promises.readFile(ezppUI);
     const existingUIMD5 = crypto.createHash("md5").update(binaryUIContents).digest("hex");
     if (existingUIMD5 != latestMd5Hash) {
-      console.log("MD5 Hashes dont match");
       filesToDownload.push({
         folder: "EZPPLauncher",
         fileName: "ezpp!ui.dll",
@@ -127,7 +134,6 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
       })
     }
   } else {
-    console.log("Does not exist");
     filesToDownload.push({
       folder: "EZPPLauncher",
       fileName: "ezpp!ui.dll",
