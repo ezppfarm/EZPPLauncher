@@ -14,6 +14,7 @@ const appInfo = require('./appInfo');
 const executeUtil = require("./executeUtil");
 const { DownloaderHelper } = require('node-downloader-helper');
 
+let shouldPatch = false;
 let patcherLoc = undefined;
 let tempOsuPath;
 let osuWindowInfo;
@@ -40,7 +41,7 @@ const run = () => {
             //TODO: do patch
             setTimeout(() => {
               console.log("yes");
-              if (patcherLoc) {
+              if (shouldPatch) {
                 console.log("running " + patcherLoc + " in dir " + path.dirname(patcherLoc));
                 executeUtil.runFileDetached(path.dirname(patcherLoc), patcherLoc);
               }
@@ -226,10 +227,9 @@ const run = () => {
     })
     ipcMain.handle('launch', async (e, opts) => {
       console.log(opts);
-      const patch = "patch" in opts && opts.patch;
+      shouldPatch = "patch" in opts && opts.patch;
       const osuFolder = await config.get("osuPath");
-      if (patch) patcherLoc = path.join(osuFolder, "EZPPLauncher", "patcher.exe");
-      else patcherLoc = undefined;
+      patcherLoc = path.join(osuFolder, "EZPPLauncher", "patcher.exe");
 
       await osuUtil.updateOsuCfg(path.join(osuFolder, "osu!.cfg"));
       const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
