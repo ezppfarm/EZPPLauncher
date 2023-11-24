@@ -11,6 +11,14 @@ const checkUpdateURL = "https://osu.ppy.sh/web/check-updates.php?action=check&st
 const customUIDLLPath = "https://ez-pp.farm/assets/ezpp!ui.dll";
 const customUIDLLHash = "https://ez-pp.farm/assets/ezpp!ui.md5";
 const customUIDLLName = "ezpp!ui.dll";
+
+const patcherHook = "https://ez-pp.farm/assets/patch.hook.dll";
+const patcherHookHash = "https://ez-pp.farm/assets/patch.hook.md5";
+const patcherHookName = "patch.hook.dll";
+const patcherExe = "https://ez-pp.farm/assets/patcher.exe";
+const patcherExeHash = "https://ez-pp.farm/assets/patcher.md5"
+const patcherExeName = "patcher.exe";
+
 const ignoredOsuEntities = [
   'osu!auth.dll',
 ]
@@ -86,6 +94,11 @@ async function getEZPPUIMD5() {
   return releaseData.data;
 }
 
+async function getMD5Hash(url) {
+  const releaseData = await axios.get(url, {});
+  return releaseData.data;
+}
+
 async function filesThatNeedUpdate(osuPath, updateFiles) {
   const filesToDownload = [];
   for (const updatedFile of updateFiles) {
@@ -122,11 +135,56 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
   }
 
   const ezppUI = path.join(osuPath, "EZPPLauncher", customUIDLLName);
+  const hook = path.join(osuPath, "EZPPLauncher", patcherHookName);
+  const patcher = path.join(osuPath, "EZPPLauncher", patcherExeName);
+
+  if (await fu.existsAsync(hook)) {
+    const latestHookMd5Hash = (await getMD5Hash(patcherHookHash)).toLowerCase().trim();
+    const binaryHookContents = await fs.promises.readFile(hook);
+    const existingHookMD5 = crypto.createHash("md5").update(binaryHookContents).digest("hex").toLowerCase().trim();
+    if (existingHookMD5 != latestHookMd5Hash) {
+      filesToDownload.push({
+        folder: "EZPPLauncher",
+        fileName: patcherHookName,
+        fileURL: patcherHook
+      });
+      console.log("patcher has wrong hashsum (" + existingHookMD5 + " / " + latestHookMd5Hash + ")");
+    }
+  } else {
+    filesToDownload.push({
+      folder: "EZPPLauncher",
+      fileName: patcherHookName,
+      fileURL: patcherHook
+    });
+    console.log("patcher does not exist");
+  }
+
+  if (await fu.existsAsync(patcher)) {
+    const latestPatchMd5Hash = (await getMD5Hash(patcherExeHash)).toLowerCase().trim();
+    const binaryPatchContents = await fs.promises.readFile(patcher);
+    const existingPatchMD5 = crypto.createHash("md5").update(binaryPatchContents).digest("hex").toLowerCase().trim();
+    if (existingPatchMD5 != latestPatchMd5Hash) {
+      filesToDownload.push({
+        folder: "EZPPLauncher",
+        fileName: patcherExeName,
+        fileURL: patcherExe
+      });
+      console.log("patcher has wrong hashsum (" + existingPatchMD5 + " / " + latestPatchMd5Hash + ")")
+    }
+  } else {
+    filesToDownload.push({
+      folder: "EZPPLauncher",
+      fileName: patcherExeName,
+      fileURL: patcherExe
+    });
+    console.log("patcher does not exist");
+  }
+
   if (await fu.existsAsync(ezppUI)) {
-    const latestMd5Hash = await getEZPPUIMD5();
+    const latestUIMd5Hash = (await getMD5Hash(customUIDLLHash)).toLowerCase().trim();
     const binaryUIContents = await fs.promises.readFile(ezppUI);
-    const existingUIMD5 = crypto.createHash("md5").update(binaryUIContents).digest("hex");
-    if (existingUIMD5 != latestMd5Hash) {
+    const existingUIMD5 = crypto.createHash("md5").update(binaryUIContents).digest("hex").toLowerCase().trim();
+    if (existingUIMD5 != latestUIMd5Hash) {
       filesToDownload.push({
         folder: "EZPPLauncher",
         fileName: "ezpp!ui.dll",
@@ -141,6 +199,8 @@ async function filesThatNeedUpdate(osuPath, updateFiles) {
     })
   }
 
+  console.log(JSON.stringify(filesToDownload, null, 2))
+
   return filesToDownload;
 }
 
@@ -149,16 +209,18 @@ async function downloadUpdateFiles(osuPath, filesToUpdate) {
   let completedIndex = 0;
   filesToUpdate.forEach(async (fileToUpdate) => {
 
+    let tempPath = osuPath;
+
     if ("folder" in fileToUpdate) {
-      osuPath = path.join(osuPath, fileToUpdate.folder);
-      if (!(await fu.existsAsync(osuPath))) await fs.promises.mkdir(osuPath);
+      tempPath = path.join(tempPath, fileToUpdate.folder);
+      if (!(await fu.existsAsync(tempPath))) await fs.promises.mkdir(tempPath);
     }
 
-    const filePath = path.join(osuPath, fileToUpdate.fileName);
+    const filePath = path.join(tempPath, fileToUpdate.fileName);
     if (await fu.existsAsync(filePath))
       await fs.promises.rm(filePath);
 
-    const fileDownload = new DownloaderHelper(fileToUpdate.fileURL, osuPath, {
+    const fileDownload = new DownloaderHelper(fileToUpdate.fileURL, tempPath, {
       fileName: fileToUpdate.fileName,
       override: true,
     });

@@ -11,8 +11,10 @@ const windowName = require('get-window-by-name');
 const terminalUtil = require('./terminalUtil');
 const osUtil = require('./osUtil');
 const appInfo = require('./appInfo');
+const executeUtil = require("./executeUtil");
 const { DownloaderHelper } = require('node-downloader-helper');
 
+let patcherLoc = undefined;
 let tempOsuPath;
 let osuWindowInfo;
 let isIngame;
@@ -36,6 +38,13 @@ const run = () => {
           if (!osuLoaded) {
             osuLoaded = true;
             //TODO: do patch
+            setTimeout(() => {
+              console.log("yes");
+              if (patcherLoc) {
+                console.log("running " + patcherLoc + " in dir " + path.dirname(patcherLoc));
+                executeUtil.runFileDetached(path.dirname(patcherLoc), patcherLoc);
+              }
+            }, 5000);
           }
           const windowTitle = firstInstance.processTitle;
           let rpcOsuVersion = "";
@@ -215,8 +224,13 @@ const run = () => {
     app.on('window-all-closed', () => {
       app.quit()
     })
-    ipcMain.handle('launch', async () => {
+    ipcMain.handle('launch', async (e, opts) => {
+      console.log(opts);
+      const patch = "patch" in opts && opts.patch;
       const osuFolder = await config.get("osuPath");
+      if (patch) patcherLoc = path.join(osuFolder, "EZPPLauncher", "patcher.exe");
+      else patcherLoc = undefined;
+
       await osuUtil.updateOsuCfg(path.join(osuFolder, "osu!.cfg"));
       const osuConfig = await osuUtil.getLatestConfig(tempOsuPath);
       const username = await config.get('username');
@@ -240,6 +254,7 @@ const run = () => {
         if (!mainWindow.isVisible()) mainWindow.show();
         setTimeout(async () => {
           isIngame = false;
+          osuLoaded = false;
           await osuUtil.replaceUI(osuFolder, false);
           await doUpdateCheck(mainWindow);
           mainWindow.closable = true;

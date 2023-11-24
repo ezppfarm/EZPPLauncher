@@ -48,7 +48,7 @@ window.addEventListener('DOMContentLoaded', () => {
       case "up-to-date":
         $("#launch-btn").attr('disabled', true);
         $('#launch-btn').html('Launching...');
-        const result = await ipcRenderer.invoke("launch");
+        const result = await ipcRenderer.invoke("launch", { patch: true });
         if (!result) {
           Swal.fire({
             title: 'Uh oh!',

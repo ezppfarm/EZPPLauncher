@@ -4,11 +4,12 @@ module.exports = {
         childProcess.execFile(file, args, {
             cwd: folder
         }, (_err, _stdout, _stderr) => {
-            onExit();
+            if (onExit)
+                onExit();
         });
     },
     runFileDetached: (folder, file, args) => {
-        const subprocess = childProcess.spawn(file + " " + args, {
+        const subprocess = childProcess.spawn(file + (args ? " " + args : ''), {
             cwd: folder,
             detached: true,
             stdio: 'ignore'
