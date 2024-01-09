@@ -5,7 +5,6 @@ window.addEventListener("DOMContentLoaded", () => {
     backgroundColor: TitlebarColor.fromHex("#202020"),
     itemBackgroundColor: TitlebarColor.fromHex("#202020"),
     menu: null,
-    
     enableMnemonics: false,
     maximizable: false,
   });
