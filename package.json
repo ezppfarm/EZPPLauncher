@@ -1,0 +1,62 @@
+{
+  "name": "ezpplauncher-next",
+  "version": "2.0.0",
+  "description": "EZPPLauncher rewritten with Svelte.",
+  "private": false,
+  "license": "MIT",
+  "main": "main.js",
+  "author": "HorizonCode <horizoncode88@gmail.com>",
+  "build": {
+    "icon": "public/favicon.png",
+    "productName": "EZPPLauncher",
+    "files": [
+      "public/**/*",
+      "main.js",
+      "preload.js"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "linux": {},
+    "mac": {}
+  },
+  "scripts": {
+    "build": "rollup -c --bundleConfigAsCjs",
+    "dev": "rollup -c -w --bundleConfigAsCjs",
+    "start": "sirv public --no-clear",
+    "electron": "wait-on http://localhost:8080 && electron .",
+    "electron-dev": "concurrently \"yarn run dev\" \"yarn run electron\"",
+    "preelectron-pack": "yarn run build",
+    "electron-pack": "electron-builder"
+  },
+  "dependencies": {
+    "custom-electron-titlebar": "^4.2.7",
+    "electron-serve": "^1.1.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-image": "^3.0.3",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@sveltejs/vite-plugin-svelte": "^3.0.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^21.2.0",
+    "electron-builder": "^23.6.0",
+    "flowbite": "^2.2.1",
+    "flowbite-svelte": "^0.44.21",
+    "postcss": "^8.4.32",
+    "postcss-load-config": "^5.0.2",
+    "rollup": "^4.9.2",
+    "rollup-plugin-css-only": "^4.5.2",
+    "rollup-plugin-livereload": "^2.0.5",
+    "rollup-plugin-postcss": "^4.0.2",
+    "rollup-plugin-svelte": "^7.1.6",
+    "sirv-cli": "^2.0.2",
+    "svelte": "^4.2.8",
+    "tailwindcss": "^3.3.6",
+    "wait-on": "^7.2.0"
+  }
+}
