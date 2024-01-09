@@ -5,18 +5,28 @@
     DropdownItem,
     DropdownHeader,
     DropdownDivider,
+    Button,
+    Checkbox,
+    DarkMode,
+    Progressbar,
   } from "flowbite-svelte";
   import ezppLogo from "../public/favicon.png";
+
+  let patch = true;
+  let rand = 0;
 </script>
 
 <div class="p-2 flex flex-row justify-between items-center">
   <div class="flex flex-row items-center">
-    <img src={ezppLogo} class="w-12 h-12 mr-2" />
-    <span class="text-gray-100 text-xl font-extralight">EZPPLauncher</span>
+    <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
+    <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight"
+      >EZPPLauncher</span
+    >
   </div>
-  <div class="w-fill cursor-pointer flex md:order-2">
+  <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
+    <DarkMode class="dark:border-gray-700"></DarkMode>
     <Avatar
-      class="rounded-lg hover:ring hover:ring-4 hover:ring-gray-800"
+      class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
       src="https://a.ez-pp.farm/1001"
       id="avatar-menu"
     />
@@ -29,23 +39,41 @@
       >
     </DropdownHeader>
     <DropdownItem
-      class="border-0 !bg-gray-700 active:!bg-gray-600 hover:!bg-gray-800 transition-colors"
+      class="border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
       >Profile</DropdownItem
     >
     <DropdownItem
-      class="border-0 !bg-gray-700 active:!bg-gray-600 hover:!bg-gray-800 transition-colors"
+      class="border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
       >Settings</DropdownItem
     >
     <DropdownDivider />
     <DropdownItem
-      class="border-0 !bg-gray-700 active:!bg-gray-600 hover:!bg-gray-800 transition-colors"
+      class="border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
       >Sign out</DropdownItem
     >
   </Dropdown>
 </div>
 
-<main class="p-1">
-  <div class="container border border-gray-700 rounded-lg"></div>
+<main class="p-5">
+  <div
+    class="container flex flex-col items-center justify-center gap-5 border border-gray-300 dark:border-gray-700 rounded-lg"
+  >
+    <Button
+      color="light"
+      size="xl"
+      on:click={() => (rand = Math.random() * 100)}>Launch</Button
+    >
+    <Checkbox color="primary" bind:checked={patch}>
+      Patching {patch ? "enabled" : "disabled"}
+    </Checkbox>
+    <Progressbar
+      animate={true}
+      progress={rand}
+      labelInside={true}
+      size="h-6"
+      labelInsideClass="bg-primary-600 drop-shadow-xl text-gray-100 text-base font-medium text-center p-1 leading-none rounded-full"
+    />
+  </div>
 </main>
 
 <style>
@@ -53,19 +81,5 @@
     text-align: center;
     padding: 1em;
     margin: 0 auto;
-  }
-  h1 {
-    font-size: 2rem;
-    margin: 0;
-    font-weight: 300;
-    font-style: normal;
-    color: #ccc;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    text-shadow: 0 0 1px #000;
-    text-align: center;
-    padding: 0.5em 0;
-    border-bottom: 1px solid #353535;
-    margin-bottom: 1.5rem;
   }
 </style>
