@@ -20,12 +20,11 @@ function createWindow() {
 
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 600,
+    height: 380,
     resizable: false,
     frame: false,
     titleBarStyle: "hidden",
-    titleBarOverlay: true,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, "preload.js"),
@@ -55,8 +54,10 @@ function createWindow() {
   // loadURL(mainWindow);
 
   // Open the DevTools and also disable Electron Security Warning.
-  // process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = true;
-  // mainWindow.webContents.openDevTools();
+  if (isDev()) {
+    process.env["ELECTRON_DISABLE_SECURITY_WARNINGS"] = true;
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   // Emitted when the window is closed.
   mainWindow.on("closed", function () {
