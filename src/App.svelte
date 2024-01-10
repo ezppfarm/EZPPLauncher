@@ -23,6 +23,7 @@
 
   let patch = true;
   let loading = false;
+  let currentStatus = "Preparing launch...";
   let rand = 0;
 </script>
 
@@ -34,7 +35,6 @@
     >
   </div>
   <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
-    <DarkMode class="dark:border-gray-700"></DarkMode>
     <Avatar
       class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
       src={loggedIn ? "https://a.ez-pp.farm/1001" : "https://a.ez-pp.farm/0"}
@@ -102,6 +102,7 @@
     <Button
       color="light"
       size="xl"
+      class="active:!bg-gray-900"
       on:click={() => {
         rand = Math.random() * 100;
         loading = true;
@@ -112,7 +113,7 @@
     </Checkbox>
     {#if loading}
       <div class="w-full flex flex-col justify-center items-center gap-2">
-        <p class="m-0 p-0 dark:text-gray-100">Waiting...</p>
+        <p class="m-0 p-0 dark:text-gray-100">{currentStatus}</p>
         <Progressbar
           animate={true}
           progress={rand}

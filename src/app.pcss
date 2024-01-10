@@ -12,17 +12,8 @@ html .cet-titlebar {
   color: #202020 !important;
 }
 
-html.dark .cet-titlebar {
-  background-color: #202020 !important;
-  color: #ececec !important;
-}
-
 html .cet-titlebar .cet-control-icon svg {
   fill: #000;
-}
-
-html.dark .cet-titlebar .cet-control-icon svg {
-  fill: #fff;
 }
 
 .cet-titlebar .cet-icon {
@@ -42,15 +33,27 @@ html.dark .cet-titlebar .cet-control-icon svg {
   animation: progress-loading 5s ease-in-out infinite;
 }
 
-html.dark .indeterminate {
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgb(217 5 89) -1%,
-    rgb(217 5 89) 10%,
-    #535353 10%,
-    #535353 90%
-  );
+@media (prefers-color-scheme: dark) {
+  .indeterminate {
+    background-image: repeating-linear-gradient(
+      90deg,
+      rgb(217 5 89) -1%,
+      rgb(217 5 89) 10%,
+      #535353 10%,
+      #535353 90%
+    );
+  }
+
+  html .cet-titlebar .cet-control-icon svg {
+    fill: #fff;
+  }
+
+  html .cet-titlebar {
+    background-color: #202020 !important;
+    color: #ececec !important;
+  }
 }
+
 @keyframes progress-loading {
   50% {
     background-position-x: -115%;
