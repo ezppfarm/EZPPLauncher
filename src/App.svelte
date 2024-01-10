@@ -9,18 +9,14 @@
     Checkbox,
     DarkMode,
   } from "flowbite-svelte";
-
   import Progressbar from "./lib/Progressbar.svelte";
-
   import {
-    AddressCardSolid,
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
-    ReplyAllSolid,
     UserPlusSolid,
     UserSettingsSolid,
+    UserSolid,
   } from "flowbite-svelte-icons";
-
   import ezppLogo from "../public/favicon.png";
 
   let loggedIn = true;
@@ -58,7 +54,7 @@
       <DropdownItem
         class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
       >
-        <AddressCardSolid class="select-none outline-none border-none" />
+        <UserSolid class="select-none outline-none border-none" />
         Profile
       </DropdownItem>
     {/if}
