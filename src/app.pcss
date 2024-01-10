@@ -28,3 +28,31 @@ html.dark .cet-titlebar .cet-control-icon svg {
 .cet-titlebar .cet-icon {
   display: none;
 }
+
+.indeterminate {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(217 5 89) -1%,
+    rgb(217 5 89) 10%,
+    #d3d3d3 10%,
+    #d3d3d3 90%
+  );
+  background-size: 200%;
+  background-position-x: 15%;
+  animation: progress-loading 5s ease-in-out infinite;
+}
+
+html.dark .indeterminate {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(217 5 89) -1%,
+    rgb(217 5 89) 10%,
+    #535353 10%,
+    #535353 90%
+  );
+}
+@keyframes progress-loading {
+  50% {
+    background-position-x: -115%;
+  }
+}

@@ -4,6 +4,11 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules/*", "__sapper__/*", "public/*"],
   "compilerOptions": {
-    "typeRoots": ["node_modules/@types", "src/types"]
+    "typeRoots": [
+      "node_modules/@types",
+      "node_modules/@sveltejs",
+      "node_modules/@sveltejs/types",
+      "src/types"
+    ]
   }
 }

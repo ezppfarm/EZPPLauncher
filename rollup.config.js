@@ -8,6 +8,7 @@ import postcss from "rollup-plugin-postcss";
 import image from "@rollup/plugin-image";
 import sveltePreprocess from "svelte-preprocess";
 import typescript from "@rollup/plugin-typescript";
+import progress from "rollup-plugin-progress";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -46,6 +47,7 @@ export default {
     file: "public/build/bundle.js",
   },
   plugins: [
+    progress({ clearLine: true }),
     svelte({
       preprocess: sveltePreprocess({ sourceMap: !production }),
       compilerOptions: {
