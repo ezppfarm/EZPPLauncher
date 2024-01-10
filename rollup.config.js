@@ -70,11 +70,11 @@ export default {
       browser: true,
       dedupe: ["svelte"],
     }),
-    commonjs(),
     typescript({
       sourceMap: !production,
       inlineSources: !production,
     }),
+    commonjs(),
     image(),
 
     // In dev mode, call `npm run start` once

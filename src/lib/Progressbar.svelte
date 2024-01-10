@@ -3,7 +3,7 @@
   import { tweened } from "svelte/motion";
   import { twMerge, twJoin } from "tailwind-merge";
 
-  export let progress: string | number | undefined = "45";
+  export let progress: string | number | undefined | null = "45";
   export let precision = 0;
   export let tweenDuration = 400;
   export let animate = false;
@@ -15,7 +15,7 @@
   export let labelInsideClass =
     "text-primary-100 text-xs font-medium text-center p-0.5 leading-none rounded-full";
   export let divClass = "w-full bg-gray-200 rounded-full dark:bg-gray-700";
-  export let indeterminate = false;
+  export let indeterminate = progress == null;
 
   const barColors: Record<string, string> = {
     primary: "bg-primary-600",

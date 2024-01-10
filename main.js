@@ -1,5 +1,5 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow, Menu } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
@@ -13,6 +13,13 @@ let mainWindow;
 
 function isDev() {
   return !app.isPackaged;
+}
+
+function registerIPCPipes() {
+  ipcMain.handle("ezpplauncher:login", (e, args) => {
+    console.log(args);
+    return "yes";
+  });
 }
 
 function createWindow() {
@@ -49,6 +56,8 @@ function createWindow() {
   } else {
     loadURL(mainWindow);
   }
+
+  registerIPCPipes();
 
   // Uncomment the following line of code when app is ready to be packaged.
   // loadURL(mainWindow);
