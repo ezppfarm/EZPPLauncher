@@ -12,7 +12,11 @@
     class="container flex flex-col items-center justify-center gap-5 rounded-lg p-3"
   >
     <ButtonGroup class="w-full">
-      <Input type="text" placeholder="Path to your osu! installation" />
+      <Input
+        type="text"
+        placeholder="Path to your osu! installation"
+        readonly
+      />
       <Button color="light" class="dark:active:!bg-gray-900"
         ><FolderSolid
           size="sm"
