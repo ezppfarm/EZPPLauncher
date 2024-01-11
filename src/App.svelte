@@ -5,16 +5,11 @@
     DropdownItem,
     DropdownHeader,
     DropdownDivider,
-    Button,
-    Checkbox,
   } from "flowbite-svelte";
-  import Progressbar from "./lib/Progressbar.svelte";
   import {
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
-    UserPlusSolid,
     UserSettingsSolid,
-    UserSolid,
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
   import { currentPage, currentUser } from "./storage/localStore";
@@ -45,9 +40,9 @@
 <div class="p-2 flex flex-row justify-between items-center">
   <div class="flex flex-row items-center">
     <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
-    <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight"
-      >EZPPLauncher</span
-    >
+    <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight">
+      EZPPLauncher
+    </span>
   </div>
   {#if $currentPage == Page.Launch}
     <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
@@ -68,14 +63,6 @@
           {loggedIn ? user?.email : "Please log in!"}
         </span>
       </DropdownHeader>
-      {#if loggedIn}
-        <!-- <DropdownItem
-          class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-        >
-          <UserSolid class="select-none outline-none border-none" />
-          Profile
-        </DropdownItem> -->
-      {/if}
       <DropdownItem
         class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
         on:click={() => currentPage.set(Page.Settings)}
@@ -104,12 +91,6 @@
           />
           Login
         </DropdownItem>
-        <!-- <DropdownItem
-          class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-        >
-          <UserPlusSolid class="select-none outline-none border-none" />
-          Register
-        </DropdownItem> -->
       {/if}
     </Dropdown>
   {/if}
