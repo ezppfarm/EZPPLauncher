@@ -1,9 +1,8 @@
 <script lang="ts">
   import { Button, Checkbox } from "flowbite-svelte";
   import Progressbar from "../lib/Progressbar.svelte";
+  import { launching, patch } from "./../storage/localStore";
   let progressbarFix = true;
-  let launching = false;
-  let patch = true;
 
   setTimeout(() => {
     progressbarFix = false;
@@ -19,15 +18,19 @@
     <Button
       color="light"
       size="xl"
-      class="dark:active:!bg-gray-900 {launching
+      class="dark:active:!bg-gray-900 {$launching
         ? ''
         : 'active:scale-95 '}transition-transform duration-75"
-      disabled={launching}
-      on:click={() => (launching = !launching)}>Launch</Button
+      disabled={$launching}
+      on:click={() => launching.set(!$launching)}>Launch</Button
     >
-    <Checkbox disabled={launching} bind:checked={patch}>Patch</Checkbox>
+    <Checkbox
+      disabled={$launching}
+      bind:checked={$patch}
+      on:click={() => patch.set(!$patch)}>Patch</Checkbox
+    >
     <div
-      class="w-full flex flex-col justify-center items-center gap-2 mt-2 {launching
+      class="w-full flex flex-col justify-center items-center gap-2 mt-2 {$launching
         ? 'animate-fadeIn '
         : 'animate-fadeOut '}{progressbarFix ? '!opacity-0' : 'opacity-0'}"
     >
