@@ -12,7 +12,7 @@
     UserSettingsSolid,
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
-  import { currentPage, currentUser } from "./storage/localStore";
+  import { currentPage, currentUser, launching } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
   import Launch from "./pages/Launch.svelte";
@@ -65,7 +65,9 @@
       </DropdownHeader>
       <DropdownItem
         class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-        on:click={() => currentPage.set(Page.Settings)}
+        on:click={() => {
+          if (!$launching) currentPage.set(Page.Settings);
+        }}
       >
         <UserSettingsSolid class="select-none outline-none border-none" />
         Settings
@@ -74,7 +76,9 @@
       {#if loggedIn}
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-          on:click={logout}
+          on:click={() => {
+            if (!$launching) logout();
+          }}
         >
           <ArrowRightFromBracketSolid
             class="select-none outline-none border-none"
@@ -84,7 +88,9 @@
       {:else}
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-          on:click={() => currentPage.set(Page.Login)}
+          on:click={() => {
+            if (!$launching) currentPage.set(Page.Login);
+          }}
         >
           <ArrowRightToBracketSolid
             class="select-none outline-none border-none"
