@@ -1,16 +1,17 @@
 <script lang="ts">
   import { Input, Button, Spinner, Checkbox } from "flowbite-svelte";
-  import { performLogin } from "../util/loginUtil";
   import type { User } from "../types/user";
   import type { Error } from "../types/error";
   import { currentPage, currentUser, startup } from "../storage/localStore";
   import toast from "svelte-french-toast";
   import { Page } from "../consts/pages";
+  import { EyeSlashSolid, EyeSolid } from "flowbite-svelte-icons";
 
   let loading = false;
   let username = "";
   let password = "";
   let saveCredentials = false;
+  let showPassword = false;
 
   const processLogin = async () => {
     loading = true;
@@ -122,12 +123,25 @@
       bind:value={username}
     />
     <Input
-      type="password"
+      type={showPassword ? "text" : "password"}
       placeholder="Password"
       size="md"
       disabled={loading}
       bind:value={password}
-    />
+    >
+      <Button
+        slot="right"
+        color="none"
+        class="!outline-none !ring-0 !p-0 !m-0 !bg-transparent !border-none"
+        on:click={() => (showPassword = !showPassword)}
+      >
+        {#if showPassword}
+          <EyeSolid class="outline-none border-none" />
+        {:else}
+          <EyeSlashSolid class="outline-none border-none" />
+        {/if}
+      </Button>
+    </Input>
     <Checkbox bind:checked={saveCredentials}>Save credentials</Checkbox>
     <div class="flex flex-col justify-center items-center gap-5 mt-1">
       <Button
