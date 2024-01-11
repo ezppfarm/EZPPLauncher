@@ -1,4 +1,5 @@
 const { Titlebar, TitlebarColor } = require("custom-electron-titlebar");
+const { ipcRenderer } = require("electron");
 
 window.addEventListener("DOMContentLoaded", () => {
   const titlebar = new Titlebar({
@@ -8,6 +9,12 @@ window.addEventListener("DOMContentLoaded", () => {
     enableMnemonics: false,
     maximizable: false,
   });
-
-  //titlebar.updateTitle(`${appInfo.appName} ${appInfo.appVersion}`);
 });
+
+window.addEventListener("login-attempt", async (e) => {
+  const loginResult = await ipcRenderer.invoke("ezpplauncher:login", {
+    username: e.detail.username,
+    password: e.detail.password,
+  });
+  window.dispatchEvent(new CustomEvent("login-result", { detail: loginResult }));
+})

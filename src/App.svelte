@@ -17,13 +17,23 @@
     UserSolid,
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
-  import { currentPage } from "./storage/localStore";
+  import { currentPage, currentUser } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
   import Launch from "./pages/Launch.svelte";
+  import { Toaster } from "svelte-french-toast";
+  import type { User } from "./types/user";
 
+  let user: User | undefined = undefined;
   let loggedIn = false;
+
+  currentUser.subscribe((newUser) => {
+    loggedIn = newUser != undefined;
+    user = newUser;
+  });
 </script>
+
+<Toaster></Toaster>
 
 <div class="p-2 flex flex-row justify-between items-center">
   <div class="flex flex-row items-center">
@@ -36,38 +46,43 @@
     <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
       <Avatar
         class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
-        src={loggedIn ? "https://a.ez-pp.farm/1001" : "https://a.ez-pp.farm/0"}
+        src={loggedIn
+          ? "https://a.ez-pp.farm/" + user?.id
+          : "https://a.ez-pp.farm/0"}
         id="avatar-menu"
       />
     </div>
     <Dropdown placement="bottom" triggeredBy="#avatar-menu">
       <DropdownHeader>
-        <span class="block text-sm">{loggedIn ? "Quetzalcoatl" : "Guest"}</span>
+        <span class="block text-sm">{loggedIn ? user?.name : "Guest"}</span>
         <span
           class="block truncate text-sm font-medium text-gray-500 dark:text-gray-200"
         >
-          {loggedIn ? "me@horizonco.de" : "Please log in!"}
+          {loggedIn ? user?.email : "Please log in!"}
         </span>
       </DropdownHeader>
       {#if loggedIn}
-        <DropdownItem
+        <!-- <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
         >
           <UserSolid class="select-none outline-none border-none" />
           Profile
-        </DropdownItem>
+        </DropdownItem> -->
       {/if}
-      <DropdownItem
+      <!-- <DropdownItem
         class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
       >
         <UserSettingsSolid class="select-none outline-none border-none" />
         Settings
-      </DropdownItem>
-      <DropdownDivider />
+      </DropdownItem> 
+      <DropdownDivider />-->
       {#if loggedIn}
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-          on:click={() => (loggedIn = false)}
+          on:click={() => {
+            currentUser.set(undefined);
+            currentPage.set(Page.Login);
+          }}
         >
           <ArrowRightFromBracketSolid
             class="select-none outline-none border-none"
@@ -84,12 +99,12 @@
           />
           Login
         </DropdownItem>
-        <DropdownItem
+        <!-- <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
         >
           <UserPlusSolid class="select-none outline-none border-none" />
           Register
-        </DropdownItem>
+        </DropdownItem> -->
       {/if}
     </Dropdown>
   {/if}

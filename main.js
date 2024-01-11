@@ -16,9 +16,23 @@ function isDev() {
 }
 
 function registerIPCPipes() {
-  ipcMain.handle("ezpplauncher:login", (e, args) => {
-    console.log(args);
-    return "yes";
+  ipcMain.handle("ezpplauncher:login", async (e, args) => {
+    const fetchResult = await fetch("https://ez-pp.farm/login/check", {
+      method: "POST",
+      body: JSON.stringify({ username: args.username, password: args.password }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (fetchResult.ok) {
+      const result = await fetchResult.json();
+      if (result.code == 200) return result;
+    }
+    return {
+      code: 403,
+      message: "Invalid username or password.",
+    }
   });
 }
 
