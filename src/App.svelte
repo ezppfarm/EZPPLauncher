@@ -23,6 +23,7 @@
   import Launch from "./pages/Launch.svelte";
   import { Toaster } from "svelte-french-toast";
   import type { User } from "./types/user";
+  import Settings from "./pages/Settings.svelte";
 
   let user: User | undefined = undefined;
   let loggedIn = false;
@@ -48,7 +49,7 @@
       >EZPPLauncher</span
     >
   </div>
-  {#if $currentPage != Page.Login}
+  {#if $currentPage == Page.Launch}
     <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
       <Avatar
         class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
@@ -75,13 +76,14 @@
           Profile
         </DropdownItem> -->
       {/if}
-      <!-- <DropdownItem
+      <DropdownItem
         class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+        on:click={() => currentPage.set(Page.Settings)}
       >
         <UserSettingsSolid class="select-none outline-none border-none" />
         Settings
-      </DropdownItem> 
-      <DropdownDivider />-->
+      </DropdownItem>
+      <DropdownDivider />
       {#if loggedIn}
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
@@ -115,6 +117,8 @@
 
 {#if $currentPage == Page.Login}
   <Login />
+{:else if $currentPage == Page.Settings}
+  <Settings />
 {:else}
   <Launch />
 {/if}
