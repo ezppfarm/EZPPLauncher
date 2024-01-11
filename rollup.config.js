@@ -9,6 +9,7 @@ import image from "@rollup/plugin-image";
 import sveltePreprocess from "svelte-preprocess";
 import typescript from "@rollup/plugin-typescript";
 import progress from "rollup-plugin-progress";
+import findUnused from "rollup-plugin-unused";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -47,6 +48,7 @@ export default {
     file: "public/build/bundle.js",
   },
   plugins: [
+    findUnused(),
     progress({ clearLine: true }),
     svelte({
       preprocess: sveltePreprocess({ sourceMap: !production }),
