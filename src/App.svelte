@@ -4,15 +4,20 @@
     Dropdown,
     DropdownItem,
     DropdownHeader,
-    DropdownDivider,
+    DropdownDivider
   } from "flowbite-svelte";
   import {
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
-    UserSettingsSolid,
+    UserSettingsSolid
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
-  import { currentPage, currentUser, launching } from "./storage/localStore";
+  import {
+    currentPage,
+    currentUser,
+    launching,
+    launchStatus
+  } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
   import Launch from "./pages/Launch.svelte";
@@ -33,6 +38,11 @@
     currentUser.set(undefined);
     currentPage.set(Page.Login);
   };
+
+  window.addEventListener("launchStatusUpdate", (e) => {
+    const status = (e as CustomEvent).detail;
+    launchStatus.set(status);
+  });
 </script>
 
 <Toaster></Toaster>

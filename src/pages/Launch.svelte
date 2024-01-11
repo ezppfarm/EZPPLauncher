@@ -1,12 +1,16 @@
 <script lang="ts">
   import { Button, Checkbox } from "flowbite-svelte";
   import Progressbar from "../lib/Progressbar.svelte";
-  import { launching, patch } from "./../storage/localStore";
+  import { launching, patch, launchStatus } from "./../storage/localStore";
   let progressbarFix = true;
 
   setTimeout(() => {
     progressbarFix = false;
   }, 1000);
+
+  const launch = () => {
+    launching.set(true);
+  }
 </script>
 
 <main
@@ -41,7 +45,7 @@
         size="h-3"
         labelInsideClass="bg-primary-600 drop-shadow-xl text-gray-100 text-base font-medium text-center p-1 leading-none rounded-full"
       />
-      <p class="m-0 p-0 dark:text-gray-400 font-light">Waiting...</p>
+      <p class="m-0 p-0 dark:text-gray-400 font-light">{$launchStatus}</p>
     </div>
   </div>
 </main>
