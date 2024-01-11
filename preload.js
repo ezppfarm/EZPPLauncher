@@ -15,6 +15,24 @@ window.addEventListener("login-attempt", async (e) => {
   const loginResult = await ipcRenderer.invoke("ezpplauncher:login", {
     username: e.detail.username,
     password: e.detail.password,
+    saveCredentials: e.detail.saveCredentials,
   });
-  window.dispatchEvent(new CustomEvent("login-result", { detail: loginResult }));
-})
+  window.dispatchEvent(
+    new CustomEvent("login-result", { detail: loginResult }),
+  );
+});
+
+window.addEventListener("autologin-attempt", async (e) => {
+  const loginResult = await ipcRenderer.invoke("ezpplauncher:autologin");
+  window.dispatchEvent(
+    new CustomEvent("login-result", { detail: loginResult }),
+  );
+});
+
+window.addEventListener("logout", async (e) => {
+  await ipcRenderer.invoke("ezpplauncher:logout");
+});
+
+window.addEventListener("guest-login", async (e) => {
+  await ipcRenderer.invoke("ezpplauncher:guestlogin");
+});

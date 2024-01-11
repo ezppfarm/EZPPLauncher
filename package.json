@@ -24,6 +24,7 @@
   },
   "scripts": {
     "build": "rollup -c --bundleConfigAsCjs",
+    "rebuild": "electron-rebuild",
     "dev": "rollup -c -w --bundleConfigAsCjs",
     "start": "sirv public --no-clear",
     "electron": "wait-on http://localhost:8080 && electron .",
@@ -33,7 +34,10 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "@electron/rebuild": "^3.5.0",
+    "@types/better-sqlite3": "^7.6.8",
     "axios": "^1.6.5",
+    "better-sqlite3": "^9.2.2",
     "custom-electron-titlebar": "^4.2.7",
     "electron-serve": "^1.1.0",
     "svelte-french-toast": "^1.2.0"

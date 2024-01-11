@@ -7,6 +7,20 @@ const config = {
   darkMode: "media",
   theme: {
     extend: {
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(5px)" },
+          "100%": { opacity: "1" },
+        },
+        fadeOut: {
+          "100%": { opacity: "0", transform: "translateY(5px)" },
+          "0%": { opacity: "1" },
+        },
+      },
+      animation: {
+        fadeIn: "fadeIn 1s ease forwards",
+        fadeOut: "fadeOut 1s ease forwards",
+      },
       colors: {
         // flowbite-svelte
         primary: {

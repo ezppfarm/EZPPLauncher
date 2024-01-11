@@ -31,6 +31,12 @@
     loggedIn = newUser != undefined;
     user = newUser;
   });
+
+  const logout = () => {
+    window.dispatchEvent(new CustomEvent("logout"));
+    currentUser.set(undefined);
+    currentPage.set(Page.Login);
+  };
 </script>
 
 <Toaster></Toaster>
@@ -52,7 +58,7 @@
         id="avatar-menu"
       />
     </div>
-    <Dropdown placement="bottom" triggeredBy="#avatar-menu">
+    <Dropdown placement="bottom-start" triggeredBy="#avatar-menu">
       <DropdownHeader>
         <span class="block text-sm">{loggedIn ? user?.name : "Guest"}</span>
         <span
@@ -79,10 +85,7 @@
       {#if loggedIn}
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-          on:click={() => {
-            currentUser.set(undefined);
-            currentPage.set(Page.Login);
-          }}
+          on:click={logout}
         >
           <ArrowRightFromBracketSolid
             class="select-none outline-none border-none"

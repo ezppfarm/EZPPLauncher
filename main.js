@@ -3,6 +3,7 @@ const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
+const config = require("./src/config/config");
 const { setupTitlebar, attachTitlebarToWindow } = require(
   "custom-electron-titlebar/main",
 );
@@ -19,7 +20,10 @@ function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
     const fetchResult = await fetch("https://ez-pp.farm/login/check", {
       method: "POST",
-      body: JSON.stringify({ username: args.username, password: args.password }),
+      body: JSON.stringify({
+        username: args.username,
+        password: args.password,
+      }),
       headers: {
         "Content-Type": "application/json",
       },
@@ -27,12 +31,61 @@ function registerIPCPipes() {
 
     if (fetchResult.ok) {
       const result = await fetchResult.json();
-      if (result.code == 200) return result;
+      if ("user" in result) {
+        if (args.saveCredentials) {
+          config.set("username", args.username);
+          config.set("password", args.password);
+        }
+        config.remove("guest");
+      }
+      return result;
     }
     return {
-      code: 403,
-      message: "Invalid username or password.",
+      code: 500,
+      message: "Something went wrong while logging you in.",
+    };
+  });
+
+  ipcMain.handle("ezpplauncher:autologin", async (e) => {
+    const username = config.get("username");
+    const password = config.get("password");
+    const guest = config.get("guest");
+    if (guest) return { code: 200, message: "Login as guest", guest: true };
+    if (username == undefined || password == undefined) {
+      return { code: 200, message: "No autologin" };
     }
+    const fetchResult = await fetch("https://ez-pp.farm/login/check", {
+      method: "POST",
+      body: JSON.stringify({
+        username: username,
+        password: password,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (fetchResult.ok) {
+      const result = await fetchResult.json();
+      return result;
+    }
+    return {
+      code: 500,
+      message: "Something went wrong while logging you in.",
+    };
+  });
+
+  ipcMain.handle("ezpplauncher:guestlogin", (e) => {
+    config.remove("username");
+    config.remove("password");
+    config.set("guest", "1");
+  });
+
+  ipcMain.handle("ezpplauncher:logout", (e) => {
+    config.remove("username");
+    config.remove("password");
+    config.remove("guest");
+    return true;
   });
 }
 
