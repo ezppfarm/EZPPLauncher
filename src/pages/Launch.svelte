@@ -1,7 +1,12 @@
 <script lang="ts">
   import { Button, Checkbox } from "flowbite-svelte";
   import Progressbar from "../lib/Progressbar.svelte";
-  import { launching, patch, launchStatus } from "./../storage/localStore";
+  import {
+    launching,
+    patch,
+    launchStatus,
+    launchPercentage,
+  } from "./../storage/localStore";
   let progressbarFix = true;
 
   setTimeout(() => {
@@ -10,7 +15,8 @@
 
   const launch = () => {
     launching.set(true);
-  }
+    window.dispatchEvent(new CustomEvent("launch"));
+  };
 </script>
 
 <main
@@ -26,7 +32,7 @@
         ? ''
         : 'active:scale-95 '}transition-transform duration-75"
       disabled={$launching}
-      on:click={() => launching.set(!$launching)}>Launch</Button
+      on:click={launch}>Launch</Button
     >
     <Checkbox
       disabled={$launching}
@@ -40,10 +46,12 @@
     >
       <Progressbar
         animate={true}
-        progress={null}
+        progress={$launchPercentage}
+        indeterminate={$launchPercentage == -1}
         labelInside={true}
         size="h-3"
-        labelInsideClass="bg-primary-600 drop-shadow-xl text-gray-100 text-base font-medium text-center p-1 leading-none rounded-full"
+        class=""
+        labelInsideClass="bg-primary-600 drop-shadow-xl text-gray-100 text-base font-medium text-center p-1 leading-none rounded-full !text-[0.7rem] !leading-[0.45]"
       />
       <p class="m-0 p-0 dark:text-gray-400 font-light">{$launchStatus}</p>
     </div>

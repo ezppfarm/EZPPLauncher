@@ -2,9 +2,10 @@
   import { cubicOut } from "svelte/easing";
   import { tweened } from "svelte/motion";
   import { twMerge, twJoin } from "tailwind-merge";
+  import { clamp } from "../util/mathUtil";
 
-  export let progress: string | number | undefined | null = "45";
-  export let precision = 0;
+  export let progress: number = 45;
+  export let precision = 2;
   export let tweenDuration = 400;
   export let animate = false;
   export let size = "h-2.5";
@@ -12,10 +13,10 @@
   export let labelOutside = "";
   export let easing = cubicOut;
   export let color = "primary";
+  export let indeterminate = false;
   export let labelInsideClass =
     "text-primary-100 text-xs font-medium text-center p-0.5 leading-none rounded-full";
   export let divClass = "w-full bg-gray-200 rounded-full dark:bg-gray-700";
-  export let indeterminate = progress == null;
 
   const barColors: Record<string, string> = {
     primary: "bg-primary-600",
@@ -28,15 +29,14 @@
     indigo: "bg-indigo-600 dark:bg-indigo-500",
   };
 
-  const _progress = tweened(0, {
-    duration: animate && !indeterminate ? tweenDuration : 0,
+  let _progress = tweened(0, {
+    duration: tweenDuration,
     easing,
   });
 
   $: {
-    if (!indeterminate) {
-      _progress.set(Number(progress));
-    }
+    progress = clamp(Number(progress), 0, 100);
+    _progress.set(progress);
   }
 </script>
 
@@ -49,7 +49,9 @@
       >{labelOutside}</span
     >
     <span class="text-sm font-medium text-blue-700 dark:text-white"
-      >{progress}%</span
+      >{animate
+        ? $_progress.toFixed(precision)
+        : progress.toFixed(precision)}%</span
     >
   </div>
 {/if}
@@ -59,9 +61,9 @@
     {#if !indeterminate}
       <div
         class={twJoin(labelInsideClass, barColors[color])}
-        style="width: {$_progress}%"
+        style="width: {animate ? $_progress : progress}%"
       >
-        {$_progress.toFixed(precision)}%
+        {animate ? $_progress.toFixed(precision) : progress.toFixed(precision)}%
       </div>
     {:else}
       <div
@@ -75,7 +77,7 @@
   {:else if !indeterminate}
     <div
       class={twJoin(barColors[color], size, "rounded-full")}
-      style="width: {$_progress}%"
+      style="width: {animate ? $_progress : progress}%"
     />
   {:else}
     <div
