@@ -22,7 +22,7 @@
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
   import Launch from "./pages/Launch.svelte";
-  import { Toaster } from "svelte-french-toast";
+  import toast, { Toaster } from "svelte-french-toast";
   import type { User } from "./types/user";
   import Settings from "./pages/Settings.svelte";
 
@@ -50,6 +50,40 @@
     console.log((e as CustomEvent).detail);
     const progress = (e as CustomEvent).detail.progress;
     launchPercentage.set(progress);
+  });
+
+  window.addEventListener("alert", (e) => {
+    console.log((e as CustomEvent).detail);
+    const toastMessage = (e as CustomEvent).detail;
+    switch (toastMessage.type) {
+      case "success": {
+        toast.success(toastMessage.message, {
+          position: "bottom-center",
+          className:
+            "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+          duration: 1500,
+        });
+        break;
+      }
+      case "error": {
+        toast.error(toastMessage.message, {
+          position: "bottom-center",
+          className:
+            "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+          duration: 1500,
+        });
+        break;
+      }
+      default: {
+        toast(toastMessage.message, {
+          icon: "ℹ",
+          position: "bottom-center",
+          className:
+            "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+          duration: 1500,
+        });
+      }
+    }
   });
 </script>
 

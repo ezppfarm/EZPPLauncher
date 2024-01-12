@@ -3,6 +3,19 @@
   import { FolderSolid } from "flowbite-svelte-icons";
   import { currentPage } from "../storage/localStore";
   import { Page } from "../consts/pages";
+
+  let folderPath: string = "";
+
+  window.addEventListener("settings-result", (e) => {
+    const settings: Record<string, string>[] = (e as CustomEvent).detail;
+    const osuPath = settings.find((setting) => setting.key == "osuPath");
+    folderPath = osuPath ? osuPath.val : "";
+  });
+  window.dispatchEvent(new CustomEvent("settings-get"));
+
+  const setFolderPath = () => {
+    window.dispatchEvent(new CustomEvent("folder-set"));
+  };
 </script>
 
 <main
@@ -15,9 +28,13 @@
       <Input
         type="text"
         placeholder="Path to your osu! installation"
+        value={folderPath}
         readonly
       />
-      <Button color="light" class="dark:active:!bg-gray-900"
+      <Button
+        color="light"
+        class="dark:active:!bg-gray-900"
+        on:click={setFolderPath}
         ><FolderSolid
           size="sm"
           class="dark:text-gray-300 text-gray-500 outline-none border-none select-none pointer-events-none"

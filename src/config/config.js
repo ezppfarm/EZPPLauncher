@@ -38,7 +38,15 @@ const get = (
   return result ? result.val ?? undefined : undefined;
 };
 
+const all = () => {
+  const result = db.prepare(
+    `SELECT configKey key, configValue val FROM config WHERE 1`,
+  ).all();
+  return result ?? undefined;
+};
+
 module.exports = {
+  all,
   get,
   set,
   remove,

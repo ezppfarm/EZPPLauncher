@@ -1,5 +1,5 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
@@ -7,6 +7,7 @@ const config = require("./src/config/config");
 const { setupTitlebar, attachTitlebarToWindow } = require(
   "custom-electron-titlebar/main",
 );
+const { isValidOsuFolder } = require("./src/util/osuUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -110,6 +111,33 @@ function registerIPCPipes() {
     config.remove("password");
     config.remove("guest");
     return true;
+  });
+
+  ipcMain.handle("ezpplauncher:settings", async (e) => {
+    return config.all();
+  });
+
+  ipcMain.handle("ezpplauncher:set-folder", async (e) => {
+    const folderResult = await dialog.showOpenDialog({
+      title: "Select osu! installation directory",
+      properties: ["openDirectory"],
+    });
+    if (!folderResult.canceled) {
+      const folder = folderResult.filePaths[0];
+      if (await isValidOsuFolder(folder)) {
+        config.set("osuPath", folder);
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "success",
+          message: "osu! path successfully saved!",
+        });
+      } else {
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: "invalid osu! path!",
+        });
+      }
+    }
+    return config.all();
   });
 
   ipcMain.handle("ezpplauncher:launch", async (e) => {

@@ -22,23 +22,47 @@ window.addEventListener("login-attempt", async (e) => {
   );
 });
 
-window.addEventListener("autologin-attempt", async (e) => {
+window.addEventListener("autologin-attempt", async () => {
   const loginResult = await ipcRenderer.invoke("ezpplauncher:autologin");
   window.dispatchEvent(
     new CustomEvent("login-result", { detail: loginResult }),
   );
 });
 
-window.addEventListener("logout", async (e) => {
+window.addEventListener("logout", async () => {
   await ipcRenderer.invoke("ezpplauncher:logout");
 });
 
-window.addEventListener("guest-login", async (e) => {
+window.addEventListener("guest-login", async () => {
   await ipcRenderer.invoke("ezpplauncher:guestlogin");
 });
 
-window.addEventListener("launch", async (e) => {
+window.addEventListener("launch", async () => {
   await ipcRenderer.invoke("ezpplauncher:launch");
+});
+
+window.addEventListener("settings-get", async () => {
+  const settings = await ipcRenderer.invoke("ezpplauncher:settings");
+  window.dispatchEvent(
+    new CustomEvent("settings-result", { detail: settings }),
+  );
+});
+
+window.addEventListener("folder-set", async (e) => {
+  const result = await ipcRenderer.invoke("ezpplauncher:set-folder");
+  window.dispatchEvent(
+    new CustomEvent("settings-result", { detail: result }),
+  );
+});
+
+window.addEventListener("settings-set", async (e) => {
+  await ipcRenderer.invoke("ezpplauncher:settings-set", e.detail);
+});
+
+ipcRenderer.addListener("ezpplauncher:alert", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("alert", { detail: args }),
+  );
 });
 
 ipcRenderer.addListener("ezpplauncher:launchstatus", (e, args) => {
