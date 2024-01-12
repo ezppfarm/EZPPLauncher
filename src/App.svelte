@@ -52,6 +52,12 @@
     launchPercentage.set(progress);
   });
 
+  window.addEventListener("launchabort", () => {
+    launchPercentage.set(-1);
+    launchStatus.set("");
+    launching.set(false);
+  });
+
   window.addEventListener("alert", (e) => {
     console.log((e as CustomEvent).detail);
     const toastMessage = (e as CustomEvent).detail;

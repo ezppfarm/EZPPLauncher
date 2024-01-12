@@ -59,6 +59,12 @@ window.addEventListener("settings-set", async (e) => {
   await ipcRenderer.invoke("ezpplauncher:settings-set", e.detail);
 });
 
+ipcRenderer.addListener("ezpplauncher:launchabort", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("launch-abort"),
+  );
+});
+
 ipcRenderer.addListener("ezpplauncher:alert", (e, args) => {
   window.dispatchEvent(
     new CustomEvent("alert", { detail: args }),

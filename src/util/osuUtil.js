@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
+const checkUpdateURL =
+  "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
 const ignoredOsuEntities = [
   "osu!auth.dll",
 ];
@@ -37,4 +39,45 @@ async function isValidOsuFolder(path) {
   return (Math.round((matches / osuEntities.length) * 100) >= 60);
 }
 
-module.exports = { isValidOsuFolder };
+async function getUserConfig(osuPath) {
+  const configFileInfo = {
+    name: "",
+    path: "",
+    get: async (key) => {
+      if (!configFileInfo.path) {
+        return "";
+      }
+      const fileStream = await fs.promises.readFile(
+        configFileInfo.path,
+        "utf-8",
+      );
+      const lines = fileStream.split(/\r?\n/);
+      for (const line of lines) {
+        if (line.includes(" = ")) {
+          const argsPair = line.split(" = ", 2);
+          const keyname = argsPair[0];
+          const value = argsPair[1];
+          if (keyname == key) {
+            return value;
+          }
+        }
+      }
+    },
+  };
+  const userOsuConfig = path.join(
+    osuPath,
+    `osu!.${process.env["USERNAME"]}.cfg`,
+  );
+  if (fs.existsSync(userOsuConfig)) {
+    configFileInfo.name = `osu!.${process.env["USERNAME"]}.cfg`;
+    configFileInfo.path = userOsuConfig;
+  }
+  return configFileInfo;
+}
+
+async function getUpdateFiles(releaseStream) {
+  const releaseData = await fetch(checkUpdateURL + releaseStream);
+  return releaseData.ok ? await releaseData.json() : undefined;
+}
+
+module.exports = { isValidOsuFolder, getUserConfig, getUpdateFiles };

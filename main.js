@@ -144,17 +144,26 @@ function registerIPCPipes() {
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking osu! directory...",
     });
-    await new Promise((res) => setTimeout(res, 1500));
+    await new Promise((res) => setTimeout(res, 1000));
+    const osuPath = config.get("osuPath");
+    if (!(await isValidOsuFolder(osuPath))) {
+      mainWindow.webContents.send("ezpplauncher:launchabort");
+      mainWindow.webContents.send("ezpplauncher:alert", {
+        type: "error",
+        message: "invalid osu! path!",
+      });
+      return;
+    }
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking for osu! updates...",
     });
-    mainWindow.webContents.send("ezpplauncher:launchprogress", {
+    await new Promise((res) => setTimeout(res, 1000));
+    /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
       progress: 0,
     });
-    await new Promise((res) => setTimeout(res, 1500));
     mainWindow.webContents.send("ezpplauncher:launchprogress", {
       progress: 100,
-    });
+    }); */
     return true;
   });
 }
