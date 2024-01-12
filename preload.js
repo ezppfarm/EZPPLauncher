@@ -36,3 +36,19 @@ window.addEventListener("logout", async (e) => {
 window.addEventListener("guest-login", async (e) => {
   await ipcRenderer.invoke("ezpplauncher:guestlogin");
 });
+
+window.addEventListener("launch", async (e) => {
+  await ipcRenderer.invoke("ezpplauncher:launch");
+});
+
+ipcRenderer.addListener("ezpplauncher:launchstatus", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("launchStatusUpdate", { detail: args }),
+  );
+});
+
+ipcRenderer.addListener("ezpplauncher:launchprogress", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("launchProgressUpdate", { detail: args }),
+  );
+});

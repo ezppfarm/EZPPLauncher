@@ -21,6 +21,9 @@ const config = {
         fadeIn: "fadeIn 1s ease forwards",
         fadeOut: "fadeOut 1s ease forwards",
       },
+      transitionProperty: {
+        'width': 'width',
+      },
       colors: {
         // flowbite-svelte
         primary: {

@@ -142,7 +142,9 @@
         {/if}
       </Button>
     </Input>
-    <Checkbox bind:checked={saveCredentials}>Save credentials</Checkbox>
+    <Checkbox bind:checked={saveCredentials} disabled={loading}
+      >Save credentials</Checkbox
+    >
     <div class="flex flex-col justify-center items-center gap-5 mt-1">
       <Button
         class="dark:active:!bg-gray-900  active:scale-95 transition-transform duration-75"

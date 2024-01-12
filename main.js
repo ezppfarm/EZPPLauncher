@@ -18,32 +18,44 @@ function isDev() {
 
 function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
-    const fetchResult = await fetch("https://ez-pp.farm/login/check", {
-      method: "POST",
-      body: JSON.stringify({
-        username: args.username,
-        password: args.password,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const timeout = new AbortController();
+    const timeoutId = setTimeout(() => timeout.abort(), 8000);
+    try {
+      const fetchResult = await fetch("https://ez-pp.farm/login/check", {
+        signal: timeout.signal,
+        method: "POST",
+        body: JSON.stringify({
+          username: args.username,
+          password: args.password,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (fetchResult.ok) {
-      const result = await fetchResult.json();
-      if ("user" in result) {
-        if (args.saveCredentials) {
-          config.set("username", args.username);
-          config.set("password", args.password);
+      clearTimeout(timeoutId);
+
+      if (fetchResult.ok) {
+        const result = await fetchResult.json();
+        if ("user" in result) {
+          if (args.saveCredentials) {
+            config.set("username", args.username);
+            config.set("password", args.password);
+          }
+          config.remove("guest");
         }
-        config.remove("guest");
+        return result;
       }
-      return result;
+      return {
+        code: 500,
+        message: "Something went wrong while logging you in.",
+      };
+    } catch (err) {
+      return {
+        code: 500,
+        message: "Something went wrong while logging you in.",
+      };
     }
-    return {
-      code: 500,
-      message: "Something went wrong while logging you in.",
-    };
   });
 
   ipcMain.handle("ezpplauncher:autologin", async (e) => {
@@ -54,25 +66,37 @@ function registerIPCPipes() {
     if (username == undefined || password == undefined) {
       return { code: 200, message: "No autologin" };
     }
-    const fetchResult = await fetch("https://ez-pp.farm/login/check", {
-      method: "POST",
-      body: JSON.stringify({
-        username: username,
-        password: password,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const timeout = new AbortController();
+    const timeoutId = setTimeout(() => timeout.abort(), 8000);
+    try {
+      const fetchResult = await fetch("https://ez-pp.farm/login/check", {
+        signal: timeout.signal,
+        method: "POST",
+        body: JSON.stringify({
+          username: username,
+          password: password,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    if (fetchResult.ok) {
-      const result = await fetchResult.json();
-      return result;
+      clearTimeout(timeoutId);
+
+      if (fetchResult.ok) {
+        const result = await fetchResult.json();
+        return result;
+      }
+      return {
+        code: 500,
+        message: "Something went wrong while logging you in.",
+      };
+    } catch (err) {
+      return {
+        code: 500,
+        message: "Something went wrong while logging you in.",
+      };
     }
-    return {
-      code: 500,
-      message: "Something went wrong while logging you in.",
-    };
   });
 
   ipcMain.handle("ezpplauncher:guestlogin", (e) => {
@@ -85,6 +109,24 @@ function registerIPCPipes() {
     config.remove("username");
     config.remove("password");
     config.remove("guest");
+    return true;
+  });
+
+  ipcMain.handle("ezpplauncher:launch", async (e) => {
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Checking osu! directory...",
+    });
+    await new Promise((res) => setTimeout(res, 1500));
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Checking for osu! updates...",
+    });
+    mainWindow.webContents.send("ezpplauncher:launchprogress", {
+      progress: 0,
+    });
+    await new Promise((res) => setTimeout(res, 1500));
+    mainWindow.webContents.send("ezpplauncher:launchprogress", {
+      progress: 100,
+    });
     return true;
   });
 }
