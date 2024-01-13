@@ -12,6 +12,7 @@ const { formatBytes } = require("./src/util/formattingUtil");
 const windowName = require("get-window-by-name");
 const { existsSync } = require("fs");
 const { runFileDetached } = require("./src/util/executeUtil");
+const richPresence = require("./src/discord/richPresence");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -19,6 +20,7 @@ let mainWindow;
 let osuCheckInterval;
 let userOsuPath;
 let osuLoaded = false;
+let lastOsuStatus = "";
 
 let currentUser = undefined;
 
@@ -43,6 +45,26 @@ function startOsuStatus() {
             runFileDetached(userOsuPath, patcherExecuteable);
           }
         }, 3000);
+      }
+
+      const windowTitle = firstInstance.processTitle;
+      if (lastOsuStatus == windowTitle) return;
+      lastOsuStatus = windowTitle;
+      if (!windowTitle.includes("-")) {
+        richPresence.updateStatus({
+          details: undefined,
+          state: "Idle..."
+        })
+      } else {
+        const components = windowTitle.split(" - ");
+        const splitTitle = [components.shift(), components.join(" - ")]
+        const currentMap = splitTitle[1];
+        if (!currentMap.endsWith(".osu")) {
+          richPresence.updateStatus({
+            state: "Playing...",
+            details: currentMap
+          })
+        }
       }
     }
   }, 1000);
@@ -291,9 +313,9 @@ function registerIPCPipes() {
       status: "Preparing launch...",
     });
 
-    //TODO: save credentials to osu!.%username%.cfg
+    const userConfig = getUserConfig(osuPath);
+    richPresence.updateVersion(await userConfig.get("LastVersion"));
     if (currentUser) {
-      const userConfig = getUserConfig(osuPath);
       await userConfig.set("Username", currentUser.username);
       await userConfig.set("Password", currentUser.password);
     }
@@ -305,6 +327,11 @@ function registerIPCPipes() {
     const onExitHook = () => {
       mainWindow.show();
       stopOsuStatus();
+      richPresence.updateVersion();
+      richPresence.updateStatus({
+        state: "Idle in Launcher...",
+        details: undefined
+      })
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
         status: "Waiting for cleanup...",
       });
@@ -366,7 +393,7 @@ function createWindow() {
   }
 
   registerIPCPipes();
-
+  richPresence.connect();
   // Uncomment the following line of code when app is ready to be packaged.
   // loadURL(mainWindow);
 
@@ -397,9 +424,10 @@ function createWindow() {
 app.on("ready", createWindow);
 
 // Quit when all windows are closed.
-app.on("window-all-closed", function () {
+app.on("window-all-closed", async function () {
   // On macOS it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
+  await richPresence.disconnect();
   if (process.platform !== "darwin") app.quit();
 });
 

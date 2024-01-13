@@ -353,7 +353,6 @@ async function replaceUIFile(osuPath, revert) {
     await fs.promises.rename(oldOsuUIFile, ezppUIFile);
     await fs.promises.rename(path.join(osuPath, "osu!ui.dll.bak"), oldOsuUIFile);
   }
-
 }
 
 module.exports = { isValidOsuFolder, getUserConfig, getGlobalConfig, getUpdateFiles, getFilesThatNeedUpdate, downloadUpdateFiles, runOsuWithDevServer, getPatcherUpdates, downloadPatcherUpdates, downloadUIFiles, getUIFiles, replaceUIFile };
