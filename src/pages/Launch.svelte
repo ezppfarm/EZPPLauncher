@@ -15,7 +15,7 @@
 
   const launch = () => {
     launching.set(true);
-    window.dispatchEvent(new CustomEvent("launch"));
+    window.dispatchEvent(new CustomEvent("launch", { detail: { patch: $patch } }));;
   };
 </script>
 

@@ -37,8 +37,8 @@ window.addEventListener("guest-login", async () => {
   await ipcRenderer.invoke("ezpplauncher:guestlogin");
 });
 
-window.addEventListener("launch", async () => {
-  await ipcRenderer.invoke("ezpplauncher:launch");
+window.addEventListener("launch", async (e) => {
+  await ipcRenderer.invoke("ezpplauncher:launch", e.detail);
 });
 
 window.addEventListener("settings-get", async () => {

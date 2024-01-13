@@ -37,8 +37,10 @@
     "@types/better-sqlite3": "^7.6.8",
     "axios": "^1.6.5",
     "better-sqlite3": "^9.2.2",
+    "crypto": "^1.0.1",
     "custom-electron-titlebar": "^4.2.7",
     "electron-serve": "^1.1.0",
+    "get-window-by-name": "^2.0.0",
     "svelte-french-toast": "^1.2.0"
   },
   "devDependencies": {

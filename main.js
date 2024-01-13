@@ -7,14 +7,49 @@ const config = require("./src/config/config");
 const { setupTitlebar, attachTitlebarToWindow } = require(
   "custom-electron-titlebar/main",
 );
-const { isValidOsuFolder } = require("./src/util/osuUtil");
+const { isValidOsuFolder, getUpdateFiles, getGlobalConfig, getFilesThatNeedUpdate, downloadUpdateFiles, getUserConfig, runOsuWithDevServer, getPatcherUpdates, downloadPatcherUpdates, getUIFiles, downloadUIFiles, replaceUIFile } = require("./src/util/osuUtil");
+const { formatBytes } = require("./src/util/formattingUtil");
+const windowName = require("get-window-by-name");
+const { existsSync } = require("fs");
+const { runFileDetached } = require("./src/util/executeUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
+let osuCheckInterval;
+let userOsuPath;
+let osuLoaded = false;
+
+let currentUser = undefined;
 
 function isDev() {
   return !app.isPackaged;
+}
+
+function startOsuStatus() {
+  osuCheckInterval = setInterval(async () => {
+    const osuWindowTitle = windowName.getWindowText("osu!.exe");
+    if (osuWindowTitle.length < 0) {
+      console.log("No osu! window found");
+      return;
+    }
+    const firstInstance = osuWindowTitle[0];
+    if (firstInstance) {
+      if (!osuLoaded) {
+        osuLoaded = true;
+        setTimeout(() => {
+          const patcherExecuteable = path.join(userOsuPath, "EZPPLauncher", "patcher.exe");
+          if (existsSync(patcherExecuteable)) {
+            runFileDetached(userOsuPath, patcherExecuteable);
+          }
+        }, 3000);
+      }
+    }
+  }, 1000);
+}
+
+function stopOsuStatus() {
+  clearInterval(osuCheckInterval);
 }
 
 function registerIPCPipes() {
@@ -43,6 +78,7 @@ function registerIPCPipes() {
             config.set("username", args.username);
             config.set("password", args.password);
           }
+          currentUser = args;
           config.remove("guest");
         }
         return result;
@@ -86,6 +122,12 @@ function registerIPCPipes() {
 
       if (fetchResult.ok) {
         const result = await fetchResult.json();
+        if ("user" in result) {
+          currentUser = {
+            username: username,
+            password: password,
+          };
+        }
         return result;
       }
       return {
@@ -104,12 +146,14 @@ function registerIPCPipes() {
     config.remove("username");
     config.remove("password");
     config.set("guest", "1");
+    currentUser = undefined;
   });
 
   ipcMain.handle("ezpplauncher:logout", (e) => {
     config.remove("username");
     config.remove("password");
     config.remove("guest");
+    currentUser = undefined
     return true;
   });
 
@@ -140,12 +184,22 @@ function registerIPCPipes() {
     return config.all();
   });
 
-  ipcMain.handle("ezpplauncher:launch", async (e) => {
+  ipcMain.handle("ezpplauncher:launch", async (e, args) => {
+    const patch = args.patch;
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking osu! directory...",
     });
     await new Promise((res) => setTimeout(res, 1000));
     const osuPath = config.get("osuPath");
+    userOsuPath = osuPath;
+    if (osuPath == undefined) {
+      mainWindow.webContents.send("ezpplauncher:launchabort");
+      mainWindow.webContents.send("ezpplauncher:alert", {
+        type: "error",
+        message: "osu! path not set!",
+      });
+      return;
+    }
     if (!(await isValidOsuFolder(osuPath))) {
       mainWindow.webContents.send("ezpplauncher:launchabort");
       mainWindow.webContents.send("ezpplauncher:alert", {
@@ -158,6 +212,114 @@ function registerIPCPipes() {
       status: "Checking for osu! updates...",
     });
     await new Promise((res) => setTimeout(res, 1000));
+    const releaseStream = await getGlobalConfig(osuPath).get("_ReleaseStream");
+    const latestFiles = await getUpdateFiles(releaseStream);
+    const uiFiles = await getUIFiles(osuPath);
+    const updateFiles = await getFilesThatNeedUpdate(osuPath, latestFiles);
+    if (uiFiles.length > 0) {
+      const uiDownloader = downloadUIFiles(osuPath, uiFiles);
+      uiDownloader.eventEmitter.on("data", (data) => {
+        mainWindow.webContents.send("ezpplauncher:launchprogress", {
+          progress: Math.ceil(data.progress),
+        });
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+        });
+      });
+      await uiDownloader.startDownload();
+      mainWindow.webContents.send("ezpplauncher:launchprogress", {
+        progress: -1,
+      });
+    }
+    if (updateFiles.length > 0) {
+      const updateDownloader = downloadUpdateFiles(osuPath, updateFiles);
+      updateDownloader.eventEmitter.on("data", (data) => {
+        mainWindow.webContents.send("ezpplauncher:launchprogress", {
+          progress: Math.ceil(data.progress),
+        });
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+        });
+      });
+      await updateDownloader.startDownload();
+      mainWindow.webContents.send("ezpplauncher:launchprogress", {
+        progress: -1,
+      });
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "osu! is now up to date!",
+      });
+      await new Promise((res) => setTimeout(res, 1000));
+    } else {
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "osu! is up to date!",
+      });
+      await new Promise((res) => setTimeout(res, 1000));
+    }
+
+    if (patch) {
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "Looking for patcher updates...",
+      });
+      await new Promise((res) => setTimeout(res, 1000));
+      const patchFiles = await getPatcherUpdates(osuPath);
+      if (patchFiles.length > 0) {
+        const patcherDownloader = downloadPatcherUpdates(osuPath, patchFiles);
+        patcherDownloader.eventEmitter.on("data", (data) => {
+          mainWindow.webContents.send("ezpplauncher:launchprogress", {
+            progress: Math.ceil(data.progress),
+          });
+          mainWindow.webContents.send("ezpplauncher:launchstatus", {
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+          });
+        });
+        await patcherDownloader.startDownload();
+        mainWindow.webContents.send("ezpplauncher:launchprogress", {
+          progress: -1,
+        })
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: "Patcher is now up to date!",
+        });
+      } else {
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: "Patcher is up to date!",
+        });
+      }
+      await new Promise((res) => setTimeout(res, 1000));
+    }
+
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Preparing launch...",
+    });
+
+    //TODO: save credentials to osu!.%username%.cfg
+    if (currentUser) {
+      const userConfig = getUserConfig(osuPath);
+      await userConfig.set("Username", currentUser.username);
+      await userConfig.set("Password", currentUser.password);
+    }
+
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Launching osu!...",
+    });
+
+    const onExitHook = () => {
+      mainWindow.show();
+      stopOsuStatus();
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "Waiting for cleanup...",
+      });
+
+      setTimeout(async () => {
+        await replaceUIFile(osuPath, true);
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+      }, 5000);
+    }
+    await replaceUIFile(osuPath, false);
+    runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
+    mainWindow.hide();
+    startOsuStatus();
+
+
     /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
       progress: 0,
     });

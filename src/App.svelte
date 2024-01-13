@@ -52,7 +52,7 @@
     launchPercentage.set(progress);
   });
 
-  window.addEventListener("launchabort", () => {
+  window.addEventListener("launch-abort", () => {
     launchPercentage.set(-1);
     launchStatus.set("");
     launching.set(false);

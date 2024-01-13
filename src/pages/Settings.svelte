@@ -42,11 +42,10 @@
       >
     </ButtonGroup>
     <div class="flex flex-row justify-center items-center gap-5">
-      <Button color="light" class="dark:active:!bg-gray-900">Save</Button>
       <Button
-        color="red"
-        class="dark:active:!bg-red-900 border-red-400"
-        on:click={() => currentPage.set(Page.Launch)}>Cancel</Button
+        color="light"
+        class="dark:active:!bg-gray-900"
+        on:click={() => currentPage.set(Page.Launch)}>Go Back</Button
       >
     </div>
   </div>
