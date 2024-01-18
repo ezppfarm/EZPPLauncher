@@ -401,6 +401,29 @@ async function replaceUIFile(osuPath, revert) {
   }
 }
 
+async function findOsuInstallation() {
+  const regedit = require("regedit-rs");
+
+  const osuLocationFromDefaultIcon =
+    "HKLM\\SOFTWARE\\Classes\\osu\\DefaultIcon";
+  const osuKey = regedit.listSync(osuLocationFromDefaultIcon);
+  if (osuKey[osuLocationFromDefaultIcon].exists) {
+    const key = osuKey[osuLocationFromDefaultIcon].values[""];
+    let value = key.value;
+    value = value.substring(1, value.length - 3);
+    return path.dirname(value.trim());
+  }
+  /* const osuStruct = await regedit.listValuesSync(osuLocationFromDefaultIcon);
+  for (const line of osuStruct.split("\n")) {
+    if (line.includes("REG_SZ")) {
+      let value = line.trim().split("    ")[2];
+      value = value.substring(1, value.length - 3);
+      return path.dirname(value.trim());
+    }
+  } */
+  return undefined;
+}
+
 module.exports = {
   isValidOsuFolder,
   getUserConfig,
@@ -414,4 +437,5 @@ module.exports = {
   downloadUIFiles,
   getUIFiles,
   replaceUIFile,
+  findOsuInstallation,
 };

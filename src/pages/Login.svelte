@@ -80,6 +80,7 @@
           const resultData = customEvent.detail;
           const isGuest = "guest" in resultData;
           const wasSuccessful = "user" in resultData;
+          console.log(resultData);
           if (isGuest) {
             currentPage.set(Page.Launch);
             res();

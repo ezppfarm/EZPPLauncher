@@ -8,6 +8,10 @@ const config = {
   theme: {
     extend: {
       keyframes: {
+        slideIn: {
+          "0%": { opacity: "0", transform: "translateX(-5px)" },
+          "100%": { opacity: "1" },
+        },
         fadeIn: {
           "0%": { opacity: "0", transform: "translateY(5px)" },
           "100%": { opacity: "1" },
@@ -18,11 +22,12 @@ const config = {
         },
       },
       animation: {
+        sideIn: "slideIn 1s ease forwards",
         fadeIn: "fadeIn 1s ease forwards",
         fadeOut: "fadeOut 1s ease forwards",
       },
       transitionProperty: {
-        'width': 'width',
+        "width": "width",
       },
       colors: {
         // flowbite-svelte

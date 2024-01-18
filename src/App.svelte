@@ -5,8 +5,10 @@
     DropdownItem,
     DropdownHeader,
     DropdownDivider,
+    Button,
   } from "flowbite-svelte";
   import {
+    ArrowLeftSolid,
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
     UserSettingsSolid,
@@ -103,6 +105,17 @@
 
 <div class="p-2 flex flex-row justify-between items-center">
   <div class="flex flex-row items-center animate-fadeIn opacity-0">
+    {#if $currentPage == Page.Settings}
+      <Button
+        class="dark:!bg-gray-800 dark:active:!bg-gray-950 !ring-0 outline-none !border-none dark:text-white w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0"
+        color="none"
+        on:click={() => {
+          currentPage.set(Page.Launch);
+        }}
+      >
+        <ArrowLeftSolid class="outline-none border-none" size="sm" />
+      </Button>
+    {/if}
     <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
     <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight">
       EZPPLauncher

@@ -57,6 +57,13 @@ window.addEventListener("settings-get", async () => {
   );
 });
 
+window.addEventListener("folder-auto", async (e) => {
+  const result = await ipcRenderer.invoke("ezpplauncher:detect-folder");
+  window.dispatchEvent(
+    new CustomEvent("settings-result", { detail: result }),
+  );
+});
+
 window.addEventListener("folder-set", async (e) => {
   const result = await ipcRenderer.invoke("ezpplauncher:set-folder");
   window.dispatchEvent(

@@ -20,6 +20,7 @@ const {
   getUIFiles,
   downloadUIFiles,
   replaceUIFile,
+  findOsuInstallation,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
@@ -140,18 +141,20 @@ function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:autologin-active", async (e) => {
     const username = config.get("username");
     const password = config.get("password");
+    const guest = config.get("guest");
+    if (guest != undefined) return true;
     return username != undefined && password != undefined;
   });
 
   ipcMain.handle("ezpplauncher:autologin", async (e) => {
     const hwid = getHwId();
     const username = config.get("username");
+    const guest = config.get("guest");
+    if (guest) return { code: 200, message: "Login as guest", guest: true };
     if (username == undefined) {
       return { code: 200, message: "No autologin" };
     }
     const password = cryptUtil.decrypt(config.get("password"), hwid);
-    const guest = config.get("guest");
-    if (guest) return { code: 200, message: "Login as guest", guest: true };
     if (username == undefined || password == undefined) {
       return { code: 200, message: "No autologin" };
     }
@@ -212,6 +215,18 @@ function registerIPCPipes() {
   });
 
   ipcMain.handle("ezpplauncher:settings", async (e) => {
+    return config.all();
+  });
+
+  ipcMain.handle("ezpplauncher:detect-folder", async (e) => {
+    const detected = await findOsuInstallation();
+    if (detected && await isValidOsuFolder(detected)) {
+      mainWindow.webContents.send("ezpplauncher:alert", {
+        type: "success",
+        message: "osu! path successfully saved!",
+      });
+      config.set("osuPath", detected);
+    }
     return config.all();
   });
 
@@ -441,8 +456,8 @@ function createWindow() {
 
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 600,
-    height: 380,
+    width: 550,
+    height: 350,
     resizable: false,
     frame: false,
     titleBarStyle: "hidden",
