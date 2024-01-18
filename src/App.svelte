@@ -96,14 +96,16 @@
 <Toaster></Toaster>
 
 <div class="p-2 flex flex-row justify-between items-center">
-  <div class="flex flex-row items-center">
+  <div class="flex flex-row items-center animate-fadeIn opacity-0">
     <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
     <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight">
       EZPPLauncher
     </span>
   </div>
   {#if $currentPage == Page.Launch}
-    <div class="flex flex-row gap-2 w-fill cursor-pointer md:order-2">
+    <div
+      class="flex flex-row gap-2 w-fill cursor-pointer md:order-2 animate-fadeIn opacity-0"
+    >
       <Avatar
         class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
         src={loggedIn
