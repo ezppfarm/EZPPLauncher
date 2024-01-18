@@ -5,16 +5,12 @@
     Input,
     Label,
     Toggle,
-    Tooltip,
+    Tooltip
   } from "flowbite-svelte";
   import { FileSearchSolid, FolderSolid } from "flowbite-svelte-icons";
-  import { currentPage } from "../storage/localStore";
-  import { Page } from "../consts/pages";
+  import { patch, presence } from "./../storage/localStore";
 
   let folderPath: string = "";
-
-  let patching: boolean = true;
-  let presence: boolean = true;
 
   window.addEventListener("settings-result", (e) => {
     const settings: Record<string, string>[] = (e as CustomEvent).detail;
@@ -32,11 +28,13 @@
   };
 
   const togglePatching = () => {
-    patching = !patching;
+    patch.set(!$patch);
+    //TODO: save in config
   };
 
   const togglePresence = () => {
-    presence = !presence;
+    presence.set(!$presence);
+    //TODO: save in config
   };
 </script>
 
@@ -44,10 +42,10 @@
   class="h-[265px] flex flex-col justify-start p-3 animate-fadeIn opacity-0"
 >
   <div class="flex flex-col gap-2 p-3">
-    <Toggle class="w-fit" bind:checked={presence} on:click={togglePresence}
+    <Toggle class="w-fit" bind:checked={$presence} on:click={togglePresence}
       >Discord Presence</Toggle
     >
-    <Toggle class="w-fit" bind:checked={patching} on:click={togglePatching}
+    <Toggle class="w-fit" bind:checked={$patch} on:click={togglePatching}
       >Patching</Toggle
     >
   </div>

@@ -5,13 +5,13 @@
     DropdownItem,
     DropdownHeader,
     DropdownDivider,
-    Button,
+    Button
   } from "flowbite-svelte";
   import {
     ArrowLeftSolid,
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
-    UserSettingsSolid,
+    UserSettingsSolid
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
   import {
@@ -19,7 +19,7 @@
     currentUser,
     launching,
     launchPercentage,
-    launchStatus,
+    launchStatus
   } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
@@ -44,7 +44,7 @@
       position: "bottom-center",
       className:
         "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-      duration: 2000,
+      duration: 2000
     });
   };
 
@@ -75,7 +75,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 2000,
+          duration: 2000
         });
         break;
       }
@@ -84,7 +84,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 4000,
+          duration: 4000
         });
         break;
       }
@@ -94,7 +94,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 1500,
+          duration: 1500
         });
       }
     }
@@ -107,8 +107,8 @@
   <div class="flex flex-row items-center animate-fadeIn opacity-0">
     {#if $currentPage == Page.Settings}
       <Button
-        class="dark:!bg-gray-800 dark:active:!bg-gray-950 !ring-0 outline-none !border-none dark:text-white w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0"
-        color="none"
+        class="dark:active:!bg-gray-900 !ring-0 w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0 active:scale-95 transition-transform duration-75"
+        color="light"
         on:click={() => {
           currentPage.set(Page.Launch);
         }}

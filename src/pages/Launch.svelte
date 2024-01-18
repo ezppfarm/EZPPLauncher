@@ -15,7 +15,8 @@
 
   const launch = () => {
     launching.set(true);
-    window.dispatchEvent(new CustomEvent("launch", { detail: { patch: $patch } }));;
+    const patching = $patch;
+    window.dispatchEvent(new CustomEvent("launch", { detail: { patch: patching } }));;
   };
 </script>
 
@@ -33,11 +34,6 @@
         : 'active:scale-95 '}transition-transform duration-75"
       disabled={$launching}
       on:click={launch}>Launch</Button
-    >
-    <Checkbox
-      disabled={$launching}
-      bind:checked={$patch}
-      on:click={() => patch.set(!$patch)}>Patch</Checkbox
     >
     <div
       class="w-full flex flex-col justify-center items-center gap-2 mt-2 {$launching

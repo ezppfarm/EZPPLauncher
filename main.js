@@ -36,7 +36,9 @@ let mainWindow;
 let osuCheckInterval;
 let userOsuPath;
 let osuLoaded = false;
+let patch = false;
 let lastOsuStatus = "";
+let lastStatusUpdate;
 
 let currentUser = undefined;
 
@@ -56,13 +58,15 @@ function startOsuStatus() {
       if (!osuLoaded) {
         osuLoaded = true;
         setTimeout(() => {
-          const patcherExecuteable = path.join(
-            userOsuPath,
-            "EZPPLauncher",
-            "patcher.exe",
-          );
-          if (existsSync(patcherExecuteable)) {
-            runFileDetached(userOsuPath, patcherExecuteable);
+          if (patch) {
+            const patcherExecuteable = path.join(
+              userOsuPath,
+              "EZPPLauncher",
+              "patcher.exe",
+            );
+            if (existsSync(patcherExecuteable)) {
+              runFileDetached(userOsuPath, patcherExecuteable);
+            }
           }
         }, 3000);
       }
@@ -121,7 +125,9 @@ function startOsuStatus() {
       richPresence.updateStatus({
         details,
         state: infoText
-      })
+      });
+
+      richPresence.update();
     }
   }, 2500);
 }
@@ -290,7 +296,7 @@ function registerIPCPipes() {
   });
 
   ipcMain.handle("ezpplauncher:launch", async (e, args) => {
-    const patch = args.patch;
+    patch = args.patch;
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking osu! directory...",
     });
@@ -338,9 +344,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await uiDownloader.startDownload();
@@ -369,9 +374,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await updateDownloader.startDownload();
@@ -416,9 +420,8 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-              formatBytes(data.total)
-            })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+              })...`,
           });
         });
         await patcherDownloader.startDownload();
@@ -446,6 +449,7 @@ function registerIPCPipes() {
 
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
+    richPresence.update();
     if (currentUser) {
       await userConfig.set("Username", currentUser.username);
       await userConfig.set("Password", currentUser.password);
@@ -463,7 +467,8 @@ function registerIPCPipes() {
       richPresence.updateStatus({
         state: "Idle in Launcher...",
         details: undefined
-      })
+      });
+      richPresence.update();
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
         status: "Waiting for cleanup...",
       });

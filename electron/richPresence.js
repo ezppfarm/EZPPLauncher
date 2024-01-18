@@ -52,4 +52,7 @@ module.exports = {
     currentStatus.smallImageKey = osuVersion ? "osu" : "  ";
     currentStatus.smallImageText = osuVersion ? `osu! ${osuVersion}` : "  ";
   },
-};
+  update: () => {
+    richPresence.setActivity(currentStatus);
+  }
+};  
