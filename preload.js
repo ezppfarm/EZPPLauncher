@@ -22,6 +22,15 @@ window.addEventListener("login-attempt", async (e) => {
   );
 });
 
+window.addEventListener("autologin-active", async (e) => {
+  const autologin = await ipcRenderer.invoke(
+    "ezpplauncher:autologin-active",
+  );
+  window.dispatchEvent(
+    new CustomEvent("autologin-result", { detail: autologin }),
+  );
+});
+
 window.addEventListener("autologin-attempt", async () => {
   const loginResult = await ipcRenderer.invoke("ezpplauncher:autologin");
   window.dispatchEvent(
@@ -45,6 +54,13 @@ window.addEventListener("settings-get", async () => {
   const settings = await ipcRenderer.invoke("ezpplauncher:settings");
   window.dispatchEvent(
     new CustomEvent("settings-result", { detail: settings }),
+  );
+});
+
+window.addEventListener("folder-auto", async (e) => {
+  const result = await ipcRenderer.invoke("ezpplauncher:detect-folder");
+  window.dispatchEvent(
+    new CustomEvent("settings-result", { detail: result }),
   );
 });
 

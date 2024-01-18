@@ -15,81 +15,118 @@
 
   const processLogin = async () => {
     loading = true;
-    window.addEventListener(
-      "login-result",
-      (e) => {
-        const customEvent = e as CustomEvent;
-        const resultData = customEvent.detail;
-        const wasSuccessful = "user" in resultData;
+    const loginPromise = new Promise<void>((res, rej) => {
+      window.addEventListener(
+        "login-result",
+        (e) => {
+          const customEvent = e as CustomEvent;
+          const resultData = customEvent.detail;
+          const wasSuccessful = "user" in resultData;
 
-        if (!wasSuccessful) {
-          const errorResult = resultData as Error;
-          toast.error(errorResult.message, {
-            position: "bottom-center",
-            className:
-              "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-            duration: 1500,
-          });
-          loading = false;
-          return;
-        }
-        const userResult = resultData.user as User;
-        currentUser.set(userResult);
-        currentPage.set(Page.Launch);
-        toast.success(`Welcome back, ${userResult.name}!`, {
-          position: "bottom-center",
-          className:
-            "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 3000,
-        });
-      },
-      { once: true }
-    );
-    window.dispatchEvent(
-      new CustomEvent("login-attempt", {
-        detail: { username, password, saveCredentials },
-      })
-    );
-  };
-
-  const tryAutoLogin = async () => {
-    loading = true;
-    await new Promise((res) => setTimeout(res, 1500));
-    window.addEventListener(
-      "login-result",
-      (e) => {
-        const customEvent = e as CustomEvent;
-        const resultData = customEvent.detail;
-        const isGuest = "guest" in resultData;
-        const wasSuccessful = "user" in resultData;
-        if (isGuest) {
+          if (!wasSuccessful) {
+            /* const errorResult = resultData as Error;
+            toast.error(errorResult.message, {
+              position: "bottom-center",
+              className:
+                "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+              duration: 1500,
+            }); */
+            rej();
+            loading = false;
+            return;
+          }
+          const userResult = resultData.user as User;
+          currentUser.set(userResult);
           currentPage.set(Page.Launch);
-          toast.success(`Logged in as Guest`, {
+          res();
+          toast.success(`Welcome back, ${userResult.name}!`, {
             position: "bottom-center",
             className:
               "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
             duration: 3000,
           });
-          return;
-        }
-        if (!wasSuccessful) {
-          loading = false;
-          return;
-        }
-        const userResult = resultData.user as User;
-        currentUser.set(userResult);
-        currentPage.set(Page.Launch);
-        toast.success(`Welcome back, ${userResult.name}!`, {
-          position: "bottom-center",
-          className:
-            "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 3000,
-        });
-        loading = false;
+        },
+        { once: true }
+      );
+      window.dispatchEvent(
+        new CustomEvent("login-attempt", {
+          detail: { username, password, saveCredentials },
+        })
+      );
+    });
+    toast.promise(
+      loginPromise,
+      {
+        loading: "Logging in...",
+        success: "Successfully logged in!",
+        error: "Failed to login.",
       },
-      { once: true }
+      {
+        position: "bottom-center",
+        className:
+          "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+        duration: 3000,
+      }
     );
-    window.dispatchEvent(new CustomEvent("autologin-attempt"));
+  };
+
+  const tryAutoLogin = async () => {
+    loading = true;
+    const loginPromise = new Promise<void>((res, rej) => {
+      window.addEventListener(
+        "login-result",
+        (e) => {
+          const customEvent = e as CustomEvent;
+          const resultData = customEvent.detail;
+          const isGuest = "guest" in resultData;
+          const wasSuccessful = "user" in resultData;
+          console.log(resultData);
+          if (isGuest) {
+            currentPage.set(Page.Launch);
+            res();
+            toast.success(`Logged in as Guest`, {
+              position: "bottom-center",
+              className:
+                "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+              duration: 3000,
+            });
+            return;
+          }
+          if (!wasSuccessful) {
+            loading = false;
+            rej();
+            return;
+          }
+          const userResult = resultData.user as User;
+          currentUser.set(userResult);
+          currentPage.set(Page.Launch);
+          res();
+          toast.success(`Welcome back, ${userResult.name}!`, {
+            position: "bottom-center",
+            className:
+              "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+            duration: 3000,
+          });
+          loading = false;
+        },
+        { once: true }
+      );
+      window.dispatchEvent(new CustomEvent("autologin-attempt"));
+    });
+    toast.promise(
+      loginPromise,
+      {
+        loading: "Logging in...",
+        success: "Successfully logged in!",
+        error: "Failed to login.",
+      },
+      {
+        position: "bottom-center",
+        className:
+          "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+        duration: 3000,
+      }
+    );
   };
 
   const proceedAsGuest = () => {
@@ -103,10 +140,24 @@
     });
   };
 
-  if (!$startup) {
-    startup.set(true);
-    tryAutoLogin();
-  }
+  const shouldAutologin = async () => {
+    const shouldAutologin = await new Promise<boolean>((res) => {
+      window.addEventListener("autologin-result", (e) => {
+        const customEvent = e as CustomEvent;
+        const resultData = customEvent.detail;
+        res(resultData);
+      });
+      window.dispatchEvent(new CustomEvent("autologin-active"));
+    });
+    return shouldAutologin;
+  };
+
+  (async () => {
+    if (!$startup) {
+      startup.set(true);
+      if (await shouldAutologin()) tryAutoLogin();
+    }
+  })();
 </script>
 
 <main

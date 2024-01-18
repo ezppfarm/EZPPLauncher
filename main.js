@@ -3,16 +3,32 @@ const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
-const config = require("./src/config/config");
+const config = require("./electron/config");
 const { setupTitlebar, attachTitlebarToWindow } = require(
   "custom-electron-titlebar/main",
 );
-const { isValidOsuFolder, getUpdateFiles, getGlobalConfig, getFilesThatNeedUpdate, downloadUpdateFiles, getUserConfig, runOsuWithDevServer, getPatcherUpdates, downloadPatcherUpdates, getUIFiles, downloadUIFiles, replaceUIFile } = require("./src/util/osuUtil");
-const { formatBytes } = require("./src/util/formattingUtil");
+const {
+  isValidOsuFolder,
+  getUpdateFiles,
+  getGlobalConfig,
+  getFilesThatNeedUpdate,
+  downloadUpdateFiles,
+  getUserConfig,
+  runOsuWithDevServer,
+  getPatcherUpdates,
+  downloadPatcherUpdates,
+  getUIFiles,
+  downloadUIFiles,
+  replaceUIFile,
+  findOsuInstallation,
+} = require("./electron/osuUtil");
+const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
 const { existsSync } = require("fs");
-const { runFileDetached } = require("./src/util/executeUtil");
-const richPresence = require("./src/discord/richPresence");
+const { runFileDetached } = require("./electron/executeUtil");
+const richPresence = require("./electron/richPresence");
+const cryptUtil = require("./electron/cryptoUtil");
+const { getHwId } = require("./electron/hwidUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -40,7 +56,11 @@ function startOsuStatus() {
       if (!osuLoaded) {
         osuLoaded = true;
         setTimeout(() => {
-          const patcherExecuteable = path.join(userOsuPath, "EZPPLauncher", "patcher.exe");
+          const patcherExecuteable = path.join(
+            userOsuPath,
+            "EZPPLauncher",
+            "patcher.exe",
+          );
           if (existsSync(patcherExecuteable)) {
             runFileDetached(userOsuPath, patcherExecuteable);
           }
@@ -102,15 +122,6 @@ function startOsuStatus() {
         details,
         state: infoText
       })
-      /* const components = windowTitle.split(" - ");
-      const splitTitle = [components.shift(), components.join(" - ")]
-      const currentMap = splitTitle[1];
-      if (!currentMap.endsWith(".osu")) {
-        richPresence.updateStatus({
-          state: "Playing...",
-          details: currentMap
-        })
-      } */
     }
   }, 2500);
 }
@@ -121,6 +132,7 @@ function stopOsuStatus() {
 
 function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
+    const hwid = getHwId();
     const timeout = new AbortController();
     const timeoutId = setTimeout(() => timeout.abort(), 8000);
     try {
@@ -143,7 +155,7 @@ function registerIPCPipes() {
         if ("user" in result) {
           if (args.saveCredentials) {
             config.set("username", args.username);
-            config.set("password", args.password);
+            config.set("password", cryptUtil.encrypt(args.password, hwid));
           }
           currentUser = args;
           config.remove("guest");
@@ -162,11 +174,23 @@ function registerIPCPipes() {
     }
   });
 
-  ipcMain.handle("ezpplauncher:autologin", async (e) => {
+  ipcMain.handle("ezpplauncher:autologin-active", async (e) => {
     const username = config.get("username");
     const password = config.get("password");
     const guest = config.get("guest");
+    if (guest != undefined) return true;
+    return username != undefined && password != undefined;
+  });
+
+  ipcMain.handle("ezpplauncher:autologin", async (e) => {
+    const hwid = getHwId();
+    const username = config.get("username");
+    const guest = config.get("guest");
     if (guest) return { code: 200, message: "Login as guest", guest: true };
+    if (username == undefined) {
+      return { code: 200, message: "No autologin" };
+    }
+    const password = cryptUtil.decrypt(config.get("password"), hwid);
     if (username == undefined || password == undefined) {
       return { code: 200, message: "No autologin" };
     }
@@ -196,6 +220,8 @@ function registerIPCPipes() {
           };
         }
         return result;
+      } else {
+        config.remove("password");
       }
       return {
         code: 500,
@@ -220,11 +246,23 @@ function registerIPCPipes() {
     config.remove("username");
     config.remove("password");
     config.remove("guest");
-    currentUser = undefined
+    currentUser = undefined;
     return true;
   });
 
   ipcMain.handle("ezpplauncher:settings", async (e) => {
+    return config.all();
+  });
+
+  ipcMain.handle("ezpplauncher:detect-folder", async (e) => {
+    const detected = await findOsuInstallation();
+    if (detected && await isValidOsuFolder(detected)) {
+      mainWindow.webContents.send("ezpplauncher:alert", {
+        type: "success",
+        message: "osu! path successfully saved!",
+      });
+      config.set("osuPath", detected);
+    }
     return config.all();
   });
 
@@ -285,33 +323,65 @@ function registerIPCPipes() {
     const updateFiles = await getFilesThatNeedUpdate(osuPath, latestFiles);
     if (uiFiles.length > 0) {
       const uiDownloader = downloadUIFiles(osuPath, uiFiles);
+      let errored = false;
+      uiDownloader.eventEmitter.on("error", (data) => {
+        const filename = data.fileName;
+        errored = true;
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message:
+            `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+        });
+      });
       uiDownloader.eventEmitter.on("data", (data) => {
         mainWindow.webContents.send("ezpplauncher:launchprogress", {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await uiDownloader.startDownload();
       mainWindow.webContents.send("ezpplauncher:launchprogress", {
         progress: -1,
       });
+      if (errored) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        return;
+      }
     }
     if (updateFiles.length > 0) {
       const updateDownloader = downloadUpdateFiles(osuPath, updateFiles);
+      let errored = false;
+      updateDownloader.eventEmitter.on("error", (data) => {
+        const filename = data.fileName;
+        errored = true;
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message:
+            `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+        });
+      });
       updateDownloader.eventEmitter.on("data", (data) => {
         mainWindow.webContents.send("ezpplauncher:launchprogress", {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await updateDownloader.startDownload();
       mainWindow.webContents.send("ezpplauncher:launchprogress", {
         progress: -1,
       });
+      if (errored) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        return;
+      }
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
         status: "osu! is now up to date!",
       });
@@ -331,18 +401,34 @@ function registerIPCPipes() {
       const patchFiles = await getPatcherUpdates(osuPath);
       if (patchFiles.length > 0) {
         const patcherDownloader = downloadPatcherUpdates(osuPath, patchFiles);
+        let errored = false;
+        patcherDownloader.eventEmitter.on("error", (data) => {
+          const filename = data.fileName;
+          errored = true;
+          mainWindow.webContents.send("ezpplauncher:alert", {
+            type: "error",
+            message:
+              `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+          });
+        });
         patcherDownloader.eventEmitter.on("data", (data) => {
           mainWindow.webContents.send("ezpplauncher:launchprogress", {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)})...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+              formatBytes(data.total)
+            })...`,
           });
         });
         await patcherDownloader.startDownload();
         mainWindow.webContents.send("ezpplauncher:launchprogress", {
           progress: -1,
-        })
+        });
+        if (errored) {
+          mainWindow.webContents.send("ezpplauncher:launchabort");
+          return;
+        }
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
           status: "Patcher is now up to date!",
         });
@@ -375,8 +461,8 @@ function registerIPCPipes() {
       stopOsuStatus();
       richPresence.updateVersion();
       richPresence.updateStatus({
-        details: "Idle in Launcher...",
-        state: undefined
+        state: "Idle in Launcher...",
+        details: undefined
       })
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
         status: "Waiting for cleanup...",
@@ -386,11 +472,19 @@ function registerIPCPipes() {
         await replaceUIFile(osuPath, true);
         mainWindow.webContents.send("ezpplauncher:launchabort");
       }, 5000);
-    }
+    };
     await replaceUIFile(osuPath, false);
     runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
     mainWindow.hide();
     startOsuStatus();
+
+
+    /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
+      progress: 0,
+    });
+    mainWindow.webContents.send("ezpplauncher:launchprogress", {
+      progress: 100,
+    }); */
     return true;
   });
 }
@@ -400,8 +494,8 @@ function createWindow() {
 
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 600,
-    height: 380,
+    width: 550,
+    height: 350,
     resizable: false,
     frame: false,
     titleBarStyle: "hidden",

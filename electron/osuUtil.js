@@ -3,7 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const EventEmitter = require("events");
 const { default: axios } = require("axios");
-const { runFile } = require("./executeUtil");
+const { runFile } = require("./executeUtil.js");
 
 const checkUpdateURL =
   "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
@@ -38,22 +38,22 @@ const patcherFiles = [
   {
     name: "patcher.exe",
     url_download: "https://ez-pp.farm/assets/patcher.exe",
-    url_hash: "https://ez-pp.farm/assets/patcher.md5"
+    url_hash: "https://ez-pp.farm/assets/patcher.md5",
   },
   {
     name: "patch.hook.dll",
     url_download: "https://ez-pp.farm/assets/patch.hook.dll",
-    url_hash: "https://ez-pp.farm/assets/patch.hook.md5"
-  }
-]
+    url_hash: "https://ez-pp.farm/assets/patch.hook.md5",
+  },
+];
 
 const uiFiles = [
   {
     name: "ezpp!ui.dll",
     url_download: "https://ez-pp.farm/assets/ezpp!ui.dll",
-    url_hash: "https://ez-pp.farm/assets/ezpp!ui.md5"
-  }
-]
+    url_hash: "https://ez-pp.farm/assets/ezpp!ui.md5",
+  },
+];
 
 async function isValidOsuFolder(path) {
   const allFiles = await fs.promises.readdir(path);
@@ -175,13 +175,17 @@ async function getFilesThatNeedUpdate(osuPath, releaseStreamFiles) {
     const fileOnDisk = path.join(osuPath, fileName);
     if (fs.existsSync(fileOnDisk)) {
       if (ignoredOsuEntities.includes(fileName)) continue;
-      const fileHashOnDisk = crypto.createHash("md5").update(fs.readFileSync(fileOnDisk)).digest("hex");
-      if (fileHashOnDisk.trim().toLowerCase() != fileHash.trim().toLowerCase()) {
+      const fileHashOnDisk = crypto.createHash("md5").update(
+        fs.readFileSync(fileOnDisk),
+      ).digest("hex");
+      if (
+        fileHashOnDisk.trim().toLowerCase() != fileHash.trim().toLowerCase()
+      ) {
         console.log({
           fileOnDisk,
           fileHashOnDisk,
-          fileHash
-        })
+          fileHash,
+        });
         updateFiles.push(updatePatch);
       }
     } else updateFiles.push(updatePatch);
@@ -207,7 +211,7 @@ function downloadUpdateFiles(osuPath, updateFiles) {
             fileName,
             loaded,
             total,
-            progress: Math.floor((loaded / total) * 100)
+            progress: Math.floor((loaded / total) * 100),
           });
         },
       });
@@ -216,20 +220,30 @@ function downloadUpdateFiles(osuPath, updateFiles) {
           fileName,
           loaded: fileSize,
           total: fileSize,
-          progress: 100
+          progress: 100,
         });
-      })
-      await fs.promises.writeFile(path.join(osuPath, fileName), axiosDownloadWithProgress.data);
+      });
+      try {
+        await fs.promises.writeFile(
+          path.join(osuPath, fileName),
+          axiosDownloadWithProgress.data,
+        );
+      } catch (err) {
+        console.log(err);
+        eventEmitter.emit("error", {
+          fileName,
+        });
+      }
     }
 
     // wait until all files are downloaded
     return true;
-  }
+  };
 
   return {
     eventEmitter,
     startDownload,
-  }
+  };
 }
 
 function runOsuWithDevServer(osuPath, serverDomain, onExit) {
@@ -238,7 +252,6 @@ function runOsuWithDevServer(osuPath, serverDomain, onExit) {
 }
 
 async function getPatcherUpdates(osuPath) {
-
   const filesToDownload = [];
 
   const patcherDir = path.join(osuPath, "EZPPLauncher");
@@ -246,9 +259,15 @@ async function getPatcherUpdates(osuPath) {
 
   for (const patcherFile of patcherFiles) {
     if (fs.existsSync(path.join(patcherDir, patcherFile.name))) {
-      const latestPatchFileHash = await (await fetch(patcherFile.url_hash)).text();
-      const localPatchFileHash = crypto.createHash("md5").update(fs.readFileSync(path.join(patcherDir, patcherFile.name))).digest("hex");
-      if (latestPatchFileHash.trim().toLowerCase() != localPatchFileHash.trim().toLowerCase()) filesToDownload.push(patcherFile);
+      const latestPatchFileHash = await (await fetch(patcherFile.url_hash))
+        .text();
+      const localPatchFileHash = crypto.createHash("md5").update(
+        fs.readFileSync(path.join(patcherDir, patcherFile.name)),
+      ).digest("hex");
+      if (
+        latestPatchFileHash.trim().toLowerCase() !=
+          localPatchFileHash.trim().toLowerCase()
+      ) filesToDownload.push(patcherFile);
     } else filesToDownload.push(patcherFile);
   }
 
@@ -259,7 +278,6 @@ function downloadPatcherUpdates(osuPath, patcherUpdates) {
   const eventEmitter = new EventEmitter();
 
   const startDownload = async () => {
-
     const patcherDir = path.join(osuPath, "EZPPLauncher");
     if (!fs.existsSync(patcherDir)) fs.mkdirSync(patcherDir);
 
@@ -274,23 +292,32 @@ function downloadPatcherUpdates(osuPath, patcherUpdates) {
             fileName,
             loaded,
             total,
-            progress: Math.floor((loaded / total) * 100)
+            progress: Math.floor((loaded / total) * 100),
           });
         },
       });
 
-      await fs.promises.writeFile(path.join(osuPath, "EZPPLauncher", fileName), axiosDownloadWithProgress.data);
+      try {
+        await fs.promises.writeFile(
+          path.join(osuPath, "EZPPLauncher", fileName),
+          axiosDownloadWithProgress.data,
+        );
+      } catch (err) {
+        console.log(err);
+        eventEmitter.emit("error", {
+          fileName,
+        });
+      }
     }
-  }
+  };
 
   return {
     eventEmitter,
     startDownload,
-  }
+  };
 }
 
 async function getUIFiles(osuPath) {
-
   const filesToDownload = [];
 
   const ezppLauncherDir = path.join(osuPath, "EZPPLauncher");
@@ -299,8 +326,13 @@ async function getUIFiles(osuPath) {
   for (const uiFile of uiFiles) {
     if (fs.existsSync(path.join(ezppLauncherDir, uiFile.name))) {
       const latestPatchFileHash = await (await fetch(uiFile.url_hash)).text();
-      const localPatchFileHash = crypto.createHash("md5").update(fs.readFileSync(path.join(ezppLauncherDir, uiFile.name))).digest("hex");
-      if (latestPatchFileHash.trim().toLowerCase() != localPatchFileHash.trim().toLowerCase()) filesToDownload.push(uiFile);
+      const localPatchFileHash = crypto.createHash("md5").update(
+        fs.readFileSync(path.join(ezppLauncherDir, uiFile.name)),
+      ).digest("hex");
+      if (
+        latestPatchFileHash.trim().toLowerCase() !=
+          localPatchFileHash.trim().toLowerCase()
+      ) filesToDownload.push(uiFile);
     } else filesToDownload.push(uiFile);
   }
 
@@ -311,7 +343,6 @@ function downloadUIFiles(osuPath, uiFiles) {
   const eventEmitter = new EventEmitter();
 
   const startDownload = async () => {
-
     const ezpplauncherDir = path.join(osuPath, "EZPPLauncher");
     if (!fs.existsSync(ezpplauncherDir)) fs.mkdirSync(ezpplauncherDir);
 
@@ -326,33 +357,85 @@ function downloadUIFiles(osuPath, uiFiles) {
             fileName,
             loaded,
             total,
-            progress: Math.floor((loaded / total) * 100)
+            progress: Math.floor((loaded / total) * 100),
           });
         },
       });
-
-      await fs.promises.writeFile(path.join(osuPath, "EZPPLauncher", fileName), axiosDownloadWithProgress.data);
+      try {
+        await fs.promises.writeFile(
+          path.join(osuPath, "EZPPLauncher", fileName),
+          axiosDownloadWithProgress.data,
+        );
+      } catch (err) {
+        console.log(err);
+        eventEmitter.emit("error", {
+          fileName,
+        });
+      }
     }
-  }
+  };
 
   return {
     eventEmitter,
     startDownload,
-  }
+  };
 }
 
 async function replaceUIFile(osuPath, revert) {
   if (!revert) {
     const ezppUIFile = path.join(osuPath, "EZPPLauncher", "ezpp!ui.dll");
     const oldOsuUIFile = path.join(osuPath, "osu!ui.dll");
-    await fs.promises.rename(oldOsuUIFile, path.join(osuPath, "osu!ui.dll.bak"));
+    await fs.promises.rename(
+      oldOsuUIFile,
+      path.join(osuPath, "osu!ui.dll.bak"),
+    );
     await fs.promises.rename(ezppUIFile, oldOsuUIFile);
   } else {
     const oldOsuUIFile = path.join(osuPath, "osu!ui.dll");
     const ezppUIFile = path.join(osuPath, "EZPPLauncher", "ezpp!ui.dll");
     await fs.promises.rename(oldOsuUIFile, ezppUIFile);
-    await fs.promises.rename(path.join(osuPath, "osu!ui.dll.bak"), oldOsuUIFile);
+    await fs.promises.rename(
+      path.join(osuPath, "osu!ui.dll.bak"),
+      oldOsuUIFile,
+    );
   }
 }
 
-module.exports = { isValidOsuFolder, getUserConfig, getGlobalConfig, getUpdateFiles, getFilesThatNeedUpdate, downloadUpdateFiles, runOsuWithDevServer, getPatcherUpdates, downloadPatcherUpdates, downloadUIFiles, getUIFiles, replaceUIFile };
+async function findOsuInstallation() {
+  const regedit = require("regedit-rs");
+
+  const osuLocationFromDefaultIcon =
+    "HKLM\\SOFTWARE\\Classes\\osu\\DefaultIcon";
+  const osuKey = regedit.listSync(osuLocationFromDefaultIcon);
+  if (osuKey[osuLocationFromDefaultIcon].exists) {
+    const key = osuKey[osuLocationFromDefaultIcon].values[""];
+    let value = key.value;
+    value = value.substring(1, value.length - 3);
+    return path.dirname(value.trim());
+  }
+  /* const osuStruct = await regedit.listValuesSync(osuLocationFromDefaultIcon);
+  for (const line of osuStruct.split("\n")) {
+    if (line.includes("REG_SZ")) {
+      let value = line.trim().split("    ")[2];
+      value = value.substring(1, value.length - 3);
+      return path.dirname(value.trim());
+    }
+  } */
+  return undefined;
+}
+
+module.exports = {
+  isValidOsuFolder,
+  getUserConfig,
+  getGlobalConfig,
+  getUpdateFiles,
+  getFilesThatNeedUpdate,
+  downloadUpdateFiles,
+  runOsuWithDevServer,
+  getPatcherUpdates,
+  downloadPatcherUpdates,
+  downloadUIFiles,
+  getUIFiles,
+  replaceUIFile,
+  findOsuInstallation,
+};
