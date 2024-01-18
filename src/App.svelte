@@ -67,7 +67,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 1500,
+          duration: 2000,
         });
         break;
       }
@@ -76,7 +76,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 1500,
+          duration: 4000,
         });
         break;
       }
@@ -167,11 +167,3 @@
 {:else}
   <Launch />
 {/if}
-
-<style>
-  .container {
-    text-align: center;
-    padding: 1em;
-    margin: auto;
-  }
-</style>

@@ -12,9 +12,12 @@
     "files": [
       "public/**/*",
       "main.js",
-      "preload.js"
+      "preload.js",
+      "electron/*",
+      "electron/**/*"
     ],
     "win": {
+      "requestedExecutionLevel": "requireAdministrator",
       "target": [
         "portable"
       ]
@@ -29,7 +32,6 @@
     "start": "sirv public --no-clear",
     "electron": "wait-on http://localhost:8080 && electron .",
     "electron-dev": "concurrently \"yarn run dev\" \"yarn run electron\"",
-    "preelectron-pack": "yarn run build",
     "electron-pack": "electron-builder",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
@@ -38,11 +40,13 @@
     "axios": "^1.6.5",
     "better-sqlite3": "^9.2.2",
     "crypto": "^1.0.1",
+    "crypto-js": "^4.2.0",
     "custom-electron-titlebar": "^4.2.7",
     "discord-auto-rpc": "^1.0.17",
     "electron-serve": "^1.1.0",
     "get-window-by-name": "^2.0.0",
-    "svelte-french-toast": "^1.2.0"
+    "svelte-french-toast": "^1.2.0",
+    "systeminformation": "^5.21.22"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.5.0",

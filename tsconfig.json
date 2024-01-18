@@ -1,7 +1,16 @@
 {
   "extends": "./node_modules/@tsconfig/svelte/tsconfig.json",
 
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "electron/richPresence.js",
+    "electron/config.js",
+    "electron/cryptoUtil.js",
+    "electron/executeUtil.js",
+    "electron/formattingUtil.js",
+    "electron/hwidUtil.js",
+    "electron/osuUtil.js"
+  ],
   "exclude": ["node_modules/*", "__sapper__/*", "public/*"],
   "compilerOptions": {
     "typeRoots": [
