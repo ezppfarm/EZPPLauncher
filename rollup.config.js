@@ -9,7 +9,6 @@ import image from "@rollup/plugin-image";
 import sveltePreprocess from "svelte-preprocess";
 import typescript from "@rollup/plugin-typescript";
 import progress from "rollup-plugin-progress";
-import findUnused from "rollup-plugin-unused";
 
 const production = !process.env.ROLLUP_WATCH;
 
@@ -48,8 +47,7 @@ export default {
     file: "public/build/bundle.js",
   },
   plugins: [
-    findUnused(),
-    progress({ clearLine: true }),
+    !production && progress({ clearLine: true }),
     svelte({
       preprocess: sveltePreprocess({ sourceMap: !production }),
       compilerOptions: {
@@ -61,7 +59,7 @@ export default {
     // we'll extract any component CSS out into
     // a separate file - better for performance
     css({ output: "bundle.css" }),
-    postcss(),
+    postcss({ sourceMap: "inline" }),
 
     // If you have external dependencies installed from
     // npm, you'll most likely need these plugins. In

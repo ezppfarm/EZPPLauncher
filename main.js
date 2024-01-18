@@ -137,9 +137,18 @@ function registerIPCPipes() {
     }
   });
 
+  ipcMain.handle("ezpplauncher:autologin-active", async (e) => {
+    const username = config.get("username");
+    const password = config.get("password");
+    return username != undefined && password != undefined;
+  });
+
   ipcMain.handle("ezpplauncher:autologin", async (e) => {
     const hwid = getHwId();
     const username = config.get("username");
+    if (username == undefined) {
+      return { code: 200, message: "No autologin" };
+    }
     const password = cryptUtil.decrypt(config.get("password"), hwid);
     const guest = config.get("guest");
     if (guest) return { code: 200, message: "Login as guest", guest: true };
@@ -172,6 +181,8 @@ function registerIPCPipes() {
           };
         }
         return result;
+      } else {
+        config.remove("password");
       }
       return {
         code: 500,

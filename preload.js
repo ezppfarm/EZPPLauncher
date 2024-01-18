@@ -22,6 +22,15 @@ window.addEventListener("login-attempt", async (e) => {
   );
 });
 
+window.addEventListener("autologin-active", async (e) => {
+  const autologin = await ipcRenderer.invoke(
+    "ezpplauncher:autologin-active",
+  );
+  window.dispatchEvent(
+    new CustomEvent("autologin-result", { detail: autologin }),
+  );
+});
+
 window.addEventListener("autologin-attempt", async () => {
   const loginResult = await ipcRenderer.invoke("ezpplauncher:autologin");
   window.dispatchEvent(

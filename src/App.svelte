@@ -38,6 +38,12 @@
     window.dispatchEvent(new CustomEvent("logout"));
     currentUser.set(undefined);
     currentPage.set(Page.Login);
+    toast.success("Successfully logged out!", {
+      position: "bottom-center",
+      className:
+        "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+      duration: 2000,
+    });
   };
 
   window.addEventListener("launchStatusUpdate", (e) => {
