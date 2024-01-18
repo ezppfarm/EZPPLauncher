@@ -5,8 +5,8 @@ const clientId = "1032772293220384808";
 let richPresence;
 
 let currentStatus = {
-    details: "  ",
-    state: "Idle in Launcher...",
+    state: "  ",
+    details: "Idle in Launcher...",
     startTimestamp: new Date(),
     largeImageKey: "ezppfarm",
     largeImageText: `${appName} ${appVersion}`,

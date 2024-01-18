@@ -48,26 +48,71 @@ function startOsuStatus() {
       }
 
       const windowTitle = firstInstance.processTitle;
-      if (lastOsuStatus == windowTitle) return;
       lastOsuStatus = windowTitle;
-      if (!windowTitle.includes("-")) {
-        richPresence.updateStatus({
-          details: undefined,
-          state: "Idle..."
-        })
-      } else {
-        const components = windowTitle.split(" - ");
-        const splitTitle = [components.shift(), components.join(" - ")]
-        const currentMap = splitTitle[1];
-        if (!currentMap.endsWith(".osu")) {
-          richPresence.updateStatus({
-            state: "Playing...",
-            details: currentMap
-          })
-        }
+      const currentStatusRequest = await fetch("https://api.ez-pp.farm/get_player_status?name=" + currentUser.username);
+      const currentStatus = await currentStatusRequest.json();
+
+      if (!("player_status" in currentStatus)) return;
+      if (!("status" in currentStatus.player_status)) return;
+
+      let details = "Idle...";
+      let infoText = currentStatus.player_status.status.info_text.length > 0 ? currentStatus.player_status.status.info_text : "  ";
+
+      switch (currentStatus.player_status.status.action) {
+        case 1:
+          details = "AFK..."
+          infoText = "  ";
+          break;
+        case 2:
+          details = "Playing...";
+          break;
+        case 3:
+          details = "Editing...";
+          break;
+        case 4:
+          details = "Modding..."
+          break;
+        case 5:
+          details = "Multiplayer: Selecting a Beatmap...";
+          infoText = "  ";
+          break;
+        case 6:
+          details = "Watching...";
+          break;
+        case 8:
+          details = "Testing...";
+          break;
+        case 9:
+          details = "Submitting...";
+          break;
+        case 11:
+          details = "Multiplayer: Idle...";
+          infoText = "  ";
+          break;
+        case 12:
+          details = "Multiplayer: Playing...";
+          break;
+        case 13:
+          details = "Browsing osu!direct...";
+          infoText = "  ";
+          break;
       }
+
+      richPresence.updateStatus({
+        details,
+        state: infoText
+      })
+      /* const components = windowTitle.split(" - ");
+      const splitTitle = [components.shift(), components.join(" - ")]
+      const currentMap = splitTitle[1];
+      if (!currentMap.endsWith(".osu")) {
+        richPresence.updateStatus({
+          state: "Playing...",
+          details: currentMap
+        })
+      } */
     }
-  }, 1000);
+  }, 2500);
 }
 
 function stopOsuStatus() {
@@ -326,11 +371,12 @@ function registerIPCPipes() {
 
     const onExitHook = () => {
       mainWindow.show();
+      mainWindow.focus();
       stopOsuStatus();
       richPresence.updateVersion();
       richPresence.updateStatus({
-        state: "Idle in Launcher...",
-        details: undefined
+        details: "Idle in Launcher...",
+        state: undefined
       })
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
         status: "Waiting for cleanup...",
@@ -345,14 +391,6 @@ function registerIPCPipes() {
     runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
     mainWindow.hide();
     startOsuStatus();
-
-
-    /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
-      progress: 0,
-    });
-    mainWindow.webContents.send("ezpplauncher:launchprogress", {
-      progress: 100,
-    }); */
     return true;
   });
 }
