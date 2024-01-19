@@ -23,8 +23,6 @@
     launching,
     launchPercentage,
     launchStatus,
-    patch,
-    presence,
   } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
