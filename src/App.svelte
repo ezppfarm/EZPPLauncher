@@ -6,11 +6,14 @@
     DropdownHeader,
     DropdownDivider,
     Button,
+    Modal,
+    Indicator,
   } from "flowbite-svelte";
   import {
     ArrowLeftSolid,
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
+    HeartSolid,
     UserSettingsSolid,
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
@@ -33,12 +36,12 @@
   let user: User | undefined = undefined;
   let loggedIn = false;
 
+  let showUpdateDialog = false;
+  let updateInfo: Record<string, unknown>;
+
   currentUser.subscribe((newUser) => {
     loggedIn = newUser != undefined;
     user = newUser;
-  });
-
-  presence.subscribe((val) => {
   });
 
   const logout = () => {
@@ -53,14 +56,22 @@
     });
   };
 
+  window.addEventListener("update", (e) => {
+    const update = (e as CustomEvent).detail;
+    setTimeout(() => {
+      showUpdateDialog = true;
+      updateInfo = update;
+
+      document.getElementById("updateDialog")?.blur();
+    }, 2000);
+  });
+
   window.addEventListener("launchStatusUpdate", (e) => {
-    console.log((e as CustomEvent).detail);
     const status = (e as CustomEvent).detail.status;
     launchStatus.set(status);
   });
 
   window.addEventListener("launchProgressUpdate", (e) => {
-    console.log((e as CustomEvent).detail);
     const progress = (e as CustomEvent).detail.progress;
     launchPercentage.set(progress);
   });
@@ -108,6 +119,8 @@
 
 <Toaster></Toaster>
 
+<!-- TODO: Update dialog-->
+
 <div class="p-2 flex flex-row justify-between items-center">
   <div class="flex flex-row items-center animate-fadeIn opacity-0">
     {#if $currentPage == Page.Settings}
@@ -137,6 +150,14 @@
           : "https://a.ez-pp.farm/0"}
         id="avatar-menu"
       />
+      <!-- TODO: if user has donator, display heart indicator-->
+      {#if $currentUser && $currentUser.id == 1001}
+        <Indicator color="red" border size="xl" placement="top-right">
+          <span class="text-red-300 text-xs font-bold">
+            <HeartSolid size="xs" />
+          </span>
+        </Indicator>
+      {/if}
     </div>
     <Dropdown placement="bottom-start" triggeredBy="#avatar-menu">
       <DropdownHeader>

@@ -105,3 +105,9 @@ ipcRenderer.addListener("ezpplauncher:launchprogress", (e, args) => {
     new CustomEvent("launchProgressUpdate", { detail: args }),
   );
 });
+
+ipcRenderer.addListener("ezpplauncher:update", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("update", { detail: args }),
+  );
+});

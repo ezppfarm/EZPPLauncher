@@ -572,9 +572,12 @@ function createWindow() {
   // Emitted when the window is ready to be shown
   // This helps in showing the window gracefully.
   mainWindow.once("ready-to-show", async () => {
-    const hasUpdate = await updateAvailable();
-    console.log({ hasUpdate });
+    const updateInfo = await updateAvailable();
+    if (!updateInfo.update) {
+      mainWindow.webContents.send("ezpplauncher:update", updateInfo.release);
+    }
     mainWindow.show();
+    mainWindow.focus();
   });
 }
 

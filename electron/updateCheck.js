@@ -10,9 +10,12 @@ module.exports = {
       const latestRelease = await fetch(repoUrl);
       const json = await latestRelease.json();
       if (json.length <= 0) return false;
-      return semver.lt(appVersion, json[0].tag_name);
+      return {
+        update: semver.lt(appVersion, json[0].tag_name),
+        release: json[0],
+      };
     } catch (err) {
-      return false;
+      return { update: false };
     }
   },
 };
