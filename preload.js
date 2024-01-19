@@ -1,5 +1,6 @@
 const { Titlebar, TitlebarColor } = require("custom-electron-titlebar");
 const { ipcRenderer } = require("electron");
+const { appName, appVersion } = require("./electron/appInfo");
 
 window.addEventListener("DOMContentLoaded", () => {
   const titlebar = new Titlebar({
@@ -9,6 +10,7 @@ window.addEventListener("DOMContentLoaded", () => {
     enableMnemonics: false,
     maximizable: false,
   });
+  titlebar.updateTitle(`${appName} ${appVersion}`);
 });
 
 window.addEventListener("login-attempt", async (e) => {
@@ -55,6 +57,11 @@ window.addEventListener("settings-get", async () => {
   window.dispatchEvent(
     new CustomEvent("settings-result", { detail: settings }),
   );
+});
+
+window.addEventListener("setting-update", async (e) => {
+  const detail = e.detail;
+  await ipcRenderer.invoke("ezpplauncher:setting-update", detail);
 });
 
 window.addEventListener("folder-auto", async (e) => {

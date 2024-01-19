@@ -5,13 +5,13 @@
     DropdownItem,
     DropdownHeader,
     DropdownDivider,
-    Button
+    Button,
   } from "flowbite-svelte";
   import {
     ArrowLeftSolid,
     ArrowRightFromBracketSolid,
     ArrowRightToBracketSolid,
-    UserSettingsSolid
+    UserSettingsSolid,
   } from "flowbite-svelte-icons";
   import ezppLogo from "../public/favicon.png";
   import {
@@ -19,7 +19,9 @@
     currentUser,
     launching,
     launchPercentage,
-    launchStatus
+    launchStatus,
+    patch,
+    presence,
   } from "./storage/localStore";
   import { Page } from "./consts/pages";
   import Login from "./pages/Login.svelte";
@@ -36,6 +38,9 @@
     user = newUser;
   });
 
+  presence.subscribe((val) => {
+  });
+
   const logout = () => {
     window.dispatchEvent(new CustomEvent("logout"));
     currentUser.set(undefined);
@@ -44,7 +49,7 @@
       position: "bottom-center",
       className:
         "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-      duration: 2000
+      duration: 2000,
     });
   };
 
@@ -75,7 +80,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 2000
+          duration: 2000,
         });
         break;
       }
@@ -84,7 +89,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 4000
+          duration: 4000,
         });
         break;
       }
@@ -94,7 +99,7 @@
           position: "bottom-center",
           className:
             "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-          duration: 1500
+          duration: 1500,
         });
       }
     }
@@ -123,7 +128,7 @@
   </div>
   {#if $currentPage == Page.Launch}
     <div
-      class="flex flex-row gap-2 w-fill cursor-pointer md:order-2 animate-fadeIn opacity-0"
+      class="flex flex-row gap-2 w-fill cursor-pointer md:order-2 animate-lsideIn opacity-0"
     >
       <Avatar
         class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"

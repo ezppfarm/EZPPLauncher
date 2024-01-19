@@ -1,12 +1,5 @@
 <script lang="ts">
-  import {
-    Button,
-    ButtonGroup,
-    Input,
-    Label,
-    Toggle,
-    Tooltip
-  } from "flowbite-svelte";
+  import { Button, ButtonGroup, Input, Toggle } from "flowbite-svelte";
   import { FileSearchSolid, FolderSolid } from "flowbite-svelte-icons";
   import { patch, presence } from "./../storage/localStore";
 
@@ -15,6 +8,12 @@
   window.addEventListener("settings-result", (e) => {
     const settings: Record<string, string>[] = (e as CustomEvent).detail;
     const osuPath = settings.find((setting) => setting.key == "osuPath");
+    const settingPatch = settings.find((setting) => setting.key == "patch");
+    const settingPresence = settings.find(
+      (setting) => setting.key == "presence"
+    );
+    patch.set(settingPatch ? settingPatch.val == "true" : true);
+    presence.set(settingPresence ? settingPresence.val == "true" : true);
     folderPath = osuPath ? osuPath.val : "";
   });
   window.dispatchEvent(new CustomEvent("settings-get"));
@@ -29,12 +28,16 @@
 
   const togglePatching = () => {
     patch.set(!$patch);
-    //TODO: save in config
+    window.dispatchEvent(
+      new CustomEvent("setting-update", { detail: { patch: $patch } })
+    );
   };
 
   const togglePresence = () => {
     presence.set(!$presence);
-    //TODO: save in config
+    window.dispatchEvent(
+      new CustomEvent("setting-update", { detail: { presence: $presence } })
+    );
   };
 </script>
 

@@ -3,6 +3,7 @@ import { Page } from "../consts/pages";
 import type { User } from "../types/user";
 
 export const startup = writable(false);
+export const updateAvailable = writable(false);
 export const launching = writable(false);
 export const launchStatus = writable("Waiting...");
 export const launchPercentage = writable(-1);

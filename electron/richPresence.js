@@ -1,8 +1,12 @@
 const DiscordRPC = require("discord-auto-rpc");
 const { appName, appVersion } = require("./appInfo.js");
+const { get } = require("./config.js");
 
 const clientId = "1032772293220384808";
 let richPresence;
+
+let showPresence = true;
+let cleared = false;
 
 let currentStatus = {
   details: "  ",
@@ -32,7 +36,19 @@ module.exports = {
       richPresence.endlessLogin({ clientId });
       richPresence.once("ready", () => {
         setInterval(() => {
-          richPresence.setActivity(currentStatus);
+          const settingPresence = get("presence");
+          showPresence = settingPresence != undefined
+            ? settingPresence.val == "true"
+            : true;
+
+          if (showPresence) {
+            richPresence.setActivity(currentStatus);
+            cleared = false;
+          } else {
+            if (cleared) return;
+            cleared = true;
+            richPresence.clearActivity();
+          }
         }, 2500);
       });
     }
@@ -53,6 +69,8 @@ module.exports = {
     currentStatus.smallImageText = osuVersion ? `osu! ${osuVersion}` : "  ";
   },
   update: () => {
-    richPresence.setActivity(currentStatus);
-  }
-};  
+    if (showPresence) {
+      richPresence.setActivity(currentStatus);
+    }
+  },
+};

@@ -29,6 +29,8 @@ const { runFileDetached } = require("./electron/executeUtil");
 const richPresence = require("./electron/richPresence");
 const cryptUtil = require("./electron/cryptoUtil");
 const { getHwId } = require("./electron/hwidUtil");
+const { appName, appVersion } = require("./electron/appInfo");
+const { updateAvailable } = require("./electron/updateCheck");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -73,18 +75,22 @@ function startOsuStatus() {
 
       const windowTitle = firstInstance.processTitle;
       lastOsuStatus = windowTitle;
-      const currentStatusRequest = await fetch("https://api.ez-pp.farm/get_player_status?name=" + currentUser.username);
+      const currentStatusRequest = await fetch(
+        "https://api.ez-pp.farm/get_player_status?name=" + currentUser.username,
+      );
       const currentStatus = await currentStatusRequest.json();
 
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
 
       let details = "Idle...";
-      let infoText = currentStatus.player_status.status.info_text.length > 0 ? currentStatus.player_status.status.info_text : "  ";
+      let infoText = currentStatus.player_status.status.info_text.length > 0
+        ? currentStatus.player_status.status.info_text
+        : "  ";
 
       switch (currentStatus.player_status.status.action) {
         case 1:
-          details = "AFK..."
+          details = "AFK...";
           infoText = "  ";
           break;
         case 2:
@@ -94,7 +100,7 @@ function startOsuStatus() {
           details = "Editing...";
           break;
         case 4:
-          details = "Modding..."
+          details = "Modding...";
           break;
         case 5:
           details = "Multiplayer: Selecting a Beatmap...";
@@ -124,7 +130,7 @@ function startOsuStatus() {
 
       richPresence.updateStatus({
         details,
-        state: infoText
+        state: infoText,
       });
 
       richPresence.update();
@@ -260,6 +266,17 @@ function registerIPCPipes() {
     return config.all();
   });
 
+  ipcMain.handle("ezpplauncher:setting-update", async (e, args) => {
+    for (const key of Object.keys(args)) {
+      const value = args[key];
+      if (typeof value == "boolean") {
+        config.set(key, value ? "true" : "false");
+      } else {
+        config.set(key, value);
+      }
+    }
+  });
+
   ipcMain.handle("ezpplauncher:detect-folder", async (e) => {
     const detected = await findOsuInstallation();
     if (detected && await isValidOsuFolder(detected)) {
@@ -295,8 +312,9 @@ function registerIPCPipes() {
     return config.all();
   });
 
-  ipcMain.handle("ezpplauncher:launch", async (e, args) => {
-    patch = args.patch;
+  ipcMain.handle("ezpplauncher:launch", async (e) => {
+    const configPatch = config.get("patch");
+    patch = configPatch != undefined ? configPatch.val == "true" : true;
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking osu! directory...",
     });
@@ -344,8 +362,9 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await uiDownloader.startDownload();
@@ -374,8 +393,9 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await updateDownloader.startDownload();
@@ -420,8 +440,9 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-              })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+              formatBytes(data.total)
+            })...`,
           });
         });
         await patcherDownloader.startDownload();
@@ -466,7 +487,7 @@ function registerIPCPipes() {
       richPresence.updateVersion();
       richPresence.updateStatus({
         state: "Idle in Launcher...",
-        details: undefined
+        details: undefined,
       });
       richPresence.update();
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
@@ -482,7 +503,6 @@ function registerIPCPipes() {
     runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
     mainWindow.hide();
     startOsuStatus();
-
 
     /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
       progress: 0,
@@ -504,6 +524,7 @@ function createWindow() {
     resizable: false,
     frame: false,
     titleBarStyle: "hidden",
+    title: `${appName} ${appVersion}`,
     webPreferences: {
       nodeIntegration: true,
       preload: path.join(__dirname, "preload.js"),
@@ -550,7 +571,9 @@ function createWindow() {
 
   // Emitted when the window is ready to be shown
   // This helps in showing the window gracefully.
-  mainWindow.once("ready-to-show", () => {
+  mainWindow.once("ready-to-show", async () => {
+    const hasUpdate = await updateAvailable();
+    console.log({ hasUpdate });
     mainWindow.show();
   });
 }
