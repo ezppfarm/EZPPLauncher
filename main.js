@@ -21,6 +21,7 @@ const {
   downloadUIFiles,
   replaceUIFile,
   findOsuInstallation,
+  updateOsuConfigHashes,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
@@ -269,6 +270,12 @@ function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:setting-update", async (e, args) => {
     for (const key of Object.keys(args)) {
       const value = args[key];
+
+      if (key == "presence") {
+        if (!value) richPresence.disconnect();
+        else richPresence.connect();
+      }
+
       if (typeof value == "boolean") {
         config.set(key, value ? "true" : "false");
       } else {
@@ -314,7 +321,7 @@ function registerIPCPipes() {
 
   ipcMain.handle("ezpplauncher:launch", async (e) => {
     const configPatch = config.get("patch");
-    patch = configPatch != undefined ? configPatch.val == "true" : true;
+    patch = configPatch != undefined ? configPatch == "true" : true;
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking osu! directory...",
     });
@@ -362,9 +369,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await uiDownloader.startDownload();
@@ -393,9 +399,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await updateDownloader.startDownload();
@@ -440,9 +445,8 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-              formatBytes(data.total)
-            })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+              })...`,
           });
         });
         await patcherDownloader.startDownload();
@@ -467,6 +471,8 @@ function registerIPCPipes() {
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Preparing launch...",
     });
+    await updateOsuConfigHashes(osuPath);
+    await replaceUIFile(osuPath, false);
 
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
@@ -499,7 +505,6 @@ function registerIPCPipes() {
         mainWindow.webContents.send("ezpplauncher:launchabort");
       }, 5000);
     };
-    await replaceUIFile(osuPath, false);
     runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
     mainWindow.hide();
     startOsuStatus();
@@ -551,14 +556,22 @@ function createWindow() {
   }
 
   registerIPCPipes();
-  richPresence.connect();
+
+  const presenceEnabled = config.get("presence");
+  if (presenceEnabled == undefined)
+    richPresence.connect();
+  else {
+    console.log(presenceEnabled);
+    if (presenceEnabled == "true")
+      richPresence.connect();
+  }
   // Uncomment the following line of code when app is ready to be packaged.
   // loadURL(mainWindow);
 
   // Open the DevTools and also disable Electron Security Warning.
   if (isDev()) {
     process.env["ELECTRON_DISABLE_SECURITY_WARNINGS"] = true;
-    mainWindow.webContents.openDevTools({ mode: "detach" });
+    // mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
   // Emitted when the window is closed.

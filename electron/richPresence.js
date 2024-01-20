@@ -1,12 +1,9 @@
 const DiscordRPC = require("discord-auto-rpc");
 const { appName, appVersion } = require("./appInfo.js");
-const { get } = require("./config.js");
 
 const clientId = "1032772293220384808";
 let richPresence;
-
-let showPresence = true;
-let cleared = false;
+let intervalId
 
 let currentStatus = {
   details: "  ",
@@ -31,30 +28,21 @@ let currentStatus = {
 
 module.exports = {
   connect: () => {
+    console.log("Connecting to Discord...");
     if (!richPresence) {
       richPresence = new DiscordRPC.AutoClient({ transport: "ipc" });
       richPresence.endlessLogin({ clientId });
       richPresence.once("ready", () => {
-        setInterval(() => {
-          const settingPresence = get("presence");
-          showPresence = settingPresence != undefined
-            ? settingPresence.val == "true"
-            : true;
-
-          if (showPresence) {
-            richPresence.setActivity(currentStatus);
-            cleared = false;
-          } else {
-            if (cleared) return;
-            cleared = true;
-            richPresence.clearActivity();
-          }
+        richPresence.setActivity(currentStatus);
+        intervalId = setInterval(() => {
+          richPresence.setActivity(currentStatus);
         }, 2500);
       });
     }
   },
   disconnect: async () => {
     if (richPresence) {
+      clearInterval(intervalId);
       await richPresence.clearActivity();
       await richPresence.destroy();
       richPresence = null;
@@ -69,7 +57,7 @@ module.exports = {
     currentStatus.smallImageText = osuVersion ? `osu! ${osuVersion}` : "  ";
   },
   update: () => {
-    if (showPresence) {
+    if (richPresence) {
       richPresence.setActivity(currentStatus);
     }
   },

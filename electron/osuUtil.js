@@ -9,6 +9,7 @@ const checkUpdateURL =
   "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
 const ignoredOsuEntities = [
   "osu!auth.dll",
+  "osu!.exe"
 ];
 const osuEntities = [
   "avcodec-51.dll",
@@ -266,7 +267,7 @@ async function getPatcherUpdates(osuPath) {
       ).digest("hex");
       if (
         latestPatchFileHash.trim().toLowerCase() !=
-          localPatchFileHash.trim().toLowerCase()
+        localPatchFileHash.trim().toLowerCase()
       ) filesToDownload.push(patcherFile);
     } else filesToDownload.push(patcherFile);
   }
@@ -331,7 +332,7 @@ async function getUIFiles(osuPath) {
       ).digest("hex");
       if (
         latestPatchFileHash.trim().toLowerCase() !=
-          localPatchFileHash.trim().toLowerCase()
+        localPatchFileHash.trim().toLowerCase()
       ) filesToDownload.push(uiFile);
     } else filesToDownload.push(uiFile);
   }
@@ -413,15 +414,41 @@ async function findOsuInstallation() {
     value = value.substring(1, value.length - 3);
     return path.dirname(value.trim());
   }
-  /* const osuStruct = await regedit.listValuesSync(osuLocationFromDefaultIcon);
-  for (const line of osuStruct.split("\n")) {
-    if (line.includes("REG_SZ")) {
-      let value = line.trim().split("    ")[2];
-      value = value.substring(1, value.length - 3);
-      return path.dirname(value.trim());
-    }
-  } */
   return undefined;
+}
+
+
+
+async function updateOsuConfigHashes(osuPath) {
+  const osuCfg = path.join(osuPath, "osu!.cfg");
+  const fileStream = await fs.promises.readFile(osuCfg, "utf-8");
+  const lines = fileStream.split(/\r?\n/);
+  const newLines = [];
+  for (const line of lines) {
+    if (line.includes(" = ")) {
+      const argsPair = line.split(" = ", 2);
+      const key = argsPair[0];
+      const value = argsPair[1];
+
+      if (key.startsWith("h_")) {
+        const fileName = key.substring(2, key.length);
+        const filePath = path.join(osuPath, fileName);
+        if (!fs.existsSync(filePath)) continue;
+        const binaryFileContents = await fs.promises.readFile(filePath);
+        const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
+        if (value == existingFileMD5) newLines.push(line);
+        else newLines.push(`${key} = ${existingFileMD5}`);
+      } else if (line.startsWith("u_UpdaterAutoStart")) {
+        newLines.push(`${key} = 0`);
+      } else {
+        newLines.push(line);
+      }
+    } else {
+      newLines.push(line);
+    }
+  }
+
+  await fs.promises.writeFile(osuCfg, newLines.join("\n"), 'utf-8');
 }
 
 module.exports = {
@@ -438,4 +465,5 @@ module.exports = {
   getUIFiles,
   replaceUIFile,
   findOsuInstallation,
+  updateOsuConfigHashes
 };
