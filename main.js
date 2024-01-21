@@ -503,6 +503,7 @@ function registerIPCPipes() {
       setTimeout(async () => {
         await replaceUIFile(osuPath, true);
         mainWindow.webContents.send("ezpplauncher:launchabort");
+        osuLoaded = false;
       }, 5000);
     };
     runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
