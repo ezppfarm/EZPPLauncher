@@ -55,7 +55,6 @@ function startOsuStatus() {
   osuCheckInterval = setInterval(async () => {
     const osuWindowTitle = windowName.getWindowText("osu!.exe");
     if (osuWindowTitle.length < 0) {
-      console.log("No osu! window found");
       return;
     }
     const firstInstance = osuWindowTitle[0];
@@ -576,7 +575,6 @@ function createWindow() {
   if (presenceEnabled == undefined) {
     richPresence.connect();
   } else {
-    console.log(presenceEnabled);
     if (presenceEnabled == "true") {
       richPresence.connect();
     }

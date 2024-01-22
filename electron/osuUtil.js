@@ -70,7 +70,6 @@ function getGlobalConfig(osuPath) {
     path: "",
     get: async (key) => {
       if (!configFileInfo.path) {
-        console.log("config file not loaded");
         return "";
       }
       const fileStream = await fs.promises.readFile(
@@ -181,11 +180,6 @@ async function getFilesThatNeedUpdate(osuPath, releaseStreamFiles) {
       if (
         fileHashOnDisk.trim().toLowerCase() != fileHash.trim().toLowerCase()
       ) {
-        console.log({
-          fileOnDisk,
-          fileHashOnDisk,
-          fileHash,
-        });
         updateFiles.push(updatePatch);
       }
     } else updateFiles.push(updatePatch);

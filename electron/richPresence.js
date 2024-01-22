@@ -3,7 +3,7 @@ const { appName, appVersion } = require("./appInfo.js");
 
 const clientId = "1032772293220384808";
 let richPresence;
-let intervalId
+let intervalId;
 
 let currentStatus = {
   details: "  ",
@@ -28,7 +28,6 @@ let currentStatus = {
 
 module.exports = {
   connect: () => {
-    console.log("Connecting to Discord...");
     if (!richPresence) {
       richPresence = new DiscordRPC.AutoClient({ transport: "ipc" });
       richPresence.endlessLogin({ clientId });

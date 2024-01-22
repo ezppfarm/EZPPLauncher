@@ -150,7 +150,7 @@
           id="avatar-menu"
         />
         <!-- TODO: if user has donator, display heart indicator-->
-        {#if $currentUser && $currentUser.id == 1001}
+        {#if $currentUser && $currentUser.donor}
           <Indicator
             class="pointer-events-none"
             color="red"
