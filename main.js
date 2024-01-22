@@ -369,8 +369,9 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await uiDownloader.startDownload();
@@ -399,8 +400,9 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+            formatBytes(data.total)
+          })...`,
         });
       });
       await updateDownloader.startDownload();
@@ -445,8 +447,9 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-              })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+              formatBytes(data.total)
+            })...`,
           });
         });
         await patcherDownloader.startDownload();
@@ -477,7 +480,11 @@ function registerIPCPipes() {
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
     richPresence.update();
+    await userConfig.set("ShowInterfaceDuringRelax", "1");
     if (currentUser) {
+      await userConfig.set("CredentialEndpoint", "ez-pp.farm");
+      await userConfig.set("SavePassword", "1");
+      await userConfig.set("SaveUsername", "1");
       await userConfig.set("Username", currentUser.username);
       await userConfig.set("Password", currentUser.password);
     }
@@ -559,12 +566,13 @@ function createWindow() {
   registerIPCPipes();
 
   const presenceEnabled = config.get("presence");
-  if (presenceEnabled == undefined)
+  if (presenceEnabled == undefined) {
     richPresence.connect();
-  else {
+  } else {
     console.log(presenceEnabled);
-    if (presenceEnabled == "true")
+    if (presenceEnabled == "true") {
       richPresence.connect();
+    }
   }
   // Uncomment the following line of code when app is ready to be packaged.
   // loadURL(mainWindow);

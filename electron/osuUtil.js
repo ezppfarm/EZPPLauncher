@@ -9,7 +9,6 @@ const checkUpdateURL =
   "https://osu.ppy.sh/web/check-updates.php?action=check&stream=";
 const ignoredOsuEntities = [
   "osu!auth.dll",
-  "osu!.exe"
 ];
 const osuEntities = [
   "avcodec-51.dll",
@@ -267,7 +266,7 @@ async function getPatcherUpdates(osuPath) {
       ).digest("hex");
       if (
         latestPatchFileHash.trim().toLowerCase() !=
-        localPatchFileHash.trim().toLowerCase()
+          localPatchFileHash.trim().toLowerCase()
       ) filesToDownload.push(patcherFile);
     } else filesToDownload.push(patcherFile);
   }
@@ -332,7 +331,7 @@ async function getUIFiles(osuPath) {
       ).digest("hex");
       if (
         latestPatchFileHash.trim().toLowerCase() !=
-        localPatchFileHash.trim().toLowerCase()
+          localPatchFileHash.trim().toLowerCase()
       ) filesToDownload.push(uiFile);
     } else filesToDownload.push(uiFile);
   }
@@ -417,8 +416,6 @@ async function findOsuInstallation() {
   return undefined;
 }
 
-
-
 async function updateOsuConfigHashes(osuPath) {
   const osuCfg = path.join(osuPath, "osu!.cfg");
   const fileStream = await fs.promises.readFile(osuCfg, "utf-8");
@@ -435,7 +432,9 @@ async function updateOsuConfigHashes(osuPath) {
         const filePath = path.join(osuPath, fileName);
         if (!fs.existsSync(filePath)) continue;
         const binaryFileContents = await fs.promises.readFile(filePath);
-        const existingFileMD5 = crypto.createHash("md5").update(binaryFileContents).digest("hex");
+        const existingFileMD5 = crypto.createHash("md5").update(
+          binaryFileContents,
+        ).digest("hex");
         if (value == existingFileMD5) newLines.push(line);
         else newLines.push(`${key} = ${existingFileMD5}`);
       } else if (line.startsWith("u_UpdaterAutoStart")) {
@@ -448,7 +447,7 @@ async function updateOsuConfigHashes(osuPath) {
     }
   }
 
-  await fs.promises.writeFile(osuCfg, newLines.join("\n"), 'utf-8');
+  await fs.promises.writeFile(osuCfg, newLines.join("\n"), "utf-8");
 }
 
 module.exports = {
@@ -465,5 +464,5 @@ module.exports = {
   getUIFiles,
   replaceUIFile,
   findOsuInstallation,
-  updateOsuConfigHashes
+  updateOsuConfigHashes,
 };

@@ -150,9 +150,15 @@
       />
       <!-- TODO: if user has donator, display heart indicator-->
       {#if $currentUser && $currentUser.id == 1001}
-        <Indicator color="red" border size="xl" placement="top-right">
+        <Indicator
+          class="pointer-events-none"
+          color="red"
+          border
+          size="xl"
+          placement="top-right"
+        >
           <span class="text-red-300 text-xs font-bold">
-            <HeartSolid size="xs" />
+            <HeartSolid class="select-none pointer-events-none" size="xs" />
           </span>
         </Indicator>
       {/if}
