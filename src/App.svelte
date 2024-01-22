@@ -6,7 +6,6 @@
     DropdownHeader,
     DropdownDivider,
     Button,
-    Modal,
     Indicator,
   } from "flowbite-svelte";
   import {
@@ -30,11 +29,11 @@
   import toast, { Toaster } from "svelte-french-toast";
   import type { User } from "./types/user";
   import Settings from "./pages/Settings.svelte";
+  import Swal from "sweetalert2";
 
   let user: User | undefined = undefined;
   let loggedIn = false;
 
-  let showUpdateDialog = false;
   let updateInfo: Record<string, unknown>;
 
   currentUser.subscribe((newUser) => {
@@ -54,14 +53,17 @@
     });
   };
 
-  window.addEventListener("update", (e) => {
+  window.addEventListener("update", async (e) => {
     const update = (e as CustomEvent).detail;
-    setTimeout(() => {
-      showUpdateDialog = true;
-      updateInfo = update;
-
-      document.getElementById("updateDialog")?.blur();
-    }, 2000);
+    await Swal.fire({
+      html: `EZPPLauncher ${update.tag_name} is now available!<br>Click the Button bellow to download the latest release!`,
+      title: "It's your lucky day!",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      allowEnterKey: false,
+      confirmButtonText: "Thanks!",
+    });
+    window.dispatchEvent(new CustomEvent("updateExit"));
   });
 
   window.addEventListener("launchStatusUpdate", (e) => {
@@ -117,104 +119,104 @@
 
 <Toaster></Toaster>
 
-<!-- TODO: Update dialog-->
-
-<div class="p-2 flex flex-row justify-between items-center">
-  <div class="flex flex-row items-center animate-fadeIn opacity-0">
-    {#if $currentPage == Page.Settings}
-      <Button
-        class="dark:active:!bg-gray-900 !ring-0 w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0 active:scale-95 transition-transform duration-75"
-        color="light"
-        on:click={() => {
-          currentPage.set(Page.Launch);
-        }}
-      >
-        <ArrowLeftSolid class="outline-none border-none" size="sm" />
-      </Button>
-    {/if}
-    <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
-    <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight">
-      EZPPLauncher
-    </span>
-  </div>
-  {#if $currentPage == Page.Launch}
-    <div
-      class="flex flex-row gap-2 w-fill cursor-pointer md:order-2 animate-lsideIn opacity-0"
-    >
-      <Avatar
-        class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
-        src={loggedIn
-          ? "https://a.ez-pp.farm/" + user?.id
-          : "https://a.ez-pp.farm/0"}
-        id="avatar-menu"
-      />
-      <!-- TODO: if user has donator, display heart indicator-->
-      {#if $currentUser && $currentUser.id == 1001}
-        <Indicator
-          class="pointer-events-none"
-          color="red"
-          border
-          size="xl"
-          placement="top-right"
+{#if !updateInfo}
+  <div class="p-2 flex flex-row justify-between items-center">
+    <div class="flex flex-row items-center animate-fadeIn opacity-0">
+      {#if $currentPage == Page.Settings}
+        <Button
+          class="dark:active:!bg-gray-900 !ring-0 w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0 active:scale-95 transition-transform duration-75"
+          color="light"
+          on:click={() => {
+            currentPage.set(Page.Launch);
+          }}
         >
-          <span class="text-red-300 text-xs font-bold">
-            <HeartSolid class="select-none pointer-events-none" size="xs" />
-          </span>
-        </Indicator>
+          <ArrowLeftSolid class="outline-none border-none" size="sm" />
+        </Button>
       {/if}
+      <img src={ezppLogo} alt="EZPPFarm Logo" class="w-12 h-12 mr-2" />
+      <span class="text-gray-700 dark:text-gray-100 text-xl font-extralight">
+        EZPPLauncher
+      </span>
     </div>
-    <Dropdown placement="bottom-start" triggeredBy="#avatar-menu">
-      <DropdownHeader>
-        <span class="block text-sm">{loggedIn ? user?.name : "Guest"}</span>
-        <span
-          class="block truncate text-sm font-medium text-gray-500 dark:text-gray-200"
-        >
-          {loggedIn ? user?.email : "Please log in!"}
-        </span>
-      </DropdownHeader>
-      <DropdownItem
-        class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-        on:click={() => {
-          if (!$launching) currentPage.set(Page.Settings);
-        }}
+    {#if $currentPage == Page.Launch}
+      <div
+        class="flex flex-row gap-2 w-fill cursor-pointer md:order-2 animate-lsideIn opacity-0"
       >
-        <UserSettingsSolid class="select-none outline-none border-none" />
-        Settings
-      </DropdownItem>
-      <DropdownDivider />
-      {#if loggedIn}
+        <Avatar
+          class="rounded-lg border dark:border-gray-700 hover:ring-4 hover:ring-gray-200 dark:hover:ring-gray-800"
+          src={loggedIn
+            ? "https://a.ez-pp.farm/" + user?.id
+            : "https://a.ez-pp.farm/0"}
+          id="avatar-menu"
+        />
+        <!-- TODO: if user has donator, display heart indicator-->
+        {#if $currentUser && $currentUser.id == 1001}
+          <Indicator
+            class="pointer-events-none"
+            color="red"
+            border
+            size="xl"
+            placement="top-right"
+          >
+            <span class="text-red-300 text-xs font-bold">
+              <HeartSolid class="select-none pointer-events-none" size="xs" />
+            </span>
+          </Indicator>
+        {/if}
+      </div>
+      <Dropdown placement="bottom-start" triggeredBy="#avatar-menu">
+        <DropdownHeader>
+          <span class="block text-sm">{loggedIn ? user?.name : "Guest"}</span>
+          <span
+            class="block truncate text-sm font-medium text-gray-500 dark:text-gray-200"
+          >
+            {loggedIn ? user?.email : "Please log in!"}
+          </span>
+        </DropdownHeader>
         <DropdownItem
           class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
           on:click={() => {
-            if (!$launching) logout();
+            if (!$launching) currentPage.set(Page.Settings);
           }}
         >
-          <ArrowRightFromBracketSolid
-            class="select-none outline-none border-none"
-          />
-          Sign out
+          <UserSettingsSolid class="select-none outline-none border-none" />
+          Settings
         </DropdownItem>
-      {:else}
-        <DropdownItem
-          class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
-          on:click={() => {
-            if (!$launching) currentPage.set(Page.Login);
-          }}
-        >
-          <ArrowRightToBracketSolid
-            class="select-none outline-none border-none"
-          />
-          Login
-        </DropdownItem>
-      {/if}
-    </Dropdown>
-  {/if}
-</div>
+        <DropdownDivider />
+        {#if loggedIn}
+          <DropdownItem
+            class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+            on:click={() => {
+              if (!$launching) logout();
+            }}
+          >
+            <ArrowRightFromBracketSolid
+              class="select-none outline-none border-none"
+            />
+            Sign out
+          </DropdownItem>
+        {:else}
+          <DropdownItem
+            class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+            on:click={() => {
+              if (!$launching) currentPage.set(Page.Login);
+            }}
+          >
+            <ArrowRightToBracketSolid
+              class="select-none outline-none border-none"
+            />
+            Login
+          </DropdownItem>
+        {/if}
+      </Dropdown>
+    {/if}
+  </div>
 
-{#if $currentPage == Page.Login}
-  <Login />
-{:else if $currentPage == Page.Settings}
-  <Settings />
-{:else}
-  <Launch />
+  {#if $currentPage == Page.Login}
+    <Login />
+  {:else if $currentPage == Page.Settings}
+    <Settings />
+  {:else}
+    <Launch />
+  {/if}
 {/if}

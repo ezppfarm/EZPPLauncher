@@ -1,5 +1,7 @@
 // Modules to control application life and create native browser window
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require(
+  "electron",
+);
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
@@ -31,7 +33,7 @@ const richPresence = require("./electron/richPresence");
 const cryptUtil = require("./electron/cryptoUtil");
 const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
-const { updateAvailable } = require("./electron/updateCheck");
+const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -319,6 +321,11 @@ function registerIPCPipes() {
     return config.all();
   });
 
+  ipcMain.handle("ezpplauncher:exitAndUpdate", async (e) => {
+    await shell.openExternal(releasesUrl);
+    app.exit();
+  });
+
   ipcMain.handle("ezpplauncher:launch", async (e) => {
     const configPatch = config.get("patch");
     patch = configPatch != undefined ? configPatch == "true" : true;
@@ -580,7 +587,7 @@ function createWindow() {
   // Open the DevTools and also disable Electron Security Warning.
   if (isDev()) {
     process.env["ELECTRON_DISABLE_SECURITY_WARNINGS"] = true;
-    // mainWindow.webContents.openDevTools({ mode: "detach" });
+    mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
   // Emitted when the window is closed.
@@ -595,7 +602,7 @@ function createWindow() {
   // This helps in showing the window gracefully.
   mainWindow.once("ready-to-show", async () => {
     const updateInfo = await updateAvailable();
-    if (!updateInfo.update) {
+    if (updateInfo.update) {
       mainWindow.webContents.send("ezpplauncher:update", updateInfo.release);
     }
     mainWindow.show();

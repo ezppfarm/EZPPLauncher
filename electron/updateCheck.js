@@ -1,13 +1,16 @@
 const semver = require("semver");
 const { appVersion } = require("./appInfo");
 
-const repoUrl =
+const repoApiUrl =
   "https://git.ez-pp.farm/api/v1/repos/EZPPFarm/EZPPLauncher/releases?limit=1";
+
+const releasesUrl =
+  "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest";
 
 module.exports = {
   updateAvailable: async () => {
     try {
-      const latestRelease = await fetch(repoUrl);
+      const latestRelease = await fetch(repoApiUrl);
       const json = await latestRelease.json();
       if (json.length <= 0) return false;
       return {
@@ -18,4 +21,5 @@ module.exports = {
       return { update: false };
     }
   },
+  releasesUrl,
 };
