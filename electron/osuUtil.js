@@ -224,6 +224,11 @@ function downloadUpdateFiles(osuPath, updateFiles) {
         });
       });
       try {
+        if (fs.existsSync(path.join(osuPath, fileName))) {
+          await fs.promises.rm(path.join(osuPath, fileName), {
+            force: true,
+          });
+        }
         await fs.promises.writeFile(
           path.join(osuPath, fileName),
           axiosDownloadWithProgress.data,
@@ -298,6 +303,11 @@ function downloadPatcherUpdates(osuPath, patcherUpdates) {
       });
 
       try {
+        if (fs.existsSync(path.join(osuPath, "EZPPLauncher", fileName))) {
+          await fs.promises.rm(path.join(osuPath, "EZPPLauncher", fileName), {
+            force: true,
+          });
+        }
         await fs.promises.writeFile(
           path.join(osuPath, "EZPPLauncher", fileName),
           axiosDownloadWithProgress.data,
@@ -362,6 +372,12 @@ function downloadUIFiles(osuPath, uiFiles) {
         },
       });
       try {
+        if (fs.existsSync(path.join(osuPath, "EZPPLauncher", fileName))) {
+          await fs.promises.rm(path.join(osuPath, "EZPPLauncher", fileName), {
+            force: true,
+          });
+        }
+
         await fs.promises.writeFile(
           path.join(osuPath, "EZPPLauncher", fileName),
           axiosDownloadWithProgress.data,
