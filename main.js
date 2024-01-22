@@ -361,7 +361,7 @@ function registerIPCPipes() {
         mainWindow.webContents.send("ezpplauncher:alert", {
           type: "error",
           message:
-            `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+            `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
         });
       });
       uiDownloader.eventEmitter.on("data", (data) => {
@@ -392,7 +392,7 @@ function registerIPCPipes() {
         mainWindow.webContents.send("ezpplauncher:alert", {
           type: "error",
           message:
-            `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+            `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
         });
       });
       updateDownloader.eventEmitter.on("data", (data) => {
@@ -439,7 +439,7 @@ function registerIPCPipes() {
           mainWindow.webContents.send("ezpplauncher:alert", {
             type: "error",
             message:
-              `Failed to download/replace ${filename}!\nMaybe try to rerun the Launcher as Admin.`,
+              `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
           });
         });
         patcherDownloader.eventEmitter.on("data", (data) => {
