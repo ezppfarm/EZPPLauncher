@@ -60,4 +60,5 @@ module.exports = {
       richPresence.setActivity(currentStatus);
     }
   },
+  hasPresence: () => richPresence != undefined,
 };
