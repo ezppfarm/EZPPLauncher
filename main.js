@@ -486,6 +486,9 @@ function registerIPCPipes() {
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
     richPresence.update();
+    if (richPresence.hasPresence) {
+      await userConfig.set("DiscordRichPresence", "0");
+    }
     await userConfig.set("ShowInterfaceDuringRelax", "1");
     if (currentUser) {
       await userConfig.set("CredentialEndpoint", "ez-pp.farm");
