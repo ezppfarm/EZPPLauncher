@@ -27,7 +27,7 @@ const {
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
-const { existsSync } = require("fs");
+const fs = require("fs");
 const { runFileDetached } = require("./electron/executeUtil");
 const richPresence = require("./electron/richPresence");
 const cryptUtil = require("./electron/cryptoUtil");
@@ -68,7 +68,7 @@ function startOsuStatus() {
               "EZPPLauncher",
               "patcher.exe",
             );
-            if (existsSync(patcherExecuteable)) {
+            if (fs.existsSync(patcherExecuteable)) {
               runFileDetached(userOsuPath, patcherExecuteable);
             }
           }
@@ -482,6 +482,24 @@ function registerIPCPipes() {
     });
     await updateOsuConfigHashes(osuPath);
     await replaceUIFile(osuPath, false);
+
+    const forceUpdateFiles = [
+      ".require_update",
+      "help.txt",
+      "_pending",
+    ];
+    //TODO: needs testing
+    try {
+      for (const updateFileName of forceUpdateFiles) {
+        const updateFile = path.join(osuPath, updateFileName);
+        if (fs.existsSync(updateFile)) {
+          await fs.promises.rm(updateFile, {
+            force: true,
+            recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+          });
+        }
+      }
+    } catch {}
 
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
