@@ -537,6 +537,12 @@ function registerIPCPipes() {
 }
 
 function createWindow() {
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+    return;
+  }
+
   setupTitlebar();
 
   // Create the browser window.
