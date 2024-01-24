@@ -45,6 +45,7 @@
     "custom-electron-titlebar": "^4.2.7",
     "discord-auto-rpc": "^1.0.17",
     "electron-serve": "^1.1.0",
+    "fkill": "^7.2.1",
     "get-window-by-name": "^2.0.0",
     "regedit-rs": "^1.0.2",
     "semver": "^7.5.4",

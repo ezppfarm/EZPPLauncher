@@ -24,6 +24,7 @@ const {
   replaceUIFile,
   findOsuInstallation,
   updateOsuConfigHashes,
+  runOsuUpdater,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
@@ -34,6 +35,7 @@ const cryptUtil = require("./electron/cryptoUtil");
 const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
+const fkill = require("fkill");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -42,13 +44,38 @@ let osuCheckInterval;
 let userOsuPath;
 let osuLoaded = false;
 let patch = false;
-let lastOsuStatus = "";
-let lastStatusUpdate;
+
+let terminate = false;
+let finishedUpdating = false;
 
 let currentUser = undefined;
 
 function isDev() {
   return !app.isPackaged;
+}
+
+async function waitForTermination() {
+  terminate = true;
+  return new Promise((res) => {
+    const checkInterval = setInterval(async () => {
+      const osuWindowTitle = windowName.getWindowText("osu!.exe");
+      if (osuWindowTitle.length < 0) {
+        return;
+      }
+      const firstInstance = osuWindowTitle[0];
+      console.log({ terminate, firstInstance });
+      if (terminate && finishedUpdating) {
+        console.log("terminating...");
+        finishedUpdating = false;
+        terminate = false;
+        const processId = firstInstance.processId;
+        await fkill(processId, { force: true, silent: true });
+        clearInterval(checkInterval);
+        res();
+        console.log("terminated");
+      }
+    }, 500);
+  });
 }
 
 function startOsuStatus() {
@@ -58,7 +85,9 @@ function startOsuStatus() {
       return;
     }
     const firstInstance = osuWindowTitle[0];
+
     if (firstInstance) {
+      console.log(osuWindowTitle);
       if (!osuLoaded) {
         osuLoaded = true;
         setTimeout(() => {
@@ -478,8 +507,21 @@ function registerIPCPipes() {
     }
 
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Launching osu updater to verify...",
+    });
+    await new Promise((res) => setTimeout(res, 1000));
+
+    runOsuUpdater(osuPath, () => {
+      finishedUpdating = true;
+    });
+    await waitForTermination();
+
+    await new Promise((res) => setTimeout(res, 1000));
+
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Preparing launch...",
     });
+
     await updateOsuConfigHashes(osuPath);
     await replaceUIFile(osuPath, false);
 

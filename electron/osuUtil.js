@@ -245,6 +245,11 @@ function downloadUpdateFiles(osuPath, updateFiles) {
   };
 }
 
+function runOsuUpdater(osuPath, onExit) {
+  const osuExecuteable = path.join(osuPath, "osu!.exe");
+  runFile(osuPath, osuExecuteable, ["-repair"], onExit);
+}
+
 function runOsuWithDevServer(osuPath, serverDomain, onExit) {
   const osuExecuteable = path.join(osuPath, "osu!.exe");
   runFile(osuPath, osuExecuteable, ["-devserver", serverDomain], onExit);
@@ -475,4 +480,5 @@ module.exports = {
   replaceUIFile,
   findOsuInstallation,
   updateOsuConfigHashes,
+  runOsuUpdater,
 };
