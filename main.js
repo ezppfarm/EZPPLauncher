@@ -477,30 +477,31 @@ function registerIPCPipes() {
       }
       await new Promise((res) => setTimeout(res, 1000));
     }
-
-    mainWindow.webContents.send("ezpplauncher:launchstatus", {
-      status: "Launching osu! updater to verify...",
-    });
-    await new Promise((res) => setTimeout(res, 1000));
-
-    await new Promise((res) => {
-      runOsuUpdater(osuPath, async () => {
-        await new Promise((res) => setTimeout(res, 500));
-        const terminationThread = setInterval(async () => {
-          const osuWindowTitle = windowName.getWindowText("osu!.exe");
-          if (osuWindowTitle.length < 0) {
-            return;
-          }
-          const firstInstance = osuWindowTitle[0];
-          if (firstInstance) {
-            const processId = firstInstance.processId;
-            await fkill(processId, { force: true, silent: true });
-            clearInterval(terminationThread);
-            res();
-          }
-        }, 500);
+    if (updateFiles.length > 0) {
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "Launching osu! updater to verify updates...",
       });
-    });
+      await new Promise((res) => setTimeout(res, 1000));
+
+      await new Promise((res) => {
+        runOsuUpdater(osuPath, async () => {
+          await new Promise((res) => setTimeout(res, 500));
+          const terminationThread = setInterval(async () => {
+            const osuWindowTitle = windowName.getWindowText("osu!.exe");
+            if (osuWindowTitle.length < 0) {
+              return;
+            }
+            const firstInstance = osuWindowTitle[0];
+            if (firstInstance) {
+              const processId = firstInstance.processId;
+              await fkill(processId, { force: true, silent: true });
+              clearInterval(terminationThread);
+              res();
+            }
+          }, 500);
+        });
+      });
+    }
 
     await new Promise((res) => setTimeout(res, 1000));
 
