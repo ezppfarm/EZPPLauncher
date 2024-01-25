@@ -16,7 +16,9 @@
   const launch = () => {
     launching.set(true);
     const patching = $patch;
-    window.dispatchEvent(new CustomEvent("launch", { detail: { patch: patching } }));;
+    window.dispatchEvent(
+      new CustomEvent("launch", { detail: { patch: patching } })
+    );
   };
 </script>
 
@@ -29,7 +31,7 @@
     <Button
       color="light"
       size="xl"
-      class="dark:active:!bg-gray-900 {$launching
+      class="{$launching
         ? ''
         : 'active:scale-95 '}transition-transform duration-75"
       disabled={$launching}

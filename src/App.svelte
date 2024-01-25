@@ -124,7 +124,7 @@
     <div class="flex flex-row items-center animate-fadeIn opacity-0">
       {#if $currentPage == Page.Settings}
         <Button
-          class="dark:active:!bg-gray-900 !ring-0 w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0 active:scale-95 transition-transform duration-75"
+          class="!ring-0 w-10 h-10 mr-1 rounded-lg animate-sideIn opacity-0 active:scale-95 transition-transform duration-75"
           color="light"
           on:click={() => {
             currentPage.set(Page.Launch);
@@ -174,7 +174,7 @@
           </span>
         </DropdownHeader>
         <DropdownItem
-          class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+          class="flex flex-row gap-2 border-0 transition-colors"
           on:click={() => {
             if (!$launching) currentPage.set(Page.Settings);
           }}
@@ -185,7 +185,7 @@
         <DropdownDivider />
         {#if loggedIn}
           <DropdownItem
-            class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+            class="flex flex-row gap-2 border-0 transition-colors"
             on:click={() => {
               if (!$launching) logout();
             }}
@@ -197,7 +197,7 @@
           </DropdownItem>
         {:else}
           <DropdownItem
-            class="flex flex-row gap-2 border-0 dark:!bg-gray-700 dark:active:!bg-gray-900 dark:hover:!bg-gray-800 transition-colors"
+            class="flex flex-row gap-2 border-0 transition-colors"
             on:click={() => {
               if (!$launching) currentPage.set(Page.Login);
             }}
