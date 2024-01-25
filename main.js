@@ -24,16 +24,18 @@ const {
   replaceUIFile,
   findOsuInstallation,
   updateOsuConfigHashes,
+  runOsuUpdater,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
-const { existsSync } = require("fs");
+const fs = require("fs");
 const { runFileDetached } = require("./electron/executeUtil");
 const richPresence = require("./electron/richPresence");
 const cryptUtil = require("./electron/cryptoUtil");
 const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
+const fkill = require("fkill");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -42,8 +44,6 @@ let osuCheckInterval;
 let userOsuPath;
 let osuLoaded = false;
 let patch = false;
-let lastOsuStatus = "";
-let lastStatusUpdate;
 
 let currentUser = undefined;
 
@@ -58,6 +58,7 @@ function startOsuStatus() {
       return;
     }
     const firstInstance = osuWindowTitle[0];
+
     if (firstInstance) {
       if (!osuLoaded) {
         osuLoaded = true;
@@ -68,7 +69,7 @@ function startOsuStatus() {
               "EZPPLauncher",
               "patcher.exe",
             );
-            if (existsSync(patcherExecuteable)) {
+            if (fs.existsSync(patcherExecuteable)) {
               runFileDetached(userOsuPath, patcherExecuteable);
             }
           }
@@ -478,10 +479,55 @@ function registerIPCPipes() {
     }
 
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
+      status: "Launching osu! updater to verify...",
+    });
+    await new Promise((res) => setTimeout(res, 1000));
+
+    await new Promise((res) => {
+      runOsuUpdater(osuPath, async () => {
+        await new Promise((res) => setTimeout(res, 500));
+        const terminationThread = setInterval(async () => {
+          const osuWindowTitle = windowName.getWindowText("osu!.exe");
+          if (osuWindowTitle.length < 0) {
+            return;
+          }
+          const firstInstance = osuWindowTitle[0];
+          if (firstInstance) {
+            const processId = firstInstance.processId;
+            await fkill(processId, { force: true, silent: true });
+            clearInterval(terminationThread);
+            res();
+          }
+        }, 500);
+      });
+    });
+
+    await new Promise((res) => setTimeout(res, 1000));
+
+    mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Preparing launch...",
     });
+
     await updateOsuConfigHashes(osuPath);
     await replaceUIFile(osuPath, false);
+
+    const forceUpdateFiles = [
+      ".require_update",
+      "help.txt",
+      "_pending",
+    ];
+    //TODO: needs testing
+    try {
+      for (const updateFileName of forceUpdateFiles) {
+        const updateFile = path.join(osuPath, updateFileName);
+        if (fs.existsSync(updateFile)) {
+          await fs.promises.rm(updateFile, {
+            force: true,
+            recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+          });
+        }
+      }
+    } catch {}
 
     const userConfig = getUserConfig(osuPath);
     richPresence.updateVersion(await userConfig.get("LastVersion"));
@@ -537,6 +583,12 @@ function registerIPCPipes() {
 }
 
 function createWindow() {
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+    return;
+  }
+
   setupTitlebar();
 
   // Create the browser window.
