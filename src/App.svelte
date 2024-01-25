@@ -83,7 +83,6 @@
   });
 
   window.addEventListener("alert", (e) => {
-    console.log((e as CustomEvent).detail);
     const toastMessage = (e as CustomEvent).detail;
     switch (toastMessage.type) {
       case "success": {
