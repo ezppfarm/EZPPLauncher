@@ -63,21 +63,13 @@
         value={folderPath}
         readonly
       />
-      <Button
-        color="light"
-        class="dark:active:!bg-gray-900"
-        on:click={detectFolderPath}
-      >
+      <Button color="light" on:click={detectFolderPath}>
         <FileSearchSolid
           size="sm"
           class="dark:text-gray-300 text-gray-500 outline-none border-none select-none pointer-events-none"
         />
       </Button>
-      <Button
-        color="light"
-        class="dark:active:!bg-gray-900 active:!rounded-lg"
-        on:click={setFolderPath}
-      >
+      <Button color="light" class="active:!rounded-lg" on:click={setFolderPath}>
         <FolderSolid
           size="sm"
           class="dark:text-gray-300 text-gray-500 outline-none border-none select-none pointer-events-none"

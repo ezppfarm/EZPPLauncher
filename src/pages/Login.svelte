@@ -59,7 +59,7 @@
       {
         loading: "Logging in...",
         success: "Successfully logged in!",
-        error: "Failed to login.",
+        error: "Invalid Username or Password!",
       },
       {
         position: "bottom-center",
@@ -198,7 +198,7 @@
     >
     <div class="flex flex-col justify-center items-center gap-2 mt-1">
       <Button
-        class="dark:active:!bg-gray-900  active:scale-95 transition-transform duration-75"
+        class="active:scale-95 transition-transform duration-75"
         color="light"
         disabled={loading}
         on:click={processLogin}
