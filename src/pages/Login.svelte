@@ -170,6 +170,7 @@
       type="text"
       placeholder="Username"
       size="md"
+      class="animate-sideIn"
       disabled={loading}
       bind:value={username}
     />
@@ -177,6 +178,7 @@
       type={showPassword ? "text" : "password"}
       placeholder="Password"
       size="md"
+      class="animate-lsideIn"
       disabled={loading}
       bind:value={password}
     >
