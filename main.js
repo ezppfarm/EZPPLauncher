@@ -3,14 +3,14 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require(
   "electron",
 );
 
-const unhandled = require("electron-unhandled");
+/* const unhandled = require("electron-unhandled");
 unhandled({
   logger: console.error,
   showDialog: true,
   reportButton: () => {
     shell.openExternal("https://ez-pp.farm/discord");
   },
-});
+}); */
 
 const path = require("path");
 const serve = require("electron-serve");
