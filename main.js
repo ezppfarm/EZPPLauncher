@@ -46,6 +46,7 @@ const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
+const { checkImageExists } = require("./electron/imageUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -96,10 +97,22 @@ function startOsuStatus() {
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
 
+      let largeImageKey = "ezppfarm";
       let details = "Idle...";
       let infoText = currentStatus.player_status.status.info_text.length > 0
         ? currentStatus.player_status.status.info_text
         : "  ";
+      if ("beatmap" in currentStatus.player_status.status) {
+        const setId = currentStatus.player_status.status.beatmap.set_id;
+        if (
+          checkImageExists(
+            `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`,
+          )
+        ) {
+          largeImageKey =
+            `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
+        }
+      }
 
       switch (currentStatus.player_status.status.action) {
         case 1:
@@ -144,6 +157,7 @@ function startOsuStatus() {
       richPresence.updateStatus({
         details,
         state: infoText,
+        largeImageKey,
       });
 
       richPresence.update();

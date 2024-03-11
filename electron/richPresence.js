@@ -47,9 +47,10 @@ module.exports = {
       richPresence = null;
     }
   },
-  updateStatus: ({ state, details }) => {
+  updateStatus: ({ state, details, largeImageKey }) => {
     currentStatus.state = state ?? "  ";
     currentStatus.details = details ?? "  ";
+    currentStatus.largeImageKey = largeImageKey ?? "ezppfarm";
   },
   updateVersion: (osuVersion) => {
     currentStatus.smallImageKey = osuVersion ? "osu" : "  ";
