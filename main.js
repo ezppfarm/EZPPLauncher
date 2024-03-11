@@ -3,14 +3,14 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require(
   "electron",
 );
 
-const unhandled = require("electron-unhandled");
+/* const unhandled = require("electron-unhandled");
 unhandled({
   logger: console.error,
   showDialog: true,
   reportButton: () => {
     shell.openExternal("https://ez-pp.farm/discord");
   },
-});
+}); */
 
 const path = require("path");
 const serve = require("electron-serve");
@@ -46,6 +46,7 @@ const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
+const { checkImageExists } = require("./electron/imageUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -96,10 +97,24 @@ function startOsuStatus() {
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
 
+      let largeImageKey = "ezppfarm";
       let details = "Idle...";
       let infoText = currentStatus.player_status.status.info_text.length > 0
         ? currentStatus.player_status.status.info_text
         : "  ";
+      if (
+        "beatmap" in currentStatus.player_status.status &&
+        currentStatus.player_status.status.beatmap !== null
+      ) {
+        const setId = currentStatus.player_status.status.beatmap.set_id;
+        const coverImage =
+          `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
+        if (
+          checkImageExists(coverImage)
+        ) {
+          largeImageKey = coverImage;
+        }
+      }
 
       switch (currentStatus.player_status.status.action) {
         case 1:
@@ -144,6 +159,7 @@ function startOsuStatus() {
       richPresence.updateStatus({
         details,
         state: infoText,
+        largeImageKey,
       });
 
       richPresence.update();
