@@ -104,13 +104,12 @@ function startOsuStatus() {
         : "  ";
       if ("beatmap" in currentStatus.player_status.status) {
         const setId = currentStatus.player_status.status.beatmap.set_id;
+        const coverImage =
+          `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
         if (
-          checkImageExists(
-            `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`,
-          )
+          checkImageExists(coverImage)
         ) {
-          largeImageKey =
-            `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
+          largeImageKey = coverImage;
         }
       }
 
