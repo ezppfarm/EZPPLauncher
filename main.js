@@ -600,7 +600,7 @@ function registerIPCPipes() {
       mainWindow.show();
       mainWindow.focus();
       stopOsuStatus();
-      richPresence.updateVersion();
+      richPresence.updateUser();
       richPresence.updateStatus({
         state: "Idle in Launcher...",
         details: undefined,
