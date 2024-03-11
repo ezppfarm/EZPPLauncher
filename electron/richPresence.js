@@ -58,7 +58,7 @@ module.exports = {
   },
   updateUser: ({ username, id }) => {
     currentStatus.smallImageKey = id ? `https://a.ez-pp.farm/${id}` : "  ";
-    currentStatus.smallImageText = username ? username : "  ";
+    currentStatus.smallImageText = username ?? "  ";
   },
   update: () => {
     if (richPresence && richPresence.user) {
