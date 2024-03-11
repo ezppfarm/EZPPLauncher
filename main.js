@@ -102,7 +102,10 @@ function startOsuStatus() {
       let infoText = currentStatus.player_status.status.info_text.length > 0
         ? currentStatus.player_status.status.info_text
         : "  ";
-      if ("beatmap" in currentStatus.player_status.status) {
+      if (
+        "beatmap" in currentStatus.player_status.status &&
+        currentStatus.player_status.status.beatmap !== null
+      ) {
         const setId = currentStatus.player_status.status.beatmap.set_id;
         const coverImage =
           `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
