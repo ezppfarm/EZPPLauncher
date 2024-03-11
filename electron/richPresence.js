@@ -56,9 +56,9 @@ module.exports = {
     currentStatus.details = details ?? "  ";
     currentStatus.largeImageKey = largeImageKey ?? "ezppfarm";
   },
-  updateVersion: (osuVersion) => {
-    currentStatus.smallImageKey = osuVersion ? "osu" : "  ";
-    currentStatus.smallImageText = osuVersion ? `osu! ${osuVersion}` : "  ";
+  updateUser: ({ username, id }) => {
+    currentStatus.smallImageKey = id ? `https://a.ez-pp.farm/${id}` : "  ";
+    currentStatus.smallImageText = username ? username : "  ";
   },
   update: () => {
     if (richPresence && richPresence.user) {
