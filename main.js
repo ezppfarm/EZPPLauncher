@@ -46,6 +46,7 @@ const { getHwId } = require("./electron/hwidUtil");
 const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
+const { checkImageExists } = require("./electron/imageUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -72,6 +73,25 @@ function startOsuStatus() {
     if (firstInstance) {
       if (!osuLoaded) {
         osuLoaded = true;
+
+        try {
+          const currentUserInfo = await fetch(`https://api.ez-pp.farm/get_player_info?name=${currentUser.username}&scope=info`);
+          const currentUserInfoJson = await currentUserInfo.json();
+          if ("player" in currentUserInfoJson && currentUserInfoJson.player != null) {
+            if ("info" in currentUserInfoJson.player && currentUserInfoJson.player.info != null) {
+              const id = currentUserInfoJson.player.info.id;
+              const username = currentUserInfoJson.player.info.name;
+              richPresence.updateUser({
+                id,
+                username,
+              });
+              richPresence.update();
+            }
+          }
+        } catch {
+
+        }
+
         setTimeout(() => {
           if (patch) {
             const patcherExecuteable = path.join(
@@ -96,15 +116,32 @@ function startOsuStatus() {
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
 
+      let largeImageKey = "ezppfarm";
       let details = "Idle...";
       let infoText = currentStatus.player_status.status.info_text.length > 0
         ? currentStatus.player_status.status.info_text
         : "  ";
+      if (
+        "beatmap" in currentStatus.player_status.status &&
+        currentStatus.player_status.status.beatmap !== null
+      ) {
+        const setId = currentStatus.player_status.status.beatmap.set_id;
+        if (setId) {
+          const coverImage =
+            `https://assets.ppy.sh/beatmaps/${setId}/covers/list@2x.jpg`;
+          if (
+            checkImageExists(coverImage)
+          ) {
+            largeImageKey = coverImage;
+          }
+        }
+      }
 
       switch (currentStatus.player_status.status.action) {
         case 1:
           details = "AFK...";
           infoText = "  ";
+          largeImageKey = "ezppfarm";
           break;
         case 2:
           details = "Playing...";
@@ -118,6 +155,7 @@ function startOsuStatus() {
         case 5:
           details = "Multiplayer: Selecting a Beatmap...";
           infoText = "  ";
+          largeImageKey = "ezppfarm";
           break;
         case 6:
           details = "Watching...";
@@ -127,10 +165,12 @@ function startOsuStatus() {
           break;
         case 9:
           details = "Submitting...";
+          largeImageKey = "ezppfarm";
           break;
         case 11:
           details = "Multiplayer: Idle...";
           infoText = "  ";
+          largeImageKey = "ezppfarm";
           break;
         case 12:
           details = "Multiplayer: Playing...";
@@ -138,12 +178,14 @@ function startOsuStatus() {
         case 13:
           details = "Browsing osu!direct...";
           infoText = "  ";
+          largeImageKey = "ezppfarm";
           break;
       }
 
       richPresence.updateStatus({
         details,
         state: infoText,
+        largeImageKey,
       });
 
       richPresence.update();
@@ -386,9 +428,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await uiDownloader.startDownload();
@@ -417,9 +458,8 @@ function registerIPCPipes() {
           progress: Math.ceil(data.progress),
         });
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-            formatBytes(data.total)
-          })...`,
+          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+            })...`,
         });
       });
       await updateDownloader.startDownload();
@@ -464,9 +504,8 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-              formatBytes(data.total)
-            })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+              })...`,
           });
         });
         await patcherDownloader.startDownload();
@@ -538,11 +577,9 @@ function registerIPCPipes() {
           });
         }
       }
-    } catch {}
+    } catch { }
 
     const userConfig = getUserConfig(osuPath);
-    richPresence.updateVersion(await userConfig.get("LastVersion"));
-    richPresence.update();
     if (richPresence.hasPresence) {
       await userConfig.set("DiscordRichPresence", "0");
     }
@@ -563,7 +600,10 @@ function registerIPCPipes() {
       mainWindow.show();
       mainWindow.focus();
       stopOsuStatus();
-      richPresence.updateVersion();
+      richPresence.updateUser({
+        username: "  ",
+        id: undefined
+      });
       richPresence.updateStatus({
         state: "Idle in Launcher...",
         details: undefined,

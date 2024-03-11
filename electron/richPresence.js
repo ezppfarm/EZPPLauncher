@@ -2,7 +2,10 @@ const DiscordRPC = require("discord-auto-rpc");
 const { appName, appVersion } = require("./appInfo.js");
 
 const clientId = "1032772293220384808";
+
+/** @type {DiscordRPC.AutoClient} */
 let richPresence;
+
 let intervalId;
 
 let currentStatus = {
@@ -32,6 +35,7 @@ module.exports = {
       richPresence = new DiscordRPC.AutoClient({ transport: "ipc" });
       richPresence.endlessLogin({ clientId });
       richPresence.once("ready", () => {
+        console.log("connected presence with user " + richPresence.user.username);
         richPresence.setActivity(currentStatus);
         intervalId = setInterval(() => {
           richPresence.setActivity(currentStatus);
@@ -47,16 +51,17 @@ module.exports = {
       richPresence = null;
     }
   },
-  updateStatus: ({ state, details }) => {
+  updateStatus: ({ state, details, largeImageKey }) => {
     currentStatus.state = state ?? "  ";
     currentStatus.details = details ?? "  ";
+    currentStatus.largeImageKey = largeImageKey ?? "ezppfarm";
   },
-  updateVersion: (osuVersion) => {
-    currentStatus.smallImageKey = osuVersion ? "osu" : "  ";
-    currentStatus.smallImageText = osuVersion ? `osu! ${osuVersion}` : "  ";
+  updateUser: ({ username, id }) => {
+    currentStatus.smallImageKey = id ? `https://a.ez-pp.farm/${id}` : "  ";
+    currentStatus.smallImageText = username ?? "  ";
   },
   update: () => {
-    if (richPresence) {
+    if (richPresence && richPresence.user) {
       richPresence.setActivity(currentStatus);
     }
   },
