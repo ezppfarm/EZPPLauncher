@@ -35,6 +35,7 @@ const {
   findOsuInstallation,
   updateOsuConfigHashes,
   runOsuUpdater,
+  gamemodes,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
@@ -116,6 +117,19 @@ function startOsuStatus() {
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
 
+      const currentMode = currentStatus.player_status.status.mode;
+      const currentModeString = gamemodes[currentMode];
+
+      const currentInfoRequest = await fetch(
+        "https://api.ez-pp.farm/get_player_info?name=" + currentUser.username + "&scope=all",
+      );
+      const currentInfo = await currentInfoRequest.json();
+      let currentUsername = currentInfo.player.info.name;
+      const currentId = currentInfo.player.info.id;
+      const currentStats = currentInfo.player.stats[currentMode];
+
+      currentUsername += ` (#${currentStats.rank})`;
+
       let largeImageKey = "ezppfarm";
       let details = "Idle...";
       let infoText = currentStatus.player_status.status.info_text.length > 0
@@ -181,6 +195,13 @@ function startOsuStatus() {
           largeImageKey = "ezppfarm";
           break;
       }
+
+      details = `[${currentModeString}] ${details}`;
+
+      richPresence.updateUser({
+        username: currentUsername,
+        id: currentId,
+      })
 
       richPresence.updateStatus({
         details,

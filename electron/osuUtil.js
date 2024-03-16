@@ -10,6 +10,16 @@ const checkUpdateURL =
 const ignoredOsuEntities = [
   "osu!auth.dll",
 ];
+const gamemodes = {
+  0: "osu!",
+  1: "taiko",
+  2: "catch",
+  3: "mania",
+  4: "osu!(rx)",
+  5: "taiko(rx)",
+  6: "catch(rx)",
+  8: "osu!(ap)"
+}
 const osuEntities = [
   "avcodec-51.dll",
   "avformat-52.dll",
@@ -481,4 +491,5 @@ module.exports = {
   findOsuInstallation,
   updateOsuConfigHashes,
   runOsuUpdater,
+  gamemodes
 };
