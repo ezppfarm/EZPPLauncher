@@ -37,6 +37,7 @@ const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
 const { checkImageExists } = require("./electron/imageUtil");
+const { isNet8Installed } = require("./electron/netUtils");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -209,6 +210,10 @@ function stopOsuStatus() {
 }
 
 function registerIPCPipes() {
+  (async () => {
+    const isNet8 = await isNet8Installed();
+    console.log("net8:", isNet8);
+  })();
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
     const hwid = getHwId();
     const timeout = new AbortController();
@@ -414,6 +419,17 @@ function registerIPCPipes() {
         message: "invalid osu! path!",
       });
       return;
+    }
+    if (patch) {
+      if (!(await isNet8Installed())) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: ".NET 8 is not installed.",
+        });
+        //open .net 8 download in browser
+        shell.openExternal('https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.4-windows-x64-installer');
+      }
     }
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking for osu! updates...",
