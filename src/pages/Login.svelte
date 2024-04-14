@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Input, Button, Spinner, Checkbox } from "flowbite-svelte";
-  import type { User } from "../types/user";
-  import type { Error } from "../types/error";
+  import { type User } from "../types/user";
   import { currentPage, currentUser, startup } from "../storage/localStore";
   import toast from "svelte-french-toast";
   import { Page } from "../consts/pages";
@@ -43,14 +42,14 @@
             position: "bottom-center",
             className:
               "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-            duration: 3000,
+            duration: 3000
           });
         },
         { once: true }
       );
       window.dispatchEvent(
         new CustomEvent("login-attempt", {
-          detail: { username, password, saveCredentials },
+          detail: { username, password, saveCredentials }
         })
       );
     });
@@ -59,13 +58,13 @@
       {
         loading: "Logging in...",
         success: "Successfully logged in!",
-        error: "Invalid Username or Password!",
+        error: "Invalid Username or Password!"
       },
       {
         position: "bottom-center",
         className:
           "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-        duration: 3000,
+        duration: 3000
       }
     );
   };
@@ -87,7 +86,7 @@
               position: "bottom-center",
               className:
                 "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-              duration: 3000,
+              duration: 3000
             });
             return;
           }
@@ -104,7 +103,7 @@
             position: "bottom-center",
             className:
               "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-            duration: 3000,
+            duration: 3000
           });
           loading = false;
         },
@@ -117,13 +116,13 @@
       {
         loading: "Logging in...",
         success: "Successfully logged in!",
-        error: "Failed to login.",
+        error: "Failed to login."
       },
       {
         position: "bottom-center",
         className:
           "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-        duration: 3000,
+        duration: 3000
       }
     );
   };
@@ -135,7 +134,7 @@
       position: "bottom-center",
       className:
         "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-      duration: 3000,
+      duration: 3000
     });
   };
 

@@ -66,6 +66,10 @@
     window.dispatchEvent(new CustomEvent("updateExit"));
   });
 
+  window.addEventListener("open-settings", (e) => {
+    currentPage.set(Page.Settings);
+  });
+
   window.addEventListener("launchStatusUpdate", (e) => {
     const status = (e as CustomEvent).detail.status;
     launchStatus.set(status);

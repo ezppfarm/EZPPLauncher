@@ -26,12 +26,12 @@
     green: "bg-green-600 dark:bg-green-500",
     yellow: "bg-yellow-400",
     purple: "bg-purple-600 dark:bg-purple-500",
-    indigo: "bg-indigo-600 dark:bg-indigo-500",
+    indigo: "bg-indigo-600 dark:bg-indigo-500"
   };
 
   let _progress = tweened(0, {
     duration: tweenDuration,
-    easing,
+    easing
   });
 
   $: {
@@ -50,8 +50,12 @@
     >
     <span class="text-sm font-medium text-blue-700 dark:text-white"
       >{animate
-        ? $_progress.toFixed(precision)
-        : progress.toFixed(precision)}%</span
+        ? isNaN($_progress)
+          ? parseInt("100").toFixed(precision)
+          : $_progress.toFixed(precision)
+        : isNaN(progress)
+          ? parseInt("100").toFixed(precision)
+          : progress.toFixed(precision)}%</span
     >
   </div>
 {/if}
@@ -63,7 +67,13 @@
         class={twJoin(labelInsideClass, barColors[color])}
         style="width: {animate ? $_progress : progress}%"
       >
-        {animate ? $_progress.toFixed(precision) : progress.toFixed(precision)}%
+        {animate
+          ? isNaN($_progress)
+            ? parseInt("100").toFixed(precision)
+            : $_progress.toFixed(precision)
+          : isNaN(progress)
+            ? parseInt("100").toFixed(precision)
+            : progress.toFixed(precision)}%
       </div>
     {:else}
       <div
