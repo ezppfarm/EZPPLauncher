@@ -1,8 +1,8 @@
 const { exec } = require("child_process");
 
 async function isNet8Installed() {
-    return new Promise((resolve, reject) => {
-        exec("dotnet --version", (error, stdout, stderr) => {
+    return new Promise((resolve) => {
+        exec("dotnet --list-runtimes", (error, stdout, stderr) => {
             if (error) {
                 resolve(false);
                 return;
@@ -12,7 +12,13 @@ async function isNet8Installed() {
                 return;
             }
             const version = stdout.trim();
-            resolve(version.startsWith("8."));
+            for (const line of version.split('\n')) {
+                if (line.startsWith("Microsoft.WindowsDesktop.App 8.")) {
+                    resolve(true);
+                    break;
+                }
+            }
+            resolve(false);
         })
     });
 }
