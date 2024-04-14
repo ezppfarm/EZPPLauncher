@@ -1,7 +1,7 @@
-const { vitePreprocess } = require("@sveltejs/vite-plugin-svelte");
+const preprocess = require("svelte-preprocess");
 
 const config = {
-  preprocess: [vitePreprocess({})],
+  preprocess: [preprocess()],
 };
 
 module.exports = config;

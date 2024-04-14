@@ -3,15 +3,6 @@ const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require(
   "electron",
 );
 
-/* const unhandled = require("electron-unhandled");
-unhandled({
-  logger: console.error,
-  showDialog: true,
-  reportButton: () => {
-    shell.openExternal("https://ez-pp.farm/discord");
-  },
-}); */
-
 const path = require("path");
 const serve = require("electron-serve");
 const loadURL = serve({ directory: "public" });
@@ -27,14 +18,13 @@ const {
   downloadUpdateFiles,
   getUserConfig,
   runOsuWithDevServer,
-  getPatcherUpdates,
-  downloadPatcherUpdates,
-  getUIFiles,
-  downloadUIFiles,
-  replaceUIFile,
+  replaceUIFiles,
   findOsuInstallation,
   updateOsuConfigHashes,
   runOsuUpdater,
+  gamemodes,
+  getEZPPLauncherUpdateFiles,
+  downloadEZPPLauncherUpdateFiles,
 } = require("./electron/osuUtil");
 const { formatBytes } = require("./electron/formattingUtil");
 const windowName = require("get-window-by-name");
@@ -47,6 +37,7 @@ const { appName, appVersion } = require("./electron/appInfo");
 const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
 const { checkImageExists } = require("./electron/imageUtil");
+const { isNet8Installed } = require("./electron/netUtils");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -97,7 +88,8 @@ function startOsuStatus() {
             const patcherExecuteable = path.join(
               userOsuPath,
               "EZPPLauncher",
-              "patcher.exe",
+              "patcher",
+              "osu!.patcher.exe",
             );
             if (fs.existsSync(patcherExecuteable)) {
               runFileDetached(userOsuPath, patcherExecuteable);
@@ -115,6 +107,19 @@ function startOsuStatus() {
 
       if (!("player_status" in currentStatus)) return;
       if (!("status" in currentStatus.player_status)) return;
+
+      const currentMode = currentStatus.player_status.status.mode;
+      const currentModeString = gamemodes[currentMode];
+
+      const currentInfoRequest = await fetch(
+        "https://api.ez-pp.farm/get_player_info?name=" + currentUser.username + "&scope=all",
+      );
+      const currentInfo = await currentInfoRequest.json();
+      let currentUsername = currentInfo.player.info.name;
+      const currentId = currentInfo.player.info.id;
+      const currentStats = currentInfo.player.stats[currentMode];
+
+      currentUsername += ` (#${currentStats.rank})`;
 
       let largeImageKey = "ezppfarm";
       let details = "Idle...";
@@ -181,6 +186,13 @@ function startOsuStatus() {
           largeImageKey = "ezppfarm";
           break;
       }
+
+      details = `[${currentModeString}] ${details}`;
+
+      richPresence.updateUser({
+        username: currentUsername,
+        id: currentId,
+      })
 
       richPresence.updateStatus({
         details,
@@ -393,6 +405,7 @@ function registerIPCPipes() {
         type: "error",
         message: "osu! path not set!",
       });
+      mainWindow.webContents.send("ezpplauncher:open-settings");
       return;
     }
     if (!(await isValidOsuFolder(osuPath))) {
@@ -403,44 +416,24 @@ function registerIPCPipes() {
       });
       return;
     }
+    if (patch) {
+      if (!(await isNet8Installed())) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: ".NET 8 is not installed.",
+        });
+        //open .net 8 download in browser
+        shell.openExternal('https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.4-windows-x64-installer');
+      }
+    }
     mainWindow.webContents.send("ezpplauncher:launchstatus", {
       status: "Checking for osu! updates...",
     });
     await new Promise((res) => setTimeout(res, 1000));
     const releaseStream = await getGlobalConfig(osuPath).get("_ReleaseStream");
     const latestFiles = await getUpdateFiles(releaseStream);
-    const uiFiles = await getUIFiles(osuPath);
     const updateFiles = await getFilesThatNeedUpdate(osuPath, latestFiles);
-    if (uiFiles.length > 0) {
-      const uiDownloader = downloadUIFiles(osuPath, uiFiles);
-      let errored = false;
-      uiDownloader.eventEmitter.on("error", (data) => {
-        const filename = data.fileName;
-        errored = true;
-        mainWindow.webContents.send("ezpplauncher:alert", {
-          type: "error",
-          message:
-            `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
-        });
-      });
-      uiDownloader.eventEmitter.on("data", (data) => {
-        mainWindow.webContents.send("ezpplauncher:launchprogress", {
-          progress: Math.ceil(data.progress),
-        });
-        mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
-        });
-      });
-      await uiDownloader.startDownload();
-      mainWindow.webContents.send("ezpplauncher:launchprogress", {
-        progress: -1,
-      });
-      if (errored) {
-        mainWindow.webContents.send("ezpplauncher:launchabort");
-        return;
-      }
-    }
     if (updateFiles.length > 0) {
       const updateDownloader = downloadUpdateFiles(osuPath, updateFiles);
       let errored = false;
@@ -486,9 +479,9 @@ function registerIPCPipes() {
         status: "Looking for patcher updates...",
       });
       await new Promise((res) => setTimeout(res, 1000));
-      const patchFiles = await getPatcherUpdates(osuPath);
+      const patchFiles = await getEZPPLauncherUpdateFiles(osuPath);
       if (patchFiles.length > 0) {
-        const patcherDownloader = downloadPatcherUpdates(osuPath, patchFiles);
+        const patcherDownloader = await downloadEZPPLauncherUpdateFiles(osuPath, patchFiles);
         let errored = false;
         patcherDownloader.eventEmitter.on("error", (data) => {
           const filename = data.fileName;
@@ -559,14 +552,14 @@ function registerIPCPipes() {
     });
 
     await updateOsuConfigHashes(osuPath);
-    await replaceUIFile(osuPath, false);
+    await replaceUIFiles(osuPath, false);
 
     const forceUpdateFiles = [
       ".require_update",
       "help.txt",
       "_pending",
     ];
-    //TODO: needs testing
+
     try {
       for (const updateFileName of forceUpdateFiles) {
         const updateFile = path.join(osuPath, updateFileName);
@@ -614,7 +607,7 @@ function registerIPCPipes() {
       });
 
       setTimeout(async () => {
-        await replaceUIFile(osuPath, true);
+        await replaceUIFiles(osuPath, true);
         mainWindow.webContents.send("ezpplauncher:launchabort");
         osuLoaded = false;
       }, 5000);

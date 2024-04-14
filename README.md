@@ -12,6 +12,7 @@ The Launcher is a "plug and play thing", download it, place it on the desktop an
 
 - Automatic osu! client updating before Launch
 - Custom osu! Logo in MainMenu
+- Relax misses and much more
 - Account saving
 
 ## Build from source

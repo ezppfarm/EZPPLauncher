@@ -115,3 +115,9 @@ ipcRenderer.addListener("ezpplauncher:update", (e, args) => {
     new CustomEvent("update", { detail: args }),
   );
 });
+
+ipcRenderer.addListener("ezpplauncher:open-settings", (e, args) => {
+  window.dispatchEvent(
+    new CustomEvent("open-settings"),
+  );
+});
