@@ -210,10 +210,6 @@ function stopOsuStatus() {
 }
 
 function registerIPCPipes() {
-  (async () => {
-    const isNet8 = await isNet8Installed();
-    console.log("net8:", isNet8);
-  })();
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
     const hwid = getHwId();
     const timeout = new AbortController();
