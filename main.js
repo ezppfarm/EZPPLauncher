@@ -20,7 +20,6 @@ const {
   runOsuWithDevServer,
   replaceUIFiles,
   findOsuInstallation,
-  updateOsuConfigHashes,
   runOsuUpdater,
   gamemodes,
   getEZPPLauncherUpdateFiles,
