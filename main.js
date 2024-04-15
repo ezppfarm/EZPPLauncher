@@ -38,6 +38,8 @@ const { updateAvailable, releasesUrl } = require("./electron/updateCheck");
 const fkill = require("fkill");
 const { checkImageExists } = require("./electron/imageUtil");
 const { isNet8Installed } = require("./electron/netUtils");
+const Logger = require("./electron/logging");
+const { isWritable } = require("./electron/fileUtil");
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -46,6 +48,13 @@ let osuCheckInterval;
 let userOsuPath;
 let osuLoaded = false;
 let patch = false;
+let logger = new Logger(path.join(
+  process.platform == "win32"
+    ? process.env["LOCALAPPDATA"]
+    : process.env["HOME"],
+  "EZPPLauncher",
+  "logs",
+));
 
 let currentUser = undefined;
 
@@ -66,10 +75,18 @@ function startOsuStatus() {
         osuLoaded = true;
 
         try {
-          const currentUserInfo = await fetch(`https://api.ez-pp.farm/get_player_info?name=${currentUser.username}&scope=info`);
+          const currentUserInfo = await fetch(
+            `https://api.ez-pp.farm/get_player_info?name=${currentUser.username}&scope=info`,
+          );
           const currentUserInfoJson = await currentUserInfo.json();
-          if ("player" in currentUserInfoJson && currentUserInfoJson.player != null) {
-            if ("info" in currentUserInfoJson.player && currentUserInfoJson.player.info != null) {
+          if (
+            "player" in currentUserInfoJson &&
+            currentUserInfoJson.player != null
+          ) {
+            if (
+              "info" in currentUserInfoJson.player &&
+              currentUserInfoJson.player.info != null
+            ) {
               const id = currentUserInfoJson.player.info.id;
               const username = currentUserInfoJson.player.info.name;
               richPresence.updateUser({
@@ -80,7 +97,6 @@ function startOsuStatus() {
             }
           }
         } catch {
-
         }
 
         setTimeout(() => {
@@ -112,7 +128,8 @@ function startOsuStatus() {
       const currentModeString = gamemodes[currentMode];
 
       const currentInfoRequest = await fetch(
-        "https://api.ez-pp.farm/get_player_info?name=" + currentUser.username + "&scope=all",
+        "https://api.ez-pp.farm/get_player_info?name=" + currentUser.username +
+          "&scope=all",
       );
       const currentInfo = await currentInfoRequest.json();
       let currentUsername = currentInfo.player.info.name;
@@ -192,7 +209,7 @@ function startOsuStatus() {
       richPresence.updateUser({
         username: currentUsername,
         id: currentId,
-      })
+      });
 
       richPresence.updateStatus({
         details,
@@ -211,9 +228,19 @@ function stopOsuStatus() {
 
 function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
-    const hwid = getHwId();
+    let hwid = "";
+    try {
+      hwid = getHwId();
+    } catch (err) {
+      logger.error(`Failed to get HWID.`, err);
+      return {
+        code: 500,
+        message: "Failed to get HWID.",
+      };
+    }
     const timeout = new AbortController();
     const timeoutId = setTimeout(() => timeout.abort(), 8000);
+    logger.log(`Logging in with user ${args.username}...`);
     try {
       const fetchResult = await fetch("https://ez-pp.farm/login/check", {
         signal: timeout.signal,
@@ -238,14 +265,20 @@ function registerIPCPipes() {
           }
           currentUser = args;
           config.remove("guest");
-        }
+          logger.log(`Logged in as user ${args.username}!`);
+        } else logger.log(`Login failed for user ${args.username}.`);
         return result;
       }
+      logger.log(
+        `Login failed for user ${username}.\nResponse:\n${await fetchResult
+          .text()}`,
+      );
       return {
         code: 500,
         message: "Something went wrong while logging you in.",
       };
     } catch (err) {
+      logger.error("Error while logging in:", err);
       return {
         code: 500,
         message: "Something went wrong while logging you in.",
@@ -275,6 +308,7 @@ function registerIPCPipes() {
     }
     const timeout = new AbortController();
     const timeoutId = setTimeout(() => timeout.abort(), 8000);
+    logger.log(`Logging in with user ${username}...`);
     try {
       const fetchResult = await fetch("https://ez-pp.farm/login/check", {
         signal: timeout.signal,
@@ -297,16 +331,23 @@ function registerIPCPipes() {
             username: username,
             password: password,
           };
-        }
+          logger.log(`Logged in as user ${username}!`);
+        } else logger.log(`Login failed for user ${username}.`);
+
         return result;
       } else {
         config.remove("password");
       }
+      logger.log(
+        `Login failed for user ${username}.\nResponse:\n${await fetchResult
+          .text()}`,
+      );
       return {
         code: 500,
         message: "Something went wrong while logging you in.",
       };
     } catch (err) {
+      logger.error("Error while logging in:", err);
       return {
         code: 500,
         message: "Something went wrong while logging you in.",
@@ -319,6 +360,7 @@ function registerIPCPipes() {
     config.remove("password");
     config.set("guest", "1");
     currentUser = undefined;
+    logger.log("Logged in as guest user.");
   });
 
   ipcMain.handle("ezpplauncher:logout", (e) => {
@@ -326,6 +368,7 @@ function registerIPCPipes() {
     config.remove("password");
     config.remove("guest");
     currentUser = undefined;
+    logger.log("Loging out.");
     return true;
   });
 
@@ -340,6 +383,10 @@ function registerIPCPipes() {
       if (key == "presence") {
         if (!value) richPresence.disconnect();
         else richPresence.connect();
+      }
+
+      if (key == "logging") {
+        logger.enabled = logging;
       }
 
       if (typeof value == "boolean") {
@@ -391,100 +438,78 @@ function registerIPCPipes() {
   });
 
   ipcMain.handle("ezpplauncher:launch", async (e) => {
-    const configPatch = config.get("patch");
-    patch = configPatch != undefined ? configPatch == "true" : true;
-    mainWindow.webContents.send("ezpplauncher:launchstatus", {
-      status: "Checking osu! directory...",
-    });
-    await new Promise((res) => setTimeout(res, 1000));
-    const osuPath = config.get("osuPath");
-    userOsuPath = osuPath;
-    if (osuPath == undefined) {
-      mainWindow.webContents.send("ezpplauncher:launchabort");
-      mainWindow.webContents.send("ezpplauncher:alert", {
-        type: "error",
-        message: "osu! path not set!",
-      });
-      mainWindow.webContents.send("ezpplauncher:open-settings");
-      return;
-    }
-    if (!(await isValidOsuFolder(osuPath))) {
-      mainWindow.webContents.send("ezpplauncher:launchabort");
-      mainWindow.webContents.send("ezpplauncher:alert", {
-        type: "error",
-        message: "invalid osu! path!",
-      });
-      return;
-    }
-    if (patch) {
-      if (!(await isNet8Installed())) {
-        mainWindow.webContents.send("ezpplauncher:launchabort");
+    try {
+      const osuWindowTitle = windowName.getWindowText("osu!.exe");
+      if (osuWindowTitle.length > 0) {
         mainWindow.webContents.send("ezpplauncher:alert", {
           type: "error",
-          message: ".NET 8 is not installed.",
+          message: "osu! is running, please exit.",
         });
-        //open .net 8 download in browser
-        shell.openExternal('https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.4-windows-x64-installer');
-      }
-    }
-    mainWindow.webContents.send("ezpplauncher:launchstatus", {
-      status: "Checking for osu! updates...",
-    });
-    await new Promise((res) => setTimeout(res, 1000));
-    const releaseStream = await getGlobalConfig(osuPath).get("_ReleaseStream");
-    const latestFiles = await getUpdateFiles(releaseStream);
-    const updateFiles = await getFilesThatNeedUpdate(osuPath, latestFiles);
-    if (updateFiles.length > 0) {
-      const updateDownloader = downloadUpdateFiles(osuPath, updateFiles);
-      let errored = false;
-      updateDownloader.eventEmitter.on("error", (data) => {
-        const filename = data.fileName;
-        errored = true;
-        mainWindow.webContents.send("ezpplauncher:alert", {
-          type: "error",
-          message:
-            `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
-        });
-      });
-      updateDownloader.eventEmitter.on("data", (data) => {
-        mainWindow.webContents.send("ezpplauncher:launchprogress", {
-          progress: Math.ceil(data.progress),
-        });
-        mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-            })...`,
-        });
-      });
-      await updateDownloader.startDownload();
-      mainWindow.webContents.send("ezpplauncher:launchprogress", {
-        progress: -1,
-      });
-      if (errored) {
         mainWindow.webContents.send("ezpplauncher:launchabort");
         return;
       }
-      mainWindow.webContents.send("ezpplauncher:launchstatus", {
-        status: "osu! is now up to date!",
-      });
-      await new Promise((res) => setTimeout(res, 1000));
-    } else {
-      mainWindow.webContents.send("ezpplauncher:launchstatus", {
-        status: "osu! is up to date!",
-      });
-      await new Promise((res) => setTimeout(res, 1000));
-    }
 
-    if (patch) {
+      logger.log("Preparing launch...");
+      const configPatch = config.get("patch");
+      patch = configPatch != undefined ? configPatch == "true" : true;
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
-        status: "Looking for patcher updates...",
+        status: "Checking osu! directory...",
       });
       await new Promise((res) => setTimeout(res, 1000));
-      const patchFiles = await getEZPPLauncherUpdateFiles(osuPath);
-      if (patchFiles.length > 0) {
-        const patcherDownloader = await downloadEZPPLauncherUpdateFiles(osuPath, patchFiles);
+      const osuPath = config.get("osuPath");
+      userOsuPath = osuPath;
+      if (osuPath == undefined) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: "osu! path not set!",
+        });
+        mainWindow.webContents.send("ezpplauncher:open-settings");
+        logger.log("osu! path is not set.");
+        return;
+      }
+      if (!(await isValidOsuFolder(osuPath))) {
+        mainWindow.webContents.send("ezpplauncher:launchabort");
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: "invalid osu! path!",
+        });
+        logger.log("osu! path is invalid.");
+        return;
+      }
+      if (patch) {
+        if (!(await isNet8Installed())) {
+          mainWindow.webContents.send("ezpplauncher:launchabort");
+          mainWindow.webContents.send("ezpplauncher:alert", {
+            type: "error",
+            message: ".NET 8 is not installed.",
+          });
+          //open .net 8 download in browser
+          shell.openExternal(
+            "https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.4-windows-x64-installer",
+          );
+          logger.log(".NET 8 is not installed.");
+        }
+      }
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "Checking for osu! updates...",
+      });
+      await new Promise((res) => setTimeout(res, 1000));
+      const releaseStream = await getGlobalConfig(osuPath).get(
+        "_ReleaseStream",
+      );
+      const latestFiles = await getUpdateFiles(releaseStream);
+      const updateFiles = await getFilesThatNeedUpdate(osuPath, latestFiles);
+      if (updateFiles.length > 0) {
+        logger.log("osu! updates found.");
+        const updateDownloader = downloadUpdateFiles(osuPath, updateFiles);
         let errored = false;
-        patcherDownloader.eventEmitter.on("error", (data) => {
+        updateDownloader.eventEmitter.on("error", (data) => {
           const filename = data.fileName;
+          logger.error(
+            `Failed to download/replace ${filename}!`,
+            data.error,
+          );
           errored = true;
           mainWindow.webContents.send("ezpplauncher:alert", {
             type: "error",
@@ -492,16 +517,20 @@ function registerIPCPipes() {
               `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
           });
         });
-        patcherDownloader.eventEmitter.on("data", (data) => {
+        updateDownloader.eventEmitter.on("data", (data) => {
+          if (data.progress >= 100) {
+            logger.log(`Downloaded ${data.fileName} successfully.`);
+          }
           mainWindow.webContents.send("ezpplauncher:launchprogress", {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-              })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+              formatBytes(data.total)
+            })...`,
           });
         });
-        await patcherDownloader.startDownload();
+        await updateDownloader.startDownload();
         mainWindow.webContents.send("ezpplauncher:launchprogress", {
           progress: -1,
         });
@@ -510,119 +539,206 @@ function registerIPCPipes() {
           return;
         }
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: "Patcher is now up to date!",
+          status: "osu! is now up to date!",
         });
+        await new Promise((res) => setTimeout(res, 1000));
       } else {
         mainWindow.webContents.send("ezpplauncher:launchstatus", {
-          status: "Patcher is up to date!",
+          status: "osu! is up to date!",
         });
+        await new Promise((res) => setTimeout(res, 1000));
       }
-      await new Promise((res) => setTimeout(res, 1000));
-    }
-    if (updateFiles.length > 0) {
-      mainWindow.webContents.send("ezpplauncher:launchstatus", {
-        status: "Launching osu! updater to verify updates...",
-      });
-      await new Promise((res) => setTimeout(res, 1000));
 
-      await new Promise((res) => {
-        runOsuUpdater(osuPath, async () => {
-          await new Promise((res) => setTimeout(res, 500));
-          const terminationThread = setInterval(async () => {
-            const osuWindowTitle = windowName.getWindowText("osu!.exe");
-            if (osuWindowTitle.length < 0) {
-              return;
-            }
-            const firstInstance = osuWindowTitle[0];
-            if (firstInstance) {
-              const processId = firstInstance.processId;
-              await fkill(processId, { force: true, silent: true });
-              clearInterval(terminationThread);
-              res();
-            }
-          }, 500);
+      if (patch) {
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: "Looking for patcher updates...",
         });
-      });
-    }
-
-    await new Promise((res) => setTimeout(res, 1000));
-
-    mainWindow.webContents.send("ezpplauncher:launchstatus", {
-      status: "Preparing launch...",
-    });
-
-    await updateOsuConfigHashes(osuPath);
-    await replaceUIFiles(osuPath, false);
-
-    const forceUpdateFiles = [
-      ".require_update",
-      "help.txt",
-      "_pending",
-    ];
-
-    try {
-      for (const updateFileName of forceUpdateFiles) {
-        const updateFile = path.join(osuPath, updateFileName);
-        if (fs.existsSync(updateFile)) {
-          await fs.promises.rm(updateFile, {
-            force: true,
-            recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+        await new Promise((res) => setTimeout(res, 1000));
+        const patchFiles = await getEZPPLauncherUpdateFiles(osuPath);
+        if (patchFiles.length > 0) {
+          logger.log("EZPPLauncher updates found.");
+          const patcherDownloader = await downloadEZPPLauncherUpdateFiles(
+            osuPath,
+            patchFiles,
+          );
+          let errored = false;
+          patcherDownloader.eventEmitter.on("error", (data) => {
+            const filename = data.fileName;
+            logger.error(`Failed to download/replace ${filename}!`, data.error);
+            errored = true;
+            mainWindow.webContents.send("ezpplauncher:alert", {
+              type: "error",
+              message:
+                `Failed to download/replace ${filename}!\nMaybe try to restart EZPPLauncher.`,
+            });
+          });
+          patcherDownloader.eventEmitter.on("data", (data) => {
+            if (data.progress >= 100) {
+              logger.log(`Downloaded ${data.fileName} successfully.`);
+            }
+            mainWindow.webContents.send("ezpplauncher:launchprogress", {
+              progress: Math.ceil(data.progress),
+            });
+            mainWindow.webContents.send("ezpplauncher:launchstatus", {
+              status: `Downloading ${data.fileName}(${
+                formatBytes(data.loaded)
+              }/${formatBytes(data.total)})...`,
+            });
+          });
+          await patcherDownloader.startDownload();
+          mainWindow.webContents.send("ezpplauncher:launchprogress", {
+            progress: -1,
+          });
+          if (errored) {
+            mainWindow.webContents.send("ezpplauncher:launchabort");
+            return;
+          }
+          mainWindow.webContents.send("ezpplauncher:launchstatus", {
+            status: "Patcher is now up to date!",
+          });
+        } else {
+          mainWindow.webContents.send("ezpplauncher:launchstatus", {
+            status: "Patcher is up to date!",
           });
         }
+        await new Promise((res) => setTimeout(res, 1000));
       }
-    } catch { }
+      if (updateFiles.length > 0) {
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: "Launching osu! updater to verify updates...",
+        });
+        await new Promise((res) => setTimeout(res, 1000));
 
-    const userConfig = getUserConfig(osuPath);
-    if (richPresence.hasPresence) {
-      await userConfig.set("DiscordRichPresence", "0");
-    }
-    await userConfig.set("ShowInterfaceDuringRelax", "1");
-    if (currentUser) {
-      await userConfig.set("CredentialEndpoint", "ez-pp.farm");
-      await userConfig.set("SavePassword", "1");
-      await userConfig.set("SaveUsername", "1");
-      await userConfig.set("Username", currentUser.username);
-      await userConfig.set("Password", currentUser.password);
-    }
+        await new Promise((res) => {
+          runOsuUpdater(osuPath, async () => {
+            await new Promise((res) => setTimeout(res, 500));
+            const terminationThread = setInterval(async () => {
+              const osuWindowTitle = windowName.getWindowText("osu!.exe");
+              if (osuWindowTitle.length < 0) {
+                return;
+              }
+              const firstInstance = osuWindowTitle[0];
+              if (firstInstance) {
+                const processId = firstInstance.processId;
+                await fkill(processId, { force: true, silent: true });
+                clearInterval(terminationThread);
+                res();
+              }
+            }, 500);
+          });
+        });
+      }
 
-    mainWindow.webContents.send("ezpplauncher:launchstatus", {
-      status: "Launching osu!...",
-    });
+      await new Promise((res) => setTimeout(res, 1000));
 
-    const onExitHook = () => {
-      mainWindow.show();
-      mainWindow.focus();
-      stopOsuStatus();
-      richPresence.updateUser({
-        username: "  ",
-        id: undefined
-      });
-      richPresence.updateStatus({
-        state: "Idle in Launcher...",
-        details: undefined,
-      });
-      richPresence.update();
       mainWindow.webContents.send("ezpplauncher:launchstatus", {
-        status: "Waiting for cleanup...",
+        status: "Preparing launch...",
       });
 
-      setTimeout(async () => {
-        await replaceUIFiles(osuPath, true);
+      /* await updateOsuConfigHashes(osuPath); */
+      logger.log("Replacing UI files...");
+      try {
+        await replaceUIFiles(osuPath, false);
+        logger.log("UI files replaced successfully.");
+      } catch (err) {
+        logger.error("Failed to replace UI files:", err);
+        mainWindow.webContents.send("ezpplauncher:alert", {
+          type: "error",
+          message: "Failed to replace UI files. try restarting EZPPLauncher.",
+        });
         mainWindow.webContents.send("ezpplauncher:launchabort");
-        osuLoaded = false;
-      }, 5000);
-    };
-    runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
-    mainWindow.hide();
-    startOsuStatus();
+        return;
+      }
 
-    /* mainWindow.webContents.send("ezpplauncher:launchprogress", {
-      progress: 0,
-    });
-    mainWindow.webContents.send("ezpplauncher:launchprogress", {
-      progress: 100,
-    }); */
-    return true;
+      const forceUpdateFiles = [
+        ".require_update",
+        "help.txt",
+        "_pending",
+      ];
+
+      try {
+        for (const updateFileName of forceUpdateFiles) {
+          const updateFile = path.join(osuPath, updateFileName);
+          if (fs.existsSync(updateFile)) {
+            await fs.promises.rm(updateFile, {
+              force: true,
+              recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+            });
+          }
+        }
+      } catch (err) {
+        logger.error("Failed to remove force update files:", err);
+      }
+
+      const userConfig = getUserConfig(osuPath);
+      if (richPresence.hasPresence) {
+        await userConfig.set("DiscordRichPresence", "0");
+      }
+      await userConfig.set("ShowInterfaceDuringRelax", "1");
+      if (currentUser) {
+        await userConfig.set("CredentialEndpoint", "ez-pp.farm");
+        await userConfig.set("SavePassword", "1");
+        await userConfig.set("SaveUsername", "1");
+        await userConfig.set("Username", currentUser.username);
+        await userConfig.set("Password", currentUser.password);
+      }
+
+      mainWindow.webContents.send("ezpplauncher:launchstatus", {
+        status: "Launching osu!...",
+      });
+
+      await new Promise((res) => setTimeout(res, 1000));
+
+      logger.log("Launching osu!...");
+
+      const onExitHook = () => {
+        logger.log("osu! has exited.");
+        mainWindow.show();
+        mainWindow.focus();
+        stopOsuStatus();
+        richPresence.updateUser({
+          username: "  ",
+          id: undefined,
+        });
+        richPresence.updateStatus({
+          state: "Idle in Launcher...",
+          details: undefined,
+        });
+        richPresence.update();
+        mainWindow.webContents.send("ezpplauncher:launchstatus", {
+          status: "Waiting for cleanup...",
+        });
+        const timeStart = performance.now();
+        logger.log("Waiting for cleanup...");
+
+        const cleanup = setInterval(async () => {
+          const osuUIFile = path.join(osuPath, "osu!ui.dll");
+          const osuGameplayFile = path.join(osuPath, "osu!gameplay.dll");
+          if (isWritable(osuUIFile) && isWritable(osuGameplayFile)) {
+            logger.log(
+              `Cleanup complete, took ${
+                ((performance.now() - timeStart) / 1000).toFixed(3)
+              } seconds.`,
+            );
+            clearInterval(cleanup);
+            await replaceUIFiles(osuPath, true);
+            mainWindow.webContents.send("ezpplauncher:launchabort");
+            osuLoaded = false;
+          }
+        }, 1000);
+      };
+      runOsuWithDevServer(osuPath, "ez-pp.farm", onExitHook);
+      mainWindow.hide();
+      startOsuStatus();
+      return true;
+    } catch (err) {
+      logger.error("Failed to launch", err);
+      mainWindow.webContents.send("ezpplauncher:alert", {
+        type: "error",
+        message: "Failed to launch osu!. Please try again.",
+      });
+      mainWindow.webContents.send("ezpplauncher:launchabort");
+    }
   });
 }
 
@@ -677,6 +793,13 @@ function createWindow() {
     if (presenceEnabled == "true") {
       richPresence.connect();
     }
+  }
+
+  logger.init();
+
+  const loggingEnabled = config.get("logging");
+  if (loggingEnabled && loggingEnabled == "true") {
+    logger.enabled = true;
   }
   // Uncomment the following line of code when app is ready to be packaged.
   // loadURL(mainWindow);
