@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button, ButtonGroup, Input, Toggle } from "flowbite-svelte";
   import { FileSearchSolid, FolderSolid } from "flowbite-svelte-icons";
-  import { patch, presence } from "./../storage/localStore";
+  import { patch, presence, logging } from "./../storage/localStore";
 
   let folderPath: string = "";
 
@@ -12,8 +12,10 @@
     const settingPresence = settings.find(
       (setting) => setting.key == "presence"
     );
+    const settingLogging = settings.find((setting) => setting.key == "logging");
     patch.set(settingPatch ? settingPatch.val == "true" : true);
     presence.set(settingPresence ? settingPresence.val == "true" : true);
+    logging.set(settingLogging ? settingLogging.val == "true" : false);
     folderPath = osuPath ? osuPath.val : "";
   });
   window.dispatchEvent(new CustomEvent("settings-get"));
@@ -39,19 +41,18 @@
       new CustomEvent("setting-update", { detail: { presence: $presence } })
     );
   };
+
+  const toggleLogging = () => {
+    logging.set(!$logging);
+    window.dispatchEvent(
+      new CustomEvent("setting-update", { detail: { logging: $logging } })
+    );
+  };
 </script>
 
 <main
   class="h-[265px] flex flex-col justify-start p-3 animate-fadeIn opacity-0"
 >
-  <div class="flex flex-col gap-2 p-3">
-    <Toggle class="w-fit" bind:checked={$presence} on:click={togglePresence}
-      >Discord Presence</Toggle
-    >
-    <Toggle class="w-fit" bind:checked={$patch} on:click={togglePatching}
-      >Patching</Toggle
-    >
-  </div>
   <div
     class="container flex flex-col items-center justify-center gap-5 rounded-lg p-3"
   >
@@ -76,5 +77,16 @@
         />
       </Button>
     </ButtonGroup>
+  </div>
+  <div class="flex flex-col gap-2 p-3">
+    <Toggle class="w-fit" bind:checked={$presence} on:click={togglePresence}
+      >Discord Presence</Toggle
+    >
+    <Toggle class="w-fit" bind:checked={$patch} on:click={togglePatching}
+      >Patching</Toggle
+    >
+    <Toggle class="w-fit" bind:checked={$logging} on:click={toggleLogging}
+      >Debug Logging</Toggle
+    >
   </div>
 </main>

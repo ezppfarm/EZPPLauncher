@@ -35,7 +35,9 @@ module.exports = {
       richPresence = new DiscordRPC.AutoClient({ transport: "ipc" });
       richPresence.endlessLogin({ clientId });
       richPresence.once("ready", () => {
-        console.log("connected presence with user " + richPresence.user.username);
+        console.log(
+          "connected presence with user " + richPresence.user.username,
+        );
         richPresence.setActivity(currentStatus);
         intervalId = setInterval(() => {
           richPresence.setActivity(currentStatus);

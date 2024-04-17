@@ -18,8 +18,8 @@ const gamemodes = {
   4: "osu!(rx)",
   5: "taiko(rx)",
   6: "catch(rx)",
-  8: "osu!(ap)"
-}
+  8: "osu!(ap)",
+};
 const osuEntities = [
   "avcodec-51.dll",
   "avformat-52.dll",
@@ -44,7 +44,7 @@ const osuEntities = [
   "scores.db",
 ];
 
-const ezppLauncherUpdateList = "https://ez-pp.farm/ezpplauncher"
+const ezppLauncherUpdateList = "https://ez-pp.farm/ezpplauncher";
 
 async function isValidOsuFolder(path) {
   const allFiles = await fs.promises.readdir(path);
@@ -184,31 +184,24 @@ function downloadUpdateFiles(osuPath, updateFiles) {
 
   const startDownload = async () => {
     for (const updatePatch of updateFiles) {
-      const fileName = updatePatch.filename;
-      const fileSize = updatePatch.filesize;
-      const fileURL = updatePatch.url_full;
-
-      const axiosDownloadWithProgress = await axios.get(fileURL, {
-        responseType: "stream",
-        onDownloadProgress: (progressEvent) => {
-          const { loaded, total } = progressEvent;
-          eventEmitter.emit("data", {
-            fileName,
-            loaded,
-            total,
-            progress: Math.floor((loaded / total) * 100),
-          });
-        },
-      });
-      axiosDownloadWithProgress.data.on("end", () => {
-        eventEmitter.emit("data", {
-          fileName,
-          loaded: fileSize,
-          total: fileSize,
-          progress: 100,
-        });
-      });
       try {
+        const fileName = updatePatch.filename;
+        const fileSize = updatePatch.filesize;
+        const fileURL = updatePatch.url_full;
+
+        const axiosDownloadWithProgress = await axios.get(fileURL, {
+          responseType: "stream",
+          onDownloadProgress: (progressEvent) => {
+            const { loaded, total } = progressEvent;
+            eventEmitter.emit("data", {
+              fileName,
+              loaded,
+              total,
+              progress: Math.floor((loaded / total) * 100),
+            });
+          },
+        });
+
         if (fs.existsSync(path.join(osuPath, fileName))) {
           await fs.promises.rm(path.join(osuPath, fileName), {
             force: true,
@@ -222,6 +215,7 @@ function downloadUpdateFiles(osuPath, updateFiles) {
         console.log(err);
         eventEmitter.emit("error", {
           fileName,
+          error: err,
         });
       }
     }
@@ -248,10 +242,16 @@ function runOsuWithDevServer(osuPath, serverDomain, onExit) {
 
 async function getEZPPLauncherUpdateFiles(osuPath) {
   const filesToDownload = [];
-  const updateFilesRequest = await fetch(ezppLauncherUpdateList, { method: "PATCH" });
+  const updateFilesRequest = await fetch(ezppLauncherUpdateList, {
+    method: "PATCH",
+  });
   const updateFiles = await updateFilesRequest.json();
   for (const updateFile of updateFiles) {
-    const filePath = path.join(osuPath, ...updateFile.folder.split("/"), updateFile.name);
+    const filePath = path.join(
+      osuPath,
+      ...updateFile.folder.split("/"),
+      updateFile.name,
+    );
     if (fs.existsSync(filePath)) {
       const fileHash = updateFile.md5.toLowerCase();
       const localFileHash = crypto.createHash("md5").update(
@@ -272,22 +272,30 @@ async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
 
   const startDownload = async () => {
     for (const updateFile of updateFiles) {
-      const filePath = path.join(osuPath, ...updateFile.folder.split("/"), updateFile.name);
-      const folder = path.dirname(filePath);
-      if (!fs.existsSync(folder)) await fs.promises.mkdir(folder, { recursive: true });
-      const axiosDownloadWithProgress = await axios.get(updateFile.url, {
-        responseType: "stream",
-        onDownloadProgress: (progressEvent) => {
-          const { loaded, total } = progressEvent;
-          eventEmitter.emit("data", {
-            fileName: path.basename(filePath),
-            loaded,
-            total,
-            progress: Math.floor((loaded / total) * 100),
-          });
-        },
-      });
       try {
+        const filePath = path.join(
+          osuPath,
+          ...updateFile.folder.split("/"),
+          updateFile.name,
+        );
+        const folder = path.dirname(filePath);
+        if (!fs.existsSync(folder)) {
+          await fs.promises.mkdir(folder, { recursive: true });
+        }
+        const axiosDownloadWithProgress = await axios.get(updateFile.url, {
+          responseType: "stream",
+          onDownloadProgress: (progressEvent) => {
+            const fileSize = updateFile.size;
+            const { loaded } = progressEvent;
+            eventEmitter.emit("data", {
+              fileName: path.basename(filePath),
+              loaded,
+              total: fileSize,
+              progress: Math.floor((loaded / fileSize) * 100),
+            });
+          },
+        });
+
         if (fs.existsSync(filePath)) {
           await fs.promises.rm(filePath, {
             force: true,
@@ -301,10 +309,11 @@ async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
         console.log(err);
         eventEmitter.emit("error", {
           fileName: path.basename(filePath),
+          error: err,
         });
       }
     }
-  }
+  };
 
   return {
     eventEmitter,
@@ -316,7 +325,11 @@ async function replaceUIFiles(osuPath, revert) {
   if (!revert) {
     const ezppUIFile = path.join(osuPath, "EZPPLauncher", "ezpp!ui.dll");
     const oldOsuUIFile = path.join(osuPath, "osu!ui.dll");
-    const ezppGameplayFile = path.join(osuPath, "EZPPLauncher", "ezpp!gameplay.dll");
+    const ezppGameplayFile = path.join(
+      osuPath,
+      "EZPPLauncher",
+      "ezpp!gameplay.dll",
+    );
     const oldOsuGameplayFile = path.join(osuPath, "osu!gameplay.dll");
 
     await fs.promises.rename(
@@ -334,7 +347,11 @@ async function replaceUIFiles(osuPath, revert) {
     const oldOsuUIFile = path.join(osuPath, "osu!ui.dll");
     const ezppUIFile = path.join(osuPath, "EZPPLauncher", "ezpp!ui.dll");
     const oldOsuGameplayFile = path.join(osuPath, "osu!gameplay.dll");
-    const ezppGameplayFile = path.join(osuPath, "EZPPLauncher", "ezpp!gameplay.dll");
+    const ezppGameplayFile = path.join(
+      osuPath,
+      "EZPPLauncher",
+      "ezpp!gameplay.dll",
+    );
 
     await fs.promises.rename(oldOsuUIFile, ezppUIFile);
     await fs.promises.rename(
@@ -413,5 +430,5 @@ module.exports = {
   runOsuUpdater,
   getEZPPLauncherUpdateFiles,
   downloadEZPPLauncherUpdateFiles,
-  gamemodes
+  gamemodes,
 };
