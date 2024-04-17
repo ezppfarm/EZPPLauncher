@@ -101,7 +101,7 @@ function startOsuStatus() {
       const windowTitle = firstInstance.processTitle;
       lastOsuStatus = windowTitle;
       const currentStatusRequest = await fetch(
-        "https://api.ez-pp.farm/get_player_status?name=" + currentUser.username,
+        "https://api.ez-pp.farm/v1/get_player_status?name=" + currentUser.username,
       );
       const currentStatus = await currentStatusRequest.json();
 
@@ -112,7 +112,7 @@ function startOsuStatus() {
       const currentModeString = gamemodes[currentMode];
 
       const currentInfoRequest = await fetch(
-        "https://api.ez-pp.farm/get_player_info?name=" + currentUser.username + "&scope=all",
+        "https://api.ez-pp.farm/v1/get_player_info?name=" + currentUser.username + "&scope=all",
       );
       const currentInfo = await currentInfoRequest.json();
       let currentUsername = currentInfo.player.info.name;
