@@ -264,24 +264,33 @@ async function getEZPPLauncherUpdateFiles(osuPath) {
       filesToDownload.push(updateFile);
     }
   }
-  return filesToDownload;
+  return [filesToDownload, updateFiles];
 }
 
-async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
+async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles, allFiles) {
   const eventEmitter = new EventEmitter();
 
   const startDownload = async () => {
     //NOTE: delete files that are not in the updateFiles array
-    const foldersToPrune = updateFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
+    const foldersToPrune = allFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
     for (const pruneFolder of foldersToPrune) {
       //NOTE: check if the folder is not the osu root folder.
       if (path.basename(pruneFolder) == "osu!")
         continue;
-      for (const files of await fs.promises.readdir(pruneFolder)) {
-        const filePath = path.join(pruneFolder, files);
-        if (!updateFiles.some(file => path.join(osuPath, ...file.folder.split("/"), file.name) === filePath)) {
-
-          await fs.promises.rm(filePath, { recursive: true, force: true });
+      if (fs.existsSync(pruneFolder)) {
+        for (const files of await fs.promises.readdir(pruneFolder)) {
+          const filePath = path.join(pruneFolder, files);
+          const validFolder = allFiles.find(file => path.dirname(filePath).endsWith(file.folder));
+          if (!validFolder) {
+            if (allFiles.find(file => file.name == path.basename(filePath)) === undefined) {
+              eventEmitter.emit("data", {
+                fileName: path.basename(filePath),
+              });
+              try {
+                await fs.promises.rm(filePath, { recursive: true, force: true });
+              } catch { }
+            }
+          }
         }
       }
     }

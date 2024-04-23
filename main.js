@@ -557,12 +557,13 @@ function registerIPCPipes() {
           status: "Looking for patcher updates...",
         });
         await new Promise((res) => setTimeout(res, 1000));
-        const patchFiles = await getEZPPLauncherUpdateFiles(osuPath);
+        const [patchFiles, allUpdateFiles] = await getEZPPLauncherUpdateFiles(osuPath);
         if (patchFiles.length > 0) {
           logger.log("EZPPLauncher updates found.");
           const patcherDownloader = await downloadEZPPLauncherUpdateFiles(
             osuPath,
             patchFiles,
+            allUpdateFiles
           );
           let errored = false;
           patcherDownloader.eventEmitter.on("error", (data) => {
@@ -585,6 +586,15 @@ function registerIPCPipes() {
             mainWindow.webContents.send("ezpplauncher:launchstatus", {
               status: `Downloading ${data.fileName}(${formatBytes(data.loaded)
                 }/${formatBytes(data.total)})...`,
+            });
+          });
+          patcherDownloader.eventEmitter.on("delete", (data) => {
+            logger.log(`Deleting ${data.fileName}!`);
+            mainWindow.webContents.send("ezpplauncher:launchprogress", {
+              progress: -1,
+            });
+            mainWindow.webContents.send("ezpplauncher:launchstatus", {
+              status: `Deleting ${data.fileName}...`,
             });
           });
           await patcherDownloader.startDownload();
@@ -664,7 +674,7 @@ function registerIPCPipes() {
           if (fs.existsSync(updateFile)) {
             await fs.promises.rm(updateFile, {
               force: true,
-              recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+              recursive: (await fs.promises.lstat(updateFile)).isDirectory(),
             });
           }
         }
