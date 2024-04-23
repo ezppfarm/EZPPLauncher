@@ -274,13 +274,13 @@ async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
     //NOTE: delete files that are not in the updateFiles array
     const foldersToPrune = updateFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
     for (const pruneFolder of foldersToPrune) {
+      //NOTE: check if the folder is not the osu root folder.
+      if (path.basename(pruneFolder) == "osu!")
+        continue;
       for (const files of await fs.promises.readdir(pruneFolder)) {
         const filePath = path.join(pruneFolder, files);
         if (!updateFiles.some(file => path.join(osuPath, ...file.folder.split("/"), file.name) === filePath)) {
-          //NOTE: check if the file is in the main osuPath folder, then dont delete.
-          if (path.dirname(filePath) == "osu!")
-            continue;
-          
+
           await fs.promises.rm(filePath, { recursive: true, force: true });
         }
       }
