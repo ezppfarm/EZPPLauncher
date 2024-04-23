@@ -587,6 +587,15 @@ function registerIPCPipes() {
                 }/${formatBytes(data.total)})...`,
             });
           });
+          patcherDownloader.eventEmitter.on("delete", (data) => {
+            logger.log(`Deleting ${data.fileName}!`);
+            mainWindow.webContents.send("ezpplauncher:launchprogress", {
+              progress: -1,
+            });
+            mainWindow.webContents.send("ezpplauncher:launchstatus", {
+              status: `Deleting ${data.fileName}...`,
+            });
+          });
           await patcherDownloader.startDownload();
           mainWindow.webContents.send("ezpplauncher:launchprogress", {
             progress: -1,
@@ -664,7 +673,7 @@ function registerIPCPipes() {
           if (fs.existsSync(updateFile)) {
             await fs.promises.rm(updateFile, {
               force: true,
-              recursive: (await fs.promises.lstat(updateFile)).isDirectory,
+              recursive: (await fs.promises.lstat(updateFile)).isDirectory(),
             });
           }
         }

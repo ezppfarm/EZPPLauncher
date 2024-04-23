@@ -277,11 +277,17 @@ async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
       //NOTE: check if the folder is not the osu root folder.
       if (path.basename(pruneFolder) == "osu!")
         continue;
-      for (const files of await fs.promises.readdir(pruneFolder)) {
-        const filePath = path.join(pruneFolder, files);
-        if (!updateFiles.some(file => path.join(osuPath, ...file.folder.split("/"), file.name) === filePath)) {
-
-          await fs.promises.rm(filePath, { recursive: true, force: true });
+      if (fs.existsSync(pruneFolder)) {
+        for (const files of await fs.promises.readdir(pruneFolder)) {
+          const filePath = path.join(pruneFolder, files);
+          if (!updateFiles.some(file => path.join(osuPath, ...file.folder.split("/"), file.name) === filePath)) {
+            eventEmitter.emit("data", {
+              fileName: path.basename(filePath),
+            });
+            try {
+              await fs.promises.rm(filePath, { recursive: true, force: true });
+            } catch { }
+          }
         }
       }
     }
