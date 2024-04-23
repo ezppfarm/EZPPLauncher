@@ -557,12 +557,13 @@ function registerIPCPipes() {
           status: "Looking for patcher updates...",
         });
         await new Promise((res) => setTimeout(res, 1000));
-        const patchFiles = await getEZPPLauncherUpdateFiles(osuPath);
+        const [patchFiles, allUpdateFiles] = await getEZPPLauncherUpdateFiles(osuPath);
         if (patchFiles.length > 0) {
           logger.log("EZPPLauncher updates found.");
           const patcherDownloader = await downloadEZPPLauncherUpdateFiles(
             osuPath,
             patchFiles,
+            allUpdateFiles
           );
           let errored = false;
           patcherDownloader.eventEmitter.on("error", (data) => {

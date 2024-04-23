@@ -264,29 +264,35 @@ async function getEZPPLauncherUpdateFiles(osuPath) {
       filesToDownload.push(updateFile);
     }
   }
-  return filesToDownload;
+  return [filesToDownload, updateFiles];
 }
 
-async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles) {
+async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles, allFiles) {
   const eventEmitter = new EventEmitter();
 
   const startDownload = async () => {
     //NOTE: delete files that are not in the updateFiles array
-    const foldersToPrune = updateFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
+    const foldersToPrune = allFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
     for (const pruneFolder of foldersToPrune) {
+      console.log("Pruning folder:", pruneFolder);
       //NOTE: check if the folder is not the osu root folder.
       if (path.basename(pruneFolder) == "osu!")
         continue;
       if (fs.existsSync(pruneFolder)) {
         for (const files of await fs.promises.readdir(pruneFolder)) {
           const filePath = path.join(pruneFolder, files);
-          if (!updateFiles.some(file => path.join(osuPath, ...file.folder.split("/"), file.name) === filePath)) {
-            eventEmitter.emit("data", {
-              fileName: path.basename(filePath),
-            });
-            try {
-              await fs.promises.rm(filePath, { recursive: true, force: true });
-            } catch { }
+          const validFolder = allFiles.find(file => path.dirname(filePath).endsWith(file.folder));
+          if (!validFolder) {
+            if (allFiles.find(file => file.name == path.basename(filePath)) === undefined) {
+              console.log("Deleting file:", filePath);
+              console.log(allFiles.find(file => file.name == path.basename(filePath)));
+              eventEmitter.emit("data", {
+                fileName: path.basename(filePath),
+              });
+              try {
+                await fs.promises.rm(filePath, { recursive: true, force: true });
+              } catch { }
+            }
           }
         }
       }
