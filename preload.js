@@ -82,6 +82,10 @@ window.addEventListener("settings-set", async (e) => {
   await ipcRenderer.invoke("ezpplauncher:settings-set", e.detail);
 });
 
+window.addEventListener("updateCheck", async () => {
+  await ipcRenderer.invoke("ezpplauncher:checkUpdate");
+})
+
 window.addEventListener("updateExit", async () => {
   await ipcRenderer.invoke("ezpplauncher:exitAndUpdate");
 });

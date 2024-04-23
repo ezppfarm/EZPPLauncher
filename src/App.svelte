@@ -66,6 +66,8 @@
     window.dispatchEvent(new CustomEvent("updateExit"));
   });
 
+  window.dispatchEvent(new CustomEvent("updateCheck"));
+
   window.addEventListener("open-settings", (e) => {
     currentPage.set(Page.Settings);
   });

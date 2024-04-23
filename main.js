@@ -430,6 +430,12 @@ function registerIPCPipes() {
     return config.all();
   });
 
+  ipcMain.handle("ezpplauncher:checkUpdate", async (e) => {
+    const updateInfo = await updateAvailable();
+    if (updateInfo.update)
+      mainWindow.webContents.send("ezpplauncher:update", updateInfo.release);
+  });
+
   ipcMain.handle("ezpplauncher:exitAndUpdate", async (e) => {
     await shell.openExternal(releasesUrl);
     app.exit();
@@ -523,9 +529,8 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
-              formatBytes(data.total)
-            })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
+              })...`,
           });
         });
         await updateDownloader.startDownload();
@@ -578,9 +583,8 @@ function registerIPCPipes() {
               progress: Math.ceil(data.progress),
             });
             mainWindow.webContents.send("ezpplauncher:launchstatus", {
-              status: `Downloading ${data.fileName}(${
-                formatBytes(data.loaded)
-              }/${formatBytes(data.total)})...`,
+              status: `Downloading ${data.fileName}(${formatBytes(data.loaded)
+                }/${formatBytes(data.total)})...`,
             });
           });
           await patcherDownloader.startDownload();
@@ -714,8 +718,7 @@ function registerIPCPipes() {
           const osuGameplayFile = path.join(osuPath, "osu!gameplay.dll");
           if (isWritable(osuUIFile) && isWritable(osuGameplayFile)) {
             logger.log(
-              `Cleanup complete, took ${
-                ((performance.now() - timeStart) / 1000).toFixed(3)
+              `Cleanup complete, took ${((performance.now() - timeStart) / 1000).toFixed(3)
               } seconds.`,
             );
             clearInterval(cleanup);
@@ -819,10 +822,6 @@ function createWindow() {
   // Emitted when the window is ready to be shown
   // This helps in showing the window gracefully.
   mainWindow.once("ready-to-show", async () => {
-    const updateInfo = await updateAvailable();
-    if (updateInfo.update) {
-      mainWindow.webContents.send("ezpplauncher:update", updateInfo.release);
-    }
     mainWindow.show();
     mainWindow.focus();
   });
