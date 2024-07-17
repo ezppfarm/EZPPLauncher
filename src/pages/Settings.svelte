@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { Button, ButtonGroup, Input, Toggle } from "flowbite-svelte";
-  import { FileSearchSolid, FolderSolid } from "flowbite-svelte-icons";
+  import Button from "flowbite-svelte/Button.svelte";
+  import ButtonGroup from "flowbite-svelte/ButtonGroup.svelte";
+  import Input from "flowbite-svelte/Input.svelte";
+  import Toggle from "flowbite-svelte/Toggle.svelte";
+  import FileSearchSolid from "flowbite-svelte-icons/FileSearchSolid.svelte";
+  import FolderSolid from "flowbite-svelte-icons/FolderSolid.svelte";
   import { patch, presence, logging } from "./../storage/localStore";
 
   let folderPath: string = "";
