@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { Input, Button, Spinner, Checkbox } from "flowbite-svelte";
+  import Input from "flowbite-svelte/Input.svelte";
+  import Button from "flowbite-svelte/Button.svelte";
+  import Spinner from "flowbite-svelte/Spinner.svelte";
+  import Checkbox from "flowbite-svelte/Checkbox.svelte";
   import { type User } from "../types/user";
   import { currentPage, currentUser, startup } from "../storage/localStore";
   import toast from "svelte-french-toast";
   import { Page } from "../consts/pages";
-  import { EyeSlashSolid, EyeSolid } from "flowbite-svelte-icons";
+  import EyeSolid from "flowbite-svelte-icons/EyeSolid.svelte";
+  import EyeSlashSolid from "flowbite-svelte-icons/EyeSlashSolid.svelte";
 
   let loading = false;
   let username = "";
@@ -13,11 +17,20 @@
   let showPassword = false;
 
   const processLogin = async () => {
+    if (username.length <= 0 || password.length <= 0) {
+      toast.error(`Please provice a valid Username and Password!`, {
+        position: "bottom-center",
+        className:
+          "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
+        duration: 3000,
+      });
+      return;
+    }
     loading = true;
-    const loginPromise = new Promise<void>((res, rej) => {
+    const loginPromise = new Promise<string>((res, rej) => {
       window.addEventListener(
         "login-result",
-        (e) => {
+        async (e) => {
           const customEvent = e as CustomEvent;
           const resultData = customEvent.detail;
           const wasSuccessful = "user" in resultData;
@@ -30,26 +43,26 @@
                 "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
               duration: 1500,
             }); */
-            rej();
+            rej(resultData.message);
             loading = false;
             return;
           }
           const userResult = resultData.user as User;
           currentUser.set(userResult);
           currentPage.set(Page.Launch);
-          res();
+          res("");
           toast.success(`Welcome back, ${userResult.name}!`, {
             position: "bottom-center",
             className:
               "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-            duration: 3000
+            duration: 3000,
           });
         },
         { once: true }
       );
       window.dispatchEvent(
         new CustomEvent("login-attempt", {
-          detail: { username, password, saveCredentials }
+          detail: { username, password, saveCredentials },
         })
       );
     });
@@ -58,20 +71,20 @@
       {
         loading: "Logging in...",
         success: "Successfully logged in!",
-        error: "Invalid Username or Password!"
+        error: (e) => e,
       },
       {
         position: "bottom-center",
         className:
           "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-        duration: 3000
+        duration: 0,
       }
     );
   };
 
   const tryAutoLogin = async () => {
     loading = true;
-    const loginPromise = new Promise<void>((res, rej) => {
+    const loginPromise = new Promise<string>((res, rej) => {
       window.addEventListener(
         "login-result",
         (e) => {
@@ -81,29 +94,29 @@
           const wasSuccessful = "user" in resultData;
           if (isGuest) {
             currentPage.set(Page.Launch);
-            res();
+            res("");
             toast.success(`Logged in as Guest`, {
               position: "bottom-center",
               className:
                 "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-              duration: 3000
+              duration: 3000,
             });
             return;
           }
           if (!wasSuccessful) {
             loading = false;
-            rej();
+            rej(resultData.message);
             return;
           }
           const userResult = resultData.user as User;
           currentUser.set(userResult);
           currentPage.set(Page.Launch);
-          res();
+          res("");
           toast.success(`Welcome back, ${userResult.name}!`, {
             position: "bottom-center",
             className:
               "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-            duration: 3000
+            duration: 3000,
           });
           loading = false;
         },
@@ -116,13 +129,13 @@
       {
         loading: "Logging in...",
         success: "Successfully logged in!",
-        error: "Failed to login."
+        error: (e) => e,
       },
       {
         position: "bottom-center",
         className:
           "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-        duration: 3000
+        duration: 0,
       }
     );
   };
@@ -134,7 +147,7 @@
       position: "bottom-center",
       className:
         "dark:!bg-gray-800 border-1 dark:!border-gray-700 dark:!text-gray-100",
-      duration: 3000
+      duration: 3000,
     });
   };
 
