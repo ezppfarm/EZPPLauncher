@@ -76,6 +76,12 @@ function startOsuStatus() {
         try {
           const currentUserInfo = await fetch(
             `https://api.ez-pp.farm/get_player_info?name=${currentUser.username}&scope=info`,
+            {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+              },
+            },
           );
           const currentUserInfoJson = await currentUserInfo.json();
           if (
@@ -118,6 +124,12 @@ function startOsuStatus() {
       const currentStatusRequest = await fetch(
         "https://api.ez-pp.farm/v1/get_player_status?name=" +
           currentUser.username,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+          },
+        },
       );
       const currentStatus = await currentStatusRequest.json();
 
@@ -130,6 +142,12 @@ function startOsuStatus() {
       const currentInfoRequest = await fetch(
         "https://api.ez-pp.farm/v1/get_player_info?name=" +
           currentUser.username + "&scope=all",
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+          },
+        },
       );
       const currentInfo = await currentInfoRequest.json();
       let currentUsername = currentInfo.player.info.name;
@@ -251,6 +269,8 @@ function registerIPCPipes() {
         }),
         headers: {
           "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
         },
       });
 
