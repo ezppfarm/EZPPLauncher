@@ -1,20 +1,16 @@
 <script lang="ts">
-  import {
-    Avatar,
-    Dropdown,
-    DropdownItem,
-    DropdownHeader,
-    DropdownDivider,
-    Button,
-    Indicator,
-  } from "flowbite-svelte";
-  import {
-    ArrowLeftSolid,
-    ArrowRightFromBracketSolid,
-    ArrowRightToBracketSolid,
-    HeartSolid,
-    UserSettingsSolid,
-  } from "flowbite-svelte-icons";
+  import Avatar from "flowbite-svelte/Avatar.svelte";
+  import Dropdown from "flowbite-svelte/Dropdown.svelte";
+  import DropdownItem from "flowbite-svelte/DropdownItem.svelte";
+  import DropdownHeader from "flowbite-svelte/DropdownHeader.svelte";
+  import DropdownDivider from "flowbite-svelte/DropdownDivider.svelte";
+  import Button from "flowbite-svelte/Button.svelte";
+  import Indicator from "flowbite-svelte/Indicator.svelte";
+  import ArrowLeftSolid from "flowbite-svelte-icons/ArrowLeftSolid.svelte";
+  import ArrowRightFromBracketSolid from "flowbite-svelte-icons/ArrowRightFromBracketSolid.svelte";
+  import ArrowRightToBracketSolid from "flowbite-svelte-icons/ArrowRightToBracketSolid.svelte";
+  import HeartSolid from "flowbite-svelte-icons/HeartSolid.svelte";
+  import UserSettingsSolid from "flowbite-svelte-icons/UserSettingsSolid.svelte";
   import ezppLogo from "../public/favicon.png";
   import {
     currentPage,

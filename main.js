@@ -76,6 +76,12 @@ function startOsuStatus() {
         try {
           const currentUserInfo = await fetch(
             `https://api.ez-pp.farm/get_player_info?name=${currentUser.username}&scope=info`,
+            {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+              },
+            },
           );
           const currentUserInfoJson = await currentUserInfo.json();
           if (
@@ -116,7 +122,14 @@ function startOsuStatus() {
       const windowTitle = firstInstance.processTitle;
       lastOsuStatus = windowTitle;
       const currentStatusRequest = await fetch(
-        "https://api.ez-pp.farm/v1/get_player_status?name=" + currentUser.username,
+        "https://api.ez-pp.farm/v1/get_player_status?name=" +
+          currentUser.username,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+          },
+        },
       );
       const currentStatus = await currentStatusRequest.json();
 
@@ -127,7 +140,14 @@ function startOsuStatus() {
       const currentModeString = gamemodes[currentMode];
 
       const currentInfoRequest = await fetch(
-        "https://api.ez-pp.farm/v1/get_player_info?name=" + currentUser.username + "&scope=all",
+        "https://api.ez-pp.farm/v1/get_player_info?name=" +
+          currentUser.username + "&scope=all",
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+          },
+        },
       );
       const currentInfo = await currentInfoRequest.json();
       let currentUsername = currentInfo.player.info.name;
@@ -237,7 +257,7 @@ function registerIPCPipes() {
       };
     }
     const timeout = new AbortController();
-    const timeoutId = setTimeout(() => timeout.abort(), 8000);
+    const timeoutId = setTimeout(() => timeout.abort(), 1000 * 10);
     logger.log(`Logging in with user ${args.username}...`);
     try {
       const fetchResult = await fetch("https://ez-pp.farm/login/check", {
@@ -249,6 +269,8 @@ function registerIPCPipes() {
         }),
         headers: {
           "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
         },
       });
 
@@ -268,7 +290,7 @@ function registerIPCPipes() {
         return result;
       }
       logger.log(
-        `Login failed for user ${username}.\nResponse:\n${await fetchResult
+        `Login failed for user ${args.username}.\nResponse:\n${await fetchResult
           .text()}`,
       );
       return {
@@ -317,6 +339,8 @@ function registerIPCPipes() {
         }),
         headers: {
           "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
         },
       });
 
@@ -384,7 +408,7 @@ function registerIPCPipes() {
       }
 
       if (key == "logging") {
-        logger.enabled = logging;
+        logger.enabled = value;
       }
 
       if (typeof value == "boolean") {
@@ -432,8 +456,9 @@ function registerIPCPipes() {
 
   ipcMain.handle("ezpplauncher:checkUpdate", async (e) => {
     const updateInfo = await updateAvailable();
-    if (updateInfo.update)
+    if (updateInfo.update) {
       mainWindow.webContents.send("ezpplauncher:update", updateInfo.release);
+    }
   });
 
   ipcMain.handle("ezpplauncher:exitAndUpdate", async (e) => {
@@ -529,8 +554,9 @@ function registerIPCPipes() {
             progress: Math.ceil(data.progress),
           });
           mainWindow.webContents.send("ezpplauncher:launchstatus", {
-            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${formatBytes(data.total)
-              })...`,
+            status: `Downloading ${data.fileName}(${formatBytes(data.loaded)}/${
+              formatBytes(data.total)
+            })...`,
           });
         });
         await updateDownloader.startDownload();
@@ -557,13 +583,15 @@ function registerIPCPipes() {
           status: "Looking for patcher updates...",
         });
         await new Promise((res) => setTimeout(res, 1000));
-        const [patchFiles, allUpdateFiles] = await getEZPPLauncherUpdateFiles(osuPath);
+        const [patchFiles, allUpdateFiles] = await getEZPPLauncherUpdateFiles(
+          osuPath,
+        );
         if (patchFiles.length > 0) {
           logger.log("EZPPLauncher updates found.");
           const patcherDownloader = await downloadEZPPLauncherUpdateFiles(
             osuPath,
             patchFiles,
-            allUpdateFiles
+            allUpdateFiles,
           );
           let errored = false;
           patcherDownloader.eventEmitter.on("error", (data) => {
@@ -584,8 +612,9 @@ function registerIPCPipes() {
               progress: Math.ceil(data.progress),
             });
             mainWindow.webContents.send("ezpplauncher:launchstatus", {
-              status: `Downloading ${data.fileName}(${formatBytes(data.loaded)
-                }/${formatBytes(data.total)})...`,
+              status: `Downloading ${data.fileName}(${
+                formatBytes(data.loaded)
+              }/${formatBytes(data.total)})...`,
             });
           });
           patcherDownloader.eventEmitter.on("delete", (data) => {
@@ -728,7 +757,8 @@ function registerIPCPipes() {
           const osuGameplayFile = path.join(osuPath, "osu!gameplay.dll");
           if (isWritable(osuUIFile) && isWritable(osuGameplayFile)) {
             logger.log(
-              `Cleanup complete, took ${((performance.now() - timeStart) / 1000).toFixed(3)
+              `Cleanup complete, took ${
+                ((performance.now() - timeStart) / 1000).toFixed(3)
               } seconds.`,
             );
             clearInterval(cleanup);

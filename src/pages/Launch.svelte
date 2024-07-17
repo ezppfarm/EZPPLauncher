@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { Button } from "flowbite-svelte";
+  import Button from "flowbite-svelte/Button.svelte";
   import Progressbar from "../lib/Progressbar.svelte";
   import {
     launching,
     patch,
     launchStatus,
-    launchPercentage
+    launchPercentage,
   } from "./../storage/localStore";
   let progressbarFix = true;
 

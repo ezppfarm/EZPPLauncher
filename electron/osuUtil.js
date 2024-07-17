@@ -152,7 +152,12 @@ function getUserConfig(osuPath) {
 }
 
 async function getUpdateFiles(releaseStream) {
-  const releaseData = await fetch(checkUpdateURL + releaseStream);
+  const releaseData = await fetch(checkUpdateURL + releaseStream, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+    },
+  });
   return releaseData.ok ? await releaseData.json() : undefined;
 }
 
@@ -244,6 +249,10 @@ async function getEZPPLauncherUpdateFiles(osuPath) {
   const filesToDownload = [];
   const updateFilesRequest = await fetch(ezppLauncherUpdateList, {
     method: "PATCH",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+    },
   });
   const updateFiles = await updateFilesRequest.json();
   for (const updateFile of updateFiles) {
@@ -272,23 +281,34 @@ async function downloadEZPPLauncherUpdateFiles(osuPath, updateFiles, allFiles) {
 
   const startDownload = async () => {
     //NOTE: delete files that are not in the updateFiles array
-    const foldersToPrune = allFiles.map(file => path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))).filter((folder, index, self) => self.indexOf(folder) === index);
+    const foldersToPrune = allFiles.map((file) =>
+      path.dirname(path.join(osuPath, ...file.folder.split("/"), file.name))
+    ).filter((folder, index, self) => self.indexOf(folder) === index);
     for (const pruneFolder of foldersToPrune) {
       //NOTE: check if the folder is not the osu root folder.
-      if (path.basename(pruneFolder) == "osu!")
+      if (path.basename(pruneFolder) == "osu!") {
         continue;
+      }
       if (fs.existsSync(pruneFolder)) {
         for (const files of await fs.promises.readdir(pruneFolder)) {
           const filePath = path.join(pruneFolder, files);
-          const validFolder = allFiles.find(file => path.dirname(filePath).endsWith(file.folder));
+          const validFolder = allFiles.find((file) =>
+            path.dirname(filePath).endsWith(file.folder)
+          );
           if (!validFolder) {
-            if (allFiles.find(file => file.name == path.basename(filePath)) === undefined) {
+            if (
+              allFiles.find((file) => file.name == path.basename(filePath)) ===
+                undefined
+            ) {
               eventEmitter.emit("data", {
                 fileName: path.basename(filePath),
               });
               try {
-                await fs.promises.rm(filePath, { recursive: true, force: true });
-              } catch { }
+                await fs.promises.rm(filePath, {
+                  recursive: true,
+                  force: true,
+                });
+              } catch {}
             }
           }
         }
