@@ -248,7 +248,7 @@ function registerIPCPipes() {
   ipcMain.handle("ezpplauncher:login", async (e, args) => {
     let hwid = "";
     try {
-      hwid = getHwId();
+      hwid = await getHwId();
     } catch (err) {
       logger.error(`Failed to get HWID.`, err);
       return {
@@ -315,7 +315,7 @@ function registerIPCPipes() {
   });
 
   ipcMain.handle("ezpplauncher:autologin", async (e) => {
-    const hwid = getHwId();
+    const hwid = await getHwId();
     const username = config.get("username");
     const guest = config.get("guest");
     if (guest) return { code: 200, message: "Login as guest", guest: true };
