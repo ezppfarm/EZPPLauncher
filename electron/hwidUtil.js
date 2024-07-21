@@ -16,17 +16,21 @@ const platforms = {
 };
 const crypto = require("crypto");
 
+const defaultHWID = "recorderinthesandybridge";
+
 /**
  * Returns machine hardware id.
  * Returns `undefined` if cannot determine.
- * @return {string?}
+ * @return {Promise<string>}
  */
 function getHwId() {
-  const getter = platforms[process.platform];
-  if (!getter) return;
-  const result = getter[1].exec(child_process.execSync(getter[0], options));
-  if (!result) return;
-  return crypto.createHash("md5").update(result[1]).digest("hex") ||
-    undefined;
+  return new Promise((resolve) => {
+    const getter = platforms[process.platform];
+    if (getter) {
+      const result = getter[1].exec(child_process.execSync(getter[0], options));
+      if (result) resolve(crypto.createHash("md5").update(result[1]).digest("hex"));
+    }
+    resolve(crypto.createHash("md5").update(defaultHWID).digest("hex"));
+  })
 }
 exports.getHwId = getHwId;
