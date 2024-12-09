@@ -9,6 +9,12 @@
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
     greetMsg = await invoke("greet", { name });
   }
+
+  async function wave(event: Event) {
+    event.preventDefault();
+    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+    greetMsg = await invoke("wave", { name });
+  }
 </script>
 
 <main class="container">
@@ -30,6 +36,11 @@
   <form class="row" onsubmit={greet}>
     <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
     <button type="submit">Greet</button>
+  </form>
+
+  <form class="row" onsubmit={wave}>
+    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
+    <button type="submit">Wave</button>
   </form>
   <p>{greetMsg}</p>
 </main>
