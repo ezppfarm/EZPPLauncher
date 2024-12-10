@@ -1,3 +1,3 @@
 # EZPPLauncher Tauri
 
-Trying to recode this shit in tauri, kms
+Trying to recode this shit with tauri, kms
