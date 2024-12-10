@@ -9,6 +9,11 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter(),
+    alias: {
+      '@/*': "./src/lib/*",
+      "$lib": "./src/lib",
+      "$lib/*": "./src/lib/*"
+    }
   },
 };
 
