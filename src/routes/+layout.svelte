@@ -5,6 +5,6 @@
 </script>
 
 <Titlebar />
-<main class="pt-7">
+<main>
   {@render children()}
 </main>
