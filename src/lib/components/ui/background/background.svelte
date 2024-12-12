@@ -6,6 +6,6 @@
   <img
     src={background}
     alt="background"
-    class="absolute top-0 left-0 w-screen -z-10 pointer-events-none blur opacity-40"
+    class="absolute top-0 left-0 w-screen -z-10 pointer-events-none blur opacity-10"
   />
 </div>
