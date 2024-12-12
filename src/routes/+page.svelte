@@ -4,10 +4,8 @@
   import Logo from "@/components/ui/logo/logo.svelte";
   import * as Avatar from "@/components/ui/avatar";
   import Progressbar from "@/components/ui/progressbar/progressbar.svelte";
-  import AvatarImage from "@/components/ui/avatar/avatar-image.svelte";
-  import AvatarFallback from "@/components/ui/avatar/avatar-fallback.svelte";
-
   let progress = $state(0);
+  let extended = $state(false);
 </script>
 
 <div class="relative h-screen w-screen">
@@ -18,12 +16,23 @@
       <Avatar.AvatarImage src="https://a.ez-pp.farm/1001"></Avatar.AvatarImage>
     </Avatar.Root>
   </div>
+
   <div
-    class="absolute top-0 left-0 py-7 w-full h-screen flex flex-col gap-16 items-center justify-end"
+    class="absolute top-0 left-0 py-3 w-full h-screen flex flex-col gap-16 items-center justify-end overflow-hidden"
   >
-    <Logo />
-    <div class="flex flex-row gap-1 items-center">
-      <Progressbar loadingText="Waiting for launch..." {progress} indeterminate={false} />
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <Logo {extended} onclick={() => (extended = !extended)} />
+    <div
+      class="{extended
+        ? 'opacity-100 translate-y-0'
+        : 'opacity-0 translate-y-1'} flex flex-row gap-1 items-center transition-all select-none"
+    >
+      <Progressbar
+        loadingText="Waiting for launch..."
+        {progress}
+        indeterminate={false}
+      />
       <Button
         onclick={() => {
           console.log(progress);
@@ -32,8 +41,10 @@
           } else {
             progress += 10;
           }
-        }}>Launch</Button
+        }}
       >
+        Launch
+      </Button>
     </div>
   </div>
 </div>
