@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -24,7 +38,7 @@
     --destructive-foreground: 210 20% 98%;
     --ring: 224 71.4% 4.1%;
     --radius: 0.5rem;
-	--sidebar-background: 0 0% 98%;
+    --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
@@ -54,7 +68,7 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 20% 98%;
     --ring: 216 12.2% 83.9%;
-	--sidebar-background: 240 5.9% 10%;
+    --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;

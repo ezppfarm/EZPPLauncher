@@ -22,7 +22,7 @@
   <div class="titlebar-button" id="titlebar-minimize">
     <Minimize size={18} />
   </div>
-  <div class="titlebar-button close" id="titlebar-close">
+  <div class="titlebar-button close rounded-tr" id="titlebar-close">
     <Close size={18} />
   </div>
 </div>
