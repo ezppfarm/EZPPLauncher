@@ -68,7 +68,9 @@
 
 <div
   class="w-screen {extended
-    ? '-translate-y-1 scale-90'
+    ? hovered
+      ? '-translate-y-1 scale-100'
+      : '-translate-y-1 scale-90'
     : hovered
       ? 'translate-y-5 scale-150'
       : 'translate-y-5 scale-125'} transition-transform select-none"
