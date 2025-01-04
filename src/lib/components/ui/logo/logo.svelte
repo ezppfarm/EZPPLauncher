@@ -1,9 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import ezppLogo from "../../../../assets/logo.png";
-  import { osudirect } from "@/api/osudirect";
   import { playAudio } from "@/utils";
-  import { BeatmapDecoder } from "osu-parsers";
 
   type logoProps = {
     extended: boolean;
@@ -13,57 +10,7 @@
   let { extended, onclick }: logoProps = $props();
 
   let hovered = $state(false);
-  let bpm = $state(150); // 1000 * 60 / bpm
-  let lastTimeout: number | undefined = undefined;
-
-  onMount(async () => {
-    const beatmapId = 2226722;
-    const beatmapData = await osudirect.osu(beatmapId);
-    if (beatmapData) {
-      const decoder = new BeatmapDecoder();
-      const beatmap = decoder.decodeFromString(beatmapData);
-      console.log(beatmap);
-
-      const audio = new Audio(
-        `https://osu.direct/api/media/audio/${beatmapId}`
-      );
-      audio.volume = 0.3;
-
-      // Function to play the heartbeat sound
-      const playHeartbeat = () => {
-        playAudio("/audio/menuHeartbeat.mp3", hovered ? 1 : 0.3);
-      };
-
-      // Function to synchronize the heartbeat with the song
-      const syncHeartbeat = () => {
-        const currentTime = audio.currentTime * 1000; // Convert to milliseconds
-        const timingPoint = beatmap.controlPoints.timingPointAt(currentTime);
-        if (timingPoint && bpm !== timingPoint.bpm) {
-          bpm = timingPoint.bpm;
-
-          if (lastTimeout) {
-            clearTimeout(lastTimeout);
-          }
-
-          const interval = (1000 * 60) / bpm; // Interval in milliseconds
-          const nextBeat = interval - (currentTime % interval); // Time to the next beat
-          setTimeout(() => {
-            playHeartbeat();
-            lastTimeout = setInterval(playHeartbeat, interval);
-          }, nextBeat);
-        }
-        // Continue syncing
-        requestAnimationFrame(syncHeartbeat);
-      };
-
-      // Start playback and syncing
-      audio.addEventListener("play", () => {
-        syncHeartbeat();
-      });
-
-      await audio.play();
-    }
-  });
+  const bpm = $state(130);
 </script>
 
 <div
@@ -83,9 +30,9 @@
     onmouseleave={() => (hovered = false)}
     onclick={() => {
       if (extended) {
-        playAudio("/audio/menuBack.wav", 1);
+        playAudio("/audio/menuBack.wav", 0.35);
       } else {
-        playAudio("/audio/menuHit.wav", 1);
+        playAudio("/audio/menuHit.wav", 0.35);
       }
       onclick();
     }}
