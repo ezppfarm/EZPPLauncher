@@ -10,8 +10,12 @@
   import Heart from "lucide-svelte/icons/heart";
   import { badgeVariants } from "@/components/ui/badge";
   import { twMerge } from "tailwind-merge";
+  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
   let progress = $state(0);
   let extended = $state(false);
+
+  const current = WebviewWindow.getCurrent();
+  current.setAlwaysOnTop(true);
 </script>
 
 <div class="relative h-screen w-screen">

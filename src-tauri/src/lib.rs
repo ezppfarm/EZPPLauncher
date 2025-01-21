@@ -22,10 +22,11 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = app
-                .get_webview_window("main")
-                .expect("no main window")
-                .set_focus();
+            let app_window = app.get_webview_window("main").expect("no main window");
+            app_window
+                .set_always_on_top(true)
+                .expect("failed to set always on top");
+            app_window.set_focus().expect("failed to focus");
         }));
     }
 
@@ -59,26 +60,60 @@ fn osu_memory_reading() {
                 }
             };
 
+            let mut values = state.values.lock().unwrap();
+
+            println!("Using auto-detected osu! folder path");
+            if let Some(ref dir) = p.executable_dir {
+                values.osu_path.clone_from(dir);
+            } else {
+                println!(
+                    "{:?}",
+                    Report::msg(
+                        "Can't auto-detect osu! folder path \
+                         nor any was provided through command \
+                         line argument",
+                    )
+                );
+                continue 'init_loop;
+            }
+
+            if !values.osu_path.exists() {
+                println!(
+                    "Provided osu path doesn't exists!\n Path: {}",
+                    &values.osu_path.to_str().unwrap()
+                );
+
+                println!(
+                    "{:?}",
+                    Report::msg(
+                        "Can't auto-detect osu! folder path \
+                     nor any was provided through command \
+                     line argument",
+                    )
+                );
+                continue 'init_loop;
+            };
+
+            drop(values);
+
             println!("Reading static signatures...");
             match StaticAddresses::new(&p) {
                 Ok(v) => state.addresses = v,
-                Err(e) => {
-                    match e.downcast_ref::<ProcessError>() {
-                        Some(&ProcessError::ProcessNotFound) =>  {
-                            thread::sleep(Duration::from_millis(2000));
-                            continue 'init_loop
-                        },
-                        #[cfg(target_os = "windows")]
-                        Some(&ProcessError::OsError{ .. }) => {
-                            println!("{:?}", e);
-                            thread::sleep(Duration::from_millis(2000));
-                            continue 'init_loop
-                        },
-                        Some(_) | None => {
-                            println!("{:?}", e);
-                            thread::sleep(Duration::from_millis(2000));
-                            continue 'init_loop
-                        },
+                Err(e) => match e.downcast_ref::<ProcessError>() {
+                    Some(&ProcessError::ProcessNotFound) => {
+                        thread::sleep(Duration::from_millis(2000));
+                        continue 'init_loop;
+                    }
+                    #[cfg(target_os = "windows")]
+                    Some(&ProcessError::OsError { .. }) => {
+                        println!("{:?}", e);
+                        thread::sleep(Duration::from_millis(2000));
+                        continue 'init_loop;
+                    }
+                    Some(_) | None => {
+                        println!("{:?}", e);
+                        thread::sleep(Duration::from_millis(2000));
+                        continue 'init_loop;
                     }
                 },
             };
@@ -91,13 +126,13 @@ fn osu_memory_reading() {
                         Some(&ProcessError::ProcessNotFound) => {
                             thread::sleep(Duration::from_millis(5000));
                             continue 'init_loop;
-                        },
+                        }
                         #[cfg(target_os = "windows")]
-                        Some(&ProcessError::OsError{ .. }) => {
+                        Some(&ProcessError::OsError { .. }) => {
                             println!("{:?}", e);
                             thread::sleep(Duration::from_millis(5000));
-                            continue 'init_loop
-                        },
+                            continue 'init_loop;
+                        }
                         Some(_) | None => {
                             println!("{:?}", e);
                             thread::sleep(Duration::from_millis(5000));
@@ -105,7 +140,11 @@ fn osu_memory_reading() {
                         }
                     }
                 }
-                println!("{:?}", state.values.clone());
+                let cloned_values = state.values.clone();
+                let values_lock = cloned_values.lock().unwrap();
+                let values = &*values_lock;
+
+                println!("{:?}", values.current_stars);
                 thread::sleep(Duration::from_millis(2000));
             }
         }
