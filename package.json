@@ -40,6 +40,8 @@
     "@types/better-sqlite3": "^7.6.8",
     "axios": "^1.6.5",
     "better-sqlite3": "^9.2.2",
+    "bsdiff-bin": "^0.1.0",
+    "bsdiff-wasm": "^0.1.4",
     "crypto": "^1.0.1",
     "crypto-js": "^4.2.0",
     "custom-electron-titlebar": "^4.2.7",
