@@ -2,22 +2,22 @@
   import { onMount } from "svelte";
   import ezppLogo from "../../../../assets/logo.png";
   import { osudirect } from "@/api/osudirect";
-  import { playAudio } from "@/utils";
+  import { gameSounds, playAudio } from "@/utils";
   import { BeatmapDecoder } from "osu-parsers";
 
   type logoProps = {
+    beatmapId: number;
     extended: boolean;
     onclick: () => void;
   };
 
-  let { extended, onclick }: logoProps = $props();
+  let { beatmapId, extended, onclick }: logoProps = $props();
 
   let hovered = $state(false);
   let bpm = $state(150); // 1000 * 60 / bpm
   let lastTimeout: number | undefined = undefined;
 
   onMount(async () => {
-    const beatmapId = 2226722;
     const beatmapData = await osudirect.osu(beatmapId);
     if (beatmapData) {
       const decoder = new BeatmapDecoder();
@@ -31,38 +31,53 @@
 
       // Function to play the heartbeat sound
       const playHeartbeat = () => {
-        playAudio("/audio/menuHeartbeat.mp3", hovered ? 1 : 0.3);
+        gameSounds.play("menuHeartbeat", {
+          volume: hovered ? 1 : 0.3,
+        });
       };
 
       // Function to synchronize the heartbeat with the song
       const syncHeartbeat = () => {
-        const currentTime = audio.currentTime * 1000; // Convert to milliseconds
+        const currentTime = audio.currentTime * 1000 - 25; // Convert to milliseconds
         const timingPoint = beatmap.controlPoints.timingPointAt(currentTime);
+        const timingPointTime = timingPoint.startTime;
+        console.log(currentTime, timingPointTime);
         if (timingPoint && bpm !== timingPoint.bpm) {
           bpm = timingPoint.bpm;
 
-          if (lastTimeout) {
-            clearTimeout(lastTimeout);
-          }
+          if (lastTimeout) window.clearTimeout(lastTimeout);
 
           const interval = (1000 * 60) / bpm; // Interval in milliseconds
-          const nextBeat = interval - (currentTime % interval); // Time to the next beat
-          setTimeout(() => {
+          const nextBeat = currentTime % interval; // Invert: time since last beat
+
+          // Schedule the next heartbeat at the correct time
+          lastTimeout = window.setTimeout(() => {
             playHeartbeat();
-            lastTimeout = setInterval(playHeartbeat, interval);
+            // Clear any previous interval
+            if (lastTimeout) {
+              window.clearInterval(lastTimeout);
+              lastTimeout = undefined;
+            }
+            if (!lastTimeout)
+              lastTimeout = window.setInterval(playHeartbeat, interval);
           }, nextBeat);
         }
         // Continue syncing
         requestAnimationFrame(syncHeartbeat);
       };
 
-      // Start playback and syncing
-      audio.addEventListener("play", () => {
+      // Wait for audio to be ready before starting playback and syncing
+      audio.addEventListener("canplay", async () => {
+        audio.addEventListener("play", syncHeartbeat);
+        audio.addEventListener("ended", async() => await audio.play());
+        await audio.play();
         syncHeartbeat();
       });
-
-      await audio.play();
     }
+  });
+
+  onMount(() => {
+    gameSounds.preload();
   });
 </script>
 
@@ -83,9 +98,9 @@
     onmouseleave={() => (hovered = false)}
     onclick={() => {
       if (extended) {
-        playAudio("/audio/menuBack.wav", 1);
+        gameSounds.play("menuBack");
       } else {
-        playAudio("/audio/menuHit.wav", 1);
+        gameSounds.play("menuHit");
       }
       onclick();
     }}

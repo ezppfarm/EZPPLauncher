@@ -6,10 +6,13 @@
   import Progressbar from "@/components/ui/progressbar/progressbar.svelte";
   let progress = $state(0);
   let extended = $state(false);
+
+  let beatmapId = $state(3820896);
+
 </script>
 
 <div class="relative h-screen w-screen">
-  <Background />
+  <Background {beatmapId} />
   <div class="absolute top-2 right-2 py-7">
     <Avatar.Root>
       <Avatar.AvatarFallback>U</Avatar.AvatarFallback>
@@ -22,7 +25,7 @@
   >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <Logo {extended} onclick={() => (extended = !extended)} />
+    <Logo {beatmapId} {extended} onclick={() => (extended = !extended)} />
     <div
       class="{extended
         ? 'opacity-100 translate-y-0'
