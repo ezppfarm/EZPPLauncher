@@ -20,7 +20,7 @@
 </script>
 
 <div class="relative h-screen w-screen">
-  <Background />
+  <Background {beatmapId} />
   <div class="absolute z-20 top-2 right-2 py-7">
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
