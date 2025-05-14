@@ -1,8 +1,5 @@
 <script lang="ts">
-  import background from "../../../../assets/background.gif";
-
   const prop: {beatmapId: number} = $props();
-
 </script>
 
 <div
@@ -11,5 +8,5 @@
   <div
     style="background: url(https://osu.direct/api/media/background/{prop.beatmapId})"
     class="absolute top-0 left-0 w-full h-full !bg-cover -z-10 pointer-events-none blur opacity-10 rounded"
-  ></div>
+  ></div> -->
 </div>

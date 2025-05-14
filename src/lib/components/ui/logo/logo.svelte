@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import ezppLogo from "../../../../assets/logo.png";
   import { osudirect } from "@/api/osudirect";
   import { gameSounds, playAudio } from "@/utils";
   import { BeatmapDecoder } from "osu-parsers";
+  import { onMount } from "svelte";
 
   type logoProps = {
     beatmapId: number;
@@ -18,6 +18,8 @@
   let lastTimeout: number | undefined = undefined;
 
   onMount(async () => {
+    gameSounds.preload();
+    
     const beatmapData = await osudirect.osu(beatmapId);
     if (beatmapData) {
       const decoder = new BeatmapDecoder();
@@ -69,15 +71,11 @@
       // Wait for audio to be ready before starting playback and syncing
       audio.addEventListener("canplay", async () => {
         audio.addEventListener("play", syncHeartbeat);
-        audio.addEventListener("ended", async() => await audio.play());
+        audio.addEventListener("ended", async () => await audio.play());
         await audio.play();
         syncHeartbeat();
       });
     }
-  });
-
-  onMount(() => {
-    gameSounds.preload();
   });
 </script>
 
