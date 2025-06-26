@@ -1,6 +1,8 @@
 <script lang="ts">
   import Minimize from "lucide-svelte/icons/minus";
   import Close from "lucide-svelte/icons/x";
+  
+  import Logo from "$assets/logo.png";
 
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
@@ -17,8 +19,11 @@
   });
 </script>
 
-<div data-tauri-drag-region class="titlebar z-[9999]">
-  <!-- <p class="mr-auto ms-2 text-sm">EZPPLauncher</p> -->
+<div data-tauri-drag-region class="titlebar z-[99999] border-b border-theme-800/90">
+  <div class="mr-auto ms-2 flex flex-row gap-2 items-center text-[1.05rem] font-semibold">
+    <img src={Logo} alt="EZPP Launcher Logo" class="h-11 w-11 inline-block" />
+    <span>EZPPLauncher</span>
+  </div>
   <div class="titlebar-button" id="titlebar-minimize">
     <Minimize size={18} />
   </div>
@@ -29,7 +34,7 @@
 
 <style lang="scss">
   .titlebar {
-    height: 30px;
+    height: 50px;
     /* background: #040612; */
     user-select: none;
     display: flex;
@@ -40,12 +45,13 @@
     left: 0;
     right: 0;
     margin-bottom: 10px;
+    pointer-events: all !important;
   }
   .titlebar-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 45px;
+    width: 60px;
     height: 100%;
     user-select: none;
     -webkit-user-select: none;

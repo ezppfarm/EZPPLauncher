@@ -131,10 +131,10 @@
   @keyframes beat {
     0%,
     100% {
-      scale: 1.08;
+      scale: 1;
     }
     90% {
-      scale: 1;
+      scale: 1.08;
     }
   }
   @keyframes beat-pulse {

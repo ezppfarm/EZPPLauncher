@@ -1,95 +1,219 @@
 <script lang="ts">
-  import Background from "@/components/ui/background/background.svelte";
-  import Button from "@/components/ui/button/button.svelte";
-  import Logo from "@/components/ui/logo/logo.svelte";
-  import * as Avatar from "@/components/ui/avatar";
-  import * as DropdownMenu from "@/components/ui/dropdown-menu";
-  import Progressbar from "@/components/ui/progressbar/progressbar.svelte";
-  import Settings from "lucide-svelte/icons/settings";
-  import LogOut from "lucide-svelte/icons/log-out";
-  import Heart from "lucide-svelte/icons/heart";
-  import { badgeVariants } from "@/components/ui/badge";
-  import { twMerge } from "tailwind-merge";
-  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-  let progress = $state(0);
-  let extended = $state(false);
+  import * as Avatar from '@/components/ui/avatar';
+  import Badge from '@/components/ui/badge/badge.svelte';
+  import Button from '@/components/ui/button/button.svelte';
+  import * as Select from '@/components/ui/select';
+  import { beatmap_sets, online_friends, server_ping } from '@/global';
+  import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+  import { LoaderCircle, Logs, Music2, Play, Users, Wifi, Gamepad2 } from 'lucide-svelte';
+  import { Circle } from 'radix-icons-svelte';
+  import NumberFlow from '@number-flow/svelte';
+  import * as AlertDialog from '@/components/ui/alert-dialog';
+  import Progress from '@/components/ui/progress/progress.svelte';
 
-  let beatmapId = $state(3820896);
-  const current = WebviewWindow.getCurrent();
-  current.setAlwaysOnTop(true);
+  let selectedTab = $state('home');
+  let launching = $state(false);
 </script>
 
-<div class="relative h-screen w-screen">
-  <Background {beatmapId} />
-  <div class="absolute z-20 top-2 right-2 py-7">
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger>
-        <div class="relative">
-          <p
-            class={twMerge(
-              badgeVariants(),
-              "p-0 h-5 w-5 absolute -right-0.5 -top-0.5 z-50 !bg-pink-600 border-2 border-pink-800 text-white"
-            )}
-          >
-            <Heart class="h-3 w-3 m-auto p-0" />
-          </p>
-          <Avatar.Root class="border-[3px] z-40">
-            <Avatar.AvatarFallback>U</Avatar.AvatarFallback>
-            <Avatar.AvatarImage src="https://a.ez-pp.farm/1001"
-            ></Avatar.AvatarImage>
-          </Avatar.Root>
-        </div>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content class="w-48 max-w-48 mx-2" side="bottom">
-        <DropdownMenu.Group>
-          <DropdownMenu.GroupHeading class="truncate"
-            >Hello, Quetzalcoatl!</DropdownMenu.GroupHeading
-          >
-          <DropdownMenu.Separator />
-          <DropdownMenu.Group>
-            <DropdownMenu.Item class="cursor-pointer">
-              <Settings class="mr-2 size-4" />
-              <span>Settings</span>
-            </DropdownMenu.Item>
-          </DropdownMenu.Group>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item class="cursor-pointer">
-            <LogOut class="mr-2 size-4" />
-            <span>Log out</span>
-          </DropdownMenu.Item>
-        </DropdownMenu.Group>
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-  </div>
+<AlertDialog.Root bind:open={launching}>
+  <AlertDialog.Content class="bg-theme-950 border-theme-900">
+    <div class="flex flex-col items-center justify-center gap-2">
+      <Progress indeterminate />
+      <span>Downloading update files...</span>
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
-  <div
-    class="absolute top-0 left-0 py-3 w-full h-screen flex flex-col gap-16 items-center justify-end overflow-hidden"
-  >
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <Logo {beatmapId} {extended} onclick={() => (extended = !extended)} />
+<div class="grid grid-cols-[0.41fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
+  <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
+    <div class="flex flex-col items-center gap-2 border-b pb-6">
+      <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
+        <Avatar.Image src="https://a.ez-pp.farm/0" />
+        <Avatar.Fallback class="bg-theme-900">
+          <LoaderCircle class="animate-spin" size={32} />
+        </Avatar.Fallback>
+      </Avatar.Root>
+      <span class="font-semibold text-2xl text-theme-50">User</span>
+    </div>
+    <div class="flex flex-col gap-6 h-full px-3">
+      <Select.Root type="single">
+        <Select.Trigger
+          class="border-theme-800/90 bg-theme-900/90 !text-muted-foreground font-semibold"
+        >
+          <div class="flex flex-row items-center gap-2">
+            <Circle class="text-muted-foreground" />
+            osu!vn
+          </div>
+        </Select.Trigger>
+        <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
+          <Select.Item value="light">osu!vn</Select.Item>
+          <Select.Item value="dark">osu!rx</Select.Item>
+          <Select.Item value="system">osu!ap</Select.Item>
+        </Select.Content>
+      </Select.Root>
+      <div class="bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
+        <div class="flex flex-row items-center gap-2">
+          <Logs class="text-muted-foreground" size="16" />
+          <span class="font-semibold text-muted-foreground text-sm">Mode Stats</span>
+        </div>
+        <div class="grid grid-cols-2 mt-2 border-t border-theme-800 pt-2 pb-2">
+          <div class="flex flex-col gap-0.5">
+            <span class="text-sm text-muted-foreground font-semibold">Rank</span>
+            <span class="text-lg font-semibold text-theme-50">#727</span>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-sm text-muted-foreground font-semibold">PP</span>
+            <span class="text-lg font-semibold text-theme-50">727</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-[1fr_auto] border-t border-theme-800 pt-2">
+          <span class="text-sm text-muted-foreground font-semibold">Accuracy</span>
+          <span class="text-sm font-semibold text-end text-theme-50">72.72%</span>
+
+          <span class="text-sm text-muted-foreground font-semibold">Play Count</span>
+          <span class="text-sm font-semibold text-end text-theme-50">727</span>
+
+          <span class="text-sm text-muted-foreground font-semibold">Play Time</span>
+          <span class="text-sm font-semibold text-end text-theme-50">727h</span>
+        </div>
+      </div>
+      <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
+        <div class="flex flex-row items-center justify-between">
+          <div class="flex flex-row items-center gap-2">
+            <Users class="text-muted-foreground" size="16" />
+            <span class="font-semibold text-muted-foreground text-sm"> Friends </span>
+          </div>
+          <Badge class="h-5 bg-green-500/20 hover:bg-green-500/20 text-green-500">3 online</Badge>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
     <div
-      class="{extended
-        ? 'opacity-100 translate-y-0'
-        : 'opacity-0 translate-y-1'} flex flex-row gap-1 items-center transition-all select-none"
+      class="flex flex-row flex-nowrap h-11 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
     >
-      <Progressbar
-        loadingText="Waiting for launch..."
-        {progress}
-        indeterminate={false}
-      />
+      <button
+        class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
+        'home'
+          ? 'bg-white/70 border border-white/60 text-theme-950'
+          : ''} transition-all"
+        onclick={() => (selectedTab = 'home')}
+      >
+        Home
+      </button>
+      <button
+        class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
+        'settings'
+          ? 'bg-white/70 border border-white/60 text-theme-950'
+          : ''} transition-all"
+        onclick={() => (selectedTab = 'settings')}
+      >
+        Settings
+      </button>
+    </div>
+    <div
+      class="my-auto bg-theme-900/90 flex flex-col items-center justify-center gap-6 border border-theme-800/90 rounded-lg p-6"
+    >
+      <div class="grid grid-cols-3 w-full gap-3">
+        <div
+          class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
+        >
+          <div class="flex items-center justify-center p-2 rounded-lg bg-blue-500/20">
+            <Music2 class="text-blue-500" size="26" />
+          </div>
+          <div class="relative font-bold text-xl text-blue-400">
+            <div
+              class="absolute top-1 left-1/2 -translate-x-1/2 {!$beatmap_sets
+                ? 'opacity-100'
+                : 'opacity-0'} transition-opacity duration-1000"
+            >
+              <LoaderCircle class="animate-spin" />
+            </div>
+            <div
+              class="{!$beatmap_sets
+                ? 'opacity-0'
+                : 'opacity-100'} transition-opacity duration-1000"
+            >
+              <NumberFlow value={$beatmap_sets ?? 0} trend={0} />
+            </div>
+          </div>
+          <div class="text-muted-foreground text-sm">Beatmap Sets imported</div>
+        </div>
+        <div
+          class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
+        >
+          <div class="flex items-center justify-center p-2 rounded-lg bg-yellow-500/20">
+            <Users class="text-yellow-500" size="26" />
+          </div>
+          <div class="relative font-bold text-xl text-yellow-400">
+            <div
+              class="absolute top-1 left-1/2 -translate-x-1/2 {!$online_friends
+                ? 'opacity-100'
+                : 'opacity-0'} transition-opacity duration-1000"
+            >
+              <LoaderCircle class="animate-spin" />
+            </div>
+            <div
+              class="{!$online_friends
+                ? 'opacity-0'
+                : 'opacity-100'} transition-opacity duration-1000"
+            >
+              <NumberFlow value={$online_friends ?? 0} trend={0} />
+            </div>
+          </div>
+          <div class="text-muted-foreground text-sm">Friends online</div>
+        </div>
+        <div
+          class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
+        >
+          <div class="flex items-center justify-center p-2 rounded-lg bg-green-500/20">
+            <Wifi class="text-green-500" size="26" />
+          </div>
+          <div class="relative font-bold text-xl text-green-400">
+            <div
+              class="absolute top-1 left-1/2 -translate-x-1/2 {!$server_ping
+                ? 'opacity-100'
+                : 'opacity-0'} transition-opacity duration-1000"
+            >
+              <LoaderCircle class="animate-spin" />
+            </div>
+            <div
+              class="{!$server_ping ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000"
+            >
+              <NumberFlow value={$server_ping ?? 0} trend={0} suffix="ms" />
+            </div>
+          </div>
+          <div class="text-muted-foreground text-sm">Ping to Server</div>
+        </div>
+      </div>
       <Button
+        size="lg"
         onclick={() => {
-          console.log(progress);
-          if (progress >= 100) {
-            progress = 0;
-          } else {
-            progress += 10;
-          }
+          launching = true;
+          setTimeout(() => {
+            launching = false;
+          }, 5000);
         }}
       >
+        <Play />
         Launch
       </Button>
+    </div>
+    <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg px-6 py-3">
+      <div class="flex flex-row items-center gap-2">
+        <Gamepad2 class="text-muted-foreground" size="24" />
+        <span class="font-semibold text-muted-foreground text-sm">Client Info</span>
+      </div>
+      <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-2">
+        <span class="text-sm text-muted-foreground font-semibold">osu! Version</span>
+        <span class="text-sm font-semibold text-end text-theme-50">20250626.1</span>
+
+        <span class="text-sm text-muted-foreground font-semibold">Beatmap Sets</span>
+        <span class="text-sm font-semibold text-end text-theme-50">{$beatmap_sets}</span>
+
+        <span class="text-sm text-muted-foreground font-semibold">Skins</span>
+        <span class="text-sm font-semibold text-end text-theme-50">727</span>
+      </div>
     </div>
   </div>
 </div>
