@@ -14,6 +14,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export const numberHumanReadable = (number: number) => {
+  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
 export const playAudio = (path: string, volume: number) => {
   const audio = new Audio(path);
   audio.volume = volume;
