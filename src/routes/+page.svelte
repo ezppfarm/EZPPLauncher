@@ -3,13 +3,21 @@
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
   import * as Select from '@/components/ui/select';
-  import { beatmap_sets, online_friends, server_ping } from '@/global';
+  import {
+    beatmap_sets,
+    online_friends,
+    server_connection_fails,
+    server_no_connection,
+    server_ping,
+    updateNoConnection,
+  } from '@/global';
   import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-  import { LoaderCircle, Logs, Music2, Play, Users, Wifi, Gamepad2 } from 'lucide-svelte';
+  import { LoaderCircle, Logs, Music2, Play, Users, Wifi, Gamepad2, WifiOff } from 'lucide-svelte';
   import { Circle } from 'radix-icons-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
+  import { numberHumanReadable } from '@/utils';
 
   let selectedTab = $state('home');
   let launching = $state(false);
@@ -28,12 +36,15 @@
   <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
     <div class="flex flex-col items-center gap-2 border-b pb-6">
       <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
-        <Avatar.Image src="https://a.ez-pp.farm/0" />
+        <Avatar.Image src="https://a.ez-pp.farm/1001" />
         <Avatar.Fallback class="bg-theme-900">
           <LoaderCircle class="animate-spin" size={32} />
         </Avatar.Fallback>
       </Avatar.Root>
-      <span class="font-semibold text-2xl text-theme-50">User</span>
+      <span class="font-semibold text-2xl text-theme-50">Quetzalcoatl</span>
+      <div class="flex flex-row gap-2">
+        <Badge variant="destructive">Owner</Badge>
+      </div>
     </div>
     <div class="flex flex-col gap-6 h-full px-3">
       <Select.Root type="single">
@@ -142,19 +153,32 @@
         <div
           class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
         >
-          <div class="flex items-center justify-center p-2 rounded-lg bg-yellow-500/20">
-            <Users class="text-yellow-500" size="26" />
+          <div
+            class="flex items-center justify-center p-2 rounded-lg {$server_connection_fails > 1
+              ? 'bg-red-500/20'
+              : 'bg-yellow-500/20'}"
+          >
+            {#if $server_connection_fails > 1}
+              <Users class="text-red-500" size="26" />
+            {:else}
+              <Users class="text-yellow-500" size="26" />
+            {/if}
           </div>
-          <div class="relative font-bold text-xl text-yellow-400">
+          <div
+            class="relative font-bold text-xl {$server_connection_fails > 1
+              ? 'text-red-400'
+              : 'text-yellow-400'}"
+          >
             <div
-              class="absolute top-1 left-1/2 -translate-x-1/2 {!$online_friends
+              class="absolute top-1 left-1/2 -translate-x-1/2 {!$online_friends ||
+              $server_connection_fails > 1
                 ? 'opacity-100'
                 : 'opacity-0'} transition-opacity duration-1000"
             >
               <LoaderCircle class="animate-spin" />
             </div>
             <div
-              class="{!$online_friends
+              class="{!$online_friends || $server_connection_fails > 1
                 ? 'opacity-0'
                 : 'opacity-100'} transition-opacity duration-1000"
             >
@@ -166,19 +190,34 @@
         <div
           class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
         >
-          <div class="flex items-center justify-center p-2 rounded-lg bg-green-500/20">
-            <Wifi class="text-green-500" size="26" />
+          <div
+            class="flex items-center justify-center p-2 rounded-lg {$server_connection_fails > 1
+              ? 'bg-red-500/20'
+              : 'bg-green-500/20'}"
+          >
+            {#if $server_connection_fails > 1}
+              <WifiOff class="text-red-500" size="26" />
+            {:else}
+              <Wifi class="text-green-500" size="26" />
+            {/if}
           </div>
-          <div class="relative font-bold text-xl text-green-400">
+          <div
+            class="relative font-bold text-xl {$server_connection_fails > 1
+              ? 'text-red-400'
+              : 'text-green-400'}"
+          >
             <div
-              class="absolute top-1 left-1/2 -translate-x-1/2 {!$server_ping
+              class="absolute top-1 left-1/2 -translate-x-1/2 {!$server_ping ||
+              $server_connection_fails > 1
                 ? 'opacity-100'
                 : 'opacity-0'} transition-opacity duration-1000"
             >
               <LoaderCircle class="animate-spin" />
             </div>
             <div
-              class="{!$server_ping ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000"
+              class="{!$server_ping || $server_connection_fails > 1
+                ? 'opacity-0'
+                : 'opacity-100'} transition-opacity duration-1000"
             >
               <NumberFlow value={$server_ping ?? 0} trend={0} suffix="ms" />
             </div>
@@ -198,6 +237,17 @@
         <Play />
         Launch
       </Button>
+      {#key server_no_connection}
+        <Button
+          size="lg"
+          onclick={() => {
+            updateNoConnection(!server_no_connection);
+          }}
+        >
+          <Wifi />
+          Connection test
+        </Button>
+      {/key}
     </div>
     <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg px-6 py-3">
       <div class="flex flex-row items-center gap-2">
@@ -206,13 +256,15 @@
       </div>
       <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-2">
         <span class="text-sm text-muted-foreground font-semibold">osu! Version</span>
-        <span class="text-sm font-semibold text-end text-theme-50">20250626.1</span>
+        <span class="text-sm font-semibold text-end text-theme-50">
+          <Badge>20250626.1</Badge>
+        </span>
 
         <span class="text-sm text-muted-foreground font-semibold">Beatmap Sets</span>
-        <span class="text-sm font-semibold text-end text-theme-50">{$beatmap_sets}</span>
+        <span class="text-sm font-semibold text-end text-theme-50">{numberHumanReadable($beatmap_sets ?? 0)}</span>
 
         <span class="text-sm text-muted-foreground font-semibold">Skins</span>
-        <span class="text-sm font-semibold text-end text-theme-50">727</span>
+        <span class="text-sm font-semibold text-end text-theme-50">{numberHumanReadable(727)}</span>
       </div>
     </div>
   </div>
