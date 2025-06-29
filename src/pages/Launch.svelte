@@ -6,7 +6,17 @@
   import * as Select from '@/components/ui/select';
   import { beatmap_sets, online_friends, server_connection_fails, server_ping } from '@/global';
   import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-  import { LoaderCircle, Logs, Music2, Play, Users, Wifi, Gamepad2, WifiOff, Settings2 } from 'lucide-svelte';
+  import {
+    LoaderCircle,
+    Logs,
+    Music2,
+    Play,
+    Users,
+    Wifi,
+    Gamepad2,
+    WifiOff,
+    Settings2,
+  } from 'lucide-svelte';
   import { Circle } from 'radix-icons-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -15,6 +25,7 @@
   import { fade, fly, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
+  import { cursorSmoothening, customCursor, userSettings } from '@/userSettings';
 
   let selectedTab = $state('settings');
   let launching = $state(false);
@@ -273,24 +284,48 @@
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
         in:scale={{ duration: 400, start: 0.98 }}
       >
-        <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3"><Settings2 /> EZPPLauncher Settings</div>
-        <div class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6">
+        <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
+          <Settings2 /> EZPPLauncher Settings
+        </div>
+        <div
+          class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
+        >
           <div class="flex flex-col">
             <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
             <div class="text-muted-foreground text-xs">
               Enable a custom cursor in the Launcher like in the lazer build of osu!
             </div>
           </div>
-          <Checkbox id="setting-custom-cursor" class="flex items-center justify-center w-5 h-5"
+          <Checkbox
+            id="setting-custom-cursor"
+            checked={$customCursor}
+            onCheckedChange={async (e) => {
+              if (!e) {
+                cursorSmoothening.set(false);
+              }
+              customCursor.set(e);
+
+              $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
 
           <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">Cursor Smoothening</Label>
+            <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
             <div class="text-muted-foreground text-xs">
               Makes the custom cursor movement smoother.
             </div>
           </div>
-          <Checkbox id="setting-custom-cursor" class="flex items-center justify-center w-5 h-5"
+          <Checkbox
+            id="setting-cursor-smoothening"
+            checked={$cursorSmoothening}
+            onCheckedChange={async (e) => {
+              if (!$customCursor) return;
+              cursorSmoothening.set(e);
+              $userSettings.save();
+            }}
+            disabled={!$customCursor}
+            class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
         </div>
       </div>

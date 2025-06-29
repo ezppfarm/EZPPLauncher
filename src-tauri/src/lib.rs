@@ -1,5 +1,12 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use hardware_id::get_id;
 use tauri::Manager;
+
+#[tauri::command]
+fn get_hwid() -> String {
+    let hwid = get_id().unwrap();
+    hwid.into()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +23,7 @@ pub fn run() {
     }
 
     builder
+        .invoke_handler(tauri::generate_handler![get_hwid])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_sql::Builder::default().build())

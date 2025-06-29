@@ -4,6 +4,9 @@
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
 
+  let { smoothCursor = true }: { smoothCursor?: boolean } =
+    $props();
+
   let mouseX = $state(0);
   let mouseY = $state(0);
   let rotation = $state(0);
@@ -75,7 +78,7 @@
     }
 
     animate(cursor, {
-      duration: 180,
+      duration: smoothCursor ? 180 : 0,
       translateX: mouseX,
       translateY: mouseY - 50,
       ease: (t: number) => (t - 1) ** 3 + 1,
@@ -128,19 +131,12 @@
   let cursorInner: HTMLDivElement;
   let cursorAdditive: HTMLImageElement;
 
-  /*   onMount(() => {
-    const processMouseMove = (e: MouseEvent) =>
-      handleMouseMove(e.clientX, e.clientY, e.pageX, e.pageY);
-    document.addEventListener('pointermove', processMouseMove);
-    document.addEventListener('pointerdown', handleMouseDown);
-    document.addEventListener('pointerup', handleMouseUp);
-
+  onMount(() => {
+    document.documentElement.classList.add('hiddenCursor');
     return () => {
-      document.removeEventListener('pointermove', processMouseMove);
-      document.removeEventListener('pointerdown', handleMouseDown);
-      document.removeEventListener('pointerup', handleMouseUp);
+      document.documentElement.classList.remove('hiddenCursor');
     };
-  }); */
+  });
 </script>
 
 <svelte:window
@@ -148,8 +144,10 @@
   onmousedown={handleMouseDown}
   onmouseup={handleMouseUp}
 />
-
-<div class="h-7 w-7 fixed pointer-events-none z-[99999]" bind:this={cursor}>
+<div
+  class="h-7 w-7 fixed pointer-events-none z-[99999]"
+  bind:this={cursor}
+>
   <div class="relative">
     <img class="absolute top-0 left-0" src={cursor_default} bind:this={cursorInner} alt="cursor" />
     <img
@@ -162,15 +160,15 @@
 </div>
 
 <style>
-  :global(html),
-  :global(body),
-  :global(*),
-  :global(*:hover),
-  :global(button),
-  :global(a),
-  :global(input),
-  :global(select),
-  :global(textarea) {
+  :global(html.hiddenCursor),
+  :global(html.hiddenCursor body),
+  :global(html.hiddenCursor *),
+  :global(html.hiddenCursor *:hover),
+  :global(html.hiddenCursor button),
+  :global(html.hiddenCursor a),
+  :global(html.hiddenCursor input),
+  :global(html.hiddenCursor select),
+  :global(html.hiddenCursor textarea) {
     cursor: none !important;
   }
 </style>
