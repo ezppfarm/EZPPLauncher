@@ -25,7 +25,7 @@
   import { fade, fly, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
-  import { cursorSmoothening, customCursor, userSettings } from '@/userSettings';
+  import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
 
   let selectedTab = $state('settings');
   let launching = $state(false);
@@ -139,7 +139,7 @@
     {#if selectedTab === 'home'}
       <div
         class="my-auto bg-theme-900/90 flex flex-col items-center justify-center gap-6 border border-theme-800/90 rounded-lg p-6"
-        in:scale={{ duration: 400, start: 0.98 }}
+        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
       >
         <div class="grid grid-cols-2 w-full gap-3">
           <div
@@ -161,7 +161,11 @@
                   ? 'opacity-0'
                   : 'opacity-100'} transition-opacity duration-1000"
               >
-                <NumberFlow value={$beatmap_sets ?? 0} trend={0} />
+                {#if $reduceAnimations}
+                  <span>{numberHumanReadable($beatmap_sets ?? 0)}</span>
+                {:else}
+                  <NumberFlow value={$beatmap_sets ?? 0} trend={0} />
+                {/if}
               </div>
             </div>
             <div class="text-muted-foreground text-sm">Beatmap Sets imported</div>
@@ -235,7 +239,11 @@
                   ? 'opacity-0'
                   : 'opacity-100'} transition-opacity duration-1000"
               >
-                <NumberFlow value={$server_ping ?? 0} trend={0} suffix="ms" />
+                {#if $reduceAnimations}
+                  <span>{$server_ping}ms</span>
+                {:else}
+                  <NumberFlow value={$server_ping ?? 0} trend={0} suffix="ms" />
+                {/if}
               </div>
             </div>
             <div class="text-muted-foreground text-sm">Ping to Server</div>
@@ -256,7 +264,7 @@
       </div>
       <div
         class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg px-6 py-3"
-        in:scale={{ duration: 400, start: 0.98 }}
+        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
       >
         <div class="flex flex-row items-center gap-2">
           <Gamepad2 class="text-muted-foreground" size="24" />
@@ -282,7 +290,7 @@
     {:else if selectedTab === 'settings'}
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
-        in:scale={{ duration: 400, start: 0.98 }}
+        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
       >
         <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
           <Settings2 /> EZPPLauncher Settings
@@ -322,6 +330,23 @@
             onCheckedChange={async (e) => {
               if (!$customCursor) return;
               cursorSmoothening.set(e);
+              $userSettings.save();
+            }}
+            disabled={!$customCursor}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
+            <div class="text-muted-foreground text-xs">
+              Disables some animations in the Launcher to improve performance on low-end devices.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-cursor-smoothening"
+            checked={$reduceAnimations}
+            onCheckedChange={async (e) => {
+              reduceAnimations.set(e);
               $userSettings.save();
             }}
             disabled={!$customCursor}

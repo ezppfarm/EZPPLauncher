@@ -4,7 +4,7 @@
   import { setupValues } from '@/global';
   import { onMount } from 'svelte';
   import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
-  import { cursorSmoothening, customCursor, userSettings } from '@/userSettings';
+  import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
   import { Buffer } from 'buffer';
   let { children } = $props();
 
@@ -15,14 +15,15 @@
 
     const config_custom_cursor = $userSettings.value('custom_cursor');
     const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
-
-    console.log("yes", config_cursor_smoothening.get(true))
+    const config_reduce_animations = $userSettings.value('reduce_animations');
 
     customCursor.set(config_custom_cursor.get(true));
     cursorSmoothening.set(config_cursor_smoothening.get(true));
+    reduceAnimations.set(config_reduce_animations.get(false));
 
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
+    reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
   });
 </script>
 
