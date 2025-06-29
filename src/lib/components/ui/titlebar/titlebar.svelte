@@ -19,7 +19,7 @@
   });
 </script>
 
-<div data-tauri-drag-region class="titlebar z-[99999] border-b border-theme-800/90">
+<div data-tauri-drag-region class="titlebar z-[60] border-b border-theme-800/90">
   <div class="mr-auto ms-2 flex flex-row gap-2 items-center text-[1.05rem] font-semibold">
     <img src={Logo} alt="EZPP Launcher Logo" class="h-11 w-11 inline-block" />
     <span>EZPPLauncher</span>

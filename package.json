@@ -24,6 +24,7 @@
     "@tauri-apps/plugin-fs": "2.4.0",
     "@tauri-apps/plugin-shell": "2.3.0",
     "@tauri-apps/plugin-sql": "2.3.0",
+    "animejs": "^4.0.2",
     "ky": "1.8.1",
     "lucide-svelte": "0.523.0",
     "osu-classes": "3.1.0",

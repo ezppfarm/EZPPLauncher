@@ -3,13 +3,10 @@ import { ezppfarm } from './api/ezpp';
 
 export const server_ping = writable<number | undefined>(undefined);
 export const server_connection_fails = writable(0);
-export let server_no_connection = false;
 
 export const online_friends = writable<number | undefined>(undefined);
 
 export const beatmap_sets = writable<number | undefined>(undefined);
-
-export const updateNoConnection = (noConnection: boolean) => (server_no_connection = noConnection);
 
 export const setupValues = () => {
   updatePing();
@@ -26,7 +23,7 @@ export const setupValues = () => {
 
 const updatePing = async () => {
   const serverPing = await ezppfarm.ping();
-  if (!serverPing || server_no_connection) {
+  if (!serverPing) {
     server_connection_fails.update((num) => num + 1);
   } else {
     server_connection_fails.set(0);
@@ -36,12 +33,8 @@ const updatePing = async () => {
 
 const updateFriends = async () => {
   await new Promise((res) => setTimeout(res, Math.random() * 300));
-  if (server_no_connection) {
-    online_friends.set(undefined);
-  } else {
-    const onlineFriends = Math.round(Math.random() * 10);
-    online_friends.set(onlineFriends);
-  }
+  const onlineFriends = Math.round(Math.random() * 10);
+  online_friends.set(onlineFriends);
 };
 
 const updateBeatmapSets = async () => {
