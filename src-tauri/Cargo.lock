@@ -1084,6 +1084,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tauri-plugin-sql",
+ "winreg 0.55.0",
 ]
 
 [[package]]

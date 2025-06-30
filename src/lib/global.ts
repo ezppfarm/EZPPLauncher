@@ -1,5 +1,9 @@
 import { writable } from 'svelte/store';
 import { ezppfarm } from './api/ezpp';
+import type { Component } from 'svelte';
+import Loading from '../pages/Loading.svelte';
+
+export const current_view = writable<Component>(Loading);
 
 export const server_ping = writable<number | undefined>(undefined);
 export const server_connection_fails = writable(0);

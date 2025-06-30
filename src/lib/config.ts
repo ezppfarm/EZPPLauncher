@@ -16,7 +16,7 @@ export class Config {
   private crypto: Crypto | undefined;
   private configFilePath: string | undefined;
 
-  async init() {
+  async init(): Promise<boolean> {
     const hwid: string = (await invoke('get_hwid')) ?? 'recorderinsandybridge';
 
     this.crypto = new Crypto(hwid);
@@ -28,9 +28,11 @@ export class Config {
     const createFolder = !(await exists(folderPath));
     if (createFolder) await mkdir(folderPath);
 
-    const createConfig = !(await exists(this.configFilePath));
-    if (createConfig) await this.save();
-    else await this.load();
+    const configExists = await exists(this.configFilePath);
+    if (!configExists) return true;
+
+    await this.load();
+    return false;
   }
 
   private async load() {
