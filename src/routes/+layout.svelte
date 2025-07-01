@@ -1,7 +1,7 @@
 <script lang="ts">
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
   import '../app.css';
-  import { current_view, setupValues } from '@/global';
+  import { current_view, first_startup, setupValues } from '@/global';
   import { onMount } from 'svelte';
   import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
   import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
@@ -27,11 +27,7 @@
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
     reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
 
-    if (!firstStartup) {
-      current_view.set(Launch);
-      return;
-    }
-    /* current_view.set(SetupWizard); */
+    first_startup.set(firstStartup);
   });
 </script>
 

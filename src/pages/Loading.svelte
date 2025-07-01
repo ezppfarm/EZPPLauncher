@@ -1,7 +1,12 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import { animate } from 'animejs';
+  import { estimateRefreshRate } from '@/displayUtils';
+  import { current_view, first_startup } from '@/global';
+  import { cursorSmoothness } from '@/userSettings';
+  import { animate, utils } from 'animejs';
   import { onMount } from 'svelte';
+  import SetupWizard from './SetupWizard.svelte';
+  import Launch from './Launch.svelte';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -26,25 +31,61 @@
     }, 450);
   };
 
-  // Animate logo on mount: pop-in, then pulse
+  const calculateCursorSmoothness = async () => {
+    const refreshRate = await estimateRefreshRate();
+    const hzMin = 60;
+    const hzMax = 144;
+    const durationMin = 70;
+    const durationMax = 180;
+
+    const duration =
+      durationMin + ((refreshRate - hzMin) / (hzMax - hzMin)) * (durationMax - durationMin);
+
+    cursorSmoothness.set(Math.round(duration));
+  };
+
+  const prepare = async () => {
+    await calculateCursorSmoothness();
+    animate(ezppLogo, {
+      opacity: [1, 0],
+      scale: [1, 1.05],
+      duration: 1000,
+      ease: (t: number) => (t - 1) ** 7 + 1,
+      onComplete: () => {},
+    });
+    animate(spinnerCircle, {
+      opacity: 0,
+      duration: 1000,
+      ease: (t: number) => (t - 1) ** 7 + 1,
+      onComplete: () => {},
+    });
+    setTimeout(() => {
+      if ($first_startup) current_view.set(SetupWizard);
+      else current_view.set(Launch);
+    }, 250);
+  };
+
   onMount(() => {
-    // Logo pop-in and pulse
     animate(ezppLogo, {
       opacity: [0, 1],
-      scale: [0, 1],
+      scale: [0.95, 1],
       duration: 900,
-      ease: (t: number) => Math.pow(2, -5 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
+      ease: (t: number) => (t - 1) ** 7 + 1,
       onComplete: doBPMAnimation,
     });
-    // Spinner animation (seamless, starts at 12 o'clock)
-    if (spinnerCircle) {
-      animate(spinnerCircle, {
-        strokeDashoffset: [0, -565],
-        duration: 1800,
-        easing: 'linear',
-        loop: true,
-      });
-    }
+    animate(spinnerCircle, {
+      strokeDashoffset: [0, -565],
+      duration: 1800,
+      easing: 'linear',
+      loop: true,
+    });
+
+    prepare();
+
+    return () => {
+      utils.remove(ezppLogo);
+      utils.remove(spinnerCircle);
+    };
   });
 </script>
 

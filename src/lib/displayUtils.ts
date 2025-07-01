@@ -1,0 +1,20 @@
+export function estimateRefreshRate(): Promise<number> {
+  return new Promise((resolve) => {
+    let last = performance.now();
+    let frames = 0;
+
+    function loop() {
+      const now = performance.now();
+      frames++;
+
+      if (now - last >= 1000) {
+        console.log(`Estimated Refresh Rate: ${frames} FPS`);
+        resolve(frames); // estimated Hz
+      } else {
+        requestAnimationFrame(loop);
+      }
+    }
+
+    requestAnimationFrame(loop);
+  });
+}

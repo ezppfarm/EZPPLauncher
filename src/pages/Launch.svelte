@@ -27,7 +27,7 @@
   import Label from '@/components/ui/label/label.svelte';
   import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
 
-  let selectedTab = $state('settings');
+  let selectedTab = $state('home');
   let launching = $state(false);
 </script>
 
@@ -264,7 +264,11 @@
       </div>
       <div
         class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg px-6 py-3"
-        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+        in:scale={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 50,
+          start: 0.98,
+        }}
       >
         <div class="flex flex-row items-center gap-2">
           <Gamepad2 class="text-muted-foreground" size="24" />
@@ -291,6 +295,76 @@
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+      >
+        <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
+          <Settings2 /> EZPPLauncher Settings
+        </div>
+        <div
+          class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
+        >
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
+            <div class="text-muted-foreground text-xs">
+              Enable a custom cursor in the Launcher like in the lazer build of osu!
+            </div>
+          </div>
+          <Checkbox
+            id="setting-custom-cursor"
+            checked={$customCursor}
+            onCheckedChange={async (e) => {
+              if (!e) {
+                cursorSmoothening.set(false);
+              }
+              customCursor.set(e);
+
+              $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
+            <div class="text-muted-foreground text-xs">
+              Makes the custom cursor movement smoother.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-cursor-smoothening"
+            checked={$cursorSmoothening}
+            onCheckedChange={async (e) => {
+              if (!$customCursor) return;
+              cursorSmoothening.set(e);
+              $userSettings.save();
+            }}
+            disabled={!$customCursor}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
+            <div class="text-muted-foreground text-xs">
+              Disables some animations in the Launcher to improve performance on low-end devices.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-cursor-smoothening"
+            checked={$reduceAnimations}
+            onCheckedChange={async (e) => {
+              reduceAnimations.set(e);
+              $userSettings.save();
+            }}
+            disabled={!$customCursor}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+        </div>
+      </div>
+      <div
+        class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
+        in:scale={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 50,
+          start: 0.98,
+        }}
       >
         <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
           <Settings2 /> EZPPLauncher Settings
