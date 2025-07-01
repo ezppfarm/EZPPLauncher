@@ -3,16 +3,19 @@
   import cursor_additive from '$assets/cursor-additive.png';
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
+  import { currentMonitor } from '@tauri-apps/api/window';
+  import { estimateRefreshRate } from '@/displayUtils';
+  import { cursorSmoothness } from '@/userSettings';
 
-  let { smoothCursor = true }: { smoothCursor?: boolean } =
-    $props();
+  let { smoothCursor = true }: { smoothCursor?: boolean } = $props();
 
   let mouseX = $state(0);
   let mouseY = $state(0);
+  let lastMouseX = $state(0);
+  let lastMouseY = $state(0);
   let rotation = $state(0);
   let isMouseDown = $state(false);
   let isHoveringInteractive = $state(false);
-
   let dragStartX = $state(0);
   let dragStartY = $state(0);
   let degrees = $state(0);
@@ -43,7 +46,10 @@
     const deltaX = e.pageX - window.pageXOffset - dragStartX;
     const deltaY = e.pageY - window.pageYOffset - dragStartY;
 
-    if (!applyRotation && isMouseDown && deltaX * deltaX + deltaY * deltaY > 30 * 100) {
+    const velocityX = Math.abs(mouseX - lastMouseX);
+    const velocityY = Math.abs(mouseY - lastMouseY);
+
+    if (!applyRotation && isMouseDown && velocityX * velocityX + velocityY * velocityY > 800) {
       applyRotation = true;
     }
 
@@ -78,10 +84,10 @@
     }
 
     animate(cursor, {
-      duration: smoothCursor ? 180 : 0,
+      duration: smoothCursor ? $cursorSmoothness : 0,
       translateX: mouseX,
       translateY: mouseY - 50,
-      ease: (t: number) => (t - 1) ** 3 + 1,
+      ease: (t: number) => (t - 1) ** 5 + 1,
     });
 
     animate(cursor, {
@@ -90,6 +96,8 @@
       transformOrigin: '0px 0px 0',
       ease: (t: number) => Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
     });
+    lastMouseX = mouseX;
+    lastMouseY = mouseY;
   };
 
   const handleMouseDown = (event: MouseEvent) => {
@@ -144,10 +152,8 @@
   onmousedown={handleMouseDown}
   onmouseup={handleMouseUp}
 />
-<div
-  class="h-7 w-7 fixed pointer-events-none z-[99999]"
-  bind:this={cursor}
->
+
+<div class="h-7 w-7 fixed pointer-events-none z-[99999]" bind:this={cursor}>
   <div class="relative">
     <img class="absolute top-0 left-0" src={cursor_default} bind:this={cursorInner} alt="cursor" />
     <img
