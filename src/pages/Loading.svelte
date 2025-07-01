@@ -10,11 +10,13 @@
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
+  let animateInterval: number | undefined;
 
   //TODO: use this to check for updates upon launch
 
   const doBPMAnimation = () => {
-    setInterval(async () => {
+    if (animateInterval) return;
+    animateInterval = window.setInterval(async () => {
       animate(ezppLogo, {
         scale: 1.1,
         duration: 900,
@@ -83,7 +85,7 @@
     prepare();
 
     return () => {
-      utils.remove(ezppLogo);
+      window.clearInterval(animateInterval);
       utils.remove(spinnerCircle);
     };
   });
