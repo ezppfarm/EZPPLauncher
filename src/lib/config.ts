@@ -1,20 +1,17 @@
-import {
-  BaseDirectory,
-  exists,
-  mkdir,
-  readFile,
-  readTextFile,
-  writeFile,
-} from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
 import * as path from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import { Crypto } from './crypto';
-import { enc } from 'crypto-js';
 
 export class Config {
   private config: Record<string, unknown> = {};
   private crypto: Crypto | undefined;
   private configFilePath: string | undefined;
+  private encrypt: boolean;
+
+  constructor(encrypt?: boolean) {
+    this.encrypt = encrypt ?? false;
+  }
 
   async init(): Promise<boolean> {
     const hwid: string = (await invoke('get_hwid')) ?? 'recorderinsandybridge';
@@ -37,16 +34,15 @@ export class Config {
 
   private async load() {
     if (!this.configFilePath) throw Error('configFilePath not set');
-    if (!this.crypto) throw Error('crypto not initialized');
+    if (this.encrypt && !this.crypto) throw Error('crypto not initialized');
 
     const fileStream = await readTextFile(this.configFilePath);
     try {
-      const decryptedJSON = JSON.parse(this.crypto.decrypt(fileStream)) as Record<string, unknown>;
+      const decryptedJSON = JSON.parse(
+        this.encrypt && this.crypto ? this.crypto.decrypt(fileStream) : fileStream
+      ) as Record<string, unknown>;
       this.config = decryptedJSON;
-      console.log('config file loaded');
-      console.log(JSON.stringify(this.config));
     } catch (err) {
-      console.log('failed to read file');
       this.config = {};
       await this.save();
     }
@@ -54,19 +50,18 @@ export class Config {
 
   async save() {
     if (!this.configFilePath) throw Error('configFilePath not set');
-    if (!this.crypto) throw Error('crypto not initialized');
-    const encryptedJSON = this.crypto.encrypt(JSON.stringify(this.config));
+    if (this.encrypt && !this.crypto) throw Error('crypto not initialized');
+    const encryptedJSON =
+      this.encrypt && this.crypto
+        ? this.crypto.encrypt(JSON.stringify(this.config))
+        : JSON.stringify(this.config);
 
-    console.log(this.config);
-    console.log('saving file...');
-    console.log(encryptedJSON);
     await writeFile(this.configFilePath, Buffer.from(encryptedJSON), {
       append: false,
     });
   }
 
   value(key: string) {
-    console.log(this.config);
     return {
       set: <T>(val: T) => {
         this.config[key] = val;
