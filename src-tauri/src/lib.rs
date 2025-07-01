@@ -41,6 +41,11 @@ fn valid_osu_folder(folder: String) -> bool {
         "scores.db",
     ];
 
+    let folder_files: Vec<&str> = osu_folder_files.iter().map(|&s| s).collect();
+    if folder_files.iter().any(|&file| file == "osu!.exe") == false {
+        return false;
+    }
+
     let path = PathBuf::from(folder);
     let match_percentage = check_folder_completeness(path, &osu_folder_files) >= 70.0;
     if match_percentage {
@@ -145,7 +150,11 @@ pub fn run() {
     }
 
     builder
-        .invoke_handler(tauri::generate_handler![get_hwid, find_osu_installation, valid_osu_folder])
+        .invoke_handler(tauri::generate_handler![
+            get_hwid,
+            find_osu_installation,
+            valid_osu_folder
+        ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
