@@ -46,10 +46,10 @@
     const deltaX = e.pageX - window.pageXOffset - dragStartX;
     const deltaY = e.pageY - window.pageYOffset - dragStartY;
 
-    const velocityX = Math.abs(mouseX - lastMouseX);
-    const velocityY = Math.abs(mouseY - lastMouseY);
+    const velocityX = mouseX - lastMouseX;
+    const velocityY = mouseY - lastMouseY;
 
-    if (!applyRotation && isMouseDown && velocityX * velocityX + velocityY * velocityY > 800) {
+    if (!applyRotation && isMouseDown && velocityX * velocityX + velocityY * velocityY > 50) {
       applyRotation = true;
     }
 
