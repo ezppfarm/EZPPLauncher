@@ -4,14 +4,12 @@
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
   import * as Select from '@/components/ui/select';
-  import { beatmap_sets, online_friends, server_connection_fails, server_ping } from '@/global';
-  import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+  import { beatmap_sets, current_view, server_connection_fails, server_ping } from '@/global';
   import {
     LoaderCircle,
     Logs,
     Music2,
     Play,
-    Users,
     Wifi,
     Gamepad2,
     WifiOff,
@@ -22,7 +20,7 @@
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
   import { numberHumanReadable } from '@/utils';
-  import { fade, fly, scale } from 'svelte/transition';
+  import { scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -36,6 +34,8 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { invoke } from '@tauri-apps/api/core';
   import { toast } from 'svelte-sonner';
+  import Login from './Login.svelte';
+  import { currentUser } from '@/userAuthentication';
 
   let selectedTab = $state('home');
   let launching = $state(false);
@@ -85,14 +85,17 @@
   <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
     <div class="flex flex-col items-center gap-2 border-b pb-6">
       <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
-        <Avatar.Image src="https://a.ez-pp.farm/1001" />
+        <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
         <Avatar.Fallback class="bg-theme-900">
           <LoaderCircle class="animate-spin" size={32} />
         </Avatar.Fallback>
       </Avatar.Root>
-      <span class="font-semibold text-2xl text-theme-50">Quetzalcoatl</span>
+      <span class="font-semibold text-2xl text-theme-50">{$currentUser?.name ?? 'Guest'}</span>
       <div class="flex flex-row gap-2">
-        <Badge variant="destructive">Owner</Badge>
+        <!-- <Badge variant="destructive">Owner</Badge> -->
+        {#if !$currentUser}
+          <Button variant="outline" size="sm" onclick={() => current_view.set(Login)}>Login</Button>
+        {/if}
       </div>
     </div>
     <div class="flex flex-col gap-6 h-full px-3">
@@ -402,7 +405,7 @@
         }}
       >
         <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
-          <Settings2 /> EZPPLauncher Settings
+          <Settings2 /> osu! Settings
         </div>
         <div
           class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"

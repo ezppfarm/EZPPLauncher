@@ -7,6 +7,9 @@
   import { onMount } from 'svelte';
   import SetupWizard from './SetupWizard.svelte';
   import Launch from './Launch.svelte';
+  import { currentUser, userAuth } from '@/userAuthentication';
+  import { ezppfarm } from '@/api/ezpp';
+  import { toast } from 'svelte-sonner';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -48,6 +51,29 @@
 
   const prepare = async () => {
     await calculateCursorSmoothness();
+
+    const username = $userAuth.value('username').get('');
+    const password = $userAuth.value('password').get('');
+
+    try {
+      const loginResult = await ezppfarm.login(username, password);
+      if (loginResult && loginResult.user) {
+        toast.success('Login successful!', {
+          description: `Welcome back, ${loginResult.user.name}!`,
+        });
+
+        currentUser.set(loginResult.user);
+      } else {
+        toast.error('Login failed!', {
+          description: 'Please check your username and password.',
+        });
+      }
+    } catch {
+      toast.error('Server error occurred during login.', {
+        description: 'There was an issue connecting to the server. Please try again later.',
+      });
+    }
+
     animate(ezppLogo, {
       opacity: [1, 0],
       scale: [1, 1.05],

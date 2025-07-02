@@ -1,7 +1,6 @@
 import { writable } from 'svelte/store';
 import { Config } from './config';
+import type { EZPPUser } from './types';
 
-export const userAuth = writable<Config>(new Config(true));
-
-export const username = writable<string>("");
-export const password = writable<string>("")
+export const userAuth = writable<Config>(new Config("user_auth", true));
+export const currentUser = writable<EZPPUser | undefined>(undefined);

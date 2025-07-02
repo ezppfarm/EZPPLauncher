@@ -4,12 +4,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { Crypto } from './crypto';
 
 export class Config {
+  private fileName: string;
   private config: Record<string, unknown> = {};
   private crypto: Crypto | undefined;
   private configFilePath: string | undefined;
   private encrypt: boolean;
 
-  constructor(encrypt?: boolean) {
+  constructor(fileName: string, encrypt?: boolean) {
+    this.fileName = fileName;
     this.encrypt = encrypt ?? false;
   }
 
@@ -20,7 +22,7 @@ export class Config {
 
     const homeDir = await path.homeDir();
     const folderPath = await path.join(homeDir, '.ezpplauncher');
-    this.configFilePath = await path.join(folderPath, 'user_settings');
+    this.configFilePath = await path.join(folderPath, this.fileName);
 
     const createFolder = !(await exists(folderPath));
     if (createFolder) await mkdir(folderPath);

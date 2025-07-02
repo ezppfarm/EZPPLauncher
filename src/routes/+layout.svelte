@@ -13,6 +13,7 @@
   } from '@/userSettings';
   import { Buffer } from 'buffer';
   import { Toaster } from '@/components/ui/sonner';
+  import { userAuth } from '@/userAuthentication';
   let { children } = $props();
 
   function disableReload() {
@@ -68,6 +69,7 @@
     disableReload();
     setupValues();
     const firstStartup = await $userSettings.init();
+    $userAuth.init();
 
     const config_custom_cursor = $userSettings.value('custom_cursor');
     const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
