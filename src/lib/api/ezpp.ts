@@ -1,4 +1,5 @@
-import ky from 'ky';
+import type { EZPPUser } from '@/types';
+import { betterFetch } from '@better-fetch/fetch';
 
 const BANCHO_ENDPOINT = 'https://c.ez-pp.farm/';
 const ENDPOINT = 'https://ez-pp.farm/';
@@ -7,8 +8,8 @@ export const ezppfarm = {
   ping: async (): Promise<number | undefined> => {
     try {
       const start = Date.now();
-      const request = await ky(BANCHO_ENDPOINT);
-      if (!request.ok) return undefined;
+      const request = await betterFetch(BANCHO_ENDPOINT);
+      if (request.error) return undefined;
       const ping = Date.now() - start;
       return ping;
     } catch {
@@ -31,28 +32,23 @@ export const ezppfarm = {
       }
     | undefined
   > => {
-    try {
-      const request = await ky(`${ENDPOINT}login/check`, {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'EZPPLauncher',
-        },
-      });
-      if (!request.ok) return undefined;
-      return await request.json<{
-        code: number;
-        message: string;
-        user?: {
-          id: number;
-          donor: boolean;
-          name: string;
-          email: string;
-        };
-      }>();
-    } catch {
-      return undefined;
-    }
+    const request = await betterFetch<{
+      code: number;
+      message: string;
+      user?: EZPPUser;
+    }>('https://ez-pp.farm/login/check', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: username,
+        password: password,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
+      },
+    });
+    if (request.error) return undefined;
+    return request.data;
   },
 };
