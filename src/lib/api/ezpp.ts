@@ -48,7 +48,12 @@ export const ezppfarm = {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
       },
     });
-    if (request.error) return undefined;
+    console.log(request.error);
+    if (request.error) {
+      if (request.error.status >= 500 && request.error.status < 600)
+        throw new Error('Server not reachable');
+      return undefined;
+    }
     return request.data;
   },
 };

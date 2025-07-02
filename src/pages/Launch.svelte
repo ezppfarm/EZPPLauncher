@@ -297,7 +297,7 @@
           }}
         >
           <Play />
-          Launch
+          Launch {$server_connection_fails > 1 ? 'offline' : ''}
         </Button>
       </div>
       <div
