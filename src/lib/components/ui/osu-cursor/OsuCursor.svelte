@@ -13,7 +13,6 @@
   let mouseY = $state(0);
   let lastMouseX = $state(0);
   let lastMouseY = $state(0);
-  let rotation = $state(0);
   let isMouseDown = $state(false);
   let isHoveringInteractive = $state(false);
   let dragStartX = $state(0);
@@ -51,13 +50,15 @@
 
     const dist = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
 
-    if (!applyRotation && isMouseDown && dist > 10) applyRotation = true;
+    if (!applyRotation && isMouseDown && dist > 80) applyRotation = true;
 
     let newDegrees = (Math.atan2(-deltaX, deltaY) * 180) / Math.PI + 24.3;
 
     let diff = (newDegrees - degrees) % 360;
+
     if (diff < -180) diff += 360;
     if (diff > 180) diff -= 360;
+
     if (isMouseDown && applyRotation) {
       degrees += diff;
     } else {
@@ -99,6 +100,7 @@
           ? (t - 1) ** 7 + 1
           : Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
     });
+    
     lastMouseX = mouseX;
     lastMouseY = mouseY;
   };
@@ -122,7 +124,6 @@
   };
 
   const handleMouseUp = () => {
-    rotation = 0;
     isMouseDown = false;
     applyRotation = false;
     animate(cursorInner, {
