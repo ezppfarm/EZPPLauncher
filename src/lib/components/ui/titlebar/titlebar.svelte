@@ -44,7 +44,7 @@
     left: 0;
     right: 0;
     margin-bottom: 10px;
-    margin-right: 8px;
+    padding-right: 5px;
     pointer-events: all !important;
   }
   .titlebar-button {
