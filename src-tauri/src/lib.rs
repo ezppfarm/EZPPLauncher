@@ -2,11 +2,13 @@
 use hardware_id::get_id;
 use std::path::PathBuf;
 use tauri::Manager;
-use winreg::enums::*;
 use winreg::RegKey;
+use winreg::enums::*;
 
-use crate::utils::check_folder_completeness;
 mod utils;
+use crate::utils::check_folder_completeness;
+use crate::utils::get_osu_user_config;
+
 
 #[tauri::command]
 fn get_hwid() -> String {
@@ -135,6 +137,38 @@ fn find_osu_installation() -> Option<String> {
     return None;
 }
 
+#[tauri::command]
+fn get_beatmapsets_count(folder: String) -> Option<u64> {
+    let path = PathBuf::from(folder);
+    let osu_config = get_osu_user_config(path.clone());
+    let songs_path = osu_config
+        .and_then(|config| config.get("Songs").cloned())
+        .unwrap_or_else(|| path.join("Songs").to_string_lossy().into_owned());
+    let songs_folder = PathBuf::from(songs_path);
+
+    if !songs_folder.exists() {
+        return None;
+    }
+
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir(songs_folder) {
+        for entry in entries.flatten() {
+            if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+                let dir_path = entry.path();
+                if let Ok(files) = std::fs::read_dir(&dir_path) {
+                    for file in files.flatten() {
+                        if file.path().extension().map_or(false, |ext| ext == "osu") {
+                            count += 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return Some(count);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -153,7 +187,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_hwid,
             find_osu_installation,
-            valid_osu_folder
+            valid_osu_folder,
+            get_beatmapsets_count
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
