@@ -67,7 +67,7 @@
   } from '@/gamemode';
   import { currentUserInfo } from '@/data';
   import { osuapi } from '@/api/osuapi';
-  import { setConfigValue, setUserConfigValue } from '@/osuUtil';
+  import { getPreviousReleaseStream, setConfigValues, setUserConfigValues } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
 
   let selectedTab = $state('home');
@@ -154,12 +154,15 @@
         return;
       }
 
+      const previousReleaseStream = await getPreviousReleaseStream(osuPath);
+      let forceUpdate = previousReleaseStream && previousReleaseStream !== $osuStream;
+
       const versions = compareBuildNumbers($osuBuild, streamInfo);
-      if (versions > 0) {
+      if (versions > 0 || forceUpdate) {
         launchInfo = 'Update found!';
         await new Promise((res) => setTimeout(res, 1500));
         launchInfo = 'Running osu! updater...';
-        await setUserConfigValue(osuPath, 'LastVersion', streamInfo);
+        await setUserConfigValues(osuPath, [{ key: 'LastVersion', value: streamInfo }]);
         await invoke('run_osu_updater', { folder: osuPath });
         launchInfo = 'osu! is now up to date!';
       } else {
@@ -169,13 +172,29 @@
         const username = $userAuth.value('username').get('');
         const password = $userAuth.value('password').get('');
         if (username.length > 0 && password.length > 0) {
-          //TODO: make this one function to prevent multiple file writes
-          await setUserConfigValue(osuPath, 'Username', username);
-          await setUserConfigValue(osuPath, 'Password', password);
-          await setUserConfigValue(osuPath, 'SaveUsername', '1');
-          await setUserConfigValue(osuPath, 'SavePassword', '1');
+          await setUserConfigValues(osuPath, [
+            {
+              key: 'Username',
+              value: username,
+            },
+            {
+              key: 'Password',
+              value: password,
+            },
+            {
+              key: 'SaveUsername',
+              value: '1',
+            },
+            {
+              key: 'SavePassword',
+              value: '1',
+            },
+            {
+              key: 'CredentialEndpoint',
+              value: 'ez-pp.farm',
+            },
+          ]);
         }
-        await setUserConfigValue(osuPath, 'CredentialEndpoint', 'ez-pp.farm');
       }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
@@ -754,8 +773,12 @@
               type="single"
               value={$osuStream}
               onValueChange={async (newStream) => {
+                const oldStream = $osuStream;
                 osuStream.set(newStream);
-                await setConfigValue($osuInstallationPath, '_ReleaseStream', newStream);
+                await setConfigValues($osuInstallationPath, [
+                  { key: '_ReleaseStream', value: newStream },
+                  { key: '_PreviousReleaseStream', value: oldStream ?? newStream },
+                ]);
               }}
             >
               <Select.Trigger class="border-theme-800 bg-theme-950 text-white font-semibold">

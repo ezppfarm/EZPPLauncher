@@ -9,7 +9,7 @@ use winreg::enums::*;
 
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
-    set_osu_user_config_val, set_osu_config_val
+    set_osu_config_vals, set_osu_user_config_vals,
 };
 use std::os::windows::process::CommandExt;
 
@@ -217,21 +217,46 @@ pub fn get_osu_release_stream(folder: String) -> String {
 }
 
 #[tauri::command]
-pub fn set_osu_user_config_value(
-    osu_folder_path: String,
-    key: String,
-    value: String,
-) -> Result<bool, String> {
-    set_osu_user_config_val(&osu_folder_path, &key, &value)
+pub fn get_osu_previous_release_stream(folder: String) -> Option<String> {
+    let path = PathBuf::from(folder);
+    let osu_config = get_osu_config(path.clone());
+    osu_config.and_then(|config| config.get("_PreviousReleaseStream").cloned())
+}
+
+#[derive(serde::Deserialize)]
+pub struct ConfigEntry {
+    pub key: String,
+    pub value: String,
 }
 
 #[tauri::command]
-pub fn set_osu_config_value(
+pub fn set_osu_user_config_values(
     osu_folder_path: String,
-    key: String,
-    value: String,
+    entries: Vec<ConfigEntry>,
 ) -> Result<bool, String> {
-    set_osu_config_val(&osu_folder_path, &key, &value)
+    let converted: Vec<(&str, Option<&str>)> = entries
+        .iter()
+        .map(|entry| (entry.key.as_str(), Some(entry.value.as_str())))
+        .collect();
+    match set_osu_user_config_vals(&osu_folder_path, &converted) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}
+
+#[tauri::command]
+pub fn set_osu_config_values(
+    osu_folder_path: String,
+    entries: Vec<ConfigEntry>,
+) -> Result<bool, String> {
+    let converted: Vec<(&str, Option<&str>)> = entries
+        .iter()
+        .map(|entry| (entry.key.as_str(), Some(entry.value.as_str())))
+        .collect();
+    match set_osu_config_vals(&osu_folder_path, &converted) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
 
 #[tauri::command]

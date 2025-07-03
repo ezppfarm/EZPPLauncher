@@ -4,9 +4,9 @@ use tauri::Manager;
 pub mod commands;
 pub mod utils;
 use crate::commands::{
-    find_osu_installation, get_beatmapsets_count, get_hwid, get_osu_release_stream,
-    get_osu_version, get_skins_count, run_osu, run_osu_updater, set_osu_config_value,
-    set_osu_user_config_value, valid_osu_folder,
+    find_osu_installation, get_beatmapsets_count, get_hwid, get_osu_previous_release_stream,
+    get_osu_release_stream, get_osu_version, get_skins_count, run_osu, run_osu_updater,
+    set_osu_config_values, set_osu_user_config_values, valid_osu_folder,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,10 +32,11 @@ pub fn run() {
             get_skins_count,
             get_osu_version,
             get_osu_release_stream,
-            set_osu_config_value,
-            set_osu_user_config_value,
+            get_osu_previous_release_stream,
+            set_osu_config_values,
+            set_osu_user_config_values,
             run_osu_updater,
-            run_osu
+            run_osu,
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())

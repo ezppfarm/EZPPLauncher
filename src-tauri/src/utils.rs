@@ -46,16 +46,15 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
     return Some(config_map);
 }
 
-pub fn set_osu_user_config_val(
+pub fn set_osu_user_config_vals(
     osu_folder_path: &str,
-    key: &str,
-    value: &str,
+    key_values: &[(&str, Option<&str>)],
 ) -> Result<bool, String> {
     let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
 
     if !osu_config_path.exists() {
-        return Ok(false);
+        return Err("osu! user config file does not exist".to_string());
     }
 
     let mut lines = fs::read_to_string(&osu_config_path)
@@ -64,20 +63,36 @@ pub fn set_osu_user_config_val(
         .map(|line| line.to_string())
         .collect::<Vec<String>>();
 
-    let mut found_key = false;
+    let mut keys_to_set: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    let mut keys_to_add: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
-    for line in lines.iter_mut() {
-        if let Some((existing_key, _)) = line.split_once(" = ") {
-            if existing_key.trim() == key {
-                *line = format!("{} = {}", key, value);
-                found_key = true;
-                break;
-            }
+    for (key, value_opt) in key_values.iter() {
+        if let Some(value) = value_opt {
+            keys_to_set.insert(*key, *value);
+            keys_to_add.insert(*key);
         }
     }
 
-    if !found_key {
-        lines.push(format!("{} = {}", key, value));
+    // Collect indices and keys to update to avoid borrow checker issues
+    let mut updates = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if let Some((existing_key, _)) = line.split_once(" = ") {
+            let trimmed_key = existing_key.trim();
+            if let Some(new_value) = keys_to_set.get(trimmed_key) {
+                updates.push((i, trimmed_key.to_string(), new_value.to_string()));
+            }
+        }
+    }
+    for (i, trimmed_key, new_value) in updates {
+        lines[i] = format!("{} = {}", trimmed_key, new_value);
+        keys_to_add.remove(trimmed_key.as_str());
+    }
+
+    // Add new keys that were not found
+    for key in keys_to_add {
+        if let Some(value) = keys_to_set.get(key) {
+            lines.push(format!("{} = {}", key, value));
+        }
     }
 
     let new_content = lines.join("\n") + "\n";
@@ -86,15 +101,14 @@ pub fn set_osu_user_config_val(
     Ok(true)
 }
 
-pub fn set_osu_config_val(
+pub fn set_osu_config_vals(
     osu_folder_path: &str,
-    key: &str,
-    value: &str,
+    key_values: &[(&str, Option<&str>)],
 ) -> Result<bool, String> {
     let osu_config_path = Path::new(osu_folder_path).join("osu!.cfg");
 
     if !osu_config_path.exists() {
-        return Ok(false);
+        return Err("osu!.cfg file does not exist".to_string());
     }
 
     let mut lines = fs::read_to_string(&osu_config_path)
@@ -103,20 +117,35 @@ pub fn set_osu_config_val(
         .map(|line| line.to_string())
         .collect::<Vec<String>>();
 
-    let mut found_key = false;
+    let mut keys_to_set: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    let mut keys_to_add: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
-    for line in lines.iter_mut() {
-        if let Some((existing_key, _)) = line.split_once(" = ") {
-            if existing_key.trim() == key {
-                *line = format!("{} = {}", key, value);
-                found_key = true;
-                break;
-            }
+    for (key, value_opt) in key_values.iter() {
+        if let Some(value) = value_opt {
+            keys_to_set.insert(*key, *value);
+            keys_to_add.insert(*key);
         }
     }
 
-    if !found_key {
-        lines.push(format!("{} = {}", key, value));
+    let mut updates = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if let Some((existing_key, _)) = line.split_once(" = ") {
+            let trimmed_key = existing_key.trim();
+            if let Some(new_value) = keys_to_set.get(trimmed_key) {
+                updates.push((i, trimmed_key.to_string(), new_value.to_string()));
+            }
+        }
+    }
+    for (i, trimmed_key, new_value) in updates {
+        lines[i] = format!("{} = {}", trimmed_key, new_value);
+        keys_to_add.remove(trimmed_key.as_str());
+    }
+
+    // Add new keys that were not found
+    for key in keys_to_add {
+        if let Some(value) = keys_to_set.get(key) {
+            lines.push(format!("{} = {}", key, value));
+        }
     }
 
     let new_content = lines.join("\n") + "\n";
