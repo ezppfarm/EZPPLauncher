@@ -1,21 +1,19 @@
 <script lang="ts">
-  import Minimize from "lucide-svelte/icons/minus";
-  import Close from "lucide-svelte/icons/x";
-  
-  import Logo from "$assets/logo.png";
+  import Minimize from 'lucide-svelte/icons/minus';
+  import Close from 'lucide-svelte/icons/x';
 
-  import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { onMount } from "svelte";
+  import Logo from '$assets/logo.png';
+
+  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { onMount } from 'svelte';
 
   onMount(() => {
     const appWindow = getCurrentWindow();
 
     document
-      .getElementById("titlebar-minimize")
-      ?.addEventListener("click", () => appWindow.minimize());
-    document
-      .getElementById("titlebar-close")
-      ?.addEventListener("click", () => appWindow.close());
+      .getElementById('titlebar-minimize')
+      ?.addEventListener('click', () => appWindow.minimize());
+    document.getElementById('titlebar-close')?.addEventListener('click', () => appWindow.close());
   });
 </script>
 
@@ -39,20 +37,23 @@
     user-select: none;
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
     align-items: center;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     margin-bottom: 10px;
+    margin-right: 8px;
     pointer-events: all !important;
   }
   .titlebar-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 60px;
-    height: 100%;
+    width: 40px;
+    height: 40px;
+    border-radius: 0.35rem;
     user-select: none;
     -webkit-user-select: none;
   }
