@@ -7,9 +7,11 @@ use sysinfo::System;
 use winreg::RegKey;
 use winreg::enums::*;
 
-use crate::utils::get_window_title_by_pid;
-use crate::utils::set_osu_user_config_value;
-use crate::utils::{check_folder_completeness, get_osu_config, get_osu_user_config};
+use crate::utils::{
+    check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
+    set_osu_user_config_val, set_osu_config_val
+};
+use std::os::windows::process::CommandExt;
 
 #[tauri::command]
 pub fn get_hwid() -> String {
@@ -215,23 +217,43 @@ pub fn get_osu_release_stream(folder: String) -> String {
 }
 
 #[tauri::command]
+pub fn set_osu_user_config_value(
+    osu_folder_path: String,
+    key: String,
+    value: String,
+) -> Result<bool, String> {
+    set_osu_user_config_val(&osu_folder_path, &key, &value)
+}
+
+#[tauri::command]
 pub fn set_osu_config_value(
     osu_folder_path: String,
     key: String,
     value: String,
 ) -> Result<bool, String> {
-    set_osu_user_config_value(&osu_folder_path, &key, &value)
+    set_osu_config_val(&osu_folder_path, &key, &value)
 }
 
 #[tauri::command]
 pub fn run_osu_updater(folder: String) -> Result<(), String> {
     let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
-    let mut updater_process = Command::new(osu_exe_path)
-      .arg("-repair")
-      .spawn()
-      .map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    #[cfg(windows)]
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
-    
+    #[cfg(windows)]
+    let mut updater_process = Command::new(osu_exe_path)
+        .arg("-repair")
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(not(windows))]
+    let mut updater_process = Command::new(osu_exe_path)
+        .arg("-repair")
+        .spawn()
+        .map_err(|e| e.to_string())?;
 
     thread::sleep(Duration::from_millis(500));
 
@@ -246,15 +268,8 @@ pub fn run_osu_updater(folder: String) -> Result<(), String> {
                 let process_id = process.pid();
                 let window_title = get_window_title_by_pid(process_id);
 
-                println!("updater_process id: {}", updater_process.id());
-                println!("process_id: {}", process_id.as_u32());
-
-                println!("found osu!.exe process with window title: {}", window_title);
-
-                if !window_title.is_empty() {
-                    println!("Killing osu!.exe process");
+                if !window_title.is_empty() && !window_title.contains("updater") {
                     if let Ok(_) = process.kill_and_wait() {
-                        println!("osu!.exe process killed");
                         termination_thread_running = false;
                         break;
                     }
@@ -265,10 +280,26 @@ pub fn run_osu_updater(folder: String) -> Result<(), String> {
         if !termination_thread_running {
             break;
         }
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
         thread::sleep(Duration::from_millis(500));
     }
 
     updater_process.wait().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn run_osu(folder: String) -> Result<(), String> {
+    let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
+
+    let mut game_process = Command::new(osu_exe_path)
+        .arg("-devserver")
+        .arg("ez-pp.farm")
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    game_process.wait().map_err(|e| e.to_string())?;
 
     Ok(())
 }

@@ -2,9 +2,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
-use std::ptr;
 use sysinfo::Pid;
-use winapi::um::winuser::{FindWindowW, GetWindowTextW, GetWindowThreadProcessId};
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
     let mut found = 0;
@@ -48,13 +46,52 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
     return Some(config_map);
 }
 
-pub fn set_osu_user_config_value(
+pub fn set_osu_user_config_val(
     osu_folder_path: &str,
     key: &str,
     value: &str,
 ) -> Result<bool, String> {
     let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
+
+    if !osu_config_path.exists() {
+        return Ok(false);
+    }
+
+    let mut lines = fs::read_to_string(&osu_config_path)
+        .map_err(|e| e.to_string())?
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<String>>();
+
+    let mut found_key = false;
+
+    for line in lines.iter_mut() {
+        if let Some((existing_key, _)) = line.split_once(" = ") {
+            if existing_key.trim() == key {
+                *line = format!("{} = {}", key, value);
+                found_key = true;
+                break;
+            }
+        }
+    }
+
+    if !found_key {
+        lines.push(format!("{} = {}", key, value));
+    }
+
+    let new_content = lines.join("\n") + "\n";
+    fs::write(&osu_config_path, new_content).map_err(|e| e.to_string())?;
+
+    Ok(true)
+}
+
+pub fn set_osu_config_val(
+    osu_folder_path: &str,
+    key: &str,
+    value: &str,
+) -> Result<bool, String> {
+    let osu_config_path = Path::new(osu_folder_path).join("osu!.cfg");
 
     if !osu_config_path.exists() {
         return Ok(false);
@@ -113,26 +150,46 @@ pub fn get_osu_config<P: AsRef<Path>>(
 }
 
 pub fn get_window_title_by_pid(pid: Pid) -> String {
-    let mut window_title = String::new();
+    use std::sync::{Arc, Mutex};
+    use winapi::shared::windef::HWND;
+    use winapi::um::winuser::{
+        EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+    };
 
-    unsafe {
-        let hwnd = FindWindowW(ptr::null_mut(), ptr::null_mut());
+    extern "system" fn enum_windows_proc(
+        hwnd: HWND,
+        lparam: winapi::shared::minwindef::LPARAM,
+    ) -> i32 {
+        unsafe {
+            let data = &mut *(lparam as *mut (u32, Arc<Mutex<Option<String>>>));
+            let target_pid = data.0;
+            let result = &data.1;
 
-        if hwnd.is_null() {
-            return String::new();
-        }
-
-        let mut process_id = 0;
-        GetWindowThreadProcessId(hwnd, &mut process_id);
-
-        if process_id == pid.as_u32() {
-            let mut title = vec![0u16; 512];
-            let length = GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32);
-
-            let title = OsString::from_wide(&title[..length as usize]);
-            window_title = title.to_string_lossy().into_owned();
+            let mut window_pid = 0u32;
+            GetWindowThreadProcessId(hwnd, &mut window_pid);
+            if window_pid == target_pid && IsWindowVisible(hwnd) != 0 {
+                let mut title = vec![0u16; 512];
+                let length = GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32);
+                if length > 0 {
+                    let title = OsString::from_wide(&title[..length as usize]);
+                    let title_str = title.to_string_lossy().into_owned();
+                    if !title_str.is_empty() {
+                        *result.lock().unwrap() = Some(title_str);
+                        return 0; // Stop enumeration
+                    }
+                }
+            }
+            1 // Continue enumeration
         }
     }
 
-    window_title
+    let result = Arc::new(Mutex::new(None));
+    let mut data = (pid.as_u32(), Arc::clone(&result));
+    unsafe {
+        EnumWindows(
+            Some(enum_windows_proc),
+            &mut data as *mut _ as winapi::shared::minwindef::LPARAM,
+        );
+    }
+    result.lock().unwrap().clone().unwrap_or_default()
 }

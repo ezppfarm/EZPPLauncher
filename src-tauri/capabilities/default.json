@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "shell:allow-open",
@@ -13,6 +15,8 @@
     "core:window:allow-minimize",
     "core:window:allow-close",
     "cors-fetch:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
     "fs:default",
     {
       "identifier": "fs:allow-write",

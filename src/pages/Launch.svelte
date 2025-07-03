@@ -67,6 +67,8 @@
   } from '@/gamemode';
   import { currentUserInfo } from '@/data';
   import { osuapi } from '@/api/osuapi';
+  import { setConfigValue, setUserConfigValue } from '@/osuUtil';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
 
   let selectedTab = $state('home');
   let launching = $state(false);
@@ -156,10 +158,30 @@
         launchInfo = 'Update found!';
         await new Promise((res) => setTimeout(res, 1500));
         launchInfo = 'Running osu! updater...';
+        await setUserConfigValue($osuInstallationPath, 'LastVersion', streamInfo);
         await invoke('run_osu_updater', { folder: $osuInstallationPath });
+        launchInfo = 'osu! is now up to date!';
       } else {
         launchInfo = 'You are up to date!';
       }
+      if ($currentUser) {
+        const username = $userAuth.value('username').get('');
+        const password = $userAuth.value('password').get('');
+        if (username.length > 0 && password.length > 0) {
+          await setUserConfigValue($osuInstallationPath, 'Username', username);
+          await setUserConfigValue($osuInstallationPath, 'Password', password);
+          await setUserConfigValue($osuInstallationPath, 'SaveUsername', '1');
+          await setUserConfigValue($osuInstallationPath, 'SavePassword', '1');
+        }
+        await setUserConfigValue($osuInstallationPath, 'CredentialEndpoint', 'ez-pp.farm');
+      }
+      await new Promise((res) => setTimeout(res, 1500));
+      launchInfo = 'Launching osu!...';
+      await new Promise((res) => setTimeout(res, 1000));
+      await getCurrentWindow().hide();
+      await invoke('run_osu', { folder: $osuInstallationPath });
+      await getCurrentWindow().show();
+      launching = false;
     } catch (err) {
       console.log(err);
       toast.error('Hmmm...', {
@@ -690,7 +712,7 @@
             <Input
               class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
               type="text"
-              bind:value={$osuInstallationPath}
+              value={$osuInstallationPath}
               placeholder="Path to osu! installation"
               readonly
             />
@@ -699,6 +721,30 @@
               variant="outline"
               onclick={browse_osu_installation}>Browse</Button
             >
+          </div>
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">osu! release stream</Label>
+            <div class="text-muted-foreground text-xs">The release stream of your osu! client</div>
+          </div>
+          <div class="flex flex-row w-full">
+            <Select.Root
+              type="single"
+              value={$osuStream}
+              onValueChange={async (newStream) => {
+                osuStream.set(newStream);
+                await setConfigValue($osuInstallationPath, '_ReleaseStream', newStream);
+              }}
+            >
+              <Select.Trigger class="border-theme-800 bg-theme-950 text-white font-semibold">
+                <div class="flex flex-row items-center gap-2">
+                  {releaseStreamToReadable($osuStream ?? 'Stable40')}
+                </div>
+              </Select.Trigger>
+              <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
+                <Select.Item value="Stable40">Stable</Select.Item>
+                <Select.Item value="CuttingEdge">Cutting Edge</Select.Item>
+              </Select.Content>
+            </Select.Root>
           </div>
         </div>
       </div>
