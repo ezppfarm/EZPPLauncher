@@ -71,6 +71,9 @@ export class Config {
       get: <T>(fallback: T): T => {
         return (this.config[key] as T) ?? fallback;
       },
+      del: () => {
+        delete this.config[key];
+      },
     };
   }
 }
