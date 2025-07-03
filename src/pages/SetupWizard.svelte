@@ -9,16 +9,22 @@
   import { Check, CheckCircle, CircleOff, Settings2 } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
-  import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
+  import {
+    cursorSmoothening,
+    customCursor,
+    osuInstallationPath,
+    reduceAnimations,
+    userSettings,
+  } from '@/userSettings';
   import Label from '@/components/ui/label/label.svelte';
-  import { beatmapSets, currentView } from '@/global';
+  import { beatmapSets, currentView, osuBuild, osuStream, skins } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
 
   let selectedStep = $state(1);
   const steps = ['Welcome', 'Locate your osu! Installation', 'Appearance Settings'];
 
-  let osuInstallationPath = $state('');
+  let osuInstallPath = $state('');
   let manualSelect = $state(false);
   let manualSelectValid = $state(false);
   let autoDetectedOsuPath = $state(false);
@@ -58,30 +64,52 @@
       manualSelect = true;
       if (!validFolder) {
         manualSelectValid = false;
-        osuInstallationPath = '';
+        osuInstallPath = '';
         return;
       }
-      osuInstallationPath = selectedPath;
+      osuInstallPath = selectedPath;
       autoDetectedOsuPath = false;
       manualSelectValid = true;
-      $userSettings.value('osu_installation_path').set(osuInstallationPath);
-
-      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
-        folder: osuInstallationPath,
-      });
-      if (beatmapSetCount) {
-        beatmapSets.set(beatmapSetCount);
-      }
     }
   };
 
+  const saveConfig = async () => {
+    $userSettings.value('osu_installation_path').set(osuInstallPath);
+    await $userSettings.save();
+    osuInstallationPath.set(osuInstallPath);
+
+    const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
+      folder: osuInstallPath,
+    });
+    if (beatmapSetCount) {
+      beatmapSets.set(beatmapSetCount);
+    }
+
+    const skinsCount: number | null = await invoke('get_skins_count', {
+      folder: osuInstallPath,
+    });
+    if (skinsCount) {
+      skins.set(skinsCount);
+    }
+
+    const osuReleaseStream: string = await invoke('get_osu_release_stream', {
+      folder: $osuInstallationPath,
+    });
+    osuStream.set(osuReleaseStream);
+    const osuVersion: string = await invoke('get_osu_version', {
+      folder: $osuInstallationPath,
+    });
+    osuBuild.set(osuVersion);
+
+    currentView.set(Launch);
+  };
+
   onMount(async () => {
-    const osuInstallPath: string | null = await invoke('find_osu_installation');
-    console.log('osu install path: ' + osuInstallPath);
-    if (osuInstallPath) {
-      osuInstallationPath = osuInstallPath;
+    const osuPath: string | null = await invoke('find_osu_installation');
+    if (osuPath) {
+      osuInstallPath = osuPath;
       autoDetectedOsuPath = true;
-      $userSettings.value('osu_installation_path').set(osuInstallationPath);
+      $userSettings.value('osu_installation_path').set(osuInstallPath);
     }
   });
 </script>
@@ -93,15 +121,7 @@
     </div>
     <h1 class="text-3xl font-semibold">EZPPLauncher Setup completed!</h1>
     <p class="text-muted-foreground mt-2">You are now ready to farm some maps!</p>
-    <Button
-      class="mt-4"
-      onclick={async () => {
-        await $userSettings.save();
-        currentView.set(Launch);
-      }}
-    >
-      Finish
-    </Button>
+    <Button class="mt-4" onclick={saveConfig}>Finish</Button>
   </div>
 {:else}
   <div class="grid grid-cols-[0.41fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
@@ -172,7 +192,7 @@
               class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
               type="text"
               placeholder="Path to osu! installation"
-              value={osuInstallationPath}
+              value={osuInstallPath}
             />
             <Button
               class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
@@ -294,7 +314,7 @@
             else selectedStep = Math.min(selectedStep + 1, steps.length);
           }}
           disabled={selectedStep > steps.length ||
-            (selectedStep === 2 && osuInstallationPath.length <= 0)}
+            (selectedStep === 2 && osuInstallPath.length <= 0)}
           >{selectedStep >= steps.length ? 'Finish' : 'Next'}</Button
         >
       </div>

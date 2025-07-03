@@ -112,6 +112,13 @@
       if (beatmapSetCount) {
         beatmapSets.set(beatmapSetCount);
       }
+
+      const skinsCount: number | null = await invoke('get_skins_count', {
+        folder: selectedPath,
+      });
+      if (skinsCount) {
+        skins.set(skinsCount);
+      }
     }
   };
 
@@ -153,7 +160,7 @@
       } else {
         launchInfo = 'You are up to date!';
       }
-    } catch(err) {
+    } catch (err) {
       console.log(err);
       toast.error('Hmmm...', {
         description: 'Failed to check for updates.',
@@ -683,7 +690,7 @@
             <Input
               class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
               type="text"
-              value={$osuInstallationPath}
+              bind:value={$osuInstallationPath}
               placeholder="Path to osu! installation"
               readonly
             />
