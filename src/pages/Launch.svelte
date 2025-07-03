@@ -127,7 +127,12 @@
       <div class="flex flex-row gap-2">
         <!-- <Badge variant="destructive">Owner</Badge> -->
         {#if !$currentUser}
-          <Button variant="outline" size="sm" onclick={() => currentView.set(Login)}>
+          <Button
+            variant="outline"
+            size="sm"
+            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800"
+            onclick={() => currentView.set(Login)}
+          >
             <LogIn size={16} />
             Login
           </Button>
@@ -135,6 +140,7 @@
           <Button
             variant="outline"
             size="sm"
+            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800"
             onclick={async () => {
               $userAuth.value('username').del();
               $userAuth.value('password').del();
