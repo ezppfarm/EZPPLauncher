@@ -182,6 +182,7 @@
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
       await invoke('run_osu', { folder: osuPath });
+      launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
 
       const osuReleaseStream: string = await invoke('get_osu_release_stream', {
