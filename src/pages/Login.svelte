@@ -4,12 +4,14 @@
   import Button from '@/components/ui/button/button.svelte';
   import Input from '@/components/ui/input/input.svelte';
   import Label from '@/components/ui/label/label.svelte';
-  import { current_view } from '@/global';
+  import { currentView } from '@/global';
   import { currentUser, userAuth } from '@/userAuthentication';
   import { animate } from 'animejs';
   import { LoaderCircle } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import Launch from './Launch.svelte';
+  import { currentUserInfo } from '@/data';
+  import { preferredMode, preferredType } from '@/userSettings';
 
   let username = $state('');
   let password = $state('');
@@ -52,7 +54,7 @@
         await $userAuth.save();
 
         currentUser.set(loginResult.user);
-        current_view.set(Launch);
+        currentView.set(Launch);
       } else {
         toast.error('Login failed!', {
           description: 'Please check your username and password.',
@@ -64,6 +66,16 @@
         description: 'There was an issue connecting to the server. Please try again later.',
       });
       isLoading = false;
+    }
+
+    if ($currentUser) {
+      const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+      if (userInfo) {
+        currentUserInfo.set(userInfo.player);
+
+        preferredMode.set(userInfo.player.info.preferred_mode);
+        preferredType.set(userInfo.player.info.preferred_type);
+      }
     }
   };
 </script>

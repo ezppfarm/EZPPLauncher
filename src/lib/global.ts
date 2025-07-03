@@ -3,15 +3,18 @@ import { ezppfarm } from './api/ezpp';
 import type { Component } from 'svelte';
 import Loading from '../pages/Loading.svelte';
 
-export const current_view = writable<Component>(Loading);
-export const first_startup = writable<boolean>(false);
+export const currentView = writable<Component>(Loading);
 
-export const server_ping = writable<number | undefined>(undefined);
-export const server_connection_fails = writable(0);
+export const currentLoadingInfo = writable<string>('Initializing...');
 
-export const online_friends = writable<number | undefined>(undefined);
+export const firstStartup = writable<boolean>(false);
 
-export const beatmap_sets = writable<number | undefined>(undefined);
+export const serverPing = writable<number | undefined>(undefined);
+export const serverConnectionFails = writable(0);
+
+export const onlineFriends = writable<number | undefined>(undefined);
+
+export const beatmapSets = writable<number | undefined>(undefined);
 
 export const setupValues = () => {
   updatePing();
@@ -27,23 +30,19 @@ export const setupValues = () => {
 };
 
 const updatePing = async () => {
-  const serverPing = await ezppfarm.ping();
-  if (!serverPing) {
-    server_connection_fails.update((num) => num + 1);
+  const currentServerPing = await ezppfarm.ping();
+  if (!currentServerPing) {
+    serverConnectionFails.update((num) => num + 1);
   } else {
-    server_connection_fails.set(0);
-    server_ping.set(serverPing);
+    serverConnectionFails.set(0);
+    serverPing.set(currentServerPing);
   }
 };
 
 const updateFriends = async () => {
   await new Promise((res) => setTimeout(res, Math.random() * 300));
-  const onlineFriends = Math.round(Math.random() * 10);
-  online_friends.set(onlineFriends);
+  const currentOnlineFriends = Math.round(Math.random() * 10);
+  onlineFriends.set(currentOnlineFriends);
 };
 
-const updateBeatmapSets = async () => {
-  await new Promise((res) => setTimeout(res, Math.random() * 1500));
-  const beatmapSets = Math.round(Math.random() * 5000);
-  beatmap_sets.set(beatmapSets);
-};
+const updateBeatmapSets = async () => {};

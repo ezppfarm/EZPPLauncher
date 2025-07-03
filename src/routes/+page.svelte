@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { current_view } from '@/global';
+  import { currentView } from '@/global';
   import { fade } from 'svelte/transition';
 
-  const View = $derived($current_view);
+  const View = $derived($currentView);
 </script>
 
 {#key View}

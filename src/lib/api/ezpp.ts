@@ -1,14 +1,22 @@
-import type { EZPPUser } from '@/types';
+import type { EZPPUser, EZPPUserInfoResponse, EZPPUserResponse } from '@/types';
 import { betterFetch } from '@better-fetch/fetch';
 
 const BANCHO_ENDPOINT = 'https://c.ez-pp.farm/';
+const API_ENDPOINT = 'https://api.ez-pp.farm/';
 const ENDPOINT = 'https://ez-pp.farm/';
+
+const timeout = 5000; // 5 seconds;
 
 export const ezppfarm = {
   ping: async (): Promise<number | undefined> => {
     try {
       const start = Date.now();
-      const request = await betterFetch(BANCHO_ENDPOINT);
+      const request = await betterFetch(BANCHO_ENDPOINT, {
+        timeout,
+        headers: {
+          'User-Agent': 'EZPPLauncher',
+        },
+      });
       if (request.error) return undefined;
       const ping = Date.now() - start;
       return ping;
@@ -23,37 +31,41 @@ export const ezppfarm = {
     | {
         code: number;
         message: string;
-        user?: {
-          id: number;
-          donor: boolean;
-          name: string;
-          email: string;
-        };
+        user?: EZPPUser;
       }
     | undefined
   > => {
-    const request = await betterFetch<{
-      code: number;
-      message: string;
-      user?: EZPPUser;
-    }>('https://ez-pp.farm/login/check', {
+    const request = await betterFetch<EZPPUserResponse>(`${ENDPOINT}login/check`, {
       method: 'POST',
+      timeout,
       body: JSON.stringify({
         username: username,
         password: password,
       }),
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0',
+        'User-Agent': 'EZPPLauncher',
       },
     });
-    console.log(request.error);
     if (request.error) {
       if (request.error.status >= 500 && request.error.status < 600)
         throw new Error('Server not reachable');
       return undefined;
     }
     return request.data;
+  },
+  getUserInfo: async (userId: number) => {
+    const request = await betterFetch<EZPPUserInfoResponse>(`${API_ENDPOINT}v1/get_player_info`, {
+      timeout,
+      query: {
+        id: userId,
+        scope: 'all',
+      },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'EZPPLauncher',
+      },
+    });
+    return request.error ? undefined : request.data;
   },
 };

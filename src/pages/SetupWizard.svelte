@@ -11,7 +11,7 @@
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
   import { cursorSmoothening, customCursor, reduceAnimations, userSettings } from '@/userSettings';
   import Label from '@/components/ui/label/label.svelte';
-  import { current_view } from '@/global';
+  import { beatmapSets, currentView } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
 
@@ -65,6 +65,13 @@
       autoDetectedOsuPath = false;
       manualSelectValid = true;
       $userSettings.value('osu_installation_path').set(osuInstallationPath);
+
+      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
+        folder: osuInstallationPath,
+      });
+      if (beatmapSetCount) {
+        beatmapSets.set(beatmapSetCount);
+      }
     }
   };
 
@@ -90,7 +97,7 @@
       class="mt-4"
       onclick={async () => {
         await $userSettings.save();
-        current_view.set(Launch);
+        currentView.set(Launch);
       }}
     >
       Finish

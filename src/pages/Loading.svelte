@@ -1,8 +1,14 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
   import { estimateRefreshRate } from '@/displayUtils';
-  import { current_view, first_startup } from '@/global';
-  import { cursorSmoothness } from '@/userSettings';
+  import { beatmapSets, currentLoadingInfo, currentView, firstStartup } from '@/global';
+  import {
+    cursorSmoothness,
+    osuInstallationPath,
+    preferredMode,
+    preferredType,
+    userSettings,
+  } from '@/userSettings';
   import { animate, utils } from 'animejs';
   import { onMount } from 'svelte';
   import SetupWizard from './SetupWizard.svelte';
@@ -10,6 +16,8 @@
   import { currentUser, userAuth } from '@/userAuthentication';
   import { ezppfarm } from '@/api/ezpp';
   import { toast } from 'svelte-sonner';
+  import { currentUserInfo } from '@/data';
+  import { invoke } from '@tauri-apps/api/core';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -54,24 +62,59 @@
 
     const username = $userAuth.value('username').get('');
     const password = $userAuth.value('password').get('');
+    if (username.length > 0 && password.length > 0) {
+      currentLoadingInfo.set('Logging in...');
+      try {
+        const loginResult = await ezppfarm.login(username, password);
+        if (loginResult && loginResult.user) {
+          toast.success('Login successful!', {
+            description: `Welcome back, ${loginResult.user.name}!`,
+          });
 
-    try {
-      const loginResult = await ezppfarm.login(username, password);
-      if (loginResult && loginResult.user) {
-        toast.success('Login successful!', {
-          description: `Welcome back, ${loginResult.user.name}!`,
-        });
-
-        currentUser.set(loginResult.user);
-      } else {
-        toast.error('Login failed!', {
-          description: 'Please check your username and password.',
+          currentUser.set(loginResult.user);
+        } else {
+          toast.error('Login failed!', {
+            description: 'Please check your username and password.',
+          });
+        }
+      } catch {
+        toast.error('Server error occurred during login.', {
+          description: 'There was an issue connecting to the server. Please try again later.',
         });
       }
-    } catch {
-      toast.error('Server error occurred during login.', {
-        description: 'There was an issue connecting to the server. Please try again later.',
+    }
+    if ($currentUser) {
+      currentLoadingInfo.set('Loading user info...');
+      const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+      if (userInfo) {
+        currentUserInfo.set(userInfo.player);
+
+        preferredMode.set(userInfo.player.info.preferred_mode);
+        preferredType.set(userInfo.player.info.preferred_type);
+      }
+    }
+
+    if (!$firstStartup) {
+      currentLoadingInfo.set('Checking osu installation path...');
+      const validFolder: boolean = await invoke('valid_osu_folder', {
+        folder: $osuInstallationPath,
       });
+      if (!validFolder) {
+        osuInstallationPath.set('');
+        $userSettings.value('osu_installation_path').del();
+        await $userSettings.save();
+        toast.error('Oops...', {
+          description: 'Your previously set osu! installation path seems to be invalid.',
+        });
+      } else {
+        currentLoadingInfo.set('Counting beatmapsets...');
+        const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
+          folder: $osuInstallationPath,
+        });
+        if (beatmapSetCount) {
+          beatmapSets.set(beatmapSetCount);
+        }
+      }
     }
 
     animate(ezppLogo, {
@@ -88,8 +131,8 @@
       onComplete: () => {},
     });
     setTimeout(() => {
-      if ($first_startup) current_view.set(SetupWizard);
-      else current_view.set(Launch);
+      if ($firstStartup) currentView.set(SetupWizard);
+      else currentView.set(Launch);
     }, 250);
   };
 
@@ -144,4 +187,5 @@
       bind:this={ezppLogo}
     />
   </div>
+  <span class="text-theme-200 font-semibold">{$currentLoadingInfo}</span>
 </div>

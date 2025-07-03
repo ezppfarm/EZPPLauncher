@@ -4,7 +4,7 @@
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
   import * as Select from '@/components/ui/select';
-  import { beatmap_sets, current_view, server_connection_fails, server_ping } from '@/global';
+  import { beatmapSets, currentView, serverConnectionFails, serverPing } from '@/global';
   import {
     LoaderCircle,
     Logs,
@@ -14,19 +14,26 @@
     Gamepad2,
     WifiOff,
     Settings2,
+    Drum,
+    Cherry,
+    Piano,
+    Circle,
+    LogOut,
+    LogIn,
   } from 'lucide-svelte';
-  import { Circle } from 'radix-icons-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
-  import { numberHumanReadable } from '@/utils';
-  import { scale } from 'svelte/transition';
+  import { formatTimeReadable, numberHumanReadable } from '@/utils';
+  import { fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
     cursorSmoothening,
     customCursor,
     osuInstallationPath,
+    preferredMode,
+    preferredType,
     reduceAnimations,
     userSettings,
   } from '@/userSettings';
@@ -35,10 +42,29 @@
   import { invoke } from '@tauri-apps/api/core';
   import { toast } from 'svelte-sonner';
   import Login from './Login.svelte';
-  import { currentUser } from '@/userAuthentication';
+  import { currentUser, userAuth } from '@/userAuthentication';
+  import {
+    getGamemodeInt,
+    getGamemodeName,
+    getModeAndTypeFromGamemode,
+    modeIntToStr,
+    typeIntToStr,
+    validModeTypeCombinationsSorted,
+  } from '@/gamemode';
+  import { currentUserInfo } from '@/data';
 
   let selectedTab = $state('home');
   let launching = $state(false);
+
+  let selectedGamemode = $derived(
+    getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
+  );
+  let selectedMode = $derived(getModeAndTypeFromGamemode(selectedGamemode).mode);
+  let selectedType = $derived(getModeAndTypeFromGamemode(selectedGamemode).type);
+
+  const updateGamemode = (newGamemode: string) => {
+    selectedGamemode = Number(newGamemode);
+  };
 
   const browse_osu_installation = async () => {
     const selectedPath = await open({
@@ -48,9 +74,9 @@
     });
 
     if (typeof selectedPath === 'string') {
-      /* if (selectedPath === $osuInstallationPath) {
+      if (selectedPath === $osuInstallationPath) {
         return;
-      } */
+      }
       const validFolder: boolean = await invoke('valid_osu_folder', { folder: selectedPath });
       if (!validFolder) {
         toast.error(
@@ -62,6 +88,13 @@
       $userSettings.value('osu_installation_path').set(selectedPath);
       $userSettings.save();
       toast.success('osu! installation path set successfully.');
+
+      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
+        folder: selectedPath,
+      });
+      if (beatmapSetCount) {
+        beatmapSets.set(beatmapSetCount);
+      }
     }
   };
 </script>
@@ -94,53 +127,184 @@
       <div class="flex flex-row gap-2">
         <!-- <Badge variant="destructive">Owner</Badge> -->
         {#if !$currentUser}
-          <Button variant="outline" size="sm" onclick={() => current_view.set(Login)}>Login</Button>
+          <Button variant="outline" size="sm" onclick={() => currentView.set(Login)}>
+            <LogIn size={16} />
+            Login
+          </Button>
+        {:else}
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={async () => {
+              $userAuth.value('username').del();
+              $userAuth.value('password').del();
+              await $userAuth.save();
+              toast.success('Logout successful!', {
+                description: 'See you soon!',
+              });
+              currentUser.set(undefined);
+              currentUserInfo.set(undefined);
+            }}
+          >
+            <LogOut size={16} />
+            Logout
+          </Button>
         {/if}
       </div>
     </div>
-    <div class="flex flex-col gap-6 h-full px-3">
-      <Select.Root type="single">
-        <Select.Trigger
-          class="border-theme-800/90 bg-theme-900/90 !text-muted-foreground font-semibold"
+    {#if $currentUser}
+      <div class="flex flex-col gap-6 h-full px-3">
+        <div
+          in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+          out:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+        >
+          <Select.Root
+            type="single"
+            value={selectedGamemode.toFixed()}
+            onValueChange={updateGamemode}
+          >
+            <Select.Trigger
+              class="border-theme-800/90 bg-theme-900/90 !text-muted-foreground font-semibold"
+            >
+              <div class="flex flex-row items-center gap-2">
+                {#if selectedMode === 0}
+                  <Circle size={16} class="text-theme-200" />
+                {:else if selectedMode === 1}
+                  <Drum size={16} class="text-theme-200" />
+                {:else if selectedMode === 2}
+                  <Cherry size={16} class="text-theme-200" />
+                {:else if selectedMode === 3}
+                  <Piano size={16} class="text-theme-200" />
+                {/if}
+                {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
+              </div>
+            </Select.Trigger>
+            <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
+              {#each validModeTypeCombinationsSorted as gamemode}
+                {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
+                <Select.Item value={gamemode.toFixed()}>
+                  <div class="flex flex-row gap-2 items-center">
+                    {#if gamemod.mode === 0}
+                      <Circle size={16} class="text-theme-200" />
+                    {:else if gamemod.mode === 1}
+                      <Drum size={16} class="text-theme-200" />
+                    {:else if gamemod.mode === 2}
+                      <Cherry size={16} class="text-theme-200" />
+                    {:else if gamemod.mode === 3}
+                      <Piano size={16} class="text-theme-200" />
+                    {/if}
+                    {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
+                  </div>
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+        <div
+          class="bg-theme-900/90 border border-theme-800/90 rounded-lg p-2"
+          in:scale={{
+            duration: $reduceAnimations ? 0 : 400,
+            delay: $reduceAnimations ? 0 : 50,
+            start: 0.98,
+          }}
+          out:scale={{
+            duration: $reduceAnimations ? 0 : 400,
+            delay: $reduceAnimations ? 0 : 50,
+            start: 0.98,
+          }}
         >
           <div class="flex flex-row items-center gap-2">
-            <Circle class="text-muted-foreground" />
-            osu!vn
+            <Logs class="text-muted-foreground" size="16" />
+            <span class="font-semibold text-muted-foreground text-sm">Mode Stats</span>
           </div>
-        </Select.Trigger>
-        <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
-          <Select.Item value="light">osu!vn</Select.Item>
-          <Select.Item value="dark">osu!rx</Select.Item>
-          <Select.Item value="system">osu!ap</Select.Item>
-        </Select.Content>
-      </Select.Root>
-      <div class="bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
-        <div class="flex flex-row items-center gap-2">
-          <Logs class="text-muted-foreground" size="16" />
-          <span class="font-semibold text-muted-foreground text-sm">Mode Stats</span>
-        </div>
-        <div class="grid grid-cols-2 mt-2 border-t border-theme-800 pt-2 pb-2">
-          <div class="flex flex-col gap-0.5">
-            <span class="text-sm text-muted-foreground font-semibold">Rank</span>
-            <span class="text-lg font-semibold text-theme-50">#727</span>
+          <div class="grid grid-cols-2 mt-2 border-t border-theme-800 pt-2 pb-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-sm text-muted-foreground font-semibold">Rank</span>
+              <div class="flex items-center h-full text-lg font-semibold text-theme-50">
+                {#if $currentUserInfo}
+                  <div in:fade>
+                    <NumberFlow
+                      trend={0}
+                      prefix="#"
+                      value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
+                    ></NumberFlow>
+                  </div>
+                {:else}
+                  <div in:fade>
+                    <LoaderCircle class="animate-spin" size={21} />
+                  </div>
+                {/if}
+              </div>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-sm text-muted-foreground font-semibold">PP</span>
+              <div class="flex items-center h-full text-lg font-semibold text-theme-50">
+                {#if $currentUserInfo}
+                  <div in:fade>
+                    <NumberFlow trend={0} value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
+                    ></NumberFlow>
+                  </div>
+                {:else}
+                  <div in:fade>
+                    <LoaderCircle class="animate-spin" size={21} />
+                  </div>
+                {/if}
+              </div>
+            </div>
           </div>
-          <div class="flex flex-col gap-0.5">
-            <span class="text-sm text-muted-foreground font-semibold">PP</span>
-            <span class="text-lg font-semibold text-theme-50">727</span>
-          </div>
-        </div>
-        <div class="grid grid-cols-[1fr_auto] border-t border-theme-800 pt-2">
-          <span class="text-sm text-muted-foreground font-semibold">Accuracy</span>
-          <span class="text-sm font-semibold text-end text-theme-50">72.72%</span>
+          <div class="grid grid-cols-[1fr_auto] border-t border-theme-800 pt-2">
+            <span class="text-sm text-muted-foreground font-semibold">Accuracy</span>
+            <div
+              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+            >
+              {#if $currentUserInfo}
+                <div in:fade>
+                  <NumberFlow
+                    trend={0}
+                    suffix="%"
+                    value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
+                  ></NumberFlow>
+                </div>
+              {:else}
+                <div in:fade>
+                  <LoaderCircle class="animate-spin" size={21} />
+                </div>
+              {/if}
+            </div>
 
-          <span class="text-sm text-muted-foreground font-semibold">Play Count</span>
-          <span class="text-sm font-semibold text-end text-theme-50">727</span>
+            <span class="text-sm text-muted-foreground font-semibold">Play Count</span>
+            <div
+              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+            >
+              {#if $currentUserInfo}
+                <div in:fade>
+                  <NumberFlow trend={0} value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
+                  ></NumberFlow>
+                </div>
+              {:else}
+                <div in:fade>
+                  <LoaderCircle class="animate-spin" size={21} />
+                </div>
+              {/if}
+            </div>
 
-          <span class="text-sm text-muted-foreground font-semibold">Play Time</span>
-          <span class="text-sm font-semibold text-end text-theme-50">727h</span>
+            <span class="text-sm text-muted-foreground font-semibold">Play Time</span>
+            <div
+              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+            >
+              {#if $currentUserInfo}
+                <div in:fade>
+                  {formatTimeReadable($currentUserInfo.stats[selectedGamemode].playtime ?? 0)}
+                </div>
+              {:else}
+                <div in:fade>
+                  <LoaderCircle class="animate-spin" size={21} />
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
-      </div>
-      <!-- <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
+        <!-- <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
         <div class="flex flex-row items-center justify-between">
           <div class="flex flex-row items-center gap-2">
             <Users class="text-muted-foreground" size="16" />
@@ -149,7 +313,8 @@
           <Badge class="h-5 bg-green-500/20 hover:bg-green-500/20 text-green-500">3 online</Badge>
         </div>
       </div> -->
-    </div>
+      </div>
+    {/if}
   </div>
   <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
     <div
@@ -188,21 +353,21 @@
             </div>
             <div class="relative font-bold text-xl text-blue-400">
               <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$beatmap_sets
+                class="absolute top-1 left-1/2 -translate-x-1/2 {!$beatmapSets
                   ? 'opacity-100'
                   : 'opacity-0'} transition-opacity duration-1000"
               >
                 <LoaderCircle class="animate-spin" />
               </div>
               <div
-                class="{!$beatmap_sets
+                class="{!$beatmapSets
                   ? 'opacity-0'
                   : 'opacity-100'} transition-opacity duration-1000"
               >
                 {#if $reduceAnimations}
-                  <span>{numberHumanReadable($beatmap_sets ?? 0)}</span>
+                  <span>{numberHumanReadable($beatmapSets ?? 0)}</span>
                 {:else}
-                  <NumberFlow value={$beatmap_sets ?? 0} trend={0} />
+                  <NumberFlow value={$beatmapSets ?? 0} trend={0} />
                 {/if}
               </div>
             </div>
@@ -249,38 +414,38 @@
             class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
           >
             <div
-              class="flex items-center justify-center p-2 rounded-lg {$server_connection_fails > 1
+              class="flex items-center justify-center p-2 rounded-lg {$serverConnectionFails > 1
                 ? 'bg-red-500/20'
                 : 'bg-green-500/20'}"
             >
-              {#if $server_connection_fails > 1}
+              {#if $serverConnectionFails > 1}
                 <WifiOff class="text-red-500" size="26" />
               {:else}
                 <Wifi class="text-green-500" size="26" />
               {/if}
             </div>
             <div
-              class="relative font-bold text-xl {$server_connection_fails > 1
+              class="relative font-bold text-xl {$serverConnectionFails > 1
                 ? 'text-red-400'
                 : 'text-green-400'}"
             >
               <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$server_ping ||
-                $server_connection_fails > 1
+                class="absolute top-1 left-1/2 -translate-x-1/2 {!$serverPing ||
+                $serverConnectionFails > 1
                   ? 'opacity-100'
                   : 'opacity-0'} transition-opacity duration-1000"
               >
                 <LoaderCircle class="animate-spin" />
               </div>
               <div
-                class="{!$server_ping || $server_connection_fails > 1
+                class="{!$serverPing || $serverConnectionFails > 1
                   ? 'opacity-0'
                   : 'opacity-100'} transition-opacity duration-1000"
               >
                 {#if $reduceAnimations}
-                  <span>{$server_ping}ms</span>
+                  <span>{$serverPing}ms</span>
                 {:else}
-                  <NumberFlow value={$server_ping ?? 0} trend={0} suffix="ms" />
+                  <NumberFlow value={$serverPing ?? 0} trend={0} suffix="ms" />
                 {/if}
               </div>
             </div>
@@ -289,6 +454,7 @@
         </div>
         <Button
           size="lg"
+          disabled={launching || $osuInstallationPath === ''}
           onclick={() => {
             launching = true;
             setTimeout(() => {
@@ -297,7 +463,7 @@
           }}
         >
           <Play />
-          Launch {$server_connection_fails > 1 ? 'offline' : ''}
+          Launch {$serverConnectionFails > 1 ? 'offline' : ''}
         </Button>
       </div>
       <div
@@ -320,7 +486,7 @@
 
           <span class="text-sm text-muted-foreground font-semibold">Beatmap Sets</span>
           <span class="text-sm font-semibold text-end text-theme-50"
-            >{numberHumanReadable($beatmap_sets ?? 0)}</span
+            >{numberHumanReadable($beatmapSets ?? 0)}</span
           >
 
           <span class="text-sm text-muted-foreground font-semibold">Skins</span>
