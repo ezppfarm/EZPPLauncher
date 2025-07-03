@@ -91,10 +91,13 @@
     });
 
     animate(cursor, {
-      duration: 1500,
+      duration: isMouseDown ? 200 : 1500,
       rotate: degrees,
       transformOrigin: '0px 0px 0',
-      ease: (t: number) => Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
+      ease: (t: number) =>
+        isMouseDown
+          ? (t - 1) ** 7 + 1
+          : Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
     });
     lastMouseX = mouseX;
     lastMouseY = mouseY;
