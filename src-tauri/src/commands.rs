@@ -224,11 +224,14 @@ pub fn set_osu_config_value(
 }
 
 #[tauri::command]
-pub fn run_osu_updater(osu_path: String) -> Result<(), String> {
-    let mut updater_process = Command::new(osu_path.clone())
-        .arg("-repair")
-        .spawn()
-        .map_err(|e| e.to_string())?;
+pub fn run_osu_updater(folder: String) -> Result<(), String> {
+    let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
+    let mut updater_process = Command::new(osu_exe_path)
+      .arg("-repair")
+      .spawn()
+      .map_err(|e| e.to_string())?;
+
+    
 
     thread::sleep(Duration::from_millis(500));
 
@@ -243,8 +246,15 @@ pub fn run_osu_updater(osu_path: String) -> Result<(), String> {
                 let process_id = process.pid();
                 let window_title = get_window_title_by_pid(process_id);
 
+                println!("updater_process id: {}", updater_process.id());
+                println!("process_id: {}", process_id.as_u32());
+
+                println!("found osu!.exe process with window title: {}", window_title);
+
                 if !window_title.is_empty() {
+                    println!("Killing osu!.exe process");
                     if let Ok(_) = process.kill_and_wait() {
+                        println!("osu!.exe process killed");
                         termination_thread_running = false;
                         break;
                     }

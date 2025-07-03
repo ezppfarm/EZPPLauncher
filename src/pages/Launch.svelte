@@ -145,7 +145,6 @@
       }
 
       const versions = compareBuildNumbers($osuBuild, streamInfo);
-
       if (versions > 0) {
         launchInfo = 'Update found!';
         await new Promise((res) => setTimeout(res, 1500));
@@ -154,7 +153,8 @@
       } else {
         launchInfo = 'You are up to date!';
       }
-    } catch {
+    } catch(err) {
+      console.log(err);
       toast.error('Hmmm...', {
         description: 'Failed to check for updates.',
       });

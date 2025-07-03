@@ -58,7 +58,9 @@ export const releaseStreamToReadable = (releaseStream: string) => {
 
 export const compareBuildNumbers = (current: string, target: string): number => {
   const parse = (version: string): [number, number] => {
-    const cleaned = version.split(/[^0-9.]/)[0];
+    const cleaned = version.startsWith('b')
+      ? version.slice(1).split(/[^0-9.]/)[0]
+      : version.split(/[^0-9.]/)[0];
 
     const [baseStr, hotfixStr] = cleaned.split('.');
     const base = parseInt(baseStr, 10);

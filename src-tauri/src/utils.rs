@@ -4,10 +4,7 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
 use std::ptr;
 use sysinfo::Pid;
-use winapi::{
-    shared::minwindef::LPARAM,
-    um::winuser::{FindWindowW, GetWindowTextW, GetWindowThreadProcessId},
-};
+use winapi::um::winuser::{FindWindowW, GetWindowTextW, GetWindowThreadProcessId};
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
     let mut found = 0;
@@ -27,12 +24,10 @@ pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files:
 pub fn get_osu_user_config<P: AsRef<Path>>(
     osu_folder_path: P,
 ) -> Option<std::collections::HashMap<String, String>> {
-    // Ensure the osu! folder path is valid
     if !osu_folder_path.as_ref().exists() {
         return None;
     }
 
-    // get the osu!{username}.cfg file from the osu! folder
     let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = osu_folder_path
         .as_ref()
@@ -41,7 +36,6 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
         return None;
     }
 
-    // read the osu config and return it as a map, key and value are separated by ' = '
     let mut config_map = std::collections::HashMap::new();
     if let Ok(contents) = std::fs::read_to_string(osu_config_path) {
         for line in contents.lines() {
@@ -97,18 +91,15 @@ pub fn set_osu_user_config_value(
 pub fn get_osu_config<P: AsRef<Path>>(
     osu_folder_path: P,
 ) -> Option<std::collections::HashMap<String, String>> {
-    // Ensure the osu! folder path is valid
     if !osu_folder_path.as_ref().exists() {
         return None;
     }
 
-    // get the osu!.cfg file from the osu! folder
     let osu_config_path = osu_folder_path.as_ref().join("osu!.cfg");
     if !osu_config_path.exists() {
         return None;
     }
 
-    // read the osu config and return it as a map, key and value are separated by ' = '
     let mut config_map = std::collections::HashMap::new();
     if let Ok(contents) = std::fs::read_to_string(osu_config_path) {
         for line in contents.lines() {
