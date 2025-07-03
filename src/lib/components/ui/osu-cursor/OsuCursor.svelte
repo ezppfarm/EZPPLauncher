@@ -51,9 +51,7 @@
 
     const dist = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
 
-    if (!applyRotation && isMouseDown && dist > 10) {
-      applyRotation = true;
-    }
+    if (!applyRotation && isMouseDown && dist > 10) applyRotation = true;
 
     let newDegrees = (Math.atan2(-deltaX, deltaY) * 180) / Math.PI + 24.3;
 
