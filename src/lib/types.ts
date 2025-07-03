@@ -95,3 +95,27 @@ export type EZPPUserInfo = {
     time: Date;
   }[];
 };
+
+export type StreamsResult = {
+  streams: {
+    id: number;
+    name: string;
+    display_name: string;
+    is_featured: boolean;
+    latest_build: {
+      created_at: Date;
+      display_version: string;
+      id: number;
+      users: number;
+      version: string;
+      youtube_id: null | string;
+      update_stream: {
+        id: number;
+        name: string;
+        display_name: string;
+        is_featured: boolean;
+      };
+    };
+    user_count: number;
+  }[];
+};

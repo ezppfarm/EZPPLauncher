@@ -4,7 +4,15 @@
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
   import * as Select from '@/components/ui/select';
-  import { beatmapSets, currentView, serverConnectionFails, serverPing } from '@/global';
+  import {
+    beatmapSets,
+    currentView,
+    osuBuild,
+    osuStream,
+    serverConnectionFails,
+    serverPing,
+    skins,
+  } from '@/global';
   import {
     LoaderCircle,
     Logs,
@@ -20,11 +28,17 @@
     Circle,
     LogOut,
     LogIn,
+    Brush,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
-  import { formatTimeReadable, numberHumanReadable } from '@/utils';
+  import {
+    compareBuildNumbers,
+    formatTimeReadable,
+    numberHumanReadable,
+    releaseStreamToReadable,
+  } from '@/utils';
   import { fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
@@ -52,9 +66,11 @@
     validModeTypeCombinationsSorted,
   } from '@/gamemode';
   import { currentUserInfo } from '@/data';
+  import { osuapi } from '@/api/osuapi';
 
   let selectedTab = $state('home');
   let launching = $state(false);
+  let launchInfo = $state('');
 
   let selectedGamemode = $derived(
     getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
@@ -97,6 +113,44 @@
       }
     }
   };
+
+  const launch = async (offline: boolean) => {
+    if (!$osuBuild || !$osuStream) {
+      toast.error('Hmmm...', {
+        description: 'There was an issue detecting your installed osu! version',
+      });
+      return;
+    }
+    launchInfo = 'Looking for updates...';
+    launching = true;
+    try {
+      const streamInfo = await osuapi.latestBuildVersion($osuStream ?? 'stable40');
+      if (!streamInfo) {
+        toast.error('Hmmm...', {
+          description: 'Failed to check for updates.',
+        });
+        launching = false;
+        return;
+      }
+
+      const versions = compareBuildNumbers($osuBuild, streamInfo);
+
+      if (versions > 0) {
+        launchInfo = 'Update found!';
+      } else {
+        launchInfo = 'You are up to date!';
+      }
+    } catch {
+      toast.error('Hmmm...', {
+        description: 'Failed to check for updates.',
+      });
+      launching = false;
+    }
+
+    setTimeout(() => {
+      launching = false;
+    }, 5000);
+  };
 </script>
 
 <AlertDialog.Root bind:open={launching}>
@@ -109,7 +163,7 @@
     </div>
     <div class="flex flex-col items-center justify-center gap-2 p-3 rounded-lg">
       <Progress indeterminate />
-      <span class="text-muted-foreground">Downloading update files...</span>
+      <span class="text-muted-foreground">{launchInfo}</span>
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>
@@ -350,7 +404,7 @@
         class="my-auto bg-theme-900/90 flex flex-col items-center justify-center gap-6 border border-theme-800/90 rounded-lg p-6"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
       >
-        <div class="grid grid-cols-2 w-full gap-3">
+        <div class="grid grid-cols-3 w-full gap-3">
           <div
             class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
           >
@@ -378,6 +432,30 @@
               </div>
             </div>
             <div class="text-muted-foreground text-sm">Beatmap Sets imported</div>
+          </div>
+          <div
+            class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
+          >
+            <div class="flex items-center justify-center p-2 rounded-lg bg-yellow-500/20">
+              <Brush class="text-yellow-500" size="26" />
+            </div>
+            <div class="relative font-bold text-xl text-yellow-400">
+              <div
+                class="absolute top-1 left-1/2 -translate-x-1/2 {!$skins
+                  ? 'opacity-100'
+                  : 'opacity-0'} transition-opacity duration-1000"
+              >
+                <LoaderCircle class="animate-spin" />
+              </div>
+              <div class="{!$skins ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000">
+                {#if $reduceAnimations}
+                  <span>{numberHumanReadable($skins ?? 0)}</span>
+                {:else}
+                  <NumberFlow value={$skins ?? 0} trend={0} />
+                {/if}
+              </div>
+            </div>
+            <div class="text-muted-foreground text-sm">Skins</div>
           </div>
           <!-- <div
           class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
@@ -461,12 +539,7 @@
         <Button
           size="lg"
           disabled={launching || $osuInstallationPath === ''}
-          onclick={() => {
-            launching = true;
-            setTimeout(() => {
-              launching = false;
-            }, 5000);
-          }}
+          onclick={() => launch($serverConnectionFails > 1)}
         >
           <Play />
           Launch {$serverConnectionFails > 1 ? 'offline' : ''}
@@ -485,20 +558,26 @@
           <span class="font-semibold text-muted-foreground text-sm">Client Info</span>
         </div>
         <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-2">
+          <span class="text-sm text-muted-foreground font-semibold">osu! Release Stream</span>
+          <span class="text-sm font-semibold text-end text-theme-50">
+            <Badge>
+              {#if $osuStream}
+                {releaseStreamToReadable($osuStream)}
+              {:else}
+                <LoaderCircle class="animate-spin" size={17} />
+              {/if}
+            </Badge>
+          </span>
           <span class="text-sm text-muted-foreground font-semibold">osu! Version</span>
           <span class="text-sm font-semibold text-end text-theme-50">
-            <Badge>20250626.1</Badge>
+            <Badge>
+              {#if $osuBuild}
+                {$osuBuild}
+              {:else}
+                <LoaderCircle class="animate-spin" size={17} />
+              {/if}
+            </Badge>
           </span>
-
-          <span class="text-sm text-muted-foreground font-semibold">Beatmap Sets</span>
-          <span class="text-sm font-semibold text-end text-theme-50"
-            >{numberHumanReadable($beatmapSets ?? 0)}</span
-          >
-
-          <span class="text-sm text-muted-foreground font-semibold">Skins</span>
-          <span class="text-sm font-semibold text-end text-theme-50"
-            >{numberHumanReadable(727)}</span
-          >
         </div>
       </div>
     {:else if selectedTab === 'settings'}

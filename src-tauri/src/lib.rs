@@ -6,9 +6,7 @@ use winreg::RegKey;
 use winreg::enums::*;
 
 mod utils;
-use crate::utils::check_folder_completeness;
-use crate::utils::get_osu_user_config;
-
+use crate::utils::{check_folder_completeness, get_osu_user_config, get_osu_config};
 
 #[tauri::command]
 fn get_hwid() -> String {
@@ -140,8 +138,8 @@ fn find_osu_installation() -> Option<String> {
 #[tauri::command]
 fn get_beatmapsets_count(folder: String) -> Option<u64> {
     let path = PathBuf::from(folder);
-    let osu_config = get_osu_user_config(path.clone());
-    let songs_path = osu_config
+    let osu_user_config = get_osu_user_config(path.clone());
+    let songs_path = osu_user_config
         .and_then(|config| config.get("Songs").cloned())
         .unwrap_or_else(|| path.join("Songs").to_string_lossy().into_owned());
     let songs_folder = PathBuf::from(songs_path);
@@ -169,6 +167,52 @@ fn get_beatmapsets_count(folder: String) -> Option<u64> {
     return Some(count);
 }
 
+#[tauri::command]
+fn get_skins_count(folder: String) -> Option<u64> {
+    let path = PathBuf::from(folder);
+    let skins_folder = path.join("Skins");
+
+    if !skins_folder.exists() {
+        return None;
+    }
+
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir(skins_folder) {
+        for entry in entries.flatten() {
+            if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+                let dir_path = entry.path();
+                if let Ok(files) = std::fs::read_dir(&dir_path) {
+                    for file in files.flatten() {
+                        if file.path().extension().map_or(false, |ext| ext == "ini") {
+                            count += 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return Some(count);
+}
+
+#[tauri::command]
+fn get_osu_version(folder: String) -> String {
+    let path = PathBuf::from(folder);
+    let osu_user_config = get_osu_user_config(path.clone());
+    return osu_user_config
+        .and_then(|config| config.get("LastVersion").cloned())
+        .unwrap_or_else(|| "failed.".to_string());
+}
+
+#[tauri::command]
+fn get_osu_release_stream(folder: String) -> String {
+    let path = PathBuf::from(folder);
+    let osu_config = get_osu_config(path.clone());
+    return osu_config
+        .and_then(|config| config.get("_ReleaseStream").cloned())
+        .unwrap_or_else(|| "Stable40".to_string());
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -188,7 +232,10 @@ pub fn run() {
             get_hwid,
             find_osu_installation,
             valid_osu_folder,
-            get_beatmapsets_count
+            get_beatmapsets_count,
+            get_skins_count,
+            get_osu_version,
+            get_osu_release_stream
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())

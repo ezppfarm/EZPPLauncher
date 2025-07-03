@@ -1,7 +1,15 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
   import { estimateRefreshRate } from '@/displayUtils';
-  import { beatmapSets, currentLoadingInfo, currentView, firstStartup } from '@/global';
+  import {
+    beatmapSets,
+    currentLoadingInfo,
+    currentView,
+    firstStartup,
+    osuBuild,
+    osuStream,
+    skins,
+  } from '@/global';
   import {
     cursorSmoothness,
     osuInstallationPath,
@@ -107,13 +115,27 @@
           description: 'Your previously set osu! installation path seems to be invalid.',
         });
       } else {
+        currentLoadingInfo.set('Getting osu version...');
+        const osuReleaseStream: string = await invoke('get_osu_release_stream', {
+          folder: $osuInstallationPath,
+        });
+        osuStream.set(osuReleaseStream);
+        const osuVersion: string = await invoke('get_osu_version', {
+          folder: $osuInstallationPath,
+        });
+        osuBuild.set(osuVersion);
+
         currentLoadingInfo.set('Counting beatmapsets...');
         const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
           folder: $osuInstallationPath,
         });
-        if (beatmapSetCount) {
-          beatmapSets.set(beatmapSetCount);
-        }
+        if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
+
+        currentLoadingInfo.set('Counting skins...');
+        const skinCount: number | null = await invoke('get_skins_count', {
+          folder: $osuInstallationPath,
+        });
+        if (skinCount) skins.set(skinCount);
       }
     }
 

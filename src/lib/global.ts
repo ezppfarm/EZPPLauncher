@@ -15,6 +15,10 @@ export const serverConnectionFails = writable(0);
 export const onlineFriends = writable<number | undefined>(undefined);
 
 export const beatmapSets = writable<number | undefined>(undefined);
+export const skins = writable<number | undefined>(undefined);
+
+export const osuStream = writable<string | undefined>(undefined);
+export const osuBuild = writable<string | undefined>(undefined);
 
 export const setupValues = () => {
   updatePing();

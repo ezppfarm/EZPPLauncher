@@ -50,3 +50,31 @@ export const formatTimeReadable = (initialSeconds: number) => {
 
   return result.trim();
 };
+
+export const releaseStreamToReadable = (releaseStream: string) => {
+  if (releaseStream.toLowerCase() === 'cuttingedge') return 'Cutting Edge';
+  return 'Stable';
+};
+
+export const compareBuildNumbers = (current: string, target: string): number => {
+  const parse = (version: string): [number, number] => {
+    const cleaned = version.split(/[^0-9.]/)[0];
+
+    const [baseStr, hotfixStr] = cleaned.split('.');
+    const base = parseInt(baseStr, 10);
+    const hotfix = hotfixStr ? parseInt(hotfixStr, 10) : 0;
+
+    return [base, hotfix];
+  };
+
+  const [currentBase, currentHotfix] = parse(current);
+  const [targetBase, targetHotfix] = parse(target);
+
+  if (targetBase > currentBase) {
+    return targetBase - currentBase + targetHotfix;
+  } else if (targetBase === currentBase) {
+    return targetHotfix - currentHotfix;
+  } else {
+    return -1;
+  }
+};
