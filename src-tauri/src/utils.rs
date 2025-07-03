@@ -1,5 +1,13 @@
+use std::ffi::OsString;
 use std::fs;
+use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
+use std::ptr;
+use sysinfo::Pid;
+use winapi::{
+    shared::minwindef::LPARAM,
+    um::winuser::{FindWindowW, GetWindowTextW, GetWindowThreadProcessId},
+};
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
     let mut found = 0;
@@ -111,4 +119,29 @@ pub fn get_osu_config<P: AsRef<Path>>(
     }
 
     return Some(config_map);
+}
+
+pub fn get_window_title_by_pid(pid: Pid) -> String {
+    let mut window_title = String::new();
+
+    unsafe {
+        let hwnd = FindWindowW(ptr::null_mut(), ptr::null_mut());
+
+        if hwnd.is_null() {
+            return String::new();
+        }
+
+        let mut process_id = 0;
+        GetWindowThreadProcessId(hwnd, &mut process_id);
+
+        if process_id == pid.as_u32() {
+            let mut title = vec![0u16; 512];
+            let length = GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32);
+
+            let title = OsString::from_wide(&title[..length as usize]);
+            window_title = title.to_string_lossy().into_owned();
+        }
+    }
+
+    window_title
 }

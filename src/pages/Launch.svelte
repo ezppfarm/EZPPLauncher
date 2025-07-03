@@ -95,9 +95,10 @@
       }
       const validFolder: boolean = await invoke('valid_osu_folder', { folder: selectedPath });
       if (!validFolder) {
-        toast.error(
-          'The selected folder is not a valid osu! installation folder. Please select the correct folder.'
-        );
+        toast.error('Oops...', {
+          description:
+            'The selected folder is not a valid osu! installation folder. Please select the correct folder.',
+        });
         return;
       }
       osuInstallationPath.set(selectedPath);
@@ -121,8 +122,18 @@
       });
       return;
     }
-    launchInfo = 'Looking for updates...';
+    launchInfo = 'Validating osu! installation...';
     launching = true;
+
+    const validFolder: boolean = await invoke('valid_osu_folder', { folder: $osuInstallationPath });
+    if (!validFolder) {
+      toast.error('Hmmm...', {
+        description: 'Your selected osu! installation folder is not valid.',
+      });
+      launching = false;
+      return;
+    }
+
     try {
       const streamInfo = await osuapi.latestBuildVersion($osuStream ?? 'stable40');
       if (!streamInfo) {
@@ -137,6 +148,9 @@
 
       if (versions > 0) {
         launchInfo = 'Update found!';
+        await new Promise((res) => setTimeout(res, 1500));
+        launchInfo = 'Running osu! updater...';
+        await invoke('run_osu_updater', { folder: $osuInstallationPath });
       } else {
         launchInfo = 'You are up to date!';
       }

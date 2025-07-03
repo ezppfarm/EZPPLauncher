@@ -1,8 +1,13 @@
 use hardware_id::get_id;
 use std::path::PathBuf;
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
+use sysinfo::System;
 use winreg::RegKey;
 use winreg::enums::*;
 
+use crate::utils::get_window_title_by_pid;
 use crate::utils::set_osu_user_config_value;
 use crate::utils::{check_folder_completeness, get_osu_config, get_osu_user_config};
 
@@ -216,4 +221,44 @@ pub fn set_osu_config_value(
     value: String,
 ) -> Result<bool, String> {
     set_osu_user_config_value(&osu_folder_path, &key, &value)
+}
+
+#[tauri::command]
+pub fn run_osu_updater(osu_path: String) -> Result<(), String> {
+    let mut updater_process = Command::new(osu_path.clone())
+        .arg("-repair")
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    thread::sleep(Duration::from_millis(500));
+
+    let mut sys = System::new_all();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+    let mut termination_thread_running = true;
+
+    while termination_thread_running {
+        for (_, process) in sys.processes() {
+            if process.name() == "osu!.exe" {
+                let process_id = process.pid();
+                let window_title = get_window_title_by_pid(process_id);
+
+                if !window_title.is_empty() {
+                    if let Ok(_) = process.kill_and_wait() {
+                        termination_thread_running = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !termination_thread_running {
+            break;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    updater_process.wait().map_err(|e| e.to_string())?;
+
+    Ok(())
 }
