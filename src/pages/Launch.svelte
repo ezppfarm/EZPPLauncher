@@ -131,10 +131,11 @@
       });
       return;
     }
+    const osuPath = $osuInstallationPath;
     launchInfo = 'Validating osu! installation...';
     launching = true;
 
-    const validFolder: boolean = await invoke('valid_osu_folder', { folder: $osuInstallationPath });
+    const validFolder: boolean = await invoke('valid_osu_folder', { folder: osuPath });
     if (!validFolder) {
       toast.error('Hmmm...', {
         description: 'Your selected osu! installation folder is not valid.',
@@ -158,8 +159,8 @@
         launchInfo = 'Update found!';
         await new Promise((res) => setTimeout(res, 1500));
         launchInfo = 'Running osu! updater...';
-        await setUserConfigValue($osuInstallationPath, 'LastVersion', streamInfo);
-        await invoke('run_osu_updater', { folder: $osuInstallationPath });
+        await setUserConfigValue(osuPath, 'LastVersion', streamInfo);
+        await invoke('run_osu_updater', { folder: osuPath });
         launchInfo = 'osu! is now up to date!';
       } else {
         launchInfo = 'You are up to date!';
@@ -168,24 +169,45 @@
         const username = $userAuth.value('username').get('');
         const password = $userAuth.value('password').get('');
         if (username.length > 0 && password.length > 0) {
-          await setUserConfigValue($osuInstallationPath, 'Username', username);
-          await setUserConfigValue($osuInstallationPath, 'Password', password);
-          await setUserConfigValue($osuInstallationPath, 'SaveUsername', '1');
-          await setUserConfigValue($osuInstallationPath, 'SavePassword', '1');
+          //TODO: make this one function to prevent multiple file writes
+          await setUserConfigValue(osuPath, 'Username', username);
+          await setUserConfigValue(osuPath, 'Password', password);
+          await setUserConfigValue(osuPath, 'SaveUsername', '1');
+          await setUserConfigValue(osuPath, 'SavePassword', '1');
         }
-        await setUserConfigValue($osuInstallationPath, 'CredentialEndpoint', 'ez-pp.farm');
+        await setUserConfigValue(osuPath, 'CredentialEndpoint', 'ez-pp.farm');
       }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
-      await invoke('run_osu', { folder: $osuInstallationPath });
+      await invoke('run_osu', { folder: osuPath });
       await getCurrentWindow().show();
+
+      const osuReleaseStream: string = await invoke('get_osu_release_stream', {
+        folder: osuPath,
+      });
+      osuStream.set(osuReleaseStream);
+      const osuVersion: string = await invoke('get_osu_version', {
+        folder: osuPath,
+      });
+      osuBuild.set(osuVersion);
+
+      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
+        folder: osuPath,
+      });
+      if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
+
+      const skinCount: number | null = await invoke('get_skins_count', {
+        folder: osuPath,
+      });
+      if (skinCount) skins.set(skinCount);
+
       launching = false;
     } catch (err) {
       console.log(err);
       toast.error('Hmmm...', {
-        description: 'Failed to check for updates.',
+        description: 'Failed to launch.',
       });
       launching = false;
     }
