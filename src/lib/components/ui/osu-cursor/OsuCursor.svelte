@@ -49,7 +49,9 @@
     const velocityX = mouseX - lastMouseX;
     const velocityY = mouseY - lastMouseY;
 
-    if (!applyRotation && isMouseDown && velocityX * velocityX + velocityY * velocityY > 50) {
+    const dist = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+
+    if (!applyRotation && isMouseDown && dist > 10) {
       applyRotation = true;
     }
 
