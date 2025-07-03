@@ -22,10 +22,10 @@
     <img src={Logo} alt="EZPP Launcher Logo" class="h-11 w-11 inline-block" />
     <span>EZPPLauncher</span>
   </div>
-  <div class="titlebar-button" id="titlebar-minimize">
+  <div class="titlebar-button rounded-lg transition-colors duration-75" id="titlebar-minimize">
     <Minimize size={18} />
   </div>
-  <div class="titlebar-button close rounded-tr" id="titlebar-close">
+  <div class="titlebar-button close rounded-lg transition-colors duration-75" id="titlebar-close">
     <Close size={18} />
   </div>
 </div>
@@ -53,7 +53,6 @@
     align-items: center;
     width: 40px;
     height: 40px;
-    border-radius: 0.35rem;
     user-select: none;
     -webkit-user-select: none;
   }
