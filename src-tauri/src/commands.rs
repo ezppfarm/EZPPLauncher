@@ -196,7 +196,7 @@ pub fn get_osu_version(folder: String) -> String {
     let osu_user_config = get_osu_user_config(path.clone());
     return osu_user_config
         .and_then(|config| config.get("LastVersion").cloned())
-        .unwrap_or_else(|| "failed.".to_string());
+        .unwrap_or_else(|| "failed".to_string());
 }
 
 #[tauri::command]
