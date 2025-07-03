@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
@@ -47,51 +46,44 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
     return Some(config_map);
 }
 
-pub fn set_osu_user_config_value<P: AsRef<Path>>(
-    osu_folder_path: P,
+pub fn set_osu_user_config_value(
+    osu_folder_path: &str,
     key: &str,
     value: &str,
-) -> std::io::Result<()> {
-    // Determine the config file path
+) -> Result<bool, String> {
     let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
-    let osu_config_path = osu_folder_path
-        .as_ref()
-        .join(format!("osu!.{}.cfg", current_user));
+    let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
 
-    // Read existing config into a Vec of lines
-    let mut lines = if osu_config_path.exists() {
-        fs::read_to_string(&osu_config_path)?
-            .lines()
-            .map(|line| line.to_string())
-            .collect::<Vec<String>>()
-    } else {
-        Vec::new()
-    };
+    if !osu_config_path.exists() {
+        return Ok(false);
+    }
 
-    let mut found = false;
+    let mut lines = fs::read_to_string(&osu_config_path)
+        .map_err(|e| e.to_string())?
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<String>>();
+
+    let mut found_key = false;
 
     for line in lines.iter_mut() {
         if let Some((existing_key, _)) = line.split_once(" = ") {
             if existing_key.trim() == key {
                 *line = format!("{} = {}", key, value);
-                found = true;
+                found_key = true;
                 break;
             }
         }
     }
 
-    // If the key was not found, append it
-    if !found {
+    if !found_key {
         lines.push(format!("{} = {}", key, value));
     }
 
-    // Write back the file
-    let mut file = fs::File::create(&osu_config_path)?;
-    for line in lines {
-        writeln!(file, "{}", line)?;
-    }
+    let new_content = lines.join("\n") + "\n";
+    fs::write(&osu_config_path, new_content).map_err(|e| e.to_string())?;
 
-    Ok(())
+    Ok(true)
 }
 
 pub fn get_osu_config<P: AsRef<Path>>(

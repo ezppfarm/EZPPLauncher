@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use winreg::RegKey;
 use winreg::enums::*;
 
-use crate::utils::{check_folder_completeness, get_osu_user_config, get_osu_config};
+use crate::utils::set_osu_user_config_value;
+use crate::utils::{check_folder_completeness, get_osu_config, get_osu_user_config};
 
 #[tauri::command]
 pub fn get_hwid() -> String {
@@ -206,4 +207,13 @@ pub fn get_osu_release_stream(folder: String) -> String {
     return osu_config
         .and_then(|config| config.get("_ReleaseStream").cloned())
         .unwrap_or_else(|| "Stable40".to_string());
+}
+
+#[tauri::command]
+pub fn set_osu_config_value(
+    osu_folder_path: String,
+    key: String,
+    value: String,
+) -> Result<bool, String> {
+    set_osu_user_config_value(&osu_folder_path, &key, &value)
 }
