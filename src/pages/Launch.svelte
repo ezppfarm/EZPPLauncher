@@ -67,7 +67,7 @@
   } from '@/gamemode';
   import { currentUserInfo } from '@/data';
   import { osuapi } from '@/api/osuapi';
-  import { getPreviousReleaseStream, setConfigValues, setUserConfigValues } from '@/osuUtil';
+  import { getReleaseStream, setConfigValues, setUserConfigValues } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
 
   let selectedTab = $state('home');
@@ -125,7 +125,7 @@
   };
 
   const launch = async (offline: boolean) => {
-    if (!$osuBuild || !$osuStream) {
+    if (!$osuBuild) {
       toast.error('Hmmm...', {
         description: 'There was an issue detecting your installed osu! version',
       });
@@ -145,7 +145,7 @@
     }
 
     try {
-      const streamInfo = await osuapi.latestBuildVersion($osuStream ?? 'stable40');
+      const streamInfo = await osuapi.latestBuildVersion('stable40');
       if (!streamInfo) {
         toast.error('Hmmm...', {
           description: 'Failed to check for updates.',
@@ -154,17 +154,37 @@
         return;
       }
 
-      const previousReleaseStream = await getPreviousReleaseStream(osuPath);
-      let forceUpdate = previousReleaseStream && previousReleaseStream !== $osuStream;
+      const releaseStream = await getReleaseStream(osuPath);
+      let forceUpdate = releaseStream && releaseStream.toLowerCase() !== 'stable40';
 
       const versions = compareBuildNumbers($osuBuild, streamInfo);
       if (versions > 0 || forceUpdate) {
         launchInfo = 'Update found!';
         await new Promise((res) => setTimeout(res, 1500));
         launchInfo = 'Running osu! updater...';
-        await setUserConfigValues(osuPath, [{ key: 'LastVersion', value: streamInfo }]);
+        await setUserConfigValues(osuPath, [
+          {
+            key: 'LastVersion',
+            value: `b${streamInfo}`,
+          },
+        ]);
+        await setConfigValues(osuPath, [
+          {
+            key: '_ReleaseStream',
+            value: 'Stable40',
+          },
+        ]);
+        osuStream.set('Stable40');
+        osuBuild.set(`b${streamInfo}`);
         await invoke('run_osu_updater', { folder: osuPath });
         launchInfo = 'osu! is now up to date!';
+        if (forceUpdate)
+          await setConfigValues(osuPath, [
+            {
+              key: '_UpdateFailCount',
+              value: '0',
+            },
+          ]);
       } else {
         launchInfo = 'You are up to date!';
       }
@@ -763,34 +783,6 @@
               variant="outline"
               onclick={browse_osu_installation}>Browse</Button
             >
-          </div>
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">osu! release stream</Label>
-            <div class="text-muted-foreground text-xs">The release stream of your osu! client</div>
-          </div>
-          <div class="flex flex-row w-full">
-            <Select.Root
-              type="single"
-              value={$osuStream}
-              onValueChange={async (newStream) => {
-                const oldStream = $osuStream;
-                osuStream.set(newStream);
-                await setConfigValues($osuInstallationPath, [
-                  { key: '_ReleaseStream', value: newStream },
-                  { key: '_PreviousReleaseStream', value: oldStream ?? newStream },
-                ]);
-              }}
-            >
-              <Select.Trigger class="border-theme-800 bg-theme-950 text-white font-semibold">
-                <div class="flex flex-row items-center gap-2">
-                  {releaseStreamToReadable($osuStream ?? 'Stable40')}
-                </div>
-              </Select.Trigger>
-              <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
-                <Select.Item value="Stable40">Stable</Select.Item>
-                <Select.Item value="CuttingEdge">Cutting Edge</Select.Item>
-              </Select.Content>
-            </Select.Root>
           </div>
         </div>
       </div>

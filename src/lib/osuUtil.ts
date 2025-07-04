@@ -18,7 +18,7 @@ export const setConfigValues = async (
     entries,
   });
 
-export const getPreviousReleaseStream = async (folder: string) => {
-  const result = await invoke('get_osu_previous_release_stream', { folder });
+export const getReleaseStream = async (folder: string) => {
+  const result = await invoke('get_osu_release_stream', { folder });
   return typeof result === 'string' ? result : undefined;
 };
