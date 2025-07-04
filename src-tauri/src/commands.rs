@@ -349,8 +349,8 @@ pub fn run_osu_updater(folder: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn run_osu(folder: String) -> Result<(), String> {
-    let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
+pub fn run_osu(folder: String, patch: bool) -> Result<(), String> {
+    let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
@@ -370,6 +370,31 @@ pub fn run_osu(folder: String) -> Result<(), String> {
         .arg("ez-pp.farm")
         .spawn()
         .map_err(|e| e.to_string())?;
+
+    if patch {
+        thread::sleep(Duration::from_secs(3));
+        let patcher_exe_path = PathBuf::from(&folder)
+            .join("EZPPLauncher")
+            .join("patcher")
+            .join("osu!.patcher.exe");
+
+        if patcher_exe_path.exists() {
+            #[cfg(windows)]
+            {
+                let _ = Command::new(&patcher_exe_path)
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                    .spawn()
+                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
+            }
+
+            #[cfg(not(windows))]
+            {
+                let _ = Command::new(&patcher_exe_path)
+                    .spawn()
+                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
+            }
+        }
+    }
 
     game_process.wait().map_err(|e| e.to_string())?;
 
@@ -570,4 +595,9 @@ pub fn is_osu_running() -> bool {
     }
 
     false
+}
+
+#[tauri::command]
+pub fn open_url_in_browser(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))
 }
