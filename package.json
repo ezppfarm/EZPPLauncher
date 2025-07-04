@@ -12,7 +12,9 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
-    "update-logo": "bun run tauri icon ./static/logo.png"
+    "update-logo": "bun run tauri icon ./static/logo.png",
+    "format": "prettier --write .",
+    "lint": "prettier --check ."
   },
   "license": "MIT",
   "dependencies": {
@@ -48,8 +50,8 @@
     "bits-ui": "^1.4.7",
     "clsx": "2.1.1",
     "mode-watcher": "^1.0.6",
-    "prettier": "^3.6.1",
-    "prettier-plugin-svelte": "^3.4.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^3.3.3",
     "sass-embedded": "1.89.2",
     "svelte": "5.34.8",
     "svelte-check": "4.2.2",
