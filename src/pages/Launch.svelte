@@ -31,6 +31,7 @@
     LogOut,
     LogIn,
     Brush,
+    Heart,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -88,7 +89,6 @@
     setUserConfigValues,
   } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { Heart } from 'radix-icons-svelte';
   import { ezppfarm } from '@/api/ezpp';
   import Hearts from '@/components/ui/effects/Hearts.svelte';
 
@@ -892,11 +892,11 @@
       >
         <Button
           variant="link"
-          class="font-semibold font-mono text-sm text-theme-100/70"
+          class="font-light font-mono text-sm text-theme-100/70"
           onclick={() => openURL('https://ez-pp.farm/u/1001')}
         >
           made with
-          <Heart class="text-red-600 animate-pulse" />
+          <Heart class="text-red-600 fill-red-600 animate-pulse" />
           by horizoncode
         </Button>
       </div>
