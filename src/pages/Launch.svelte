@@ -89,6 +89,8 @@
   } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { Heart } from 'radix-icons-svelte';
+  import { ezppfarm } from '@/api/ezpp';
+  import Hearts from '@/components/ui/effects/Hearts.svelte';
 
   let selectedTab = $state('home');
   let progress = $state(-1);
@@ -326,11 +328,12 @@
         description: 'Failed to launch.',
       });
       launching.set(false);
-    }
 
-    setTimeout(() => {
-      launching.set(false);
-    }, 5000);
+      if ($currentUser) {
+        const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+        if (userInfo) currentUserInfo.set(userInfo.player);
+      }
+    }
   };
 </script>
 
@@ -352,30 +355,34 @@
 <div class="grid grid-cols-[0.41fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
   <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
     <div class="flex flex-col items-center gap-2 border-b pb-6">
-      <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
-        <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
-        <Avatar.Fallback class="bg-theme-900">
-          <LoaderCircle class="animate-spin" size={32} />
-        </Avatar.Fallback>
-      </Avatar.Root>
+      <div class="size-20 relative">
+        {#if $currentUser?.donor}
+          <Hearts className="top-0 left-0 h-[70px] w-[60px] absolute"></Hearts>
+        {/if}
+        <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
+          <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
+          <Avatar.Fallback class="bg-theme-900">
+            <LoaderCircle class="animate-spin" size={32} />
+          </Avatar.Fallback>
+        </Avatar.Root>
+      </div>
       <span class="font-semibold text-2xl text-theme-50">{$currentUser?.name ?? 'Guest'}</span>
       <div class="flex flex-row gap-2">
-        <!-- <Badge variant="destructive">Owner</Badge> -->
         {#if !$currentUser}
           <Button
             variant="outline"
             size="sm"
-            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800"
+            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800 text-xs"
             onclick={() => currentView.set(Login)}
           >
-            <LogIn size={16} />
+            <LogIn class="!size-4" />
             Login
           </Button>
         {:else}
           <Button
             variant="outline"
             size="sm"
-            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800"
+            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800 text-xs"
             onclick={async () => {
               $userAuth.value('username').del();
               $userAuth.value('password').del();
@@ -387,7 +394,7 @@
               currentUserInfo.set(undefined);
             }}
           >
-            <LogOut size={16} />
+            <LogOut class="!size-4" />
             Logout
           </Button>
         {/if}
@@ -494,9 +501,9 @@
             </div>
           </div>
           <div class="grid grid-cols-[1fr_auto] border-t border-theme-800 pt-2">
-            <span class="text-sm text-muted-foreground font-semibold">Accuracy</span>
+            <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
             <div
-              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
             >
               {#if $currentUserInfo}
                 <div in:fade>
@@ -513,9 +520,9 @@
               {/if}
             </div>
 
-            <span class="text-sm text-muted-foreground font-semibold">Play Count</span>
+            <span class="text-xs text-muted-foreground font-semibold">Play Count</span>
             <div
-              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
             >
               {#if $currentUserInfo}
                 <div in:fade>
@@ -529,9 +536,9 @@
               {/if}
             </div>
 
-            <span class="text-sm text-muted-foreground font-semibold">Play Time</span>
+            <span class="text-xs text-muted-foreground font-semibold">Play Time</span>
             <div
-              class="flex items-center flex-row-reverse h-full text-sm text-end font-semibold text-theme-50"
+              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
             >
               {#if $currentUserInfo}
                 <div in:fade>
@@ -612,7 +619,7 @@
                 {/if}
               </div>
             </div>
-            <div class="text-muted-foreground text-sm">Beatmap Sets imported</div>
+            <div class="text-muted-foreground text-[12px] leading-4">Beatmap Sets imported</div>
           </div>
           <div
             class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
@@ -636,7 +643,7 @@
                 {/if}
               </div>
             </div>
-            <div class="text-muted-foreground text-sm">Skins</div>
+            <div class="text-muted-foreground text-[12px] leading-4">Skins</div>
           </div>
           <!-- <div
           class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
@@ -714,7 +721,7 @@
                 {/if}
               </div>
             </div>
-            <div class="text-muted-foreground text-sm">Ping to Server</div>
+            <div class="text-muted-foreground text-[12px] leading-4">Ping to Server</div>
           </div>
         </div>
         <Button
@@ -739,33 +746,33 @@
           <span class="font-semibold text-muted-foreground text-sm">Client Info</span>
         </div>
         <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-0">
-          <span class="text-sm text-muted-foreground font-semibold">osu! Release Stream</span>
-          <span class="text-sm font-semibold text-end text-theme-50">
-            <Badge>
+          <span class="text-xs text-muted-foreground font-semibold">osu! Release Stream</span>
+          <span class="text-xs font-semibold text-end text-theme-50">
+            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
               {#if $osuStream}
                 {releaseStreamToReadable($osuStream)}
               {:else}
-                <LoaderCircle class="animate-spin" size={17} />
+                <LoaderCircle class="animate-spin" size={12} />
               {/if}
             </Badge>
           </span>
-          <span class="text-sm text-muted-foreground font-semibold">osu! Version</span>
-          <span class="text-sm font-semibold text-end text-theme-50">
-            <Badge>
+          <span class="text-xs text-muted-foreground font-semibold">osu! Version</span>
+          <span class="text-xs font-semibold text-end text-theme-50">
+            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
               {#if $osuBuild}
                 {$osuBuild}
               {:else}
-                <LoaderCircle class="animate-spin" size={17} />
+                <LoaderCircle class="animate-spin" size={12} />
               {/if}
             </Badge>
           </span>
-          <span class="text-sm text-muted-foreground font-semibold">Skin</span>
-          <span class="text-sm font-semibold text-end text-theme-50">
-            <Badge>
+          <span class="text-xs text-muted-foreground font-semibold">Skin</span>
+          <span class="text-xs font-semibold text-end text-theme-50">
+            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
               {#if $currentSkin}
                 {$currentSkin}
               {:else}
-                <LoaderCircle class="animate-spin" size={17} />
+                <LoaderCircle class="animate-spin" size={12} />
               {/if}
             </Badge>
           </span>
@@ -848,7 +855,6 @@
                 reduceAnimations.set(e);
                 $userSettings.save();
               }}
-              disabled={!$customCursor}
               class="flex items-center justify-center w-5 h-5"
             ></Checkbox>
           </div>
@@ -876,7 +882,14 @@
           </div>
         </div>
       </div>
-      <div class="mt-auto mx-auto flex flex-row items-center gap-2">
+      <div
+        class="mt-auto mx-auto flex flex-row items-center gap-2"
+        in:scale={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 50,
+          start: 0.97,
+        }}
+      >
         <Button
           variant="link"
           class="font-semibold font-mono text-sm text-theme-100/70"
