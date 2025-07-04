@@ -7,6 +7,7 @@
   import {
     beatmapSets,
     currentView,
+    launching,
     osuBuild,
     osuStream,
     serverConnectionFails,
@@ -71,7 +72,6 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
 
   let selectedTab = $state('home');
-  let launching = $state(false);
   let launchInfo = $state('');
 
   let selectedGamemode = $derived(
@@ -133,14 +133,14 @@
     }
     const osuPath = $osuInstallationPath;
     launchInfo = 'Validating osu! installation...';
-    launching = true;
+    launching.set(true);
 
     const validFolder: boolean = await invoke('valid_osu_folder', { folder: osuPath });
     if (!validFolder) {
       toast.error('Hmmm...', {
         description: 'Your selected osu! installation folder is not valid.',
       });
-      launching = false;
+      launching.set(false);
       return;
     }
 
@@ -150,7 +150,7 @@
         toast.error('Hmmm...', {
           description: 'Failed to check for updates.',
         });
-        launching = false;
+        launching.set(false);
         return;
       }
 
@@ -215,6 +215,29 @@
             },
           ]);
         }
+      } else {
+        await setUserConfigValues(osuPath, [
+          {
+            key: 'Username',
+            value: '',
+          },
+          {
+            key: 'Password',
+            value: '',
+          },
+          {
+            key: 'SaveUsername',
+            value: '1',
+          },
+          {
+            key: 'SavePassword',
+            value: '0',
+          },
+          {
+            key: 'CredentialEndpoint',
+            value: 'ez-pp.farm',
+          },
+        ]);
       }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
@@ -243,22 +266,22 @@
       });
       if (skinCount) skins.set(skinCount);
 
-      launching = false;
+      launching.set(false);
     } catch (err) {
       console.log(err);
       toast.error('Hmmm...', {
         description: 'Failed to launch.',
       });
-      launching = false;
+      launching.set(false);
     }
 
     setTimeout(() => {
-      launching = false;
+      launching.set(false);
     }, 5000);
   };
 </script>
 
-<AlertDialog.Root bind:open={launching}>
+<AlertDialog.Root bind:open={$launching}>
   <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
@@ -643,7 +666,7 @@
         </div>
         <Button
           size="lg"
-          disabled={launching || $osuInstallationPath === ''}
+          disabled={$launching || $osuInstallationPath === ''}
           onclick={() => launch($serverConnectionFails > 1)}
         >
           <Play />
@@ -662,7 +685,7 @@
           <Gamepad2 class="text-muted-foreground" size="24" />
           <span class="font-semibold text-muted-foreground text-sm">Client Info</span>
         </div>
-        <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-2">
+        <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-0">
           <span class="text-sm text-muted-foreground font-semibold">osu! Release Stream</span>
           <span class="text-sm font-semibold text-end text-theme-50">
             <Badge>

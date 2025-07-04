@@ -9,6 +9,8 @@ export const currentLoadingInfo = writable<string>('Initializing...');
 
 export const firstStartup = writable<boolean>(false);
 
+export const launching = writable<boolean>(false);
+
 export const serverPing = writable<number | undefined>(undefined);
 export const serverConnectionFails = writable(0);
 
@@ -20,20 +22,20 @@ export const skins = writable<number | undefined>(undefined);
 export const osuStream = writable<string | undefined>(undefined);
 export const osuBuild = writable<string | undefined>(undefined);
 
+let updateValues = true;
+launching.subscribe((val) => (updateValues = !val));
+
 export const setupValues = () => {
   updatePing();
-  updateFriends();
-  updateBeatmapSets();
   const pingUpdater = setInterval(updatePing, 5000 * 2);
-  const friendUpdater = setInterval(updateFriends, 5000 * 2);
 
   return () => {
     clearInterval(pingUpdater);
-    clearInterval(friendUpdater);
   };
 };
 
 const updatePing = async () => {
+  if (!updateValues) return;
   const currentServerPing = await ezppfarm.ping();
   if (!currentServerPing) {
     serverConnectionFails.update((num) => num + 1);
@@ -42,11 +44,3 @@ const updatePing = async () => {
     serverPing.set(currentServerPing);
   }
 };
-
-const updateFriends = async () => {
-  await new Promise((res) => setTimeout(res, Math.random() * 300));
-  const currentOnlineFriends = Math.round(Math.random() * 10);
-  onlineFriends.set(currentOnlineFriends);
-};
-
-const updateBeatmapSets = async () => {};
