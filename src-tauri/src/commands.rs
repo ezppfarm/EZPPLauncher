@@ -316,11 +316,20 @@ pub fn run_osu_updater(folder: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn run_osu(folder: String) -> Result<(), String> {
-    let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
+        let osu_exe_path = PathBuf::from(folder).join("osu!.exe");
+    #[cfg(windows)]
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    #[cfg(windows)]
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
+    #[cfg(windows)]
     let mut game_process = Command::new(osu_exe_path)
-        .arg("-devserver")
-        .arg("ez-pp.farm")
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    #[cfg(not(windows))]
+    let mut game_process = Command::new(osu_exe_path)
         .spawn()
         .map_err(|e| e.to_string())?;
 
