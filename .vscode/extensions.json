@@ -6,6 +6,7 @@
     "esbenp.prettier-vscode",
     "fill-labs.dependi",
     "mylesmurphy.prettify-ts",
-    "edwinhuish.better-comments-next"
+    "edwinhuish.better-comments-next",
+    "dbaeumer.vscode-eslint"
   ]
 }
