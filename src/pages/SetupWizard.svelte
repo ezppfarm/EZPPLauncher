@@ -4,8 +4,7 @@
   import Input from '@/components/ui/input/input.svelte';
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
-  import { invoke } from '@tauri-apps/api/core';
+  import { fade } from 'svelte/transition';
   import { Check, CheckCircle, CircleOff, Settings2 } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
@@ -20,6 +19,15 @@
   import { beatmapSets, currentSkin, currentView, osuBuild, osuStream, skins } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
+  import {
+    autoDetectOsuInstallFolder,
+    getBeatmapSetsCount,
+    getReleaseStream,
+    getSkin,
+    getSkinsCount,
+    getVersion,
+    isValidOsuFolder,
+  } from '@/osuUtil';
 
   let selectedStep = $state(1);
   const steps = ['Welcome', 'Locate your osu! Installation', 'Appearance Settings'];
@@ -60,7 +68,7 @@
     });
 
     if (typeof selectedPath === 'string') {
-      const validFolder: boolean = await invoke('valid_osu_folder', { folder: selectedPath });
+      const validFolder = await isValidOsuFolder(selectedPath);
       manualSelect = true;
       if (!validFolder) {
         manualSelectValid = false;
@@ -78,39 +86,29 @@
     await $userSettings.save();
     osuInstallationPath.set(osuInstallPath);
 
-    const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
-      folder: osuInstallPath,
-    });
+    const beatmapSetCount = await getBeatmapSetsCount(osuInstallPath);
     if (beatmapSetCount) {
       beatmapSets.set(beatmapSetCount);
     }
 
-    const skinsCount: number | null = await invoke('get_skins_count', {
-      folder: osuInstallPath,
-    });
+    const skinsCount: number | null = await getSkinsCount(osuInstallPath);
     if (skinsCount) {
       skins.set(skinsCount);
     }
 
-    const skin: string = await invoke('get_osu_skin', {
-      folder: $osuInstallationPath,
-    });
+    const skin: string = await getSkin(osuInstallPath);
     currentSkin.set(skin);
 
-    const osuReleaseStream: string = await invoke('get_osu_release_stream', {
-      folder: $osuInstallationPath,
-    });
+    const osuReleaseStream = await getReleaseStream(osuInstallPath);
     osuStream.set(osuReleaseStream);
-    const osuVersion: string = await invoke('get_osu_version', {
-      folder: $osuInstallationPath,
-    });
+    const osuVersion = await getVersion(osuInstallPath);
     osuBuild.set(osuVersion);
 
     currentView.set(Launch);
   };
 
   onMount(async () => {
-    const osuPath: string | null = await invoke('find_osu_installation');
+    const osuPath = await autoDetectOsuInstallFolder();
     if (osuPath) {
       osuInstallPath = osuPath;
       autoDetectedOsuPath = true;

@@ -119,3 +119,18 @@ export type StreamsResult = {
     user_count: number;
   }[];
 };
+
+export type UpdateFile = {
+  folder: string;
+  md5: string;
+  name: string;
+  size: number;
+  url: string;
+};
+
+export type UpdateStatus = {
+  fileName: string;
+  downloaded: number;
+  size: number;
+  progress: number;
+};

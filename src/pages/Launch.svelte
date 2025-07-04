@@ -37,6 +37,7 @@
   import Progress from '@/components/ui/progress/progress.svelte';
   import {
     compareBuildNumbers,
+    formatBytes,
     formatTimeReadable,
     numberHumanReadable,
     releaseStreamToReadable,
@@ -55,7 +56,6 @@
   } from '@/userSettings';
   import Input from '@/components/ui/input/input.svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { invoke } from '@tauri-apps/api/core';
   import { toast } from 'svelte-sonner';
   import Login from './Login.svelte';
   import { currentUser, userAuth } from '@/userAuthentication';
@@ -69,10 +69,26 @@
   } from '@/gamemode';
   import { currentUserInfo } from '@/data';
   import { osuapi } from '@/api/osuapi';
-  import { getReleaseStream, setConfigValues, setUserConfigValues } from '@/osuUtil';
+  import {
+    downloadEZPPLauncherUpdateFiles,
+    getBeatmapSetsCount,
+    getEZPPLauncherUpdateFiles,
+    getReleaseStream,
+    getSkin,
+    getSkinsCount,
+    getVersion,
+    isOsuRunning,
+    isValidOsuFolder,
+    replaceUIFiles,
+    runOsu,
+    runUpdater,
+    setConfigValues,
+    setUserConfigValues,
+  } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
 
   let selectedTab = $state('home');
+  let progress = $state(-1);
   let launchInfo = $state('');
 
   let selectedGamemode = $derived(
@@ -96,7 +112,7 @@
       if (selectedPath === $osuInstallationPath) {
         return;
       }
-      const validFolder: boolean = await invoke('valid_osu_folder', { folder: selectedPath });
+      const validFolder = await isValidOsuFolder(selectedPath);
       if (!validFolder) {
         toast.error('Oops...', {
           description:
@@ -109,27 +125,29 @@
       $userSettings.save();
       toast.success('osu! installation path set successfully.');
 
-      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
-        folder: selectedPath,
-      });
+      const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
       if (beatmapSetCount) {
         beatmapSets.set(beatmapSetCount);
       }
 
-      const skinsCount: number | null = await invoke('get_skins_count', {
-        folder: selectedPath,
-      });
+      const skinsCount: number | null = await getSkinsCount(selectedPath);
       if (skinsCount) {
         skins.set(skinsCount);
       }
-      const skin: string = await invoke('get_osu_skin', {
-        folder: $osuInstallationPath,
-      });
+      const skin: string = await getSkin(selectedPath);
       currentSkin.set(skin);
     }
   };
 
   const launch = async (offline: boolean) => {
+    const osuRunning = await isOsuRunning();
+    if (osuRunning) {
+      toast.error('Hold on a second!', {
+        description:
+          'osu! is currently running, please exit osu! before launching via EZPPLauncher!',
+      });
+      return;
+    }
     if (!$osuBuild) {
       toast.error('Hmmm...', {
         description: 'There was an issue detecting your installed osu! version',
@@ -137,16 +155,45 @@
       return;
     }
     const osuPath = $osuInstallationPath;
+
     launchInfo = 'Validating osu! installation...';
     launching.set(true);
 
-    const validFolder: boolean = await invoke('valid_osu_folder', { folder: osuPath });
+    const validFolder = await isValidOsuFolder(osuPath);
     if (!validFolder) {
       toast.error('Hmmm...', {
         description: 'Your selected osu! installation folder is not valid.',
       });
       launching.set(false);
       return;
+    }
+
+    try {
+      launchInfo = 'Looking for EZPPLauncher File updates...';
+      const updateResult = await getEZPPLauncherUpdateFiles(osuPath);
+      if (updateResult) {
+        if (updateResult.filesToDownload.length > 0) {
+          launchInfo = 'Found EZPPLauncher File updates!';
+          await new Promise((res) => setTimeout(res, 1000));
+          await downloadEZPPLauncherUpdateFiles(
+            osuPath,
+            updateResult.filesToDownload,
+            updateResult.updateFiles,
+            (file) => {
+              progress = file.progress;
+              launchInfo = `Downloading ${file.fileName}(${formatBytes(
+                file.downloaded
+              )}/${formatBytes(file.size)})...`;
+            }
+          );
+          progress = -1;
+        } else {
+          launchInfo = 'EZPPLauncher Files are up to date!';
+          await new Promise((res) => setTimeout(res, 1500));
+        }
+      }
+    } catch (err) {
+      console.log(err);
     }
 
     try {
@@ -181,7 +228,7 @@
         ]);
         osuStream.set('Stable40');
         osuBuild.set(`b${streamInfo}`);
-        await invoke('run_osu_updater', { folder: osuPath });
+        await runUpdater(osuPath);
         launchInfo = 'osu! is now up to date!';
         if (forceUpdate)
           await setConfigValues(osuPath, [
@@ -246,34 +293,27 @@
       }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
+      await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
-      await invoke('run_osu', { folder: osuPath });
+      await runOsu(osuPath);
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
+      await new Promise((res) => setTimeout(res, 1000));
+      await replaceUIFiles(osuPath, true);
 
-      const osuReleaseStream: string = await invoke('get_osu_release_stream', {
-        folder: osuPath,
-      });
+      const osuReleaseStream = await getReleaseStream(osuPath);
       osuStream.set(osuReleaseStream);
-      const osuVersion: string = await invoke('get_osu_version', {
-        folder: osuPath,
-      });
+      const osuVersion = await getVersion(osuPath);
       osuBuild.set(osuVersion);
 
-      const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
-        folder: osuPath,
-      });
+      const beatmapSetCount = await getBeatmapSetsCount(osuPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
-      const skinCount: number | null = await invoke('get_skins_count', {
-        folder: osuPath,
-      });
+      const skinCount = await getSkinsCount(osuPath);
       if (skinCount) skins.set(skinCount);
 
-      const skin: string = await invoke('get_osu_skin', {
-        folder: $osuInstallationPath,
-      });
+      const skin = await getSkin(osuPath);
       currentSkin.set(skin);
 
       launching.set(false);
@@ -300,7 +340,7 @@
       <span class="font-semibold text-xl">Launching...</span>
     </div>
     <div class="flex flex-col items-center justify-center gap-2 p-3 rounded-lg">
-      <Progress indeterminate />
+      <Progress indeterminate={progress === -1} value={progress} />
       <span class="text-muted-foreground">{launchInfo}</span>
     </div>
   </AlertDialog.Content>

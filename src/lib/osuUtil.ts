@@ -1,4 +1,23 @@
 import { invoke } from '@tauri-apps/api/core';
+import type { UpdateFile, UpdateStatus } from './types';
+import { listen } from '@tauri-apps/api/event';
+
+const updateUrl = 'https://ez-pp.farm/ezpplauncher';
+
+export const getHWID = async () => {
+  const hwid = await invoke('get_hwid');
+  return typeof hwid === 'string' ? hwid : undefined;
+};
+
+export const isValidOsuFolder = async (folder: string): Promise<boolean> => {
+  const result = await invoke('valid_osu_folder', { folder });
+  return typeof result === 'boolean' ? result : false;
+};
+
+export const autoDetectOsuInstallFolder = async () => {
+  const result = await invoke('find_osu_installation');
+  return typeof result === 'string' ? result : undefined;
+};
 
 export const setUserConfigValues = async (
   osuFolderPath: string,
@@ -21,4 +40,72 @@ export const setConfigValues = async (
 export const getReleaseStream = async (folder: string) => {
   const result = await invoke('get_osu_release_stream', { folder });
   return typeof result === 'string' ? result : undefined;
+};
+
+export const getVersion = async (folder: string) => {
+  const result = await invoke('get_osu_version', { folder });
+  return typeof result === 'string' ? result : undefined;
+};
+
+export const getBeatmapSetsCount = async (folder: string) => {
+  const result = await invoke('get_beatmapsets_count', {
+    folder,
+  });
+  return typeof result === 'number' ? result : 0;
+};
+
+export const getSkinsCount = async (folder: string) => {
+  const result = await invoke('get_skins_count', {
+    folder,
+  });
+  return typeof result === 'number' ? result : 0;
+};
+
+export const getSkin = async (folder: string) => {
+  const result = await invoke('get_osu_skin', {
+    folder,
+  });
+
+  return typeof result === 'string' ? result : 'Default';
+};
+
+export const runUpdater = async (folder: string) => await invoke('run_osu_updater', { folder });
+export const runOsu = async (folder: string) => await invoke('run_osu', { folder });
+
+export const getEZPPLauncherUpdateFiles = async (folder: string) => {
+  const result = await invoke('get_ezpp_launcher_update_files', { folder, updateUrl });
+  if (typeof result === 'object') {
+    const [filesToDownload, updateFiles] = result as [UpdateFile[], UpdateFile[]];
+    return {
+      filesToDownload,
+      updateFiles,
+    };
+  }
+
+  return undefined;
+};
+
+export const downloadEZPPLauncherUpdateFiles = async (
+  folder: string,
+  updateFiles: UpdateFile[],
+  allFiles: UpdateFile[],
+  progressCallback: (file: UpdateStatus) => void
+) => {
+  const downloadStatusListen = await listen('download-progress', (event) =>
+    progressCallback(event.payload as UpdateStatus)
+  );
+  try {
+    await invoke('download_ezpp_launcher_update_files', { folder, updateFiles, allFiles });
+  } finally {
+    downloadStatusListen();
+  }
+};
+
+export const replaceUIFiles = async (folder: string, revert: boolean) => {
+  await invoke('replace_ui_files', { folder, revert });
+};
+
+export const isOsuRunning = async () => {
+  const result = await invoke('is_osu_running');
+  return typeof result === 'boolean' ? result : false;
 };

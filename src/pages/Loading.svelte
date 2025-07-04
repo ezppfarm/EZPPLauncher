@@ -26,7 +26,14 @@
   import { ezppfarm } from '@/api/ezpp';
   import { toast } from 'svelte-sonner';
   import { currentUserInfo } from '@/data';
-  import { invoke } from '@tauri-apps/api/core';
+  import {
+    getBeatmapSetsCount,
+    getReleaseStream,
+    getSkin,
+    getSkinsCount,
+    getVersion,
+    isValidOsuFolder,
+  } from '@/osuUtil';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -105,9 +112,7 @@
 
     if (!$firstStartup) {
       currentLoadingInfo.set('Checking osu installation path...');
-      const validFolder: boolean = await invoke('valid_osu_folder', {
-        folder: $osuInstallationPath,
-      });
+      const validFolder = await isValidOsuFolder($osuInstallationPath);
       if (!validFolder) {
         osuInstallationPath.set('');
         $userSettings.value('osu_installation_path').del();
@@ -117,29 +122,19 @@
         });
       } else {
         currentLoadingInfo.set('Getting osu version...');
-        const osuReleaseStream: string = await invoke('get_osu_release_stream', {
-          folder: $osuInstallationPath,
-        });
+        const osuReleaseStream = await getReleaseStream($osuInstallationPath);
         osuStream.set(osuReleaseStream);
-        const osuVersion: string = await invoke('get_osu_version', {
-          folder: $osuInstallationPath,
-        });
+        const osuVersion = await getVersion($osuInstallationPath);
         osuBuild.set(osuVersion);
 
         currentLoadingInfo.set('Counting beatmapsets...');
-        const beatmapSetCount: number | null = await invoke('get_beatmapsets_count', {
-          folder: $osuInstallationPath,
-        });
+        const beatmapSetCount = await getBeatmapSetsCount($osuInstallationPath);
         if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
         currentLoadingInfo.set('Counting skins...');
-        const skinCount: number | null = await invoke('get_skins_count', {
-          folder: $osuInstallationPath,
-        });
+        const skinCount = await getSkinsCount($osuInstallationPath);
         if (skinCount) skins.set(skinCount);
-        const skin: string = await invoke('get_osu_skin', {
-          folder: $osuInstallationPath,
-        });
+        const skin: string = await getSkin($osuInstallationPath);
         currentSkin.set(skin);
       }
     }

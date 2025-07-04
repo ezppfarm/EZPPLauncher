@@ -1,7 +1,7 @@
 import { exists, mkdir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
 import * as path from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
 import { Crypto } from './crypto';
+import { getHWID } from './osuUtil';
 
 export class Config {
   private fileName: string;
@@ -16,7 +16,7 @@ export class Config {
   }
 
   async init(): Promise<boolean> {
-    const hwid: string = (await invoke('get_hwid')) ?? 'recorderinsandybridge';
+    const hwid = (await getHWID()) ?? 'recorderinsandybridge';
 
     this.crypto = new Crypto(hwid);
 

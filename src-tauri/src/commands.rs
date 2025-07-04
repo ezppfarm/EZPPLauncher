@@ -1,9 +1,16 @@
 use hardware_id::get_id;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use sysinfo::System;
+use tauri::AppHandle;
+use tauri::Emitter;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use winreg::RegKey;
 use winreg::enums::*;
 
@@ -367,4 +374,200 @@ pub fn run_osu(folder: String) -> Result<(), String> {
     game_process.wait().map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateFile {
+    pub name: String,
+    pub folder: String,
+    pub url: String,
+    pub size: usize,
+    pub md5: String,
+}
+
+#[tauri::command]
+pub async fn get_ezpp_launcher_update_files(
+    folder: String,
+    update_url: String,
+) -> Result<(Vec<UpdateFile>, Vec<UpdateFile>), String> {
+    let osu_path = PathBuf::from(folder);
+    let client = Client::new();
+
+    let update_files = client
+        .patch(update_url)
+        .header("User-Agent", "EZPPLauncher")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<Vec<UpdateFile>>()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut files_to_download = Vec::new();
+
+    for file in &update_files {
+        let file_path = osu_path.join(&file.folder).join(&file.name);
+        if file_path.exists() {
+            let data = fs::read(&file_path).await.map_err(|e| e.to_string())?;
+            let hash = format!("{:x}", md5::compute(&data));
+            if hash.to_lowercase() != file.md5.to_lowercase() {
+                files_to_download.push(file.clone());
+            }
+        } else {
+            files_to_download.push(file.clone());
+        }
+    }
+
+    Ok((files_to_download, update_files))
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateStatus {
+    pub file_name: String,
+    pub downloaded: u64,
+    pub size: usize,
+    pub progress: f64,
+}
+
+#[tauri::command]
+pub async fn download_ezpp_launcher_update_files(
+    app: AppHandle,
+    folder: String,
+    update_files: Vec<UpdateFile>,
+    all_files: Vec<UpdateFile>,
+) -> Result<(), String> {
+    let osu_path = PathBuf::from(folder);
+    let client = Client::new();
+
+    let valid_paths: HashSet<PathBuf> = all_files
+        .iter()
+        .map(|f| osu_path.join(&f.folder).join(&f.name))
+        .collect();
+
+    for folder in all_files
+        .iter()
+        .map(|f| osu_path.join(&f.folder))
+        .collect::<HashSet<_>>()
+    {
+        if folder.exists() && folder != osu_path {
+            let mut dir = fs::read_dir(&folder).await.map_err(|e| e.to_string())?;
+            while let Some(entry) = dir.next_entry().await.map_err(|e| e.to_string())? {
+                let path = entry.path();
+                if !valid_paths.contains(&path) {
+                    fs::remove_file(&path).await.ok();
+                }
+            }
+        }
+    }
+
+    for file in update_files {
+        let file_path = osu_path.join(&file.folder).join(&file.name);
+        let parent = file_path.parent().unwrap();
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+
+        let mut response = client
+            .get(&file.url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let mut file_out = fs::File::create(&file_path)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut downloaded = 0u64;
+
+        while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+            downloaded += chunk.len() as u64;
+            file_out
+                .write_all(&chunk)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            // Emit progress to frontend
+            app.emit(
+                "download-progress",
+                UpdateStatus {
+                    file_name: file.name.clone(),
+                    downloaded,
+                    size: file.size,
+                    progress: ((downloaded as f64 / file.size as f64 * 100.0) * 100.0).trunc()
+                        / 100.0,
+                },
+            )
+            .unwrap_or_default();
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", content = "details")]
+pub enum ReplaceUIError {
+    FileNotFound(String),
+    PermissionDenied(String),
+    IoError(String),
+}
+
+#[tauri::command]
+pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIError> {
+    let osu_path = PathBuf::from(folder);
+    let ezpp_ui = osu_path.join("EZPPLauncher").join("ezpp!ui.dll");
+    let osu_ui = osu_path.join("osu!ui.dll");
+    let ezpp_gameplay = osu_path.join("EZPPLauncher").join("ezpp!gameplay.dll");
+    let osu_gameplay = osu_path.join("osu!gameplay.dll");
+
+    let osu_ui_bak = osu_path.join("osu!ui.dll.bak");
+    let osu_gameplay_bak = osu_path.join("osu!gameplay.dll.bak");
+
+    let try_rename = |from: &PathBuf, to: &PathBuf| -> Result<(), ReplaceUIError> {
+        if !from.exists() {
+            return Err(ReplaceUIError::FileNotFound(from.display().to_string()));
+        }
+        std::fs::rename(from, to).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => {
+                ReplaceUIError::FileNotFound(from.display().to_string())
+            }
+            std::io::ErrorKind::PermissionDenied => {
+                ReplaceUIError::PermissionDenied(from.display().to_string())
+            }
+            _ => ReplaceUIError::IoError(e.to_string()),
+        })
+    };
+
+    if !revert {
+        try_rename(&osu_ui, &osu_ui_bak)?;
+        try_rename(&ezpp_ui, &osu_ui)?;
+
+        try_rename(&osu_gameplay, &osu_gameplay_bak)?;
+        try_rename(&ezpp_gameplay, &osu_gameplay)?;
+    } else {
+        try_rename(&osu_ui, &ezpp_ui)?;
+        try_rename(&osu_ui_bak, &osu_ui)?;
+
+        try_rename(&osu_gameplay, &ezpp_gameplay)?;
+        try_rename(&osu_gameplay_bak, &osu_gameplay)?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_osu_running() -> bool {
+    let mut sys = System::new_all();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+    for process in sys.processes().values() {
+        if process.name().eq_ignore_ascii_case("osu!.exe") {
+            return true;
+        }
+    }
+
+    false
 }
