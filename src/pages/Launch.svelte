@@ -6,6 +6,7 @@
   import * as Select from '@/components/ui/select';
   import {
     beatmapSets,
+    currentSkin,
     currentView,
     launching,
     osuBuild,
@@ -121,6 +122,10 @@
       if (skinsCount) {
         skins.set(skinsCount);
       }
+      const skin: string = await invoke('get_osu_skin', {
+        folder: $osuInstallationPath,
+      });
+      currentSkin.set(skin);
     }
   };
 
@@ -265,6 +270,11 @@
         folder: osuPath,
       });
       if (skinCount) skins.set(skinCount);
+
+      const skin: string = await invoke('get_osu_skin', {
+        folder: $osuInstallationPath,
+      });
+      currentSkin.set(skin);
 
       launching.set(false);
     } catch (err) {
@@ -701,6 +711,16 @@
             <Badge>
               {#if $osuBuild}
                 {$osuBuild}
+              {:else}
+                <LoaderCircle class="animate-spin" size={17} />
+              {/if}
+            </Badge>
+          </span>
+          <span class="text-sm text-muted-foreground font-semibold">Skin</span>
+          <span class="text-sm font-semibold text-end text-theme-50">
+            <Badge>
+              {#if $currentSkin}
+                {$currentSkin}
               {:else}
                 <LoaderCircle class="animate-spin" size={17} />
               {/if}

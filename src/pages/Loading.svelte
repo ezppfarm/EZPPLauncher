@@ -4,6 +4,7 @@
   import {
     beatmapSets,
     currentLoadingInfo,
+    currentSkin,
     currentView,
     firstStartup,
     osuBuild,
@@ -136,6 +137,10 @@
           folder: $osuInstallationPath,
         });
         if (skinCount) skins.set(skinCount);
+        const skin: string = await invoke('get_osu_skin', {
+          folder: $osuInstallationPath,
+        });
+        currentSkin.set(skin);
       }
     }
 

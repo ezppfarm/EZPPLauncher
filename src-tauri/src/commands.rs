@@ -199,6 +199,15 @@ pub fn get_skins_count(folder: String) -> Option<u64> {
 }
 
 #[tauri::command]
+pub fn get_osu_skin(folder: String) -> String {
+    let path = PathBuf::from(folder);
+    let osu_user_config = get_osu_user_config(path.clone());
+    return osu_user_config
+        .and_then(|config| config.get("Skin").cloned())
+        .unwrap_or_else(|| "Default".to_string());
+}
+
+#[tauri::command]
 pub fn get_osu_version(folder: String) -> String {
     let path = PathBuf::from(folder);
     let osu_user_config = get_osu_user_config(path.clone());
@@ -342,18 +351,18 @@ pub fn run_osu(folder: String) -> Result<(), String> {
 
     #[cfg(windows)]
     let mut game_process = Command::new(osu_exe_path)
-      .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-      .arg("-devserver")
-      .arg("ez-pp.farm")
-      .spawn()
-      .map_err(|e| e.to_string())?;
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        .arg("-devserver")
+        .arg("ez-pp.farm")
+        .spawn()
+        .map_err(|e| e.to_string())?;
 
     #[cfg(not(windows))]
     let mut game_process = Command::new(osu_exe_path)
-      .arg("-devserver")
-      .arg("ez-pp.farm")
-      .spawn()
-      .map_err(|e| e.to_string())?;
+        .arg("-devserver")
+        .arg("ez-pp.farm")
+        .spawn()
+        .map_err(|e| e.to_string())?;
 
     game_process.wait().map_err(|e| e.to_string())?;
 

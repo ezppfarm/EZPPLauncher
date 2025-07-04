@@ -17,7 +17,7 @@
     userSettings,
   } from '@/userSettings';
   import Label from '@/components/ui/label/label.svelte';
-  import { beatmapSets, currentView, osuBuild, osuStream, skins } from '@/global';
+  import { beatmapSets, currentSkin, currentView, osuBuild, osuStream, skins } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
 
@@ -91,6 +91,11 @@
     if (skinsCount) {
       skins.set(skinsCount);
     }
+
+    const skin: string = await invoke('get_osu_skin', {
+      folder: $osuInstallationPath,
+    });
+    currentSkin.set(skin);
 
     const osuReleaseStream: string = await invoke('get_osu_release_stream', {
       folder: $osuInstallationPath,
