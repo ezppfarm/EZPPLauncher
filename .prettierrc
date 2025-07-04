@@ -9,7 +9,6 @@
   "tabWidth": 2,
   "useTabs": false,
   "bracketSpacing": true,
-  "svelteBracketNewLine": true,
   "plugins": ["prettier-plugin-svelte"],
   "overrides": [
     {

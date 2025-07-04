@@ -3,8 +3,6 @@
   import cursor_additive from '$assets/cursor-additive.png';
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
-  import { currentMonitor } from '@tauri-apps/api/window';
-  import { estimateRefreshRate } from '@/displayUtils';
   import { cursorSmoothness } from '@/userSettings';
 
   let { smoothCursor = true }: { smoothCursor?: boolean } = $props();
@@ -100,7 +98,7 @@
           ? (t - 1) ** 7 + 1
           : Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
     });
-    
+
     lastMouseX = mouseX;
     lastMouseY = mouseY;
   };

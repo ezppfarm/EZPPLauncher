@@ -144,7 +144,7 @@
     }
   };
 
-  const launch = async (offline: boolean) => {
+  const launch = async () => {
     const osuRunning = await isOsuRunning();
     if (osuRunning) {
       toast.error('Hold on a second!', {
@@ -428,7 +428,7 @@
               </div>
             </Select.Trigger>
             <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
-              {#each validModeTypeCombinationsSorted as gamemode}
+              {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
                 {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
                 <Select.Item value={gamemode.toFixed()}>
                   <div class="flex flex-row gap-2 items-center">
@@ -726,11 +726,11 @@
         </div>
         <Button
           size="lg"
-          disabled={$launching || $osuInstallationPath === ''}
-          onclick={() => launch($serverConnectionFails > 1)}
+          disabled={$launching || $osuInstallationPath === '' || $serverConnectionFails > 1}
+          onclick={launch}
         >
           <Play />
-          Launch {$serverConnectionFails > 1 ? 'offline' : ''}
+          {$serverConnectionFails > 1 ? 'No connection' : 'Launch'}
         </Button>
       </div>
       <div

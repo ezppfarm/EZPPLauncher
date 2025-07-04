@@ -22,7 +22,7 @@ export const skins = writable<number | undefined>(undefined);
 export const osuStream = writable<string | undefined>(undefined);
 export const osuBuild = writable<string | undefined>(undefined);
 
-export const currentSkin = writable<string>("");
+export const currentSkin = writable<string>('');
 
 let updateValues = true;
 launching.subscribe((val) => (updateValues = !val));
