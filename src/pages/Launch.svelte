@@ -40,6 +40,7 @@
     formatBytes,
     formatTimeReadable,
     numberHumanReadable,
+    openURL,
     releaseStreamToReadable,
   } from '@/utils';
   import { fade, scale } from 'svelte/transition';
@@ -49,6 +50,7 @@
     cursorSmoothening,
     customCursor,
     osuInstallationPath,
+    patch,
     preferredMode,
     preferredType,
     reduceAnimations,
@@ -86,6 +88,7 @@
     setUserConfigValues,
   } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { Heart } from 'radix-icons-svelte';
 
   let selectedTab = $state('home');
   let progress = $state(-1);
@@ -296,7 +299,7 @@
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
-      await runOsu(osuPath);
+      await runOsu(osuPath, true);
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
       await new Promise((res) => setTimeout(res, 1000));
@@ -776,98 +779,113 @@
         <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
           <Settings2 /> EZPPLauncher Settings
         </div>
-        <div
-          class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
-        >
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
-            <div class="text-muted-foreground text-xs">
-              Enable a custom cursor in the Launcher like in the lazer build of osu!
+        <div>
+          <div
+            class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 pt-4 pb-1 px-6"
+          >
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">Patching</Label>
+              <div class="text-muted-foreground text-xs">Shows misses in Relax and Autopilot</div>
+            </div>
+            <Checkbox
+              id="setting-custom-cursor"
+              checked={$patch}
+              onCheckedChange={async (e) => {
+                patch.set(e);
+                $userSettings.save();
+              }}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
+              <div class="text-muted-foreground text-xs">
+                Enable a custom cursor in the Launcher like in the lazer build of osu!
+              </div>
+            </div>
+            <Checkbox
+              id="setting-custom-cursor"
+              checked={$customCursor}
+              onCheckedChange={async (e) => {
+                if (!e) {
+                  cursorSmoothening.set(false);
+                }
+                customCursor.set(e);
+
+                $userSettings.save();
+              }}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
+              <div class="text-muted-foreground text-xs">
+                Makes the custom cursor movement smoother.
+              </div>
+            </div>
+            <Checkbox
+              id="setting-cursor-smoothening"
+              checked={$cursorSmoothening}
+              onCheckedChange={async (e) => {
+                if (!$customCursor) return;
+                cursorSmoothening.set(e);
+                $userSettings.save();
+              }}
+              disabled={!$customCursor}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
+              <div class="text-muted-foreground text-xs">
+                Disables some animations in the Launcher to improve performance on low-end devices.
+              </div>
+            </div>
+            <Checkbox
+              id="setting-cursor-smoothening"
+              checked={$reduceAnimations}
+              onCheckedChange={async (e) => {
+                reduceAnimations.set(e);
+                $userSettings.save();
+              }}
+              disabled={!$customCursor}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+          </div>
+          <div
+            class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-theme-800 pl-6 pr-5 pb-4"
+          >
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
+              <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
+            </div>
+            <div class="flex flex-row w-full">
+              <Input
+                class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
+                type="text"
+                value={$osuInstallationPath}
+                placeholder="Path to osu! installation"
+                readonly
+              />
+              <Button
+                class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
+                variant="outline"
+                onclick={browse_osu_installation}>Browse</Button
+              >
             </div>
           </div>
-          <Checkbox
-            id="setting-custom-cursor"
-            checked={$customCursor}
-            onCheckedChange={async (e) => {
-              if (!e) {
-                cursorSmoothening.set(false);
-              }
-              customCursor.set(e);
-
-              $userSettings.save();
-            }}
-            class="flex items-center justify-center w-5 h-5"
-          ></Checkbox>
-
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
-            <div class="text-muted-foreground text-xs">
-              Makes the custom cursor movement smoother.
-            </div>
-          </div>
-          <Checkbox
-            id="setting-cursor-smoothening"
-            checked={$cursorSmoothening}
-            onCheckedChange={async (e) => {
-              if (!$customCursor) return;
-              cursorSmoothening.set(e);
-              $userSettings.save();
-            }}
-            disabled={!$customCursor}
-            class="flex items-center justify-center w-5 h-5"
-          ></Checkbox>
-
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
-            <div class="text-muted-foreground text-xs">
-              Disables some animations in the Launcher to improve performance on low-end devices.
-            </div>
-          </div>
-          <Checkbox
-            id="setting-cursor-smoothening"
-            checked={$reduceAnimations}
-            onCheckedChange={async (e) => {
-              reduceAnimations.set(e);
-              $userSettings.save();
-            }}
-            disabled={!$customCursor}
-            class="flex items-center justify-center w-5 h-5"
-          ></Checkbox>
         </div>
       </div>
-      <div
-        class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
-        in:scale={{
-          duration: $reduceAnimations ? 0 : 400,
-          delay: $reduceAnimations ? 0 : 50,
-          start: 0.98,
-        }}
-      >
-        <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
-          <Settings2 /> osu! Settings
-        </div>
-        <div
-          class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
+      <div class="mt-auto mx-auto flex flex-row items-center gap-2">
+        <Button
+          variant="link"
+          class="font-semibold font-mono text-sm text-theme-100/70"
+          onclick={() => openURL('https://ez-pp.farm/u/1001')}
         >
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
-            <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
-          </div>
-          <div class="flex flex-row w-full">
-            <Input
-              class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
-              type="text"
-              value={$osuInstallationPath}
-              placeholder="Path to osu! installation"
-              readonly
-            />
-            <Button
-              class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
-              variant="outline"
-              onclick={browse_osu_installation}>Browse</Button
-            >
-          </div>
-        </div>
+          made with
+          <Heart class="text-red-600 animate-pulse" />
+          by horizoncode
+        </Button>
       </div>
     {/if}
   </div>

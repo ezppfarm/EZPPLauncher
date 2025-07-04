@@ -1,4 +1,5 @@
 import { createAudioStore } from '@elron/svelte-audio-store';
+import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -92,4 +93,8 @@ export const formatBytes = (bytes: number, decimals = 2) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))}${sizes[i]}`;
+};
+
+export const openURL = async (url: string) => {
+  await invoke('open_url_in_browser', { url });
 };

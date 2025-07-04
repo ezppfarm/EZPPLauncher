@@ -8,12 +8,17 @@
     cursorSmoothening,
     customCursor,
     osuInstallationPath,
+    patch,
     reduceAnimations,
     userSettings,
   } from '@/userSettings';
   import { Buffer } from 'buffer';
   import { Toaster } from '@/components/ui/sonner';
   import { userAuth } from '@/userAuthentication';
+
+  import '@fontsource/sora';
+  import '@fontsource/space-mono';
+
   let { children } = $props();
 
   function disableReload() {
@@ -72,16 +77,19 @@
     $userAuth.init();
 
     currentLoadingInfo.set('Loading config...');
+    const config_patching = $userSettings.value('patching');
     const config_custom_cursor = $userSettings.value('custom_cursor');
     const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
     const config_reduce_animations = $userSettings.value('reduce_animations');
     const config_osu_installation_path = $userSettings.value('osu_installation_path');
 
+    patch.set(config_patching.get(true));
     customCursor.set(config_custom_cursor.get(true));
     cursorSmoothening.set(config_cursor_smoothening.get(true));
     reduceAnimations.set(config_reduce_animations.get(false));
     osuInstallationPath.set(config_osu_installation_path.get(''));
 
+    patch.subscribe((val) => config_patching.set(val));
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
     reduceAnimations.subscribe((val) => config_reduce_animations.set(val));

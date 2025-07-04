@@ -12,6 +12,7 @@
     cursorSmoothening,
     customCursor,
     osuInstallationPath,
+    patch,
     reduceAnimations,
     userSettings,
   } from '@/userSettings';
@@ -250,6 +251,20 @@
           <div
             class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
           >
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">Patching</Label>
+              <div class="text-muted-foreground text-xs">Shows misses in Relax and Autopilot</div>
+            </div>
+            <Checkbox
+              id="setting-custom-cursor"
+              checked={$patch}
+              onCheckedChange={async (e) => {
+                patch.set(e);
+                $userSettings.save();
+              }}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+
             <div class="flex flex-col">
               <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
               <div class="text-muted-foreground text-xs">
