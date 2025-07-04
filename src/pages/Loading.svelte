@@ -209,5 +209,5 @@
       bind:this={ezppLogo}
     />
   </div>
-  <span class="text-theme-200 font-semibold">{$currentLoadingInfo}</span>
+  <span class="text-theme-200 text-sm mt-5">{$currentLoadingInfo}</span>
 </div>
