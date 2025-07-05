@@ -278,7 +278,11 @@ pub fn set_osu_config_values(
 
 #[tauri::command]
 pub fn run_osu_updater(folder: String) -> Result<(), String> {
+    #[cfg(windows)]
+    use std::os::windows::process::CommandExt;
+
     let osu_exe_path = PathBuf::from(folder.clone()).join("osu!.exe");
+    
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
@@ -358,7 +362,11 @@ pub fn run_osu_updater(folder: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn run_osu(folder: String, patch: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    use std::os::windows::process::CommandExt;
+
     let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
+    
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
