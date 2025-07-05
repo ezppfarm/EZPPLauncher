@@ -11,14 +11,12 @@ use tauri::AppHandle;
 use tauri::Emitter;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use winreg::RegKey;
-use winreg::enums::*;
 
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
     set_osu_config_vals, set_osu_user_config_vals,
 };
-use std::os::windows::process::CommandExt;
+
 
 #[tauri::command]
 pub fn get_hwid() -> String {
@@ -65,8 +63,18 @@ pub fn valid_osu_folder(folder: String) -> bool {
     return false;
 }
 
+#[cfg(not(windows))]
 #[tauri::command]
 pub fn find_osu_installation() -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
+#[tauri::command]
+pub fn find_osu_installation() -> Option<String> {
+    use winreg::RegKey;
+    use winreg::enums::*;
+
     let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
 
     let hkcr_registry_paths = [
@@ -142,7 +150,7 @@ pub fn find_osu_installation() -> Option<String> {
             }
         }
     }
-    return None;
+    None
 }
 
 #[tauri::command]

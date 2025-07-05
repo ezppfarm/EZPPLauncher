@@ -1,6 +1,4 @@
-use std::ffi::OsString;
 use std::fs;
-use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
 use sysinfo::Pid;
 
@@ -178,12 +176,20 @@ pub fn get_osu_config<P: AsRef<Path>>(
     return Some(config_map);
 }
 
+#[cfg(not(windows))]
+pub fn get_window_title_by_pid(_pid: Pid) -> String {
+    "".to_string()
+}
+
+#[cfg(windows)]
 pub fn get_window_title_by_pid(pid: Pid) -> String {
     use std::sync::{Arc, Mutex};
     use winapi::shared::windef::HWND;
     use winapi::um::winuser::{
         EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
     };
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
 
     extern "system" fn enum_windows_proc(
         hwnd: HWND,
