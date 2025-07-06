@@ -347,7 +347,7 @@
     </div>
     <div class="flex flex-col items-center justify-center gap-2 p-3 rounded-lg">
       <Progress indeterminate={progress === -1} value={progress} />
-      <span class="text-muted-foreground">{launchInfo}</span>
+      <span class="text-muted-foreground text-sm mt-4">{launchInfo}</span>
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>
@@ -471,11 +471,17 @@
               <div class="flex items-center h-full text-lg font-semibold text-theme-50">
                 {#if $currentUserInfo}
                   <div in:fade>
-                    <NumberFlow
-                      trend={0}
-                      prefix="#"
-                      value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
-                    ></NumberFlow>
+                    {#if $reduceAnimations}
+                      <span>
+                        #{numberHumanReadable($currentUserInfo.stats[selectedGamemode].rank ?? 0)}
+                      </span>
+                    {:else}
+                      <NumberFlow
+                        trend={0}
+                        prefix="#"
+                        value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
+                      />
+                    {/if}
                   </div>
                 {:else}
                   <div in:fade>
@@ -489,8 +495,16 @@
               <div class="flex items-center h-full text-lg font-semibold text-theme-50">
                 {#if $currentUserInfo}
                   <div in:fade>
-                    <NumberFlow trend={0} value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
-                    ></NumberFlow>
+                    {#if $reduceAnimations}
+                      <span>
+                        {numberHumanReadable($currentUserInfo.stats[selectedGamemode].pp ?? 0)}
+                      </span>
+                    {:else}
+                      <NumberFlow
+                        trend={0}
+                        value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
+                      />
+                    {/if}
                   </div>
                 {:else}
                   <div in:fade>
@@ -507,11 +521,16 @@
             >
               {#if $currentUserInfo}
                 <div in:fade>
-                  <NumberFlow
-                    trend={0}
-                    suffix="%"
-                    value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
-                  ></NumberFlow>
+                  {#if $reduceAnimations}
+                    <span>{($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%</span>
+                  {:else}
+                    <NumberFlow
+                      class="leading-none"
+                      trend={0}
+                      suffix="%"
+                      value={($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}
+                    />
+                  {/if}
                 </div>
               {:else}
                 <div in:fade>
@@ -526,8 +545,19 @@
             >
               {#if $currentUserInfo}
                 <div in:fade>
-                  <NumberFlow trend={0} value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
-                  ></NumberFlow>
+                  {#if $reduceAnimations}
+                    <span
+                      >{numberHumanReadable(
+                        $currentUserInfo.stats[selectedGamemode].plays ?? 0
+                      )}</span
+                    >
+                  {:else}
+                    <NumberFlow
+                      class="leading-none"
+                      trend={0}
+                      value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
+                    />
+                  {/if}
                 </div>
               {:else}
                 <div in:fade>
