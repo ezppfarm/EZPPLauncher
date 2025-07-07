@@ -68,8 +68,6 @@ src-tauri/target/release/ezpplauncher.exe
 ├── src/                    # Frontend (Svelte)
 ├── src-tauri/              # Backend (Rust)
 │   ├── tauri.conf.json     # Tauri configuration
-├── assets/                 # Static assets (screenshots, icons, etc.)
-│   └── screenshot.png
 ├── package.json            # Bun project config
 └── README.md
 ```
