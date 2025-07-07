@@ -37,7 +37,6 @@
     "osu-classes": "3.1.0",
     "osu-parsers": "4.1.7",
     "prettier-plugin-rust": "^0.1.9",
-    "radix-icons-svelte": "1.2.1",
     "semver": "^7.7.2",
     "svelte-confetti": "^2.0.0"
   },
