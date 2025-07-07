@@ -19,7 +19,6 @@
   "license": "MIT",
   "dependencies": {
     "@better-fetch/fetch": "^1.1.18",
-    "@elron/svelte-audio-store": "1.0.0",
     "@fontsource/sora": "^5.2.6",
     "@fontsource/space-mono": "^5.2.8",
     "@iarna/toml": "^2.2.5",

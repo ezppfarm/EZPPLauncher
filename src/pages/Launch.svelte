@@ -8,7 +8,9 @@
     beatmapSets,
     currentSkin,
     currentView,
+    launcherVersion,
     launching,
+    newVersion,
     osuBuild,
     osuStream,
     serverConnectionFails,
@@ -32,6 +34,7 @@
     LogIn,
     Brush,
     Heart,
+    ArrowRight,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -74,6 +77,7 @@
   import { osuapi } from '@/api/osuapi';
   import {
     downloadEZPPLauncherUpdateFiles,
+    exit,
     getBeatmapSetsCount,
     getEZPPLauncherUpdateFiles,
     getReleaseStream,
@@ -336,6 +340,42 @@
     }
   };
 </script>
+
+<AlertDialog.Root open={$newVersion !== undefined}>
+  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <img class="h-20 w-20" src={Logo} alt="logo" />
+      <span class="font-semibold text-xl">Update available!</span>
+    </div>
+    <div
+      class="grid grid-cols-3 items-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-sm text-muted-foreground">Current Version</span>
+        <span>{$launcherVersion}</span>
+      </div>
+      <div class="flex items-center justify-center">
+        <ArrowRight />
+      </div>
+      <div class="flex flex-col items-center justify-center">
+        <span class="text-sm text-muted-foreground">New Version</span>
+        <span class="text-green-400">{$newVersion?.tag_name}</span>
+      </div>
+    </div>
+    <div class="flex items-center justify-center mb-3">
+      <Button
+        onclick={async () => {
+          if ($newVersion) {
+            await openURL($newVersion.html_url);
+            await exit();
+          }
+        }}>Update now</Button
+      >
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 <AlertDialog.Root bind:open={$launching}>
   <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">

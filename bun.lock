@@ -5,7 +5,6 @@
       "name": "ezpplauncher",
       "dependencies": {
         "@better-fetch/fetch": "^1.1.18",
-        "@elron/svelte-audio-store": "1.0.0",
         "@fontsource/sora": "^5.2.6",
         "@fontsource/space-mono": "^5.2.8",
         "@iarna/toml": "^2.2.5",
@@ -71,8 +70,6 @@
     "@better-fetch/fetch": ["@better-fetch/fetch@1.1.18", "", {}, "sha512-rEFOE1MYIsBmoMJtQbl32PGHHXuG2hDxvEd7rUHE0vCBoFQVSDqaVs9hkZEtHCxRoY+CljXKFCOuJ8uxqw1LcA=="],
 
     "@bufbuild/protobuf": ["@bufbuild/protobuf@2.5.2", "", {}, "sha512-foZ7qr0IsUBjzWIq+SuBLfdQCpJ1j8cTuNNT4owngTHoN5KsJb8L9t65fzz7SCeSWzescoOil/0ldqiL041ABg=="],
-
-    "@elron/svelte-audio-store": ["@elron/svelte-audio-store@1.0.0", "", { "peerDependencies": { "svelte": "^4.0.0" } }, "sha512-ksBF88rG4cbIt+ZLrxMKDdr1CxWxxEiyyZfHfNHCF/G9O2eDflSnCytSpid0Y43R4DwK+AukUlFfc0j5evqqEw=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.5", "", { "os": "aix", "cpu": "ppc64" }, "sha512-9o3TMmpmftaCMepOdA5k/yDw8SfInyzWWTjYTFCX3kPSDJMROQTb8jg+h9Cnwnmm1vOzvxN7gIfB5V2ewpjtGA=="],
 

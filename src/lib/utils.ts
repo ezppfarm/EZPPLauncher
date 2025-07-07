@@ -1,15 +1,6 @@
-import { createAudioStore } from '@elron/svelte-audio-store';
 import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-
-const sounds = {
-  menuHeartbeat: '/audio/menuHeartbeat.mp3',
-  menuBack: '/audio/menuBack.wav',
-  menuHit: '/audio/menuHit.wav',
-};
-
-export const gameSounds = createAudioStore(sounds);
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
