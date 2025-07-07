@@ -155,7 +155,7 @@
   onmouseup={handleMouseUp}
 />
 
-<div class="h-7 w-7 fixed pointer-events-none z-[99999]" bind:this={cursor}>
+<div class="h-7 w-7 fixed pointer-events-none z-[9999]" bind:this={cursor}>
   <div class="relative">
     <img class="absolute top-0 left-0" src={cursor_default} bind:this={cursorInner} alt="cursor" />
     <img
