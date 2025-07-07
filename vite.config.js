@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
-import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from 'vite';
+import { sveltekit } from '@sveltejs/kit/vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
 
 // @ts-expect-error process is a nodejs global
@@ -20,14 +20,14 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
+          protocol: 'ws',
           host,
           port: 1421,
         }
       : undefined,
     watch: {
       // 3. tell vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      ignored: ['**/src-tauri/**'],
     },
   },
 }));

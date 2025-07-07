@@ -45,6 +45,7 @@ export class Config {
       ) as Record<string, unknown>;
       this.config = decryptedJSON;
     } catch (err) {
+      console.log(err);
       this.config = {};
       await this.save();
     }

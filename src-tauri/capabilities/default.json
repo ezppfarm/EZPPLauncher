@@ -2,9 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": [
-    "main"
-  ],
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "shell:allow-open",
@@ -19,59 +17,59 @@
     "core:window:allow-show",
     "fs:default",
     {
-      "identifier": "fs:allow-write",
+      "identifier": "fs:allow-read",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     },
     {
-      "identifier": "fs:allow-read",
+      "identifier": "fs:allow-write",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     },
     {
       "identifier": "fs:allow-exists",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     },
     {
       "identifier": "fs:allow-read-file",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     },
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     },
     {
       "identifier": "fs:allow-mkdir",
       "allow": [
-        {
-          "path": "$HOME/**/*"
-        }
+        { "path": "$HOME/.ezpplauncher" },
+        { "path": "$HOME/.ezpplauncher/*" },
+        { "path": "$HOME/.ezpplauncher/**/*" }
       ]
     }
   ]

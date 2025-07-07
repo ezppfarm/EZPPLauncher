@@ -1,6 +1,6 @@
 export function estimateRefreshRate(): Promise<number> {
   return new Promise((resolve) => {
-    let last = performance.now();
+    const last = performance.now();
     let frames = 0;
 
     function loop() {

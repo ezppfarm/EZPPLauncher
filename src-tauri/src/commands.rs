@@ -63,8 +63,18 @@ pub fn valid_osu_folder(folder: String) -> bool {
     return false;
 }
 
+#[cfg(not(windows))]
 #[tauri::command]
 pub fn find_osu_installation() -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
+#[tauri::command]
+pub fn find_osu_installation() -> Option<String> {
+    use winreg::RegKey;
+    use winreg::enums::*;
+
     let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
 
     let hkcr_registry_paths = [
@@ -140,7 +150,7 @@ pub fn find_osu_installation() -> Option<String> {
             }
         }
     }
-    return None;
+    None
 }
 
 #[tauri::command]

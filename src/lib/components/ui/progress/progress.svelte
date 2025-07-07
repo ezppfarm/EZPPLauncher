@@ -20,7 +20,9 @@
   {...restProps}
 >
   <div
-    class="bg-primary h-full w-full flex-1 transition-all {indeterminate ? 'animate-slide' : ''} rounded-lg"
+    class="bg-primary h-full w-full flex-1 transition-all {indeterminate
+      ? 'animate-slide'
+      : ''} rounded-lg"
     style={`transform: translateX(-${100 - (100 * ((indeterminate ? max : value) ?? 0)) / (max ?? 1)}%);`}
   ></div>
 </ProgressPrimitive.Root>
@@ -31,13 +33,13 @@
   }
   @keyframes indeterminate {
     0%,
-	2%,
-	98%,
-	100% {
+    2%,
+    98%,
+    100% {
       transform: translateX(-99%);
     }
     49%,
-	51% {
+    51% {
       transform: translateX(99%);
     }
   }

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import ezppLogo from "../../../../assets/logo.png";
-  import { osudirect } from "@/api/osudirect";
-  import { gameSounds, playAudio } from "@/utils";
-  import { BeatmapDecoder } from "osu-parsers";
-  import { onMount } from "svelte";
+  import ezppLogo from '../../../../assets/logo.png';
+  import { osudirect } from '@/api/osudirect';
+  import { gameSounds } from '@/utils';
+  import { BeatmapDecoder } from 'osu-parsers';
+  import { onMount } from 'svelte';
 
   type logoProps = {
     beatmapId: number;
@@ -19,21 +19,19 @@
 
   onMount(async () => {
     gameSounds.preload();
-    
+
     const beatmapData = await osudirect.osu(beatmapId);
     if (beatmapData) {
       const decoder = new BeatmapDecoder();
       const beatmap = decoder.decodeFromString(beatmapData);
       console.log(beatmap);
 
-      const audio = new Audio(
-        `https://osu.direct/api/media/audio/${beatmapId}`
-      );
+      const audio = new Audio(`https://osu.direct/api/media/audio/${beatmapId}`);
       audio.volume = 0.3;
 
       // Function to play the heartbeat sound
       const playHeartbeat = () => {
-        gameSounds.play("menuHeartbeat", {
+        gameSounds.play('menuHeartbeat', {
           volume: hovered ? 1 : 0.3,
         });
       };
@@ -60,8 +58,7 @@
               window.clearInterval(lastTimeout);
               lastTimeout = undefined;
             }
-            if (!lastTimeout)
-              lastTimeout = window.setInterval(playHeartbeat, interval);
+            if (!lastTimeout) lastTimeout = window.setInterval(playHeartbeat, interval);
           }, nextBeat);
         }
         // Continue syncing
@@ -69,9 +66,9 @@
       };
 
       // Wait for audio to be ready before starting playback and syncing
-      audio.addEventListener("canplay", async () => {
-        audio.addEventListener("play", syncHeartbeat);
-        audio.addEventListener("ended", async () => await audio.play());
+      audio.addEventListener('canplay', async () => {
+        audio.addEventListener('play', syncHeartbeat);
+        audio.addEventListener('ended', async () => await audio.play());
         await audio.play();
         syncHeartbeat();
       });
@@ -96,9 +93,9 @@
     onmouseleave={() => (hovered = false)}
     onclick={() => {
       if (extended) {
-        gameSounds.play("menuBack");
+        gameSounds.play('menuBack');
       } else {
-        gameSounds.play("menuHit");
+        gameSounds.play('menuHit');
       }
       onclick();
     }}

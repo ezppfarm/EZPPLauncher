@@ -1,4 +1,4 @@
-const API_ENDPOINT = "https://osu.direct/api/";
+const API_ENDPOINT = 'https://osu.direct/api/';
 
 export const osudirect = {
   osu: async (mapId: number): Promise<string | undefined> => {
