@@ -10,8 +10,6 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::{Duration, sleep};
-use winreg::RegKey;
-use winreg::enums::*;
 
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
