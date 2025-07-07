@@ -181,6 +181,7 @@
     try {
       launchInfo = 'Looking for EZPPLauncher File updates...';
       const updateResult = await getEZPPLauncherUpdateFiles(osuPath);
+
       if (updateResult) {
         if (updateResult.filesToDownload.length > 0) {
           launchInfo = 'Found EZPPLauncher File updates!';
@@ -358,10 +359,11 @@
       class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
     >
       {#if launchError}
-        <span>{launchError.message}</span>
-        {#if launchError.stack}
-          <pre>{launchError.stack}</pre>
-        {/if}
+        <pre class="text-wrap text-start">{JSON.stringify(
+            launchError,
+            Object.getOwnPropertyNames(launchError),
+            2
+          )}</pre>
       {:else}
         Unexpected error
       {/if}
