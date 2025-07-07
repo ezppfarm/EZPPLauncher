@@ -24,6 +24,18 @@ It enhances the osu! experience with quality-of-life features and integration sp
 
 ---
 
+## 💻 Supported Platforms
+
+| Platform | Status           |
+| -------- | ---------------- |
+| Windows  | ✅ Supported     |
+| macOS    | ❌ Not supported |
+| Linux    | ❌ Not supported |
+
+> Currently, only **Windows** is supported. Support for other platforms may be considered in the future.
+
+---
+
 ## 🛠 Build From Source
 
 ### Requirements
