@@ -3,14 +3,13 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
+use tokio::time::{Duration, sleep};
 use winreg::RegKey;
 use winreg::enums::*;
 
@@ -18,7 +17,6 @@ use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
     set_osu_config_vals, set_osu_user_config_vals,
 };
-use std::os::windows::process::CommandExt;
 
 #[tauri::command]
 pub fn get_hwid() -> String {
@@ -269,110 +267,128 @@ pub fn set_osu_config_values(
 }
 
 #[tauri::command]
-pub fn run_osu_updater(folder: String) -> Result<(), String> {
-    let osu_exe_path = PathBuf::from(folder.clone()).join("osu!.exe");
+pub async fn run_osu_updater(folder: String) -> Result<(), String> {
+    let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
+
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
-    let handle = thread::spawn(move || {
+    let mut updater_process = {
         #[cfg(windows)]
-        let mut updater_process = Command::new(&osu_exe_path)
-            .arg("-repair")
-            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-            .spawn()
-            .ok()?; // Ignore error, just exit thread
+        {
+            Command::new(&osu_exe_path)
+                .arg("-repair")
+                .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                .spawn()
+                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+        }
 
         #[cfg(not(windows))]
-        let mut updater_process = Command::new(&osu_exe_path).arg("-repair").spawn().ok()?; // Ignore error, just exit thread
+        {
+            Command::new(&osu_exe_path)
+                .arg("-repair")
+                .spawn()
+                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+        }
+    };
 
-        thread::sleep(Duration::from_millis(500));
+    sleep(Duration::from_millis(500)).await;
 
-        let mut sys = System::new_all();
+    let mut sys = System::new_all();
+
+    loop {
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-        let mut termination_thread_running = true;
+        let mut found = false;
 
-        while termination_thread_running {
-            for (_, process) in sys.processes() {
-                if process.name() == "osu!.exe" {
-                    let process_id = process.pid();
-                    let window_title = get_window_title_by_pid(process_id);
+        for (_pid, process) in sys.processes() {
+            if process.name() == "osu!.exe" {
+                let pid = process.pid();
+                let title = get_window_title_by_pid(pid);
 
-                    if !window_title.is_empty() && !window_title.contains("updater") {
-                        if let Ok(_) = process.kill_and_wait() {
-                            termination_thread_running = false;
-                            break;
-                        }
-                    }
+                if !title.is_empty() && !title.contains("updater") {
+                    let _ = process.kill_and_wait();
+                    found = true;
+                    break;
                 }
             }
-
-            if !termination_thread_running {
-                break;
-            }
-
-            thread::sleep(Duration::from_millis(500));
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
         }
 
-        let _ = updater_process.wait();
+        if found {
+            break;
+        }
 
-        let force_update_files = [".require_update", "help.txt", "_pending"];
+        sleep(Duration::from_millis(500)).await;
+    }
 
-        for update_file_name in &force_update_files {
-            let update_file = PathBuf::from(&folder).join(update_file_name);
-            if update_file.exists() {
-                let metadata = std::fs::symlink_metadata(&update_file);
-                if let Ok(meta) = metadata {
-                    let result = if meta.is_dir() {
-                        std::fs::remove_dir_all(&update_file)
+    // Wait for updater process to fully exit
+    let _ = updater_process.wait().await;
+
+    // Clean up update-related files
+    let force_update_files = [".require_update", "help.txt", "_pending"];
+    for update_file_name in &force_update_files {
+        let path = PathBuf::from(&folder).join(update_file_name);
+        if path.exists() {
+            match std::fs::symlink_metadata(&path) {
+                Ok(meta) => {
+                    let res = if meta.is_dir() {
+                        std::fs::remove_dir_all(&path)
                     } else {
-                        std::fs::remove_file(&update_file)
+                        std::fs::remove_file(&path)
                     };
-                    if let Err(e) = result {
-                        eprintln!(
-                            "Failed to remove force update file {:?}: {}",
-                            update_file, e
-                        );
+
+                    if let Err(e) = res {
+                        eprintln!("Failed to remove {:?}: {}", path, e);
                     }
+                }
+                Err(e) => {
+                    eprintln!("Could not stat {:?}: {}", path, e);
                 }
             }
         }
+    }
 
-        Some(())
-    });
-
-    handle.join().map_err(|_| "Thread panicked".to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn run_osu(folder: String, patch: bool) -> Result<(), String> {
+pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
+    /* #[cfg(windows)]
+    use std::os::windows::process::CommandExt; */
+
     let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
+
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
-    #[cfg(windows)]
-    let mut game_process = Command::new(osu_exe_path)
-        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-        .arg("-devserver")
-        .arg("ez-pp.farm")
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    let mut game_process = {
+        #[cfg(windows)]
+        {
+            Command::new(&osu_exe_path)
+                .arg("-devserver")
+                .arg("ez-pp.farm")
+                .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                .spawn()
+                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+        }
 
-    #[cfg(not(windows))]
-    let mut game_process = Command::new(osu_exe_path)
-        .arg("-devserver")
-        .arg("ez-pp.farm")
-        .spawn()
-        .map_err(|e| e.to_string())?;
+        #[cfg(not(windows))]
+        {
+            Command::new(&osu_exe_path)
+                .arg("-devserver")
+                .arg("ez-pp.farm")
+                .spawn()
+                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+        }
+    };
 
     if patch {
-        thread::sleep(Duration::from_secs(3));
+        sleep(Duration::from_secs(3)).await;
+
         let patcher_exe_path = PathBuf::from(&folder)
             .join("EZPPLauncher")
             .join("patcher")
@@ -396,8 +412,7 @@ pub fn run_osu(folder: String, patch: bool) -> Result<(), String> {
         }
     }
 
-    game_process.wait().map_err(|e| e.to_string())?;
-
+    game_process.wait().await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
