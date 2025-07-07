@@ -2,8 +2,12 @@ import { writable } from 'svelte/store';
 import { ezppfarm } from './api/ezpp';
 import type { Component } from 'svelte';
 import Loading from '../pages/Loading.svelte';
+import type { Release } from './types';
 
 export const currentView = writable<Component>(Loading);
+
+export const launcherVersion = writable<string>('');
+export const newVersion = writable<Release | undefined>(undefined);
 
 export const currentLoadingInfo = writable<string>('Initializing...');
 

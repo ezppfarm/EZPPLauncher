@@ -7,6 +7,8 @@
     currentSkin,
     currentView,
     firstStartup,
+    launcherVersion,
+    newVersion,
     osuBuild,
     osuStream,
     skins,
@@ -34,6 +36,7 @@
     getVersion,
     isValidOsuFolder,
   } from '@/osuUtil';
+  import { git } from '@/api/git';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -137,6 +140,12 @@
         const skin: string = await getSkin($osuInstallationPath);
         currentSkin.set(skin);
       }
+    }
+
+    currentLoadingInfo.set('Checking for EZPPLauncher updates...');
+    const launcherUpdate = await git.hasUpdate($launcherVersion);
+    if (launcherUpdate) {
+      newVersion.set(launcherUpdate);
     }
 
     animate(ezppLogo, {

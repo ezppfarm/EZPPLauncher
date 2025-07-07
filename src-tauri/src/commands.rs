@@ -17,6 +17,11 @@ use crate::utils::{
 };
 
 #[tauri::command]
+pub fn get_launcher_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 pub fn get_hwid() -> String {
     let hwid = get_id().unwrap();
     hwid.into()
@@ -623,4 +628,9 @@ pub fn is_osu_running() -> bool {
 #[tauri::command]
 pub fn open_url_in_browser(url: String) -> Result<(), String> {
     open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))
+}
+
+#[tauri::command]
+pub fn exit(app: AppHandle) {
+    app.exit(0x0100);
 }

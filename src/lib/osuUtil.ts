@@ -110,3 +110,6 @@ export const isOsuRunning = async () => {
   const result = await invoke('is_osu_running');
   return typeof result === 'boolean' ? result : false;
 };
+
+export const getLauncherVersion = async () => await invoke<string>('get_launcher_version');
+export const exit = async () => await invoke('exit');

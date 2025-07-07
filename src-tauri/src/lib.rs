@@ -4,10 +4,11 @@ use tauri::Manager;
 pub mod commands;
 pub mod utils;
 use crate::commands::{
-    download_ezpp_launcher_update_files, find_osu_installation, get_beatmapsets_count,
-    get_ezpp_launcher_update_files, get_hwid, get_osu_release_stream, get_osu_skin,
-    get_osu_version, get_skins_count, is_osu_running, open_url_in_browser, replace_ui_files,
-    run_osu, run_osu_updater, set_osu_config_values, set_osu_user_config_values, valid_osu_folder,
+    download_ezpp_launcher_update_files, exit, find_osu_installation, get_beatmapsets_count,
+    get_ezpp_launcher_update_files, get_hwid, get_launcher_version, get_osu_release_stream,
+    get_osu_skin, get_osu_version, get_skins_count, is_osu_running, open_url_in_browser,
+    replace_ui_files, run_osu, run_osu_updater, set_osu_config_values, set_osu_user_config_values,
+    valid_osu_folder,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -42,7 +43,9 @@ pub fn run() {
             download_ezpp_launcher_update_files,
             replace_ui_files,
             is_osu_running,
-            open_url_in_browser
+            open_url_in_browser,
+            get_launcher_version,
+            exit
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())

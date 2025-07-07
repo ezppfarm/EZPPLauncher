@@ -38,6 +38,7 @@
     "osu-parsers": "4.1.7",
     "prettier-plugin-rust": "^0.1.9",
     "radix-icons-svelte": "1.2.1",
+    "semver": "^7.7.2",
     "svelte-confetti": "^2.0.0"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@sveltejs/vite-plugin-svelte": "5.1.0",
     "@tauri-apps/cli": "2.6.1",
     "@types/crypto-js": "^4.2.2",
+    "@types/semver": "^7.7.0",
     "autoprefixer": "10.4.21",
     "bits-ui": "^1.4.7",
     "clsx": "2.1.1",

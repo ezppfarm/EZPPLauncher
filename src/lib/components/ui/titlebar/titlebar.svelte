@@ -6,6 +6,8 @@
 
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
+  import { launcherVersion } from '@/global';
+  import Badge from '../badge/badge.svelte';
 
   onMount(() => {
     const appWindow = getCurrentWindow();
@@ -18,9 +20,10 @@
 </script>
 
 <div data-tauri-drag-region class="titlebar z-[60] border-b border-theme-800/90">
-  <div class="mr-auto ms-2 flex flex-row gap-2 items-center text-[1.05rem] font-semibold">
+  <div class="mr-auto ms-2 flex flex-row gap-2 items-center text-[1.05rem] font-semibold pointer-events-none">
     <img src={Logo} alt="EZPP Launcher Logo" class="h-11 w-11 inline-block" />
     <span>EZPPLauncher</span>
+    <Badge class="!text-[0.6rem] py-[0.5px] bg-primary-500 hover:bg-primary-500">{$launcherVersion}</Badge>
   </div>
   <div class="titlebar-button rounded-lg transition-colors duration-75" id="titlebar-minimize">
     <Minimize size={18} />

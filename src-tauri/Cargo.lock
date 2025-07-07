@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "ezpplauncher"
-version = "0.1.0"
+version = "3.0.0-beta.1"
 dependencies = [
  "hardware-id",
  "md5",
