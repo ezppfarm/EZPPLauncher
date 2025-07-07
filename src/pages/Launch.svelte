@@ -84,6 +84,7 @@
     getSkin,
     getSkinsCount,
     getVersion,
+    isOsuCorrupted,
     isOsuRunning,
     isValidOsuFolder,
     replaceUIFiles,
@@ -221,7 +222,9 @@
       }
 
       const releaseStream = await getReleaseStream(osuPath);
-      let forceUpdate = releaseStream && releaseStream.toLowerCase() !== 'stable40';
+      const osuCorrupted = await isOsuCorrupted(osuPath);
+      let forceUpdate =
+        (releaseStream && releaseStream.toLowerCase() !== 'stable40') || osuCorrupted;
 
       const versions = compareBuildNumbers($osuBuild, streamInfo);
       if (versions > 0 || forceUpdate) {
