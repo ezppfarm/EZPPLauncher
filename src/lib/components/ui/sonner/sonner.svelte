@@ -7,7 +7,7 @@
 
 <Sonner
   theme={mode.current}
-  class="toaster group z-[5000]"
+  class="toaster group !z-[1000]"
   toastOptions={{
     classes: {
       toast:
