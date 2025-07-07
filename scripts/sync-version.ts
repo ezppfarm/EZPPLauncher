@@ -13,7 +13,9 @@ const version = cargo.package['version'];
 if (!version) throw new Error('Could not find version in Cargo.toml');
 
 const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
-tauriConf.version = version;
+if (tauriConf.version !== version) {
+  tauriConf.version = version;
 
-fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2));
-console.log(`✅ Synced tauri.conf.json version to ${version}`);
+  fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2));
+  console.log(`✅ Synced tauri.conf.json version to ${version}`);
+}
