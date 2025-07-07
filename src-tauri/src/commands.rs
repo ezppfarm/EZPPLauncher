@@ -634,3 +634,8 @@ pub fn open_url_in_browser(url: String) -> Result<(), String> {
 pub fn exit(app: AppHandle) {
     app.exit(0x0100);
 }
+
+#[tauri::command]
+pub fn get_platform() -> String {
+    std::env::consts::OS.to_string()
+}

@@ -1,7 +1,9 @@
 <script lang="ts">
+  import Logo from '$assets/logo.png';
   import '../app.css';
 
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
+  import * as AlertDialog from '@/components/ui/alert-dialog';
   import { currentLoadingInfo, firstStartup, launcherVersion, setupValues } from '@/global';
   import { onMount } from 'svelte';
   import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
@@ -16,12 +18,15 @@
   import { Buffer } from 'buffer';
   import { Toaster } from '@/components/ui/sonner';
   import { userAuth } from '@/userAuthentication';
-  import { getLauncherVersion } from '@/osuUtil';
+  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
+  import Button from '@/components/ui/button/button.svelte';
 
   let { children } = $props();
+
+  let unsupported_platform = $state<boolean>(false);
 
   function disableReload() {
     if (window.location.hostname !== 'tauri.localhost') {
@@ -77,6 +82,7 @@
     disableReload();
     setupValues();
     launcherVersion.set(await getLauncherVersion());
+    if ((await getPlatform()) !== 'windows') unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
     $userAuth.init();
 
@@ -109,6 +115,29 @@
 <Toaster richColors closeButton />
 
 <Titlebar />
+
+<AlertDialog.Root open={unsupported_platform}>
+  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <img class="h-20 w-20" src={Logo} alt="logo" />
+      <span class="font-semibold text-xl">Unsupported Platform!</span>
+    </div>
+    <div
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      This Platform is not supported by EZPPLauncher.
+    </div>
+    <div class="flex items-center justify-center mb-3">
+      <Button
+        onclick={async () => {
+          await exit();
+        }}>Close</Button
+      >
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 <main>
   {@render children()}

@@ -113,3 +113,4 @@ export const isOsuRunning = async () => {
 
 export const getLauncherVersion = async () => await invoke<string>('get_launcher_version');
 export const exit = async () => await invoke('exit');
+export const getPlatform = async () => await invoke<string>('get_platform');
