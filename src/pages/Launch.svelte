@@ -99,6 +99,7 @@
   let selectedTab = $state('home');
   let progress = $state(-1);
   let launchInfo = $state('');
+  let launchError = $state<Error | undefined>(undefined);
 
   let selectedGamemode = $derived(
     getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
@@ -203,6 +204,9 @@
       }
     } catch (err) {
       console.log(err);
+      launchError = err as Error;
+      launching.set(false);
+      return;
     }
 
     try {
@@ -327,6 +331,7 @@
 
       launching.set(false);
     } catch (err) {
+      launchError = err as Error;
       console.log(err);
       toast.error('Hmmm...', {
         description: 'Failed to launch.',
@@ -340,6 +345,36 @@
     }
   };
 </script>
+
+<AlertDialog.Root open={launchError !== undefined}>
+  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <img class="h-20 w-20" src={Logo} alt="logo" />
+      <span class="font-semibold text-xl">Error on Launch!</span>
+    </div>
+    <div
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      {#if launchError}
+        <span>{launchError.message}</span>
+        {#if launchError.stack}
+          <pre>{launchError.stack}</pre>
+        {/if}
+      {:else}
+        Unexpected error
+      {/if}
+    </div>
+    <div class="flex items-center justify-center mb-3">
+      <Button
+        onclick={async () => {
+          launchError = undefined;
+        }}>Close</Button
+      >
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 <AlertDialog.Root open={$newVersion !== undefined}>
   <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
