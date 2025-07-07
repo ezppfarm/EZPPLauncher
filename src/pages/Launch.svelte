@@ -329,6 +329,11 @@
       const skin = await getSkin(osuPath);
       currentSkin.set(skin);
 
+      if ($currentUser) {
+        const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+        if (userInfo) currentUserInfo.set(userInfo.player);
+      }
+
       launching.set(false);
     } catch (err) {
       launchError = err as Error;
@@ -337,11 +342,6 @@
         description: 'Failed to launch.',
       });
       launching.set(false);
-
-      if ($currentUser) {
-        const userInfo = await ezppfarm.getUserInfo($currentUser.id);
-        if (userInfo) currentUserInfo.set(userInfo.player);
-      }
     }
   };
 </script>
