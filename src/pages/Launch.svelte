@@ -8,11 +8,13 @@
     beatmapSets,
     currentSkin,
     currentView,
+    discordPresence,
     launcherVersion,
     launching,
     newVersion,
     osuBuild,
     osuStream,
+    presenceLoading,
     serverConnectionFails,
     serverPing,
     skins,
@@ -953,13 +955,13 @@
             ></Checkbox>
 
             <div class="flex flex-col">
-              <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
+              <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
               <div class="text-muted-foreground text-xs">
                 Disables some animations in the Launcher to improve performance on low-end devices.
               </div>
             </div>
             <Checkbox
-              id="setting-cursor-smoothening"
+              id="setting-reduce-animations"
               checked={$reduceAnimations}
               onCheckedChange={async (e) => {
                 reduceAnimations.set(e);
@@ -967,6 +969,26 @@
               }}
               class="flex items-center justify-center w-5 h-5"
             ></Checkbox>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
+              <div class="text-muted-foreground text-xs">
+                Let other discord users show what you are doing right now 👀
+              </div>
+            </div>
+            <div class="relative">
+              {#if $presenceLoading}
+                <div class="-left-8 absolute" transition:fade>
+                  <LoaderCircle class="animate-spin" />
+                </div>
+              {/if}
+              <Checkbox
+                id="setting-rich-presence"
+                bind:checked={$discordPresence}
+                disabled={$presenceLoading}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+            </div>
           </div>
           <div
             class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-theme-800 pl-6 pr-5 pb-4"

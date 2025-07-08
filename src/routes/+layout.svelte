@@ -4,7 +4,14 @@
 
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
-  import { currentLoadingInfo, firstStartup, launcherVersion, setupValues } from '@/global';
+  import {
+    currentLoadingInfo,
+    discordPresence,
+    firstStartup,
+    launcherVersion,
+    presenceLoading,
+    setupValues,
+  } from '@/global';
   import { onMount } from 'svelte';
   import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
   import {
@@ -20,6 +27,7 @@
   import { userAuth } from '@/userAuthentication';
   import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
   import Button from '@/components/ui/button/button.svelte';
+  import * as presence from '@/presence';
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
@@ -92,17 +100,39 @@
     const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
     const config_reduce_animations = $userSettings.value('reduce_animations');
     const config_osu_installation_path = $userSettings.value('osu_installation_path');
+    const config_discord_presence = $userSettings.value('discord_presence');
 
     patch.set(config_patching.get(true));
     customCursor.set(config_custom_cursor.get(true));
     cursorSmoothening.set(config_cursor_smoothening.get(true));
     reduceAnimations.set(config_reduce_animations.get(false));
     osuInstallationPath.set(config_osu_installation_path.get(''));
+    discordPresence.set(config_discord_presence.get(true));
+
+    try {
+      if ($discordPresence) {
+        presenceLoading.set(true);
+        await presence.connect();
+        presenceLoading.set(false);
+      }
+    } catch {}
 
     patch.subscribe((val) => config_patching.set(val));
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
     reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
+    discordPresence.subscribe(async (val) => {
+      config_discord_presence.set(val);
+      try {
+        presenceLoading.set(true);
+        if (val) {
+          await presence.connect();
+        } else {
+          await presence.disconnect();
+        }
+        presenceLoading.set(false);
+      } catch {}
+    });
 
     firstStartup.set(isFirstStartup);
   });
