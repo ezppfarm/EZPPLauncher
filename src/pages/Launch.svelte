@@ -8,11 +8,13 @@
     beatmapSets,
     currentSkin,
     currentView,
+    discordPresence,
     launcherVersion,
     launching,
     newVersion,
     osuBuild,
     osuStream,
+    presenceLoading,
     serverConnectionFails,
     serverPing,
     skins,
@@ -46,6 +48,7 @@
     numberHumanReadable,
     openURL,
     releaseStreamToReadable,
+    urlIsValidImage,
   } from '@/utils';
   import { fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
@@ -96,6 +99,8 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { ezppfarm } from '@/api/ezpp';
   import Hearts from '@/components/ui/effects/Hearts.svelte';
+  import { EZPPActionStatus } from '@/types';
+  import * as presence from '@/presence';
 
   let selectedTab = $state('home');
   let progress = $state(-1);
@@ -313,9 +318,130 @@
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
+
+      let presenceUpdater: number | undefined = undefined;
+
+      const isPresenceConnected = await presence.isConnected();
+
+      if ($discordPresence && isPresenceConnected) {
+        let osuDetected = false;
+        presenceUpdater = window.setInterval(async () => {
+          if (!osuDetected) {
+            const osuRunning = await isOsuRunning();
+            if (osuRunning) osuDetected = true;
+            return;
+          }
+          if ($currentUser) {
+            const userStats = await ezppfarm.getUserInfo($currentUser.id, 'stats');
+            const userStatus = await ezppfarm.getUserStatus($currentUser.id);
+            if (userStatus?.player_status.online) {
+              let largeImageKey = 'ezppfarm';
+              let details = 'Idle...';
+              let state =
+                userStatus.player_status.status.info_text.length > 0
+                  ? userStatus.player_status.status.info_text
+                  : '  ';
+
+              const gamemode = getModeAndTypeFromGamemode(userStatus.player_status.status.mode);
+              const gamemodeName = getGamemodeName(
+                modeIntToStr(gamemode.mode),
+                typeIntToStr(gamemode.type)
+              );
+
+              switch (userStatus.player_status.status.action) {
+                case EZPPActionStatus.AFK:
+                  details = 'AFK...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.PLAYING:
+                  details = 'Playing...';
+                  break;
+                case EZPPActionStatus.EDITING:
+                  details = 'Editing...';
+                  break;
+                case EZPPActionStatus.MODDING:
+                  details = 'Modding...';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_SELECT:
+                  details = 'Multiplayer: Selecting a Beatmap...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.WATCHING:
+                  details = 'Watching...';
+                  break;
+                case EZPPActionStatus.TESTING:
+                  details = 'Testing...';
+                  break;
+                case EZPPActionStatus.SUBMITTING:
+                  details = 'Submitting...';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_IDLE:
+                  details = 'Multiplayer: Idle...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_PLAYING:
+                  details = 'Multiplayer: Playing...';
+                  break;
+                case EZPPActionStatus.DIRECT:
+                  details = 'Browsing osu!direct...';
+                  state = '  ';
+                  break;
+              }
+
+              if (userStatus.player_status.status.beatmap !== null) {
+                const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
+                const isValidImage = await urlIsValidImage(beatmapCoverImage);
+                if (isValidImage) largeImageKey = beatmapCoverImage;
+              }
+
+              details = `[${gamemodeName}] ${details}`;
+              try {
+                const currentModeStats =
+                  userStats?.player.stats[userStatus.player_status.status.mode];
+                let username = $currentUser.name;
+
+                if (currentModeStats && currentModeStats.rank > 0)
+                  username += ` (#${currentModeStats.rank})`;
+
+                await Promise.all([
+                  presence.updateUser({
+                    username,
+                    id: $currentUser.id.toFixed(),
+                  }),
+                  presence.updateStatus({
+                    details,
+                    state,
+                    largeImageKey,
+                  }),
+                ]);
+              } catch {}
+            }
+          }
+        }, 1000 * 2);
+      }
+
       await runOsu(osuPath, true);
+
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
+      if (presenceUpdater) {
+        window.clearInterval(presenceUpdater);
+        console.log('clearing discord presence...');
+        try {
+          await Promise.all([
+            presence.updateUser({
+              username: '  ',
+              id: null,
+            }),
+            presence.updateStatus({
+              details: '  ',
+              state: 'Idle in Launcher...',
+              largeImageKey: 'ezppfarm',
+            }),
+          ]);
+        } catch {}
+        console.log('discord presence cleared...');
+      }
       await new Promise((res) => setTimeout(res, 1000));
       await replaceUIFiles(osuPath, true);
 
@@ -953,13 +1079,13 @@
             ></Checkbox>
 
             <div class="flex flex-col">
-              <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
+              <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
               <div class="text-muted-foreground text-xs">
                 Disables some animations in the Launcher to improve performance on low-end devices.
               </div>
             </div>
             <Checkbox
-              id="setting-cursor-smoothening"
+              id="setting-reduce-animations"
               checked={$reduceAnimations}
               onCheckedChange={async (e) => {
                 reduceAnimations.set(e);
@@ -967,6 +1093,26 @@
               }}
               class="flex items-center justify-center w-5 h-5"
             ></Checkbox>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
+              <div class="text-muted-foreground text-xs">
+                Let other discord users show what you are doing right now 👀
+              </div>
+            </div>
+            <div class="relative">
+              {#if $presenceLoading}
+                <div class="-left-8 absolute" transition:fade>
+                  <LoaderCircle class="animate-spin" />
+                </div>
+              {/if}
+              <Checkbox
+                id="setting-rich-presence"
+                bind:checked={$discordPresence}
+                disabled={$presenceLoading}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+            </div>
           </div>
           <div
             class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-theme-800 pl-6 pr-5 pb-4"

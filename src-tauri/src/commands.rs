@@ -11,6 +11,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::{Duration, sleep};
 
+use crate::presence;
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
     set_osu_config_vals, set_osu_user_config_vals,
@@ -667,4 +668,48 @@ pub async fn check_for_corruption(folder: String) -> Result<bool, String> {
     }
 
     Ok(false)
+}
+
+#[tauri::command]
+pub async fn presence_connect() -> bool {
+    presence::connect().await
+}
+
+#[tauri::command]
+pub async fn presence_disconnect() {
+    presence::disconnect().await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceStatus {
+    state: Option<String>,
+    details: Option<String>,
+    large_image_key: Option<String>,
+}
+
+#[tauri::command]
+pub async fn presence_update_status(status: PresenceStatus) {
+    presence::update_status(
+        status.state.as_deref(),
+        status.details.as_deref(),
+        status.large_image_key.as_deref(),
+    );
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceUser {
+    username: Option<String>,
+    id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn presence_update_user(user: PresenceUser) {
+    presence::update_user(user.username.as_deref(), user.id.as_deref());
+}
+
+#[tauri::command]
+pub async fn presence_is_connected() -> bool {
+    presence::has_presence().await
 }

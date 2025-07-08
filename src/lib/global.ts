@@ -9,6 +9,9 @@ export const currentView = writable<Component>(Loading);
 export const launcherVersion = writable<string>('');
 export const newVersion = writable<Release | undefined>(undefined);
 
+export const discordPresence = writable<boolean>(false);
+export const presenceLoading = writable<boolean>(false);
+
 export const currentLoadingInfo = writable<string>('Initializing...');
 
 export const firstStartup = writable<boolean>(false);
