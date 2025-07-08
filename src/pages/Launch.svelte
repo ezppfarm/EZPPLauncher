@@ -401,7 +401,7 @@
                 let username = $currentUser.name;
 
                 if (currentModeStats && currentModeStats.rank > 0)
-                  username + ` (#${currentModeStats.rank})`;
+                  username += ` (#${currentModeStats.rank})`;
 
                 await Promise.all([
                   presence.updateUser({
