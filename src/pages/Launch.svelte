@@ -341,7 +341,7 @@
                 userStatus.player_status.status.info_text.length > 0
                   ? userStatus.player_status.status.info_text
                   : '  ';
-              let beatmapCover = false;
+
               const gamemode = getModeAndTypeFromGamemode(userStatus.player_status.status.mode);
               const gamemodeName = getGamemodeName(
                 modeIntToStr(gamemode.mode),
@@ -388,7 +388,7 @@
                   break;
               }
 
-              if (userStatus.player_status.status.beatmap !== null && beatmapCover) {
+              if (userStatus.player_status.status.beatmap !== null) {
                 const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
                 const isValidImage = await urlIsValidImage(beatmapCoverImage);
                 if (isValidImage) largeImageKey = beatmapCoverImage;
