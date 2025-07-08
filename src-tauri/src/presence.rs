@@ -8,8 +8,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{interval, Duration};
 
-// --- Datenstrukturen und Befehle ---
-
 #[derive(Clone, Debug)]
 pub struct PresenceData {
     pub state: String,
@@ -20,17 +18,13 @@ pub struct PresenceData {
     pub small_image_text: Option<String>,
 }
 
-// Befehle, die an den Presence-Actor gesendet werden können
 #[derive(Debug)]
 enum PresenceCommand {
     Connect(oneshot::Sender<bool>),
-    // Geändert: Nimmt einen Sender, um den Abschluss zu signalisieren
     Disconnect(oneshot::Sender<()>),
     UpdateData(PresenceData),
     IsConnected(oneshot::Sender<bool>),
 }
-
-// --- Der Actor ---
 
 struct PresenceActor {
     receiver: mpsc::Receiver<PresenceCommand>,
@@ -71,7 +65,6 @@ impl PresenceActor {
                 Some(cmd) = self.receiver.recv() => {
                     match cmd {
                         PresenceCommand::Connect(responder) => self.handle_connect(responder).await,
-                        // Geändert: Leitet den Responder weiter
                         PresenceCommand::Disconnect(responder) => {
                             self.handle_disconnect(responder).await;
                         },
@@ -118,7 +111,6 @@ impl PresenceActor {
         }
     }
 
-    // Geändert: Nimmt einen Responder als Parameter
     async fn handle_disconnect(&mut self, responder: oneshot::Sender<()>) {
         if let Some(mut client) = self.client.take() {
             println!("Actor: Disconnecting...");
@@ -126,7 +118,6 @@ impl PresenceActor {
             let _ = client.close().map_err(|e| e.to_string());
             println!("Actor: Disconnected successfully.");
         }
-        // Signalisiere, dass der Vorgang abgeschlossen ist
         let _ = responder.send(());
     }
 
@@ -158,7 +149,6 @@ impl PresenceActor {
 
             if let Err(e) = client.set_activity(activity).map_err(|e| e.to_string()) {
                 eprintln!("Failed to set activity, disconnecting: {:?}", e);
-                // Rufe die interne handle_disconnect auf, ohne auf eine Antwort zu warten
                 if let Some(mut client) = self.client.take() {
                     let _ = client.clear_activity();
                     let _ = client.close();
@@ -167,8 +157,6 @@ impl PresenceActor {
         }
     }
 }
-
-// --- Öffentliche API ---
 
 static PRESENCE_TX: Lazy<mpsc::Sender<PresenceCommand>> = Lazy::new(|| {
     let (tx, rx) = mpsc::channel(10);
@@ -196,11 +184,9 @@ pub async fn connect() -> bool {
     false
 }
 
-// Geändert: Wartet jetzt auf den Abschluss des Disconnects
 pub async fn disconnect() {
     let (tx, rx) = oneshot::channel();
     if PRESENCE_TX.send(PresenceCommand::Disconnect(tx)).await.is_ok() {
-        // Warte, bis der Actor den Abschluss signalisiert
         let _ = rx.await;
     } else {
         println!("Could not send disconnect command; actor may not be running.");
