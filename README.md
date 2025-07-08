@@ -21,6 +21,7 @@ It enhances the osu! experience with quality-of-life features and integration sp
 - [x] Shows the number of imported skins
 - [x] Displays ping to the EZPPFarm server
 - [ ] Discord Rich Presence (planned and in development)
+- [ ] Performance Display Overlay (planned)
 
 ---
 

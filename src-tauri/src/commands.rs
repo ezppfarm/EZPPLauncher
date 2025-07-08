@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
-use tauri::Manager;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
@@ -639,43 +638,6 @@ pub fn exit(app: AppHandle) {
 #[tauri::command]
 pub fn get_platform() -> String {
     std::env::consts::OS.to_string()
-}
-
-#[tauri::command]
-pub fn show_overlay(app: tauri::AppHandle) -> Result<(), String> {
-    if !app.webview_windows().contains_key("overlay") {
-        tauri::WebviewWindowBuilder::new(
-            &app,
-            "overlay",
-            tauri::WebviewUrl::App("/overlay".into()),
-        )
-        .always_on_top(true)
-        .transparent(true)
-        .decorations(false)
-        .resizable(false)
-        .minimizable(false)
-        .fullscreen(true)
-        .skip_taskbar(true)
-        .visible(true)
-        .center()
-        .build()
-        .map_err(|e| e.to_string())?;
-    } else if let Some(overlay) = app.get_webview_window("overlay") {
-        overlay.show().map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-pub fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
-    if app.webview_windows().contains_key("overlay")
-        && let Some(overlay) = app.get_webview_window("overlay")
-    {
-        overlay.show().map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
 }
 
 #[tauri::command]

@@ -19,10 +19,10 @@
   import { Toaster } from '@/components/ui/sonner';
   import { userAuth } from '@/userAuthentication';
   import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
+  import Button from '@/components/ui/button/button.svelte';
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
-  import Button from '@/components/ui/button/button.svelte';
 
   let { children } = $props();
 
