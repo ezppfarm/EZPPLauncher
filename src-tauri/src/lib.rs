@@ -8,7 +8,7 @@ use crate::commands::{
     get_ezpp_launcher_update_files, get_hwid, get_launcher_version, get_osu_release_stream,
     get_osu_skin, get_osu_version, get_skins_count, is_osu_running, open_url_in_browser,
     replace_ui_files, run_osu, run_osu_updater, set_osu_config_values, set_osu_user_config_values,
-    valid_osu_folder, get_platform
+    valid_osu_folder, get_platform, show_overlay, hide_overlay
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -46,7 +46,9 @@ pub fn run() {
             open_url_in_browser,
             get_launcher_version,
             exit,
-            get_platform
+            get_platform,
+            show_overlay,
+            hide_overlay
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
