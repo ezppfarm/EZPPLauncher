@@ -59,12 +59,12 @@ export const ezppfarm = {
     }
     return request.data;
   },
-  getUserInfo: async (userId: number) => {
+  getUserInfo: async (userId: number, scope: 'all' | 'info' | 'stats' = 'all') => {
     const request = await betterFetch<EZPPUserInfoResponse>(`${API_ENDPOINT}v1/get_player_info`, {
       timeout,
       query: {
         id: userId,
-        scope: 'all',
+        scope,
       },
       headers: {
         'Content-Type': 'application/json',

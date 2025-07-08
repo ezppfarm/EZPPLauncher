@@ -332,6 +332,7 @@
             return;
           }
           if ($currentUser) {
+            const userStats = await ezppfarm.getUserInfo($currentUser.id, 'stats');
             const userStatus = await ezppfarm.getUserStatus($currentUser.id);
             if (userStatus?.player_status.online) {
               let largeImageKey = 'ezppfarm';
@@ -394,42 +395,53 @@
               }
 
               details = `[${gamemodeName}] ${details}`;
+              try {
+                const currentModeStats =
+                  userStats?.player.stats[userStatus.player_status.status.mode];
+                let username = $currentUser.name;
 
-              await Promise.all([
-                presence.updateUser({
-                  username: $currentUser.name,
-                  id: $currentUser.id.toFixed(),
-                }),
-                presence.updateStatus({
-                  details,
-                  state,
-                  largeImageKey,
-                }),
-              ]);
+                if (currentModeStats && currentModeStats.rank > 0)
+                  username + ` (#${currentModeStats.rank})`;
+
+                await Promise.all([
+                  presence.updateUser({
+                    username,
+                    id: $currentUser.id.toFixed(),
+                  }),
+                  presence.updateStatus({
+                    details,
+                    state,
+                    largeImageKey,
+                  }),
+                ]);
+              } catch {}
             }
           }
-        }, 1000 * 5);
+        }, 1000 * 2);
       }
 
       await runOsu(osuPath, true);
 
-      if (presenceUpdater) {
-        window.clearInterval(presenceUpdater);
-        await Promise.all([
-          presence.updateUser({
-            username: '  ',
-            id: null,
-          }),
-          presence.updateStatus({
-            details: null,
-            state: 'Idle in Launcher...',
-            largeImageKey: 'ezppfarm',
-          }),
-        ]);
-      }
-
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
+      if (presenceUpdater) {
+        window.clearInterval(presenceUpdater);
+        console.log('clearing discord presence...');
+        try {
+          await Promise.all([
+            presence.updateUser({
+              username: '  ',
+              id: null,
+            }),
+            presence.updateStatus({
+              details: '  ',
+              state: 'Idle in Launcher...',
+              largeImageKey: 'ezppfarm',
+            }),
+          ]);
+        } catch {}
+        console.log('discord presence cleared...');
+      }
       await new Promise((res) => setTimeout(res, 1000));
       await replaceUIFiles(osuPath, true);
 
