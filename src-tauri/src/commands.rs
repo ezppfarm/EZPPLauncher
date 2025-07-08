@@ -677,3 +677,32 @@ pub fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn check_for_corruption(folder: String) -> Result<bool, String> {
+    let osu_path = PathBuf::from(folder);
+    let osu_ui = osu_path.join("osu!ui.dll");
+    let osu_gameplay = osu_path.join("osu!gameplay.dll");
+
+    let osu_ui_bak = osu_path.join("osu!ui.dll.bak");
+    let osu_gameplay_bak = osu_path.join("osu!gameplay.dll.bak");
+
+    let required_files = [&osu_ui, &osu_gameplay];
+
+    for file in &required_files {
+        if !file.exists() {
+            return Ok(true);
+        }
+    }
+
+    let bak_files = [&osu_ui_bak, &osu_gameplay_bak];
+    for bak in &bak_files {
+        if bak.exists() {
+            if let Err(e) = fs::remove_file(bak).await {
+                return Err(format!("Failed to delete {}: {}", bak.display(), e));
+            }
+        }
+    }
+
+    Ok(false)
+}
