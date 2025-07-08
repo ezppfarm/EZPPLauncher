@@ -89,3 +89,14 @@ export const formatBytes = (bytes: number, decimals = 2) => {
 export const openURL = async (url: string) => {
   await invoke('open_url_in_browser', { url });
 };
+
+export const urlIsValidImage = async (url: string) => {
+  try {
+    const request = await fetch(url);
+    if (!request.ok) return false;
+    const contentType = request.headers.get('content-type');
+    return contentType?.startsWith('image/');
+  } catch {
+    return false;
+  }
+};

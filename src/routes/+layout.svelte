@@ -109,14 +109,6 @@
     osuInstallationPath.set(config_osu_installation_path.get(''));
     discordPresence.set(config_discord_presence.get(true));
 
-    try {
-      if ($discordPresence) {
-        presenceLoading.set(true);
-        await presence.connect();
-        presenceLoading.set(false);
-      }
-    } catch {}
-
     patch.subscribe((val) => config_patching.set(val));
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
@@ -133,6 +125,15 @@
         presenceLoading.set(false);
       } catch {}
     });
+
+    try {
+      if ($discordPresence) {
+        currentLoadingInfo.set('Connecting to Discord RPC...');
+        presenceLoading.set(true);
+        await presence.connect();
+        presenceLoading.set(false);
+      }
+    } catch {}
 
     firstStartup.set(isFirstStartup);
   });

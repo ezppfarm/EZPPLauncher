@@ -44,7 +44,7 @@ impl PresenceActor {
             state: "Idle in Launcher...".to_string(),
             details: "  ".to_string(),
             large_image_key: "ezppfarm".to_string(),
-            large_image_text: "EZPPFarm v1.0.0".to_string(),
+            large_image_text: "EZPPFarm".to_string(),
             small_image_key: None,
             small_image_text: None,
         };

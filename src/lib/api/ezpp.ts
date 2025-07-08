@@ -1,4 +1,9 @@
-import type { EZPPUser, EZPPUserInfoResponse, EZPPUserResponse } from '@/types';
+import type {
+  EZPPUser,
+  EZPPUserInfoResponse,
+  EZPPUserResponse,
+  EZPPUSerStatusResponse,
+} from '@/types';
 import { betterFetch } from '@better-fetch/fetch';
 
 const BANCHO_ENDPOINT = 'https://c.ez-pp.farm/';
@@ -66,6 +71,22 @@ export const ezppfarm = {
         'User-Agent': 'EZPPLauncher',
       },
     });
+    return request.error ? undefined : request.data;
+  },
+  getUserStatus: async (userId: number) => {
+    const request = await betterFetch<EZPPUSerStatusResponse>(
+      `${API_ENDPOINT}v1/get_player_status`,
+      {
+        timeout,
+        query: {
+          id: userId,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'EZPPLauncher',
+        },
+      }
+    );
     return request.error ? undefined : request.data;
   },
 };

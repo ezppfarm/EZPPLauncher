@@ -48,6 +48,7 @@
     numberHumanReadable,
     openURL,
     releaseStreamToReadable,
+    urlIsValidImage,
   } from '@/utils';
   import { fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
@@ -98,6 +99,8 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { ezppfarm } from '@/api/ezpp';
   import Hearts from '@/components/ui/effects/Hearts.svelte';
+  import { EZPPActionStatus } from '@/types';
+  import * as presence from '@/presence';
 
   let selectedTab = $state('home');
   let progress = $state(-1);
@@ -315,7 +318,116 @@
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
+
+      let presenceUpdater: number | undefined = undefined;
+
+      const isPresenceConnected = await presence.isConnected();
+
+      if ($discordPresence && isPresenceConnected) {
+        let osuDetected = false;
+        presenceUpdater = window.setInterval(async () => {
+          if (!osuDetected) {
+            const osuRunning = await isOsuRunning();
+            if (osuRunning) osuDetected = true;
+            return;
+          }
+          if ($currentUser) {
+            const userStatus = await ezppfarm.getUserStatus($currentUser.id);
+            if (userStatus?.player_status.online) {
+              let largeImageKey = 'ezppfarm';
+              let details = 'Idle...';
+              let state =
+                userStatus.player_status.status.info_text.length > 0
+                  ? userStatus.player_status.status.info_text
+                  : '  ';
+              let beatmapCover = false;
+              const gamemode = getModeAndTypeFromGamemode(userStatus.player_status.status.mode);
+              const gamemodeName = getGamemodeName(
+                modeIntToStr(gamemode.mode),
+                typeIntToStr(gamemode.type)
+              );
+
+              switch (userStatus.player_status.status.action) {
+                case EZPPActionStatus.AFK:
+                  details = 'AFK...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.PLAYING:
+                  details = 'Playing...';
+                  break;
+                case EZPPActionStatus.EDITING:
+                  details = 'Editing...';
+                  break;
+                case EZPPActionStatus.MODDING:
+                  details = 'Modding...';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_SELECT:
+                  details = 'Multiplayer: Selecting a Beatmap...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.WATCHING:
+                  details = 'Watching...';
+                  break;
+                case EZPPActionStatus.TESTING:
+                  details = 'Testing...';
+                  break;
+                case EZPPActionStatus.SUBMITTING:
+                  details = 'Submitting...';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_IDLE:
+                  details = 'Multiplayer: Idle...';
+                  state = '  ';
+                  break;
+                case EZPPActionStatus.MULTIPLAYER_PLAYING:
+                  details = 'Multiplayer: Playing...';
+                  break;
+                case EZPPActionStatus.DIRECT:
+                  details = 'Browsing osu!direct...';
+                  state = '  ';
+                  break;
+              }
+
+              if (userStatus.player_status.status.beatmap !== null && beatmapCover) {
+                const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
+                const isValidImage = await urlIsValidImage(beatmapCoverImage);
+                if (isValidImage) largeImageKey = beatmapCoverImage;
+              }
+
+              details = `[${gamemodeName}] ${details}`;
+
+              await Promise.all([
+                presence.updateUser({
+                  username: $currentUser.name,
+                  id: $currentUser.id.toFixed(),
+                }),
+                presence.updateStatus({
+                  details,
+                  state,
+                  largeImageKey,
+                }),
+              ]);
+            }
+          }
+        }, 1000 * 5);
+      }
+
       await runOsu(osuPath, true);
+
+      if (presenceUpdater) {
+        window.clearInterval(presenceUpdater);
+        await Promise.all([
+          presence.updateUser({
+            username: '  ',
+            id: null,
+          }),
+          presence.updateStatus({
+            details: null,
+            state: 'Idle in Launcher...',
+            largeImageKey: 'ezppfarm',
+          }),
+        ]);
+      }
+
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
       await new Promise((res) => setTimeout(res, 1000));

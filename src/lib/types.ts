@@ -185,3 +185,65 @@ export type Release = {
     browser_download_url: string;
   }[];
 };
+
+export type EZPPUSerStatusResponse = EZPPUserOfflineStatus | EZPPUserOnlineStatus;
+
+type EZPPUserOfflineStatus = {
+  status: string;
+  player_status: {
+    online: false;
+    last_seen: number;
+  };
+};
+
+type EZPPUserOnlineStatus = {
+  status: string;
+  player_status: {
+    online: true;
+    login_time: number;
+    status: {
+      action: EZPPActionStatus;
+      info_text: string;
+      mode: number;
+      mods: number;
+      beatmap: EZPPUserBeatmapStatus | null;
+    };
+  };
+};
+
+type EZPPUserBeatmapStatus = {
+  md5: string;
+  id: number;
+  set_id: number;
+  artist: string;
+  title: string;
+  version: string;
+  creator: string;
+  last_update: string;
+  total_length: number;
+  max_combo: number;
+  status: number;
+  plays: number;
+  passes: number;
+  mode: number;
+  bpm: number;
+  cs: number;
+  od: number;
+  ar: number;
+  hp: number;
+  diff: number;
+};
+
+export enum EZPPActionStatus {
+  AFK = 1,
+  PLAYING = 2,
+  EDITING = 3,
+  MODDING = 4,
+  MULTIPLAYER_SELECT = 5,
+  WATCHING = 6,
+  TESTING = 8,
+  SUBMITTING = 9,
+  MULTIPLAYER_IDLE = 11,
+  MULTIPLAYER_PLAYING = 12,
+  DIRECT = 13,
+}
