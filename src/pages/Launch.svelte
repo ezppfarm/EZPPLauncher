@@ -802,7 +802,7 @@
   </div>
   <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
     <div
-      class="flex flex-row flex-nowrap h-11 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
+      class="flex flex-row flex-nowrap h-11 gap-1 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
     >
       <button
         class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
