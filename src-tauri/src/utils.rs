@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 use sysinfo::Pid;
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
@@ -177,8 +178,68 @@ pub fn get_osu_config<P: AsRef<Path>>(
 }
 
 #[cfg(not(windows))]
-pub fn get_window_title_by_pid(_pid: Pid) -> String {
-    "".to_string()
+pub fn is_osuwinello_available() -> bool {
+    Command::new("osu-wine")
+        .arg("--info") // A lightweight operation like getting the version is ideal.
+        .stdout(std::process::Stdio::null()) // Suppress stdout
+        .stderr(std::process::Stdio::null()) // Suppress stderr
+        .status() // Execute the command and get its status
+        .is_ok() // is_ok() will be true if the command was found and ran
+}
+
+#[cfg(windows)]
+pub fn is_osuwinello_available() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn is_wmctrl_available() -> bool {
+    Command::new("wmctrl")
+        .arg("-V") // A lightweight operation like getting the version is ideal.
+        .stdout(std::process::Stdio::null()) // Suppress stdout
+        .stderr(std::process::Stdio::null()) // Suppress stderr
+        .status() // Execute the command and get its status
+        .is_ok() // is_ok() will be true if the command was found and ran
+}
+
+#[cfg(windows)]
+pub fn is_wmctrl_available() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn get_window_title_by_pid(target_pid: Pid) -> String {
+    let find_title = || -> Option<String> {
+        // 1. Execute `wmctrl -lp`
+        let output = Command::new("wmctrl").arg("-lp").output().ok()?;
+
+        if !output.status.success() {
+            return None; // wmctrl command failed (e.g., not on X11)
+        }
+
+        let output_str = String::from_utf8(output.stdout).ok()?;
+
+        // 2. Parse the output line by line
+        for line in output_str.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 4 {
+                continue;
+            }
+
+            // The PID is typically the 3rd column (index 2)
+            if let Ok(pid) = parts[2].parse::<u32>() {
+                if pid == target_pid.as_u32() {
+                    // 3. Extract the title and return it as Some(title)
+                    let title = parts[4..].join(" ");
+                    return Some(title);
+                }
+            }
+        }
+
+        None
+    };
+
+    find_title().unwrap_or_default()
 }
 
 #[cfg(windows)]

@@ -6,6 +6,8 @@ import type { Release } from './types';
 
 export const currentView = writable<Component>(Loading);
 
+export const platform = writable<string>("");
+
 export const launcherVersion = writable<string>('');
 export const newVersion = writable<Release | undefined>(undefined);
 
