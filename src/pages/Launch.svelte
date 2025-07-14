@@ -1138,7 +1138,7 @@
             </div>
           </div>
           <div
-            class="grid grid-cols-[0.7fr_auto] gap-y-5 items-center border-theme-800 pl-6 pr-5 pb-4"
+            class="grid grid-cols-[0.7fr_auto] gap-y-1 items-center border-theme-800 pl-6 pr-5 pb-4"
           >
             <div class="flex flex-col">
               <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
