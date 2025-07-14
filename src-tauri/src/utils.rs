@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use sysinfo::Pid;
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
@@ -72,7 +71,6 @@ pub fn set_osu_user_config_vals(
         }
     }
 
-    // Collect indices and keys to update to avoid borrow checker issues
     let mut updates = Vec::new();
     for (i, line) in lines.iter().enumerate() {
         if let Some((existing_key, _)) = line.split_once(" = ") {
@@ -87,7 +85,6 @@ pub fn set_osu_user_config_vals(
         keys_to_add.remove(trimmed_key.as_str());
     }
 
-    // Add new keys that were not found
     for key in keys_to_add {
         if let Some(value) = keys_to_set.get(key) {
             lines.push(format!("{} = {}", key, value));
@@ -140,7 +137,6 @@ pub fn set_osu_config_vals(
         keys_to_add.remove(trimmed_key.as_str());
     }
 
-    // Add new keys that were not found
     for key in keys_to_add {
         if let Some(value) = keys_to_set.get(key) {
             lines.push(format!("{} = {}", key, value));
@@ -179,12 +175,13 @@ pub fn get_osu_config<P: AsRef<Path>>(
 
 #[cfg(not(windows))]
 pub fn is_osuwinello_available() -> bool {
+    use std::process::Command;
     Command::new("osu-wine")
-        .arg("--info") // A lightweight operation like getting the version is ideal.
-        .stdout(std::process::Stdio::null()) // Suppress stdout
-        .stderr(std::process::Stdio::null()) // Suppress stderr
-        .status() // Execute the command and get its status
-        .is_ok() // is_ok() will be true if the command was found and ran
+        .arg("--info")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok()
 }
 
 #[cfg(windows)]
@@ -194,12 +191,13 @@ pub fn is_osuwinello_available() -> bool {
 
 #[cfg(not(windows))]
 pub fn is_wmctrl_available() -> bool {
+    use std::process::Command;
     Command::new("wmctrl")
-        .arg("-V") // A lightweight operation like getting the version is ideal.
-        .stdout(std::process::Stdio::null()) // Suppress stdout
-        .stderr(std::process::Stdio::null()) // Suppress stderr
-        .status() // Execute the command and get its status
-        .is_ok() // is_ok() will be true if the command was found and ran
+        .arg("-V")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok()
 }
 
 #[cfg(windows)]
@@ -209,27 +207,24 @@ pub fn is_wmctrl_available() -> bool {
 
 #[cfg(not(windows))]
 pub fn get_window_title_by_pid(target_pid: Pid) -> String {
+    use std::process::Command;
     let find_title = || -> Option<String> {
-        // 1. Execute `wmctrl -lp`
         let output = Command::new("wmctrl").arg("-lp").output().ok()?;
 
         if !output.status.success() {
-            return None; // wmctrl command failed (e.g., not on X11)
+            return None;
         }
 
         let output_str = String::from_utf8(output.stdout).ok()?;
 
-        // 2. Parse the output line by line
         for line in output_str.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() < 4 {
                 continue;
             }
 
-            // The PID is typically the 3rd column (index 2)
             if let Ok(pid) = parts[2].parse::<u32>() {
                 if pid == target_pid.as_u32() {
-                    // 3. Extract the title and return it as Some(title)
                     let title = parts[4..].join(" ");
                     return Some(title);
                 }
@@ -271,11 +266,11 @@ pub fn get_window_title_by_pid(pid: Pid) -> String {
                     let title_str = title.to_string_lossy().into_owned();
                     if !title_str.is_empty() {
                         *result.lock().unwrap() = Some(title_str);
-                        return 0; // Stop enumeration
+                        return 0
                     }
                 }
             }
-            1 // Continue enumeration
+            1
         }
     }
 
