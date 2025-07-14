@@ -133,3 +133,7 @@ export const exit = async () => await invoke('exit');
 export const getPlatform = async () => await invoke<string>('get_platform');
 export const isOsuCorrupted = async (folder: string) =>
   await invoke<boolean>('check_for_corruption', { folder });
+export const hasWMCTRL = async () =>
+  await invoke<boolean>('has_wmctrl');
+export const hasOsuWinello = async () =>
+  await invoke<boolean>('has_osuwinello');

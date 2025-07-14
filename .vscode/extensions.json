@@ -7,6 +7,7 @@
     "fill-labs.dependi",
     "mylesmurphy.prettify-ts",
     "edwinhuish.better-comments-next",
-    "dbaeumer.vscode-eslint"
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss"
   ]
 }

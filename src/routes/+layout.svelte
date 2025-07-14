@@ -9,6 +9,7 @@
     discordPresence,
     firstStartup,
     launcherVersion,
+    platform,
     presenceLoading,
     setupValues,
   } from '@/global';
@@ -90,7 +91,8 @@
     disableReload();
     setupValues();
     launcherVersion.set(await getLauncherVersion());
-    if ((await getPlatform()) !== 'windows') unsupported_platform = true;
+    platform.set(await getPlatform());
+    if ($platform !== "windows" && $platform !== "linux") unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
     $userAuth.init();
 

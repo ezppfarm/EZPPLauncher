@@ -14,7 +14,7 @@ use tokio::time::{Duration, sleep};
 use crate::presence;
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
-    set_osu_config_vals, set_osu_user_config_vals,
+    set_osu_config_vals, set_osu_user_config_vals, is_wmctrl_available, is_osuwinello_available
 };
 
 #[tauri::command]
@@ -282,8 +282,6 @@ pub fn set_osu_config_values(
 
 #[tauri::command]
 pub async fn run_osu_updater(folder: String) -> Result<(), String> {
-    let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
-
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
@@ -292,6 +290,7 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
     let mut updater_process = {
         #[cfg(windows)]
         {
+            let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
             Command::new(&osu_exe_path)
                 .arg("-repair")
                 .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
@@ -301,7 +300,7 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
 
         #[cfg(not(windows))]
         {
-            Command::new(&osu_exe_path)
+            Command::new("osu-wine")
                 .arg("-repair")
                 .spawn()
                 .map_err(|e| format!("Failed to spawn updater: {}", e))?
@@ -372,8 +371,6 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
     /* #[cfg(windows)]
     use std::os::windows::process::CommandExt; */
 
-    let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
-
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
@@ -382,6 +379,7 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
     let mut game_process = {
         #[cfg(windows)]
         {
+            let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
             Command::new(&osu_exe_path)
                 .arg("-devserver")
                 .arg("ez-pp.farm")
@@ -392,8 +390,8 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
 
         #[cfg(not(windows))]
         {
-            Command::new(&osu_exe_path)
-                .arg("-devserver")
+            Command::new("osu-wine")
+                .arg("--devserver")
                 .arg("ez-pp.farm")
                 .spawn()
                 .map_err(|e| format!("Failed to spawn updater: {}", e))?
@@ -413,13 +411,6 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
             {
                 let _ = Command::new(&patcher_exe_path)
                     .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                    .spawn()
-                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
-            }
-
-            #[cfg(not(windows))]
-            {
-                let _ = Command::new(&patcher_exe_path)
                     .spawn()
                     .map_err(|e| format!("Failed to run patcher: {e}"))?;
             }
@@ -714,4 +705,14 @@ pub async fn presence_update_user(user: PresenceUser) {
 #[tauri::command]
 pub async fn presence_is_connected() -> bool {
     presence::has_presence().await
+}
+
+#[tauri::command]
+pub fn has_wmctrl() -> bool {
+    is_wmctrl_available()
+}
+
+#[tauri::command]
+pub fn has_osuwinello() -> bool {
+    is_osuwinello_available()
 }
