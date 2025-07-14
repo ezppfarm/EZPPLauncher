@@ -9,6 +9,9 @@ export const currentView = writable<Component>(Loading);
 export const launcherVersion = writable<string>('');
 export const newVersion = writable<Release | undefined>(undefined);
 
+export const launcherStreams = writable<string[]>(['stable']);
+export const launcherStream = writable<string>('stable');
+
 export const discordPresence = writable<boolean>(false);
 export const presenceLoading = writable<boolean>(false);
 

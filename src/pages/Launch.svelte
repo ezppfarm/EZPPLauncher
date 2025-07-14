@@ -9,6 +9,8 @@
     currentSkin,
     currentView,
     discordPresence,
+    launcherStream,
+    launcherStreams,
     launcherVersion,
     launching,
     newVersion,
@@ -186,7 +188,7 @@
 
     try {
       launchInfo = 'Looking for EZPPLauncher File updates...';
-      const updateResult = await getEZPPLauncherUpdateFiles(osuPath);
+      const updateResult = await getEZPPLauncherUpdateFiles(osuPath, $launcherStream);
 
       if (updateResult) {
         if (updateResult.filesToDownload.length > 0) {
@@ -1134,6 +1136,41 @@
                 variant="outline"
                 onclick={browse_osu_installation}>Browse</Button
               >
+            </div>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
+              <div class="text-muted-foreground text-xs">
+                test different versions of the patcher
+              </div>
+            </div>
+            <div class="flex flex-row w-full">
+              <Select.Root
+                type="single"
+                value={$launcherStream}
+                onValueChange={async (newStream) => {
+                  $userSettings.value('patcherStream').set(newStream);
+                  launcherStream.set(newStream);
+                  await $userSettings.save();
+                }}
+              >
+                <Select.Trigger
+                  class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+                >
+                  <div class="flex flex-row items-center gap-2 font-normal text-foreground">
+                    {$launcherStream}
+                  </div>
+                </Select.Trigger>
+                <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
+                  {#each $launcherStreams as stream (stream)}
+                    <Select.Item value={stream}>
+                      <div class="flex flex-row gap-2 items-center">
+                        {stream}
+                      </div>
+                    </Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
             </div>
           </div>
         </div>

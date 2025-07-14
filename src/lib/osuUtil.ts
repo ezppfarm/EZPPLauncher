@@ -1,8 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { UpdateFile, UpdateStatus } from './types';
 import { listen } from '@tauri-apps/api/event';
+import { betterFetch } from '@better-fetch/fetch';
 
-const updateUrl = 'https://ez-pp.farm/ezpplauncher';
+const updateUrl = 'https://next.ez-pp.farm/api/ezpplauncher';
 
 export const getHWID = async () => {
   const hwid = await invoke('get_hwid');
@@ -73,8 +74,24 @@ export const runUpdater = async (folder: string) => await invoke('run_osu_update
 export const runOsu = async (folder: string, patch: boolean) =>
   await invoke('run_osu', { folder, patch });
 
-export const getEZPPLauncherUpdateFiles = async (folder: string) => {
-  const result = await invoke('get_ezpp_launcher_update_files', { folder, updateUrl });
+export const getEZPPLauncherStreams = async () => {
+  const resp = await betterFetch<{ streams: string[] }>(updateUrl, {
+    method: 'POST',
+  });
+
+  if (!resp.error) {
+    return resp.data.streams;
+  }
+
+  return undefined;
+};
+
+export const getEZPPLauncherUpdateFiles = async (folder: string, updateStream: string) => {
+  const result = await invoke('get_ezpp_launcher_update_files', {
+    folder,
+    updateUrl,
+    updateStream,
+  });
   if (typeof result === 'object') {
     const [filesToDownload, updateFiles] = result as [UpdateFile[], UpdateFile[]];
     return {

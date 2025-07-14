@@ -7,6 +7,8 @@
     currentSkin,
     currentView,
     firstStartup,
+    launcherStream,
+    launcherStreams,
     launcherVersion,
     newVersion,
     osuBuild,
@@ -30,6 +32,7 @@
   import { currentUserInfo } from '@/data';
   import {
     getBeatmapSetsCount,
+    getEZPPLauncherStreams,
     getReleaseStream,
     getSkin,
     getSkinsCount,
@@ -146,6 +149,14 @@
     const launcherUpdate = await git.hasUpdate($launcherVersion);
     if (launcherUpdate) {
       newVersion.set(launcherUpdate);
+    }
+
+    const ezpplauncherStreams = await getEZPPLauncherStreams();
+    if (ezpplauncherStreams) launcherStreams.set(ezpplauncherStreams);
+
+    const selectedLauncherStream = $userSettings.value('patcherStream').get('stable');
+    if ($launcherStreams.includes(selectedLauncherStream)) {
+      launcherStream.set(selectedLauncherStream);
     }
 
     animate(ezppLogo, {

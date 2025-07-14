@@ -444,6 +444,7 @@ pub struct UpdateFile {
 pub async fn get_ezpp_launcher_update_files(
     folder: String,
     update_url: String,
+    update_stream: String
 ) -> Result<(Vec<UpdateFile>, Vec<UpdateFile>), String> {
     let osu_path = PathBuf::from(folder);
     let client = Client::new();
@@ -451,6 +452,7 @@ pub async fn get_ezpp_launcher_update_files(
     let update_files = client
         .patch(update_url)
         .header("User-Agent", "EZPPLauncher")
+        .query(&[("stream", update_stream)])
         .send()
         .await
         .map_err(|e| e.to_string())?
