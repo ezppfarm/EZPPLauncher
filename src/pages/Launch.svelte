@@ -1177,7 +1177,7 @@
                 type="single"
                 bind:value={$launcherStream}
                 onValueChange={async (newStream) => {
-                  if (newStream === 'experimental' && (await hasNet8())) {
+                  if (newStream === 'experimental' && !(await hasNet8())) {
                     launcherStream.set('stable');
                     toast.error('.NET 8.0 Desktop Runtime not found!', {
                       action: {
