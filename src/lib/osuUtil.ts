@@ -137,3 +137,5 @@ export const hasWMCTRL = async () =>
   await invoke<boolean>('has_wmctrl');
 export const hasOsuWinello = async () =>
   await invoke<boolean>('has_osuwinello');
+export const hasNet8 = async () =>
+  await invoke<boolean>('has_net8');

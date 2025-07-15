@@ -239,13 +239,13 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
 
 #[cfg(windows)]
 pub fn get_window_title_by_pid(pid: Pid) -> String {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
     use std::sync::{Arc, Mutex};
     use winapi::shared::windef::HWND;
     use winapi::um::winuser::{
         EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
     };
-    use std::ffi::OsString;
-    use std::os::windows::ffi::OsStringExt;
 
     extern "system" fn enum_windows_proc(
         hwnd: HWND,
@@ -266,7 +266,7 @@ pub fn get_window_title_by_pid(pid: Pid) -> String {
                     let title_str = title.to_string_lossy().into_owned();
                     if !title_str.is_empty() {
                         *result.lock().unwrap() = Some(title_str);
-                        return 0
+                        return 0;
                     }
                 }
             }
@@ -283,4 +283,27 @@ pub fn get_window_title_by_pid(pid: Pid) -> String {
         );
     }
     result.lock().unwrap().clone().unwrap_or_default()
+}
+
+pub async fn is_net8_installed() -> bool {
+    use std::process::Command;
+    let output_result = Command::new("dotnet").arg("--list-runtimes").output();
+    match output_result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!(
+                    "Error: `dotnet --list-runtimes` failed with status: {}",
+                    output.status
+                );
+                eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+                return false;
+            }
+
+            let stdout_str = String::from_utf8_lossy(&output.stdout);
+            stdout_str
+                .lines()
+                .any(|line| line.starts_with("Microsoft.WindowsDesktop.App 8."))
+        }
+        Err(_) => false,
+    }
 }

@@ -90,6 +90,7 @@
     getSkin,
     getSkinsCount,
     getVersion,
+    hasNet8,
     hasOsuWinello,
     hasWMCTRL,
     isOsuCorrupted,
@@ -189,20 +190,20 @@
       return;
     }
 
-    if($platform === "linux"){
-      if(!(await hasWMCTRL())){
+    if ($platform === 'linux') {
+      if (!(await hasWMCTRL())) {
         toast.error('Hmmm...', {
           description: 'wmctrl seems to be missing, please install via AUR.',
         });
         launching.set(false);
-      return;
+        return;
       }
-      if(!(await hasOsuWinello())){
+      if (!(await hasOsuWinello())) {
         toast.error('Hmmm...', {
           description: 'osu-winello seems to be missing, please install it.',
         });
         launching.set(false);
-      return;
+        return;
       }
     }
 
@@ -1050,12 +1051,18 @@
           >
             <div class="flex flex-col">
               <Label class="text-sm" for="setting-custom-cursor">Patching</Label>
-              <div class="text-muted-foreground text-xs">Shows misses in Relax and Autopilot {#if $platform !== "windows"}<span class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg">currently only on windows!</span> {/if}</div>
+              <div class="text-muted-foreground text-xs">
+                Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+                    class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg"
+                    >currently only on windows!</span
+                  >
+                {/if}
+              </div>
             </div>
             <Checkbox
               id="setting-custom-cursor"
-              checked={$platform === "windows" ? $patch : false}
-              disabled={$platform !== "windows"}
+              checked={$platform === 'windows' ? $patch : false}
+              disabled={$platform !== 'windows'}
               onCheckedChange={async (e) => {
                 patch.set(e);
                 $userSettings.save();
@@ -1168,8 +1175,21 @@
             <div class="flex flex-row w-full">
               <Select.Root
                 type="single"
-                value={$launcherStream}
+                bind:value={$launcherStream}
                 onValueChange={async (newStream) => {
+                  if (newStream === 'experimental' && (await hasNet8())) {
+                    launcherStream.set('stable');
+                    toast.error('.NET 8.0 Desktop Runtime not found!', {
+                      action: {
+                        label: 'Download .NET 8.0',
+                        onClick: async () =>
+                          await openURL(
+                            'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.18-windows-x64-installer'
+                          ),
+                      },
+                    });
+                    return;
+                  }
                   $userSettings.value('patcherStream').set(newStream);
                   launcherStream.set(newStream);
                   await $userSettings.save();

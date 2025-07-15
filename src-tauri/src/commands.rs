@@ -14,7 +14,8 @@ use tokio::time::{Duration, sleep};
 use crate::presence;
 use crate::utils::{
     check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
-    set_osu_config_vals, set_osu_user_config_vals, is_wmctrl_available, is_osuwinello_available
+    is_net8_installed, is_osuwinello_available, is_wmctrl_available, set_osu_config_vals,
+    set_osu_user_config_vals,
 };
 
 #[tauri::command]
@@ -336,10 +337,8 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
         sleep(Duration::from_millis(500)).await;
     }
 
-    // Wait for updater process to fully exit
     let _ = updater_process.wait().await;
 
-    // Clean up update-related files
     let force_update_files = [".require_update", "help.txt", "_pending"];
     for update_file_name in &force_update_files {
         let path = PathBuf::from(&folder).join(update_file_name);
@@ -435,7 +434,7 @@ pub struct UpdateFile {
 pub async fn get_ezpp_launcher_update_files(
     folder: String,
     update_url: String,
-    update_stream: String
+    update_stream: String,
 ) -> Result<(Vec<UpdateFile>, Vec<UpdateFile>), String> {
     let osu_path = PathBuf::from(folder);
     let client = Client::new();
@@ -536,7 +535,6 @@ pub async fn download_ezpp_launcher_update_files(
                 .await
                 .map_err(|e| e.to_string())?;
 
-            // Emit progress to frontend
             app.emit(
                 "download-progress",
                 UpdateStatus {
@@ -715,4 +713,9 @@ pub fn has_wmctrl() -> bool {
 #[tauri::command]
 pub fn has_osuwinello() -> bool {
     is_osuwinello_available()
+}
+
+#[tauri::command]
+pub async fn has_net8() -> bool {
+    is_net8_installed().await
 }
