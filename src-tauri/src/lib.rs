@@ -27,9 +27,6 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let app_window = app.get_webview_window("main").expect("no main window");
-            app_window
-                .set_always_on_top(true)
-                .expect("failed to set always on top");
             app_window.set_focus().expect("failed to focus");
         }));
     }

@@ -1094,7 +1094,7 @@ dependencies = [
 
 [[package]]
 name = "ezpplauncher"
-version = "3.0.0-beta.5"
+version = "3.0.0"
 dependencies = [
  "discord-rich-presence",
  "hardware-id",
