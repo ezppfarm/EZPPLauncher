@@ -20,8 +20,8 @@ It enhances the osu! experience with quality-of-life features and integration sp
 - [x] Shows the number of imported beatmapsets
 - [x] Shows the number of imported skins
 - [x] Displays ping to the EZPPFarm server
-- [ ] Discord Rich Presence (planned and in development)
-- [ ] Performance Display Overlay (planned)
+- [x] Discord Rich Presence
+- [x] Performance Display Overlay (currently in experimental patcher release stream)
 
 ---
 
@@ -31,9 +31,9 @@ It enhances the osu! experience with quality-of-life features and integration sp
 | -------- | ---------------- |
 | Windows  | ✅ Supported     |
 | macOS    | ❌ Not supported |
-| Linux    | ❌ Not supported |
+| Linux    | 🕧 Partially supported (via osu-winello) |
 
-> Currently, only **Windows** is supported. Support for other platforms may be considered in the future.
+> Currently, only **Windows** is fully supported. Support for other platforms may be considered in the future.
 
 ---
 
