@@ -720,15 +720,7 @@ pub async fn has_net8() -> bool {
     is_net8_installed().await
 }
 
-/*
-* osu!.exe decompile result:
-* dpapi cipher is most likely: cu24180ncjeiu0ci1nwui
-* dpapi key type is: 1
-*
-* example call for encryption: DPAPI.Encrypt((DPAPI.KeyType)1, this.storage.UnsecureRepresentation(), "cu24180ncjeiu0ci1nwui", this.representation.ToString());
-* the method args are following: Encrypt(DPAPI.KeyType keyType, byte[] plainTextBytes, byte[] entropyBytes, string description)
-*/
-
+#[cfg(windows)]
 #[tauri::command]
 pub fn encrypt_string(string: String, entropy: String) -> String {
     let encrypted = encrypt_password(&string, &entropy);
@@ -740,4 +732,11 @@ pub fn encrypt_string(string: String, entropy: String) -> String {
         }
         Err(_) => string,
     }
+}
+
+// NOTE: should not be called by tauri on non windows systems, return the string nonthenless
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn encrypt_string(string: String, _entropy: String) -> String {
+    string
 }
