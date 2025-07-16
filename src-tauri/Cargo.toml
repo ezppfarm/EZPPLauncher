@@ -1,6 +1,6 @@
 [package]
 name = "ezpplauncher"
-version = "3.0.0"
+version = "3.0.1"
 description = "EZPPLauncher redefined."
 authors = ["HorizonCode"]
 edition = "2024"
