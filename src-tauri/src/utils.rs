@@ -307,3 +307,112 @@ pub async fn is_net8_installed() -> bool {
         Err(_) => false,
     }
 }
+
+
+#[cfg(windows)]
+pub fn encrypt_password(password: &str) -> Result<String, String> {
+    use std::ptr;
+    use std::slice;
+    use winapi::shared::minwindef::{BYTE, DWORD, LPVOID};
+    use winapi::um::dpapi::{CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData};
+    use winapi::um::winbase::LocalFree;
+    use winapi::um::wincrypt::DATA_BLOB;
+    use base64::{engine::general_purpose, Engine as _};
+
+    let password_bytes = password.as_bytes();
+    let mut input_blob = DATA_BLOB {
+        cbData: password_bytes.len() as DWORD,
+        pbData: password_bytes.as_ptr() as *mut BYTE,
+    };
+
+    let mut output_blob = DATA_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+
+    let result = unsafe {
+        CryptProtectData(
+            &mut input_blob,
+            ptr::null(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut output_blob,
+        )
+    };
+
+    if result == 0 {
+        return Err("CryptProtectData failed".to_string());
+    }
+
+    let encrypted_data =
+        unsafe { slice::from_raw_parts(output_blob.pbData, output_blob.cbData as usize).to_vec() };
+
+    unsafe {
+        LocalFree(output_blob.pbData as LPVOID);
+    }
+
+    let base64_string = general_purpose::STANDARD.encode(&encrypted_data);
+
+    Ok(base64_string)
+}
+
+#[cfg(windows)]
+pub fn decrypt_password(encrypted_password_base64: &str) -> Result<String, String> {
+  use std::ptr;
+    use std::slice;
+    use winapi::shared::minwindef::{BYTE, DWORD, LPVOID};
+    use winapi::um::dpapi::{CRYPTPROTECT_UI_FORBIDDEN, CryptUnprotectData};
+    use winapi::um::winbase::LocalFree;
+    use winapi::um::wincrypt::DATA_BLOB;
+    use base64::{engine::general_purpose, Engine as _};
+
+    // 1. Decode the Base64 string back into raw bytes
+    let encrypted_password_bytes = general_purpose::STANDARD.decode(encrypted_password_base64)
+        .map_err(|e| format!("Base64 decoding failed: {}", e))?;
+
+    // 2. Prepare the input data structure
+    let mut input_blob = DATA_BLOB {
+        cbData: encrypted_password_bytes.len() as DWORD,
+        pbData: encrypted_password_bytes.as_ptr() as *mut BYTE,
+    };
+
+    // 3. Prepare the output data structure
+    let mut output_blob = DATA_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+
+    // 4. Call the Windows API function
+    let result = unsafe {
+        CryptUnprotectData(
+            &mut input_blob,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut output_blob,
+        )
+    };
+
+    // 5. Check the result
+    if result == 0 {
+        return Err("CryptUnprotectData failed".to_string());
+    }
+
+    // 6. Copy the decrypted data into a safe Rust Vec
+    let decrypted_bytes = unsafe {
+        slice::from_raw_parts(output_blob.pbData, output_blob.cbData as usize).to_vec()
+    };
+
+    // 7. Free the memory allocated by the Windows API
+    unsafe {
+        LocalFree(output_blob.pbData as LPVOID);
+    }
+
+    // 8. Convert the decrypted bytes back to a UTF-8 string
+    String::from_utf8(decrypted_bytes)
+        .map_err(|e| format!("UTF-8 conversion failed: {}", e))
+}
