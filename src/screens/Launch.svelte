@@ -534,7 +534,7 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root open>
+<AlertDialog.Root open={$newVersion !== undefined}>
   <AlertDialog.Content
     class="bg-theme-950 border-theme-800 p-0"
     escapeKeydownBehavior="ignore"
