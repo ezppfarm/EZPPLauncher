@@ -308,8 +308,6 @@ pub async fn is_net8_installed() -> bool {
     }
 }
 
-//TODO: maybe switch to this crate: https://crates.io/crates/windows-dpapi
-
 #[cfg(windows)]
 pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose};
