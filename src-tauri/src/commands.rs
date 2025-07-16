@@ -726,10 +726,7 @@ pub fn encrypt_string(string: String, entropy: String) -> String {
     let encrypted = encrypt_password(&string, &entropy);
 
     match encrypted {
-        Ok(encrypted_vec) => {
-            // encrypted_vec is already a String, not Vec<u8>
-            encrypted_vec
-        }
+        Ok(encrypted_vec) => encrypted_vec,
         Err(_) => string,
     }
 }
