@@ -92,7 +92,7 @@
     setupValues();
     launcherVersion.set(await getLauncherVersion());
     platform.set(await getPlatform());
-    if ($platform !== "windows" && $platform !== "linux") unsupported_platform = true;
+    if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
     $userAuth.init();
 

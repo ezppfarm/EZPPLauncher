@@ -27,10 +27,10 @@ It enhances the osu! experience with quality-of-life features and integration sp
 
 ## 💻 Supported Platforms
 
-| Platform | Status           |
-| -------- | ---------------- |
-| Windows  | ✅ Supported     |
-| macOS    | ❌ Not supported |
+| Platform | Status                                   |
+| -------- | ---------------------------------------- |
+| Windows  | ✅ Supported                             |
+| macOS    | ❌ Not supported                         |
 | Linux    | 🕧 Partially supported (via osu-winello) |
 
 > Currently, only **Windows** is fully supported. Support for other platforms may be considered in the future.

@@ -133,11 +133,8 @@ export const exit = async () => await invoke('exit');
 export const getPlatform = async () => await invoke<string>('get_platform');
 export const isOsuCorrupted = async (folder: string) =>
   await invoke<boolean>('check_for_corruption', { folder });
-export const hasWMCTRL = async () =>
-  await invoke<boolean>('has_wmctrl');
-export const hasOsuWinello = async () =>
-  await invoke<boolean>('has_osuwinello');
-export const hasNet8 = async () =>
-  await invoke<boolean>('has_net8');
+export const hasWMCTRL = async () => await invoke<boolean>('has_wmctrl');
+export const hasOsuWinello = async () => await invoke<boolean>('has_osuwinello');
+export const hasNet8 = async () => await invoke<boolean>('has_net8');
 export const encryptString = async (str: string, entropy: string) =>
-  await invoke<string>('encrypt_string', {string: str, entropy});
+  await invoke<string>('encrypt_string', { string: str, entropy });

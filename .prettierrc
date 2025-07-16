@@ -9,7 +9,7 @@
   "tabWidth": 2,
   "useTabs": false,
   "bracketSpacing": true,
-  "plugins": ["prettier-plugin-svelte", "prettier-plugin-rust"],
+  "plugins": ["prettier-plugin-svelte"],
   "overrides": [
     {
       "files": "*.svelte",

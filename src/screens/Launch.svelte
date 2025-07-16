@@ -297,7 +297,10 @@
             },
             {
               key: 'Password',
-              value: $platform === "windows" ? await encryptString(password, "cu24180ncjeiu0ci1nwui") : password,
+              value:
+                $platform === 'windows'
+                  ? await encryptString(password, 'cu24180ncjeiu0ci1nwui')
+                  : password,
             },
             {
               key: 'SaveUsername',
@@ -531,8 +534,12 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root open={$newVersion !== undefined}>
-  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+<AlertDialog.Root open>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
@@ -568,7 +575,11 @@
 </AlertDialog.Root>
 
 <AlertDialog.Root bind:open={$launching}>
-  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
