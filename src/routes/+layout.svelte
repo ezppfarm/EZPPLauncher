@@ -26,7 +26,7 @@
   import { Buffer } from 'buffer';
   import { Toaster } from '@/components/ui/sonner';
   import { userAuth } from '@/userAuthentication';
-  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
+  import { encryptString, exit, getLauncherVersion, getPlatform } from '@/osuUtil';
   import Button from '@/components/ui/button/button.svelte';
   import * as presence from '@/presence';
 
@@ -87,6 +87,13 @@
 
   onMount(async () => {
     window.Buffer = Buffer;
+
+    /* const decryptTest = "AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAs463WdMtG0mr/mVLQCZ6dQAAAAAIAAAAUgBhAHcAAAAQZgAAAAEAACAAAABnyhFo8QK2iL5aTehKmsZSUpihGWBwlKfYj7cL2/lDagAAAAAOgAAAAAIAACAAAABMxyG6EdkLORSMB8isbltZhPQV2iVQ2r+yJLJ2Tw9yWiAAAABE1EzBPD9PRFQ3evk0vneNpfQTNTvMpjDVUTl3kAaKWUAAAADBshJzPDx6qcYfYh2zh6cKJWClZpIp6H50IKriW936XGhLFQboK/m18O77TBnpSrs0YosFjzsYVJTkrWjetFAf";
+    const decrypted = await decryptString(decryptTest);
+    console.log(decrypted); */
+
+    const encrypted = await encryptString("Todesengel007008009!", "cu24180ncjeiu0ci1nwui");
+    console.log(encrypted);
 
     disableReload();
     setupValues();

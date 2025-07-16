@@ -13,9 +13,9 @@ use tokio::time::{Duration, sleep};
 
 use crate::presence;
 use crate::utils::{
-    check_folder_completeness, get_osu_config, get_osu_user_config, get_window_title_by_pid,
-    is_net8_installed, is_osuwinello_available, is_wmctrl_available, set_osu_config_vals,
-    set_osu_user_config_vals,
+    check_folder_completeness, encrypt_password, get_osu_config, get_osu_user_config,
+    get_window_title_by_pid, is_net8_installed, is_osuwinello_available, is_wmctrl_available,
+    set_osu_config_vals, set_osu_user_config_vals,
 };
 
 #[tauri::command]
@@ -718,4 +718,26 @@ pub fn has_osuwinello() -> bool {
 #[tauri::command]
 pub async fn has_net8() -> bool {
     is_net8_installed().await
+}
+
+/*
+* osu!.exe decompile result:
+* dpapi cipher is most likely: cu24180ncjeiu0ci1nwui
+* dpapi key type is: 1
+*
+* example call for encryption: DPAPI.Encrypt((DPAPI.KeyType)1, this.storage.UnsecureRepresentation(), "cu24180ncjeiu0ci1nwui", this.representation.ToString());
+* the method args are following: Encrypt(DPAPI.KeyType keyType, byte[] plainTextBytes, byte[] entropyBytes, string description)
+*/
+
+#[tauri::command]
+pub fn encrypt_string(string: String, entropy: String) -> String {
+    let encrypted = encrypt_password(&string, &entropy);
+
+    match encrypted {
+        Ok(encrypted_vec) => {
+            // encrypted_vec is already a String, not Vec<u8>
+            encrypted_vec
+        }
+        Err(_) => string,
+    }
 }

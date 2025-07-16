@@ -83,6 +83,7 @@
   import { osuapi } from '@/api/osuapi';
   import {
     downloadEZPPLauncherUpdateFiles,
+    encryptString,
     exit,
     getBeatmapSetsCount,
     getEZPPLauncherUpdateFiles,
@@ -296,7 +297,7 @@
             },
             {
               key: 'Password',
-              value: password,
+              value: $platform === "windows" ? await encryptString(password, "cu24180ncjeiu0ci1nwui") : password,
             },
             {
               key: 'SaveUsername',

@@ -139,3 +139,5 @@ export const hasOsuWinello = async () =>
   await invoke<boolean>('has_osuwinello');
 export const hasNet8 = async () =>
   await invoke<boolean>('has_net8');
+export const encryptString = async (str: string, entropy: string) =>
+  await invoke<string>('encrypt_string', {string: str, entropy});
