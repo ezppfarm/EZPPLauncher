@@ -369,7 +369,7 @@ pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String>
         LocalFree(output_blob.pbData as LPVOID);
     }
 
-    let base64_string = general_purpose::STANDARD_NO_PAD.encode(&encrypted_data);
+    let base64_string = general_purpose::STANDARD.encode(&encrypted_data);
 
     Ok(base64_string)
 }
