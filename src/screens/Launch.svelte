@@ -149,14 +149,11 @@
       toast.success('osu! installation path set successfully.');
 
       const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
-      if (beatmapSetCount) {
-        beatmapSets.set(beatmapSetCount);
-      }
+      if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
       const skinsCount: number | null = await getSkinsCount(selectedPath);
-      if (skinsCount) {
-        skins.set(skinsCount);
-      }
+      if (skinsCount !== null) skins.set(skinsCount);
+
       const skin: string = await getSkin(selectedPath);
       currentSkin.set(skin);
     }
@@ -481,7 +478,7 @@
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
       const skinCount = await getSkinsCount(osuPath);
-      if (skinCount) skins.set(skinCount);
+      if (skinCount !== null) skins.set(skinCount);
 
       const skin = await getSkin(osuPath);
       currentSkin.set(skin);
@@ -900,13 +897,17 @@
             </div>
             <div class="relative font-bold text-xl text-yellow-400">
               <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$skins
+                class="absolute top-1 left-1/2 -translate-x-1/2 {$skins === null
                   ? 'opacity-100'
                   : 'opacity-0'} transition-opacity duration-1000"
               >
                 <LoaderCircle class="animate-spin" />
               </div>
-              <div class="{!$skins ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000">
+              <div
+                class="{$skins === null
+                  ? 'opacity-0'
+                  : 'opacity-100'} transition-opacity duration-1000"
+              >
                 {#if $reduceAnimations}
                   <span>{numberHumanReadable($skins ?? 0)}</span>
                 {:else}
