@@ -308,6 +308,11 @@ pub async fn is_net8_installed() -> bool {
     }
 }
 
+#[cfg(not(windows))]
+pub fn encrypt_password(password: &str, _entropy: &str) -> Result<String, String> {
+    Ok(password.to_string())
+}
+
 #[cfg(windows)]
 pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose};

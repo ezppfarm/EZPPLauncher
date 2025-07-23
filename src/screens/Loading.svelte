@@ -135,11 +135,11 @@
 
         currentLoadingInfo.set('Counting beatmapsets...');
         const beatmapSetCount = await getBeatmapSetsCount($osuInstallationPath);
-        if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
+        if (beatmapSetCount !== null) beatmapSets.set(beatmapSetCount);
 
         currentLoadingInfo.set('Counting skins...');
         const skinCount = await getSkinsCount($osuInstallationPath);
-        if (skinCount) skins.set(skinCount);
+        if (skinCount !== null) skins.set(skinCount);
         const skin: string = await getSkin($osuInstallationPath);
         currentSkin.set(skin);
       }

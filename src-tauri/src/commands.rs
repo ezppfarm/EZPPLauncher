@@ -720,7 +720,6 @@ pub async fn has_net8() -> bool {
     is_net8_installed().await
 }
 
-#[cfg(windows)]
 #[tauri::command]
 pub fn encrypt_string(string: String, entropy: String) -> String {
     let encrypted = encrypt_password(&string, &entropy);
@@ -729,11 +728,4 @@ pub fn encrypt_string(string: String, entropy: String) -> String {
         Ok(encrypted_vec) => encrypted_vec,
         Err(_) => string,
     }
-}
-
-// NOTE: should not be called by tauri on non windows systems, return the string nonthenless
-#[cfg(not(windows))]
-#[tauri::command]
-pub fn encrypt_string(string: String, _entropy: String) -> String {
-    string
 }
