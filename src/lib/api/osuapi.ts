@@ -18,11 +18,13 @@ export const osuapi = {
       },
     });
     if (request.error) {
-      if (request.error.status >= 500 && request.error.status < 600)
-        throw new Error('Server not reachable');
       return undefined;
     }
     const releaseData = request.data;
+    if (!releaseData || !releaseData.streams) {
+      return undefined;
+    }
+    if (releaseData.streams.length === 0) return undefined;
     const selectedRelease = releaseData.streams.find(
       (releaseBuild) =>
         releaseBuild.name.toLowerCase() === releaseStream.replaceAll(' ', '').toLowerCase()
