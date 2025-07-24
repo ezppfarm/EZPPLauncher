@@ -519,7 +519,7 @@
 </script>
 
 <AlertDialog.Root open={launchError !== undefined}>
-  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0 max-w-[90vw]">
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
@@ -527,10 +527,10 @@
       <span class="font-semibold text-xl">Error on Launch!</span>
     </div>
     <div
-      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3 overflow-hidden"
     >
       {#if launchError}
-        <pre class="text-wrap text-start">{JSON.stringify(
+        <pre class="text-wrap text-start overflow-auto w-full">{JSON.stringify(
             launchError,
             Object.getOwnPropertyNames(launchError),
             2
