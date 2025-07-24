@@ -241,13 +241,31 @@
       const streamInfo = await osuapi.latestBuildVersion('stable40');
       if (!streamInfo) {
         toast.error('Hmmm...', {
-          description: 'Failed to check for updates.',
+          description: 'Failed to check for updates, maybe osu! is down?',
         });
         launching.set(false);
         return;
       }
 
       const releaseStream = await getReleaseStream(osuPath);
+
+      if (releaseStream === undefined) {
+        toast.error('Hmmm...', {
+          description: 'Failed to get osu! release stream.',
+        });
+        launching.set(false);
+        return;
+      }
+
+      // only stable osu! release streams are supported for now
+      if (!releaseStream.toLowerCase().includes('stable')) {
+        toast.error('Hmmm...', {
+          description: 'You are not on the stable release stream, please switch to it.',
+        });
+        launching.set(false);
+        return;
+      }
+
       const osuCorrupted = await isOsuCorrupted(osuPath);
       let forceUpdate =
         (releaseStream && releaseStream.toLowerCase() !== 'stable40') || osuCorrupted;
