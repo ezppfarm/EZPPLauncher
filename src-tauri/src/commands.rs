@@ -789,7 +789,7 @@ pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> 
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
     Command::new(&file_path)
-        .arg("/QN")
+        .arg("/S")
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
         .spawn()
         .map_err(|e| format!("Failed to spawn updater: {}", e))?;

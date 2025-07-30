@@ -33,7 +33,8 @@
     "license": "GPL-3.0",
     "active": true,
     "targets": [
-      "nsis"
+      "nsis",
+      "appimage"
     ],
     "windows": {
       "webviewInstallMode": {
