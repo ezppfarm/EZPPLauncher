@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
+use tauri::Manager;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
@@ -728,4 +729,80 @@ pub fn encrypt_string(string: String, entropy: String) -> String {
         Ok(encrypted_vec) => encrypted_vec,
         Err(_) => string,
     }
+}
+
+#[tauri::command]
+pub async fn download_ezpp_launcher_update(app: AppHandle, url: String) -> Result<(), String> {
+    let client = Client::new();
+
+    let mut response = client.get(&url).send().await.map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("Failed to download update: {}", response.status()));
+    }
+
+    let temp_dir = app.path().temp_dir().expect("Failed to get temp directory");
+    let file_path = temp_dir.join("ezpplauncher_update.exe");
+
+    let mut file_out = fs::File::create(&file_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut downloaded = 0u64;
+    let size = response
+        .content_length()
+        .ok_or("Failed to get content length")? as usize;
+
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        downloaded += chunk.len() as u64;
+        file_out
+            .write_all(&chunk)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        app.emit(
+            "download-progress",
+            UpdateStatus {
+                file_name: "Update".to_string(),
+                downloaded,
+                size: size,
+                progress: ((downloaded as f64 / size as f64 * 100.0) * 100.0).trunc() / 100.0,
+            },
+        )
+        .unwrap_or_default();
+    }
+
+    Ok(())
+}
+
+#[cfg(windows)]
+#[tauri::command]
+pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> {
+    let temp_dir = app.path().temp_dir().expect("Failed to get temp directory");
+    let file_path = temp_dir.join("ezpplauncher_update.exe");
+    if !file_path.exists() {
+        return Err("Update file does not exist".to_string());
+    }
+
+    // run this app detached and exit
+
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+
+    Command::new(&file_path)
+        .arg("/QN")
+        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn updater: {}", e))?;
+
+    sleep(Duration::from_millis(250)).await;
+
+    app.exit(0x0100);
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+pub async fn install_ezpp_launcher_update(_app: AppHandle) -> Result<(), String> {
+    Ok(())
 }
