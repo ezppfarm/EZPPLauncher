@@ -308,6 +308,11 @@ pub async fn is_net8_installed() -> bool {
     }
 }
 
+#[cfg(not(windows))]
+pub fn encrypt_password(password: &str, _entropy: &str) -> Result<String, String> {
+    Ok(password.to_string())
+}
+
 #[cfg(windows)]
 pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String> {
     use base64::{Engine as _, engine::general_purpose};
@@ -369,7 +374,7 @@ pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String>
         LocalFree(output_blob.pbData as LPVOID);
     }
 
-    let base64_string = general_purpose::STANDARD_NO_PAD.encode(&encrypted_data);
+    let base64_string = general_purpose::STANDARD.encode(&encrypted_data);
 
     Ok(base64_string)
 }

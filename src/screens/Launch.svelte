@@ -149,14 +149,11 @@
       toast.success('osu! installation path set successfully.');
 
       const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
-      if (beatmapSetCount) {
-        beatmapSets.set(beatmapSetCount);
-      }
+      if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
       const skinsCount: number | null = await getSkinsCount(selectedPath);
-      if (skinsCount) {
-        skins.set(skinsCount);
-      }
+      if (skinsCount !== null) skins.set(skinsCount);
+
       const skin: string = await getSkin(selectedPath);
       currentSkin.set(skin);
     }
@@ -244,13 +241,31 @@
       const streamInfo = await osuapi.latestBuildVersion('stable40');
       if (!streamInfo) {
         toast.error('Hmmm...', {
-          description: 'Failed to check for updates.',
+          description: 'Failed to check for updates, maybe osu! is down?',
         });
         launching.set(false);
         return;
       }
 
       const releaseStream = await getReleaseStream(osuPath);
+
+      if (releaseStream === undefined) {
+        toast.error('Hmmm...', {
+          description: 'Failed to get osu! release stream.',
+        });
+        launching.set(false);
+        return;
+      }
+
+      // only stable osu! release streams are supported for now
+      if (!releaseStream.toLowerCase().includes('stable')) {
+        toast.error('Hmmm...', {
+          description: 'You are not on the stable release stream, please switch to it.',
+        });
+        launching.set(false);
+        return;
+      }
+
       const osuCorrupted = await isOsuCorrupted(osuPath);
       let forceUpdate =
         (releaseStream && releaseStream.toLowerCase() !== 'stable40') || osuCorrupted;
@@ -481,7 +496,7 @@
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
       const skinCount = await getSkinsCount(osuPath);
-      if (skinCount) skins.set(skinCount);
+      if (skinCount !== null) skins.set(skinCount);
 
       const skin = await getSkin(osuPath);
       currentSkin.set(skin);
@@ -504,7 +519,7 @@
 </script>
 
 <AlertDialog.Root open={launchError !== undefined}>
-  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
+  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0 max-w-[90vw]">
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
@@ -512,10 +527,10 @@
       <span class="font-semibold text-xl">Error on Launch!</span>
     </div>
     <div
-      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3 overflow-hidden"
     >
       {#if launchError}
-        <pre class="text-wrap text-start">{JSON.stringify(
+        <pre class="text-wrap text-start overflow-auto w-full">{JSON.stringify(
             launchError,
             Object.getOwnPropertyNames(launchError),
             2
@@ -900,13 +915,17 @@
             </div>
             <div class="relative font-bold text-xl text-yellow-400">
               <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$skins
+                class="absolute top-1 left-1/2 -translate-x-1/2 {$skins === null
                   ? 'opacity-100'
                   : 'opacity-0'} transition-opacity duration-1000"
               >
                 <LoaderCircle class="animate-spin" />
               </div>
-              <div class="{!$skins ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000">
+              <div
+                class="{$skins === null
+                  ? 'opacity-0'
+                  : 'opacity-100'} transition-opacity duration-1000"
+              >
                 {#if $reduceAnimations}
                   <span>{numberHumanReadable($skins ?? 0)}</span>
                 {:else}

@@ -67,7 +67,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_cors_fetch::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

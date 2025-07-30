@@ -144,7 +144,7 @@ impl PresenceActor {
                         "Download the Launcher",
                         "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest",
                     ),
-                    Button::new("Join EZPZFarm", "https://ez-pp.farm/discord"),
+                    Button::new("Join EZPPFarm", "https://ez-pp.farm/discord"),
                 ]);
 
             if let Err(e) = client.set_activity(activity).map_err(|e| e.to_string()) {
