@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ezpplauncher",
+  "productName": "EZPPLauncher",
   "version": "3.0.1",
   "identifier": "farm.ezpp.launcher",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ezpplauncher",
+        "title": "EZPPLauncher",
         "width": 1000,
         "height": 700,
         "decorations": false,
@@ -28,8 +28,18 @@
   "bundle": {
     "active": true,
     "targets": [
-      "app"
+      "nsis"
     ],
+    "windows": {
+      "webviewInstallMode": {
+        "silent": true,
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "compression": "lzma"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
