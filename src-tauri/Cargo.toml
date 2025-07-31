@@ -1,6 +1,6 @@
 [package]
 name = "ezpplauncher"
-version = "3.0.3"
+version = "3.0.4"
 description = "EZPPLauncher redefined."
 authors = ["HorizonCode"]
 edition = "2024"
@@ -23,14 +23,14 @@ tauri-plugin-shell = "2.3.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
 serde_repr = "0.1.20"
-tauri-plugin-dialog = "2.3.1"
+tauri-plugin-dialog = "2.3.2"
 tauri-plugin-fs = "2.4.1"
 hardware-id = "0.3.0"
 tauri-plugin-cors-fetch = "4.1.0"
 sysinfo = "0.36.1"
 reqwest = { version = "0.12.22", features = ["json", "stream"] }
 md5 = "0.8.0"
-tokio = { version = "1.46.1", features = ["full"] }
+tokio = { version = "1.47.0", features = ["full"] }
 open = "5.3.2"
 windows-sys = "0.60.2"
 discord-rich-presence = "0.2.5"
