@@ -83,6 +83,7 @@
   import { osuapi } from '@/api/osuapi';
   import {
     downloadEZPPLauncherUpdateFiles,
+    downloadUpdate,
     encryptString,
     exit,
     getBeatmapSetsCount,
@@ -94,6 +95,7 @@
     hasNet8,
     hasOsuWinello,
     hasWMCTRL,
+    installUpdate,
     isOsuCorrupted,
     isOsuRunning,
     isValidOsuFolder,
@@ -113,6 +115,8 @@
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
+
+  let downloadingUpdate = $state(false);
 
   let selectedGamemode = $derived(
     getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
@@ -577,14 +581,45 @@
       </div>
     </div>
     <div class="flex items-center justify-center mb-3">
-      <Button
-        onclick={async () => {
-          if ($newVersion) {
-            await openURL($newVersion.html_url);
-            await exit();
-          }
-        }}>Update now</Button
-      >
+      {#if $platform === 'windows'}
+        {#if downloadingUpdate}
+          <div class="flex flex-col items-center justify-center gap-2 p-3 rounded-lg w-full">
+            <Progress indeterminate={progress === -1} value={progress} />
+            <span class="text-muted-foreground text-sm mt-4">{launchInfo}</span>
+          </div>
+        {:else}
+          <Button
+            onclick={async () => {
+              const updateFile = $newVersion?.assets.find((asset) => asset.name.endsWith('.exe'));
+              if (!updateFile) {
+                toast.error('Hmmm...', {
+                  description: 'No update file found.',
+                });
+                $newVersion = undefined;
+                return;
+              }
+              downloadingUpdate = true;
+              launchInfo = 'Downloading Update...';
+              await downloadUpdate(updateFile.browser_download_url, (file) => {
+                progress = file.progress;
+                launchInfo = `Downloading Update (${formatBytes(file.downloaded)}/${formatBytes(file.size)})...`;
+              });
+              progress = -1;
+              launchInfo = 'Update downloaded, installing...';
+              await installUpdate();
+            }}>Install Update now</Button
+          >
+        {/if}
+      {:else}
+        <Button
+          onclick={async () => {
+            if ($newVersion) {
+              await openURL($newVersion.html_url);
+              await exit();
+            }
+          }}>Update now</Button
+        >
+      {/if}
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>

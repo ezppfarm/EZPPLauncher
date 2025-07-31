@@ -138,3 +138,17 @@ export const hasOsuWinello = async () => await invoke<boolean>('has_osuwinello')
 export const hasNet8 = async () => await invoke<boolean>('has_net8');
 export const encryptString = async (str: string, entropy: string) =>
   await invoke<string>('encrypt_string', { string: str, entropy });
+export const downloadUpdate = async (
+  url: string,
+  progressCallback: (file: UpdateStatus) => void
+) => {
+  const downloadStatusListen = await listen('download-progress', (event) =>
+    progressCallback(event.payload as UpdateStatus)
+  );
+  try {
+    await invoke<string>('download_ezpp_launcher_update', { url });
+  } finally {
+    downloadStatusListen();
+  }
+};
+export const installUpdate = async () => await invoke('install_ezpp_launcher_update');

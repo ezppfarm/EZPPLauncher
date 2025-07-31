@@ -1,8 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ezpplauncher",
-  "version": "3.0.3",
-  "identifier": "farm.ezpp.launcher",
+  "productName": "EZPPLauncher",
+  "version": "3.0.4",
+  "identifier": "farm.EZPPFarm.Launcher",
+  "mainBinaryName": "ezpplauncher",
   "build": {
     "beforeDevCommand": "bun run vite:dev",
     "devUrl": "http://localhost:1420",
@@ -32,20 +33,26 @@
     "license": "GPL-3.0",
     "active": true,
     "targets": [
-      "app"
+      "nsis",
+      "appimage"
     ],
+    "windows": {
+      "webviewInstallMode": {
+        "silent": true,
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "installerHooks": "./nsis-hooks.nsh"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "windows": {
-      "webviewInstallMode": {
-        "silent": true,
-        "type": "downloadBootstrapper"
-      }
-    }
+    ]
   }
 }
