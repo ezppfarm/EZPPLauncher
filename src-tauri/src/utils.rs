@@ -286,8 +286,18 @@ pub fn get_window_title_by_pid(pid: Pid) -> String {
 }
 
 pub async fn is_net8_installed() -> bool {
-    use std::process::Command;
-    let output_result = Command::new("dotnet").arg("--list-runtimes").output();
+    use tokio::process::Command;
+
+    let mut command = Command::new("dotnet");
+    command.arg("--list-runtimes");
+
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output_result = command.output().await;
     match output_result {
         Ok(output) => {
             if !output.status.success() {
@@ -300,9 +310,7 @@ pub async fn is_net8_installed() -> bool {
             }
 
             let stdout_str = String::from_utf8_lossy(&output.stdout);
-            stdout_str
-                .lines()
-                .any(|line| line.starts_with("Microsoft.WindowsDesktop.App 8."))
+            stdout_str.lines().any(|line| line.starts_with("Microsoft.WindowsDesktop.App 8."))
         }
         Err(_) => false,
     }
