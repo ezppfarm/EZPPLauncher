@@ -110,6 +110,7 @@
   import Hearts from '@/components/ui/effects/Hearts.svelte';
   import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
+  import { expoOut } from 'svelte/easing';
 
   const tabs = [
     { name: 'Home', key: 'home' },
@@ -121,6 +122,7 @@
   let selectedTab = $state('home');
   let [tab_send, tab_receive] = crossfade({
     duration: $reduceAnimations ? 0 : 400,
+    easing: expoOut,
   });
   let progress = $state(-1);
   let launchInfo = $state('');
