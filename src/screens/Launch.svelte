@@ -53,7 +53,7 @@
     releaseStreamToReadable,
     urlIsValidImage,
   } from '@/utils';
-  import { fade, scale } from 'svelte/transition';
+  import { crossfade, fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -111,7 +111,17 @@
   import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
 
+  const tabs = [
+    { name: 'Home', key: 'home' },
+    {
+      name: 'Settings',
+      key: 'settings',
+    },
+  ];
   let selectedTab = $state('home');
+  let [tab_send, tab_receive] = crossfade({
+    duration: $reduceAnimations ? 0 : 400,
+  });
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
@@ -889,7 +899,7 @@
     <div
       class="flex flex-row flex-nowrap h-11 gap-1 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
     >
-      <button
+      <!-- <button
         class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
         'home'
           ? 'bg-white/70 border border-white/60 text-theme-950'
@@ -906,7 +916,24 @@
         onclick={() => (selectedTab = 'settings')}
       >
         Settings
-      </button>
+      </button> -->
+      {#each tabs as tab (tab.key)}
+        <button
+          class="inline-block relative py-2 px-2 disabled:opacity-25 transition-opacity w-full text-center"
+          onclick={() => selectedTab = tab.key}
+        >
+          <div class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center">
+            <div>{tab.name}</div>
+          </div>
+          {#if selectedTab === tab.key}
+            <div
+              in:tab_receive={{ key: 'tab' }}
+              out:tab_send={{ key: 'tab' }}
+              class="absolute left-0 bottom-0 w-full h-full rounded-lg bg-white/10 border border-white/10"
+            ></div>
+          {/if}
+        </button>
+      {/each}
     </div>
     {#if selectedTab === 'home'}
       <div
