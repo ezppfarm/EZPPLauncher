@@ -115,6 +115,10 @@
   const tabs = [
     { name: 'Home', key: 'home' },
     {
+      name: 'Skins',
+      key: 'skins',
+    },
+    {
       name: 'Settings',
       key: 'settings',
     },
