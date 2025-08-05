@@ -963,14 +963,14 @@
             </div>
             <div class="relative font-bold text-xl text-yellow-400">
               <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {$skins === null
+                class="absolute top-1 left-1/2 -translate-x-1/2 {!$skins && $skins !== 0
                   ? 'opacity-100'
                   : 'opacity-0'} transition-opacity duration-1000"
               >
                 <LoaderCircle class="animate-spin" />
               </div>
               <div
-                class="{$skins === null
+                class="{!$skins && $skins !== 0
                   ? 'opacity-0'
                   : 'opacity-100'} transition-opacity duration-1000"
               >
