@@ -899,30 +899,14 @@
     <div
       class="flex flex-row flex-nowrap h-11 gap-1 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
     >
-      <!-- <button
-        class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
-        'home'
-          ? 'bg-white/70 border border-white/60 text-theme-950'
-          : ''} transition-all"
-        onclick={() => (selectedTab = 'home')}
-      >
-        Home
-      </button>
-      <button
-        class="w-full flex justify-center items-center font-semibold text-sm rounded-lg {selectedTab ===
-        'settings'
-          ? 'bg-white/70 border border-white/60 text-theme-950'
-          : ''} transition-all"
-        onclick={() => (selectedTab = 'settings')}
-      >
-        Settings
-      </button> -->
       {#each tabs as tab (tab.key)}
         <button
           class="inline-block relative py-2 px-2 disabled:opacity-25 transition-opacity w-full text-center"
-          onclick={() => selectedTab = tab.key}
+          onclick={() => (selectedTab = tab.key)}
         >
-          <div class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center">
+          <div
+            class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center"
+          >
             <div>{tab.name}</div>
           </div>
           {#if selectedTab === tab.key}
