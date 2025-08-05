@@ -987,43 +987,6 @@
             </div>
             <div class="text-muted-foreground text-[12px] leading-4">Skins</div>
           </div>
-          <!-- <div
-          class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
-        >
-          <div
-            class="flex items-center justify-center p-2 rounded-lg {$server_connection_fails > 1
-              ? 'bg-red-500/20'
-              : 'bg-yellow-500/20'}"
-          >
-            {#if $server_connection_fails > 1}
-              <Users class="text-red-500" size="26" />
-            {:else}
-              <Users class="text-yellow-500" size="26" />
-            {/if}
-          </div>
-          <div
-            class="relative font-bold text-xl {$server_connection_fails > 1
-              ? 'text-red-400'
-              : 'text-yellow-400'}"
-          >
-            <div
-              class="absolute top-1 left-1/2 -translate-x-1/2 {!$online_friends ||
-              $server_connection_fails > 1
-                ? 'opacity-100'
-                : 'opacity-0'} transition-opacity duration-1000"
-            >
-              <LoaderCircle class="animate-spin" />
-            </div>
-            <div
-              class="{!$online_friends || $server_connection_fails > 1
-                ? 'opacity-0'
-                : 'opacity-100'} transition-opacity duration-1000"
-            >
-              <NumberFlow value={$online_friends ?? 0} trend={0} />
-            </div>
-          </div>
-          <div class="text-muted-foreground text-sm">Friends online</div>
-        </div> -->
           <div
             class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
           >
@@ -1120,7 +1083,9 @@
           </span>
         </div>
       </div>
-    {:else if selectedTab === 'settings'}
+      {:else if selectedTab === "skins"}
+        <p>list of skins here, option to set current skin (also a subpage to download new skins?)</p>
+      {:else if selectedTab === 'settings'}
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
