@@ -113,14 +113,16 @@
   import { expoOut } from 'svelte/easing';
 
   const tabs = [
-    { name: 'Home', key: 'home' },
+    { name: 'Home', key: 'home', show: true },
     {
       name: 'Skins',
       key: 'skins',
+      show: false,
     },
     {
       name: 'Settings',
       key: 'settings',
+      show: true,
     },
   ];
   let selectedTab = $state('home');
@@ -906,23 +908,25 @@
       class="flex flex-row flex-nowrap h-11 gap-1 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
     >
       {#each tabs as tab (tab.key)}
-        <button
-          class="inline-block relative py-2 px-2 disabled:opacity-25 transition-opacity w-full text-center"
-          onclick={() => (selectedTab = tab.key)}
-        >
-          <div
-            class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center"
+        {#if tab.show}
+          <button
+            class="inline-block relative py-2 px-2 disabled:opacity-25 transition-opacity w-full text-center"
+            onclick={() => (selectedTab = tab.key)}
           >
-            <div>{tab.name}</div>
-          </div>
-          {#if selectedTab === tab.key}
             <div
-              in:tab_receive={{ key: 'tab' }}
-              out:tab_send={{ key: 'tab' }}
-              class="absolute left-0 bottom-0 w-full h-full rounded-lg bg-white/10 border border-white/10"
-            ></div>
-          {/if}
-        </button>
+              class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center"
+            >
+              <div>{tab.name}</div>
+            </div>
+            {#if selectedTab === tab.key}
+              <div
+                in:tab_receive={{ key: 'tab' }}
+                out:tab_send={{ key: 'tab' }}
+                class="absolute left-0 bottom-0 w-full h-full rounded-lg bg-white/10 border border-white/10"
+              ></div>
+            {/if}
+          </button>
+        {/if}
       {/each}
     </div>
     {#if selectedTab === 'home'}
@@ -1083,9 +1087,9 @@
           </span>
         </div>
       </div>
-      {:else if selectedTab === "skins"}
-        <p>list of skins here, option to set current skin (also a subpage to download new skins?)</p>
-      {:else if selectedTab === 'settings'}
+    {:else if selectedTab === 'skins'}
+      <p>list of skins here, option to set current skin (also a subpage to download new skins?)</p>
+    {:else if selectedTab === 'settings'}
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
@@ -1225,7 +1229,8 @@
                 type="single"
                 bind:value={$launcherStream}
                 onValueChange={async (newStream) => {
-                  if (newStream === 'experimental' && !(await hasNet8())) {
+                  const isNet8Installed = await hasNet8();
+                  if (newStream === 'experimental' && !isNet8Installed) {
                     launcherStream.set('stable');
                     toast.error('.NET 8.0 Desktop Runtime not found!', {
                       action: {

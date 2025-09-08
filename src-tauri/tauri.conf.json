@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "EZPPLauncher",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "identifier": "farm.EZPPFarm.Launcher",
   "mainBinaryName": "ezpplauncher",
   "build": {
     "beforeDevCommand": "bun run vite:dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run vite:build",
+    "beforeBuildCommand": "",
     "frontendDist": "../build"
   },
   "app": {

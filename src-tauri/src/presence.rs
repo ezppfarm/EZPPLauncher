@@ -1,12 +1,12 @@
 use discord_rich_presence::{
-    activity::{Activity, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
+    activity::{Activity, Assets, Button, Timestamps},
 };
 use once_cell::sync::Lazy;
 use std::sync::Mutex as StdMutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
 #[derive(Clone, Debug)]
 pub struct PresenceData {
@@ -92,14 +92,10 @@ impl PresenceActor {
         }
 
         println!("Actor: Connecting to Discord...");
-        match DiscordIpcClient::new("1032772293220384808").map_err(|e| e.to_string()) {
-            Ok(mut new_client) => {
-                if let Err(e) = new_client.connect().map_err(|e| e.to_string()) {
-                    eprintln!("Failed to connect to Discord: {:?}", e);
-                    let _ = responder.send(false);
-                    return;
-                }
-                self.client = Some(new_client);
+        let mut dc_client = DiscordIpcClient::new("1032772293220384808");
+        match dc_client.connect() {
+            Ok(()) => {
+                self.client = Some(dc_client);
                 println!("Actor: Connected successfully.");
                 self.handle_update().await;
                 let _ = responder.send(true);
@@ -186,7 +182,11 @@ pub async fn connect() -> bool {
 
 pub async fn disconnect() {
     let (tx, rx) = oneshot::channel();
-    if PRESENCE_TX.send(PresenceCommand::Disconnect(tx)).await.is_ok() {
+    if PRESENCE_TX
+        .send(PresenceCommand::Disconnect(tx))
+        .await
+        .is_ok()
+    {
         let _ = rx.await;
     } else {
         println!("Could not send disconnect command; actor may not be running.");
@@ -195,7 +195,11 @@ pub async fn disconnect() {
 
 pub async fn has_presence() -> bool {
     let (tx, rx) = oneshot::channel();
-    if PRESENCE_TX.send(PresenceCommand::IsConnected(tx)).await.is_ok() {
+    if PRESENCE_TX
+        .send(PresenceCommand::IsConnected(tx))
+        .await
+        .is_ok()
+    {
         return rx.await.unwrap_or(false);
     }
     false
