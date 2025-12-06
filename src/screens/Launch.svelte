@@ -1284,27 +1284,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .launch {
-    margin-top: 24px;
-    padding: 16px 48px;
-    font-size: 1.1rem;
-    font-weight: 600;
-
-    background: linear-gradient(135deg, #c7a6ff, #9f7cff);
-    color: #120a1f;
-
-    border-radius: 14px;
-    box-shadow: 0 8px 30px rgba(160, 120, 255, 0.4);
-
-    transition:
-      transform 120ms ease,
-      box-shadow 120ms ease;
-  }
-
-  .launch:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 42px rgba(160, 120, 255, 0.6);
-  }
-</style>
