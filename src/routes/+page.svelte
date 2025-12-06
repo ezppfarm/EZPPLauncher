@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { currentView, launcherVersion } from '@/global';
+  import { currentView, launcherVersion, trackingEnabled } from '@/global';
   import { fade } from 'svelte/transition';
 
   const View = $derived($currentView);
 </script>
 
 <svelte:head>
-  {#if $launcherVersion !== ''}
+  {#if $launcherVersion !== '' && $trackingEnabled}
     <script
       defer
       src="https://analytics.ez-pp.farm/script.js"
