@@ -1231,7 +1231,7 @@
                         label: 'Download .NET 8.0',
                         onClick: async () =>
                           await openURL(
-                            'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.18-windows-x64-installer'
+                            'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
                           ),
                       },
                     });
