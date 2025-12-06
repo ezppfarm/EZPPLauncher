@@ -115,11 +115,6 @@
   const tabs = [
     { name: 'Home', key: 'home', show: true },
     {
-      name: 'Skins',
-      key: 'skins',
-      show: false,
-    },
-    {
       name: 'Settings',
       key: 'settings',
       show: true,
@@ -1035,11 +1030,12 @@
         </div>
         <Button
           size="lg"
+          class="text-xl h-16 px-16 border-2 border-violet-500/40"
           disabled={$launching || $osuInstallationPath === '' || $serverConnectionFails > 1}
           onclick={launch}
         >
-          <Play />
-          {$serverConnectionFails > 1 ? 'No connection' : 'Launch'}
+          <Play class="!size-5" />
+          {$launching ? 'Launching...' : $serverConnectionFails > 1 ? 'No connection' : 'Launch'}
         </Button>
       </div>
       <div
@@ -1087,8 +1083,6 @@
           </span>
         </div>
       </div>
-    {:else if selectedTab === 'skins'}
-      <p>list of skins here, option to set current skin (also a subpage to download new skins?)</p>
     {:else if selectedTab === 'settings'}
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
@@ -1290,3 +1284,27 @@
     {/if}
   </div>
 </div>
+
+<style>
+  .launch {
+    margin-top: 24px;
+    padding: 16px 48px;
+    font-size: 1.1rem;
+    font-weight: 600;
+
+    background: linear-gradient(135deg, #c7a6ff, #9f7cff);
+    color: #120a1f;
+
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(160, 120, 255, 0.4);
+
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .launch:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 42px rgba(160, 120, 255, 0.6);
+  }
+</style>
