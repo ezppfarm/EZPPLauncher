@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "debug": "bun run tauri dev",
-    "build": "bun ./scripts/sync-version.ts && bun run tauri:build",
+    "build": "bun ./scripts/sync-version.ts && bun run vite:build && bun run tauri:build",
     "vite:dev": "vite dev",
     "vite:build": "vite build",
     "tauri:build": "tauri build",
