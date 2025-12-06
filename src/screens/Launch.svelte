@@ -21,6 +21,7 @@
     serverConnectionFails,
     serverPing,
     skins,
+    trackingEnabled,
   } from '@/global';
   import {
     LoaderCircle,
@@ -111,6 +112,7 @@
   import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
   import { expoOut } from 'svelte/easing';
+  import { onMount } from 'svelte';
 
   const tabs = [
     { name: 'Home', key: 'home', show: true },
@@ -128,6 +130,8 @@
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
+
+  let askForTrackingPermission = $state(false);
 
   let downloadingUpdate = $state(false);
 
@@ -535,6 +539,16 @@
       umami.track('app_launch_fail', { error: err });
     }
   };
+
+  onMount(() => {
+    const config = $userSettings;
+    const trackingConsent = config.value('tracking_consent');
+    if (trackingConsent.exists()) {
+      trackingEnabled.set(trackingConsent.get(false));
+    } else {
+      askForTrackingPermission = true;
+    }
+  });
 </script>
 
 <AlertDialog.Root open={launchError !== undefined}>
@@ -635,6 +649,59 @@
           }}>Update now</Button
         >
       {/if}
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root open={$newVersion === undefined && askForTrackingPermission}>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <img class="h-20 w-20" src={Logo} alt="logo" />
+      <span class="font-semibold text-xl">App Tracking Consent</span>
+    </div>
+
+    <div
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      <p class="mb-4">
+        We value your privacy. To enhance your experience and improve our services, we would like to
+        collect anonymous usage data. This data helps us understand how the application is used and
+        identify areas for improvement.
+      </p>
+      <p class="mb-4">
+        No personal information is collected, and all data is anonymized. You can choose to enable
+        or disable this tracking at any time in the application settings.
+      </p>
+      <p>
+        Do you consent to the collection of anonymous usage data to help us improve the application?
+      </p>
+    </div>
+    <div class="flex items-center justify-center mb-3 gap-4 mt-4">
+      <Button
+        onclick={async () => {
+          trackingEnabled.set(true);
+          const config = $userSettings;
+          config.value('tracking_consent').set(true);
+          await config.save();
+          askForTrackingPermission = false;
+        }}>Yes, I consent</Button
+      >
+      <Button
+        variant="outline"
+        onclick={async () => {
+          trackingEnabled.set(false);
+          const config = $userSettings;
+          config.value('tracking_consent').set(false);
+          await config.save();
+          askForTrackingPermission = false;
+        }}>No, I do not consent</Button
+      >
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>
@@ -1191,6 +1258,23 @@
                 class="flex items-center justify-center w-5 h-5"
               ></Checkbox>
             </div>
+
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-reduce-animations">App Tracking</Label>
+              <div class="text-muted-foreground text-xs">
+                Allow anonymous usage data to be collected to help improve the application.
+              </div>
+            </div>
+            <Checkbox
+              id="setting-reduce-animations"
+              checked={$trackingEnabled}
+              onCheckedChange={async (e) => {
+                trackingEnabled.set(e);
+                $userSettings.value('tracking_consent').set(e);
+                await $userSettings.save();
+              }}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
           </div>
           <div
             class="grid grid-cols-[0.7fr_auto] gap-y-1 items-center border-theme-800 pl-6 pr-5 pb-4"

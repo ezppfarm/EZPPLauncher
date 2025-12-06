@@ -65,9 +65,14 @@ export class Config {
   }
 
   value(key: string) {
+    console.log('Accessing config key:', key, this.config[key]);
     return {
       set: <T>(val: T) => {
         this.config[key] = val;
+      },
+      exists: () => {
+        console.log('Checking existence of key:', key, this.config[key] !== undefined);
+        return this.config[key] !== undefined;
       },
       get: <T>(fallback: T): T => {
         return (this.config[key] as T) ?? fallback;

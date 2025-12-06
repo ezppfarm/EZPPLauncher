@@ -12,6 +12,7 @@
     platform,
     presenceLoading,
     setupValues,
+    trackingEnabled,
   } from '@/global';
   import { onMount } from 'svelte';
   import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
@@ -103,6 +104,7 @@
     const config_reduce_animations = $userSettings.value('reduce_animations');
     const config_osu_installation_path = $userSettings.value('osu_installation_path');
     const config_discord_presence = $userSettings.value('discord_presence');
+    const config_tracking_enabled = $userSettings.value('tracking_consent');
 
     patch.set(config_patching.get(true));
     customCursor.set(config_custom_cursor.get(true));
@@ -110,6 +112,9 @@
     reduceAnimations.set(config_reduce_animations.get(false));
     osuInstallationPath.set(config_osu_installation_path.get(''));
     discordPresence.set(config_discord_presence.get(true));
+    if (config_tracking_enabled.exists()) {
+      trackingEnabled.set(config_tracking_enabled.get(false));
+    }
 
     patch.subscribe((val) => config_patching.set(val));
     customCursor.subscribe((val) => config_custom_cursor.set(val));

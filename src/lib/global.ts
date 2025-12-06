@@ -14,6 +14,8 @@ export const newVersion = writable<Release | undefined>(undefined);
 export const launcherStreams = writable<string[]>(['stable']);
 export const launcherStream = writable<string>('stable');
 
+export const trackingEnabled = writable<boolean>(false);
+
 export const discordPresence = writable<boolean>(false);
 export const presenceLoading = writable<boolean>(false);
 
