@@ -177,6 +177,7 @@
   };
 
   const launch = async () => {
+    umami.track('app_launch_osu');
     const osuRunning = await isOsuRunning();
     if (osuRunning) {
       toast.error('Hold on a second!', {
@@ -480,7 +481,7 @@
       }
 
       await runOsu(osuPath, true);
-
+      umami.track('app_exit_osu');
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
       if (presenceUpdater) {
@@ -531,6 +532,7 @@
         description: 'Failed to launch.',
       });
       launching.set(false);
+      umami.track('app_launch_fail', { error: err });
     }
   };
 </script>
