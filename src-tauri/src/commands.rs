@@ -566,10 +566,13 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
     let osu_path = PathBuf::from(folder);
     let ezpp_ui = osu_path.join("EZPPLauncher").join("ezpp!ui.dll");
     let osu_ui = osu_path.join("osu!ui.dll");
+    let ezpp_seasonal = osu_path.join("EZPPLauncher").join("ezpp!seasonal.dll");
+    let osu_seasonal = osu_path.join("osu!seasonal.dll");
     let ezpp_gameplay = osu_path.join("EZPPLauncher").join("ezpp!gameplay.dll");
     let osu_gameplay = osu_path.join("osu!gameplay.dll");
 
     let osu_ui_bak = osu_path.join("osu!ui.dll.bak");
+    let osu_seasonal_bak = osu_path.join("osu!seasonal.dll.bak");
     let osu_gameplay_bak = osu_path.join("osu!gameplay.dll.bak");
 
     let try_rename = |from: &PathBuf, to: &PathBuf| -> Result<(), ReplaceUIError> {
@@ -590,12 +593,18 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
     if !revert {
         try_rename(&osu_ui, &osu_ui_bak)?;
         try_rename(&ezpp_ui, &osu_ui)?;
+        
+        try_rename(&osu_seasonal, &osu_seasonal_bak)?;
+        try_rename(&ezpp_seasonal, &osu_seasonal)?;
 
         try_rename(&osu_gameplay, &osu_gameplay_bak)?;
         try_rename(&ezpp_gameplay, &osu_gameplay)?;
     } else {
         try_rename(&osu_ui, &ezpp_ui)?;
         try_rename(&osu_ui_bak, &osu_ui)?;
+        
+        try_rename(&osu_seasonal, &ezpp_seasonal)?;
+        try_rename(&osu_seasonal_bak, &osu_seasonal)?;
 
         try_rename(&osu_gameplay, &ezpp_gameplay)?;
         try_rename(&osu_gameplay_bak, &osu_gameplay)?;
