@@ -43,6 +43,7 @@ It enhances the osu! experience with quality-of-life features and integration sp
 
 - **Rust** (installed via [rustup](https://rustup.rs/) – recommended for Windows)
 - **Cargo** (comes with rustup)
+- **[CMake](https://cmake.org/download/)**
 - **[Bun](https://bun.sh/)** (JavaScript runtime)
 
 ### Steps
