@@ -735,7 +735,7 @@
                   <LoaderCircle class="animate-spin" size={32} />
                 </Avatar.Fallback>
               </Avatar.Root>
-              <span class="font-semibold text-sm text-theme-200 truncate max-w-40">
+              <span class="font-semibold text-sm text-muted-foreground truncate max-w-40">
                 {$currentUser?.name ?? 'Guest'}
               </span>
             </div>
