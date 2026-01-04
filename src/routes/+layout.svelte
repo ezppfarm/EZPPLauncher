@@ -150,7 +150,7 @@
   <OsuCursor smoothCursor={$cursorSmoothening} />
 {/if}
 
-<Toaster richColors closeButton />
+<Toaster richColors closeButton theme="dark" />
 
 <Titlebar />
 
