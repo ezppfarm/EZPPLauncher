@@ -41,6 +41,8 @@
     Brush,
     Heart,
     ArrowRight,
+    Settings,
+    ArrowLeft,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -54,7 +56,7 @@
     releaseStreamToReadable,
     urlIsValidImage,
   } from '@/utils';
-  import { crossfade, fade, scale } from 'svelte/transition';
+  import { fade, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -111,22 +113,11 @@
   import Hearts from '@/components/ui/effects/Hearts.svelte';
   import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
-  import { expoOut } from 'svelte/easing';
   import { onMount } from 'svelte';
+  import * as DropdownMenu from '@/components/ui/dropdown-menu';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
 
-  const tabs = [
-    { name: 'Home', key: 'home', show: true },
-    {
-      name: 'Settings',
-      key: 'settings',
-      show: true,
-    },
-  ];
-  let selectedTab = $state('home');
-  let [tab_send, tab_receive] = crossfade({
-    duration: $reduceAnimations ? 0 : 400,
-    easing: expoOut,
-  });
+  let selectedView = $state('home');
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
@@ -725,53 +716,68 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<div class="grid grid-cols-[0.41fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
+<div class="grid grid-cols-[0.38fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
   <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
-    <div class="flex flex-col items-center gap-2 border-b pb-6">
-      <div class="size-20 relative">
-        {#if $currentUser?.donor}
-          <Hearts className="top-0 left-0 h-[70px] w-[60px] absolute"></Hearts>
-        {/if}
-        <Avatar.Root class="w-20 h-20 border-2 border-theme-800">
-          <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
-          <Avatar.Fallback class="bg-theme-900">
-            <LoaderCircle class="animate-spin" size={32} />
-          </Avatar.Fallback>
-        </Avatar.Root>
-      </div>
-      <span class="font-semibold text-2xl text-theme-50">{$currentUser?.name ?? 'Guest'}</span>
-      <div class="flex flex-row gap-2">
-        {#if !$currentUser}
+    <div class="flex flex-col items-center gap-2 border-b pb-3">
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger class="w-full px-3">
           <Button
-            variant="outline"
-            size="sm"
-            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800 text-xs"
-            onclick={() => currentView.set(Login)}
+            class="w-full justify-start py-6 ps-1 pr-3 border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 border"
           >
-            <LogIn class="!size-4" />
-            Login
+            <div class="flex flex-row items-center gap-2 relative">
+              {#if $currentUser?.donor}
+                <Hearts className="-top-1 -left-1 z-50 h-[35px] w-[250px] opacity-80 absolute"
+                ></Hearts>
+              {/if}
+              <Avatar.Root class="size-10 border-2 border-theme-800">
+                <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
+                <Avatar.Fallback class="bg-theme-900">
+                  <LoaderCircle class="animate-spin" size={32} />
+                </Avatar.Fallback>
+              </Avatar.Root>
+              <span class="font-semibold text-sm text-theme-200 truncate max-w-40">
+                {$currentUser?.name ?? 'Guest'}
+              </span>
+            </div>
+            <ChevronDown class="ms-auto text-[#5d6581]" />
           </Button>
-        {:else}
-          <Button
-            variant="outline"
-            size="sm"
-            class="bg-theme-900 hover:bg-theme-700/40 border-theme-800 text-xs"
-            onclick={async () => {
-              $userAuth.value('username').del();
-              $userAuth.value('password').del();
-              await $userAuth.save();
-              toast.success('Logout successful!', {
-                description: 'See you soon!',
-              });
-              currentUser.set(undefined);
-              currentUserInfo.set(undefined);
-            }}
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content
+          class="w-[calc(var(--bits-dropdown-menu-anchor-width)_-_1.5rem)] bg-theme-950 border border-theme-900 rounded-lg"
+          align="center"
+        >
+          <DropdownMenu.Item
+            class={selectedView === 'settings' ? 'bg-accent text-accent-foreground' : ''}
+            onclick={() => (selectedView = 'settings')}
           >
-            <LogOut class="!size-4" />
-            Logout
-          </Button>
-        {/if}
-      </div>
+            <Settings class="!size-4" />
+            Settings
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator class="bg-theme-800/45" />
+          {#if $currentUser}
+            <DropdownMenu.Item
+              onclick={async () => {
+                $userAuth.value('username').del();
+                $userAuth.value('password').del();
+                await $userAuth.save();
+                toast.success('Logout successful!', {
+                  description: 'See you soon!',
+                });
+                currentUser.set(undefined);
+                currentUserInfo.set(undefined);
+              }}
+            >
+              <LogOut class="!size-4" />
+              Logout
+            </DropdownMenu.Item>
+          {:else}
+            <DropdownMenu.Item onclick={() => currentView.set(Login)}>
+              <LogIn class="!size-4" />
+              Login
+            </DropdownMenu.Item>
+          {/if}
+        </DropdownMenu.Content>
+      </DropdownMenu.Root>
     </div>
     {#if $currentUser}
       <div class="flex flex-col gap-6 h-full px-3">
@@ -785,7 +791,7 @@
             onValueChange={updateGamemode}
           >
             <Select.Trigger
-              class="border-theme-800/90 bg-theme-900/90 !text-muted-foreground font-semibold"
+              class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 !text-muted-foreground font-semibold"
             >
               <div class="flex flex-row items-center gap-2">
                 {#if selectedMode === 0}
@@ -806,13 +812,13 @@
                 <Select.Item value={gamemode.toFixed()}>
                   <div class="flex flex-row gap-2 items-center">
                     {#if gamemod.mode === 0}
-                      <Circle size={16} class="text-theme-200" />
+                      <Circle size={16} />
                     {:else if gamemod.mode === 1}
-                      <Drum size={16} class="text-theme-200" />
+                      <Drum size={16} />
                     {:else if gamemod.mode === 2}
-                      <Cherry size={16} class="text-theme-200" />
+                      <Cherry size={16} />
                     {:else if gamemod.mode === 3}
-                      <Piano size={16} class="text-theme-200" />
+                      <Piano size={16} />
                     {/if}
                     {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
                   </div>
@@ -955,45 +961,11 @@
             </div>
           </div>
         </div>
-        <!-- <div class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg p-2">
-        <div class="flex flex-row items-center justify-between">
-          <div class="flex flex-row items-center gap-2">
-            <Users class="text-muted-foreground" size="16" />
-            <span class="font-semibold text-muted-foreground text-sm"> Friends </span>
-          </div>
-          <Badge class="h-5 bg-green-500/20 hover:bg-green-500/20 text-green-500">3 online</Badge>
-        </div>
-      </div> -->
       </div>
     {/if}
   </div>
-  <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
-    <div
-      class="flex flex-row flex-nowrap h-11 gap-1 w-full bg-theme-800/50 border border-theme-800/90 rounded-lg p-[4px]"
-    >
-      {#each tabs as tab (tab.key)}
-        {#if tab.show}
-          <button
-            class="inline-block relative py-2 px-2 disabled:opacity-25 transition-opacity w-full text-center"
-            onclick={() => (selectedTab = tab.key)}
-          >
-            <div
-              class="flex flex-row items-center justify-center gap-1 text-xs md:text-sm font-semibold w-full text-center"
-            >
-              <div>{tab.name}</div>
-            </div>
-            {#if selectedTab === tab.key}
-              <div
-                in:tab_receive={{ key: 'tab' }}
-                out:tab_send={{ key: 'tab' }}
-                class="absolute left-0 bottom-0 w-full h-full rounded-lg bg-white/10 border border-white/10"
-              ></div>
-            {/if}
-          </button>
-        {/if}
-      {/each}
-    </div>
-    {#if selectedTab === 'home'}
+  <div class="flex flex-col gap-6 w-full h-full p-6">
+    {#if selectedView === 'home'}
       <div
         class="my-auto bg-theme-900/90 flex flex-col items-center justify-center gap-6 border border-theme-800/90 rounded-lg p-6"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
@@ -1152,7 +1124,11 @@
           </span>
         </div>
       </div>
-    {:else if selectedTab === 'settings'}
+    {:else if selectedView === 'settings'}
+      <Button onclick={() => (selectedView = 'home')}>
+        <ArrowLeft />
+        Back
+      </Button>
       <div
         class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
         in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
@@ -1165,7 +1141,7 @@
             class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 pt-4 pb-1 px-6"
           >
             <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">Patching</Label>
+              <Label class="text-sm" for="setting-patch">Patching</Label>
               <div class="text-muted-foreground text-xs">
                 Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
                     class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg"
@@ -1175,7 +1151,7 @@
               </div>
             </div>
             <Checkbox
-              id="setting-custom-cursor"
+              id="setting-patch"
               checked={$platform === 'windows' ? $patch : false}
               disabled={$platform !== 'windows'}
               onCheckedChange={async (e) => {
@@ -1260,13 +1236,13 @@
             </div>
 
             <div class="flex flex-col">
-              <Label class="text-sm" for="setting-reduce-animations">App Tracking</Label>
+              <Label class="text-sm" for="setting-tracking">App Tracking</Label>
               <div class="text-muted-foreground text-xs">
                 Allow anonymous usage data to be collected to help improve the application.
               </div>
             </div>
             <Checkbox
-              id="setting-reduce-animations"
+              id="setting-tracking"
               checked={$trackingEnabled}
               onCheckedChange={async (e) => {
                 trackingEnabled.set(e);
@@ -1349,24 +1325,24 @@
           </div>
         </div>
       </div>
-      <div
-        class="mt-auto mx-auto flex flex-row items-center gap-2"
-        in:scale={{
-          duration: $reduceAnimations ? 0 : 400,
-          delay: $reduceAnimations ? 0 : 50,
-          start: 0.97,
-        }}
-      >
-        <Button
-          variant="link"
-          class="font-light font-mono text-sm text-theme-100/70"
-          onclick={() => openURL('https://ez-pp.farm/u/1001')}
-        >
-          made with
-          <Heart class="text-red-600 fill-red-600 animate-pulse" />
-          by horizoncode
-        </Button>
-      </div>
     {/if}
+    <div
+      class="mt-auto mx-auto flex flex-row items-center gap-2"
+      in:scale={{
+        duration: $reduceAnimations ? 0 : 400,
+        delay: $reduceAnimations ? 0 : 50,
+        start: 0.97,
+      }}
+    >
+      <Button
+        variant="link"
+        class="font-light font-mono text-sm text-theme-100/70"
+        onclick={() => openURL('https://ez-pp.farm/u/1001')}
+      >
+        made with
+        <Heart class="text-red-600 fill-red-600 animate-pulse" />
+        by horizoncode
+      </Button>
+    </div>
   </div>
 </div>
