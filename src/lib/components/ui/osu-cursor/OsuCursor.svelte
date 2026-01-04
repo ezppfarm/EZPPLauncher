@@ -25,7 +25,7 @@
       const computed = getComputedStyle(el);
       if (
         ['button', 'a', 'input', 'select', 'textarea', 'label', 'option'].includes(tag) ||
-        (role && ['button', 'link', 'checkbox', 'combobox'].includes(role)) ||
+        (role && ['button', 'link', 'checkbox', 'combobox', 'menuitem', 'option'].includes(role)) ||
         computed.cursor === 'pointer'
       ) {
         return true;
