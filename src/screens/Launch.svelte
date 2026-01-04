@@ -1336,7 +1336,7 @@
     >
       <Button
         variant="link"
-        class="font-light font-mono text-sm text-theme-100/70"
+        class="font-light font-mono text-sm text-theme-500"
         onclick={() => openURL('https://ez-pp.farm/u/1001')}
       >
         made with
