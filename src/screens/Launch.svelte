@@ -521,13 +521,24 @@
 
       launching.set(false);
     } catch (err) {
-      launchError = err as Error;
-      console.log(err);
-      toast.error('Hmmm...', {
-        description: 'Failed to launch.',
-      });
-      launching.set(false);
-      if ($trackingEnabled) umami.track('app_launch_fail', { error: err });
+      const error = err as Error;
+      if (error.name === 'AbortError') {
+        toast.error('Hmmm...', {
+          description: 'Failed to launch.',
+        });
+        launching.set(false);
+        launchError = {
+          name: error.name,
+          message: 'Network request connection timed out.',
+        };
+      } else {
+        launchError = error;
+        toast.error('Hmmm...', {
+          description: 'Failed to launch.',
+        });
+        launching.set(false);
+        if ($trackingEnabled) umami.track('app_launch_fail', { error: err });
+      }
     }
   };
 
