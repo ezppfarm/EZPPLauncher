@@ -1032,7 +1032,7 @@
             </div>
             <div class="flex flex-col">
               <span class="text-xs text-muted-foreground font-semibold">PP</span>
-              <div class="flex items-center h-full font-semibold text-pink-500">
+              <div class="flex items-center h-full font-semibold text-pink-300">
                 {#if $currentUserInfo}
                   <div in:fade>
                     {#if $reduceAnimations}
