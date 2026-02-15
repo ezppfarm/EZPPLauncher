@@ -169,6 +169,7 @@
   };
 
   const launch = async () => {
+    if ($launching) return;
     if ($trackingEnabled) umami.track('app_launch_osu');
     const osuRunning = await isOsuRunning();
     if (osuRunning) {
@@ -955,9 +956,17 @@
                   : 'Launching...'
               : $serverConnectionFails > 1
                 ? 'No connection'
-                : 'Launch'}
-            subtext={$launching && !cleanup ? launchInfo : undefined}
-            disabled={$launching || $osuInstallationPath === '' || $serverConnectionFails > 1}
+                : $osuInstallationPath === ''
+                  ? 'Hmmm..'
+                  : 'Launch'}
+            subtext={$launching && !cleanup
+              ? launchInfo
+              : $osuInstallationPath === ''
+                ? 'osu! path is not set!'
+                : $serverConnectionFails > 1
+                  ? 'No connection...'
+                  : undefined}
+            disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
             onClick={launch}
           />
         </div>
