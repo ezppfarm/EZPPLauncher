@@ -163,7 +163,7 @@
     <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
       {#if selectedStep === 1}
         <div
-          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <img
@@ -184,7 +184,7 @@
         </div>
       {:else if selectedStep === 2}
         <div
-          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <h1 class="text-3xl font-semibold">Locate your osu! Installation</h1>
@@ -242,7 +242,7 @@
         </div>
       {:else if selectedStep === 3}
         <div
-          class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
+          class="bg-theme-900/90 flex flex-col justify-center gap-3 mt-5 border border-theme-800/90 rounded-lg"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
