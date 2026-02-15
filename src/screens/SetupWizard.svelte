@@ -119,7 +119,7 @@
 </script>
 
 {#if wizardFinished}
-  <div class="relative flex flex-col items-center justify-center mt-[50px] h-[calc(100vh-50px)]">
+  <div class="relative flex flex-col items-center justify-center h-[100vh]">
     <div class="absolute h-fit w-fit top-1/2 left-1/2">
       <Confetti amount={200} y={[-1, 1.5]} x={[-2.3, 2.3]} colorArray={['#C6A0F3']} />
     </div>
@@ -128,7 +128,7 @@
     <Button class="mt-4" onclick={saveConfig}>Finish</Button>
   </div>
 {:else}
-  <div class="grid grid-cols-[0.41fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
+  <div class="grid grid-cols-[0.41fr_1fr] h-[100vh]">
     <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 p-3">
       {#each steps as step, i (step)}
         <div

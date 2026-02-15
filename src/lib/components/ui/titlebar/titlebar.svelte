@@ -19,27 +19,18 @@
   });
 </script>
 
-<div data-tauri-drag-region class="titlebar z-[60] border-b border-theme-800/90">
-  <div
-    class="mr-auto ms-2 flex flex-row gap-2 items-center text-[1.05rem] font-semibold pointer-events-none"
-  >
-    <img src={Logo} alt="EZPP Launcher Logo" class="h-11 w-11 inline-block" />
-    <span>EZPPLauncher</span>
-    <Badge class="!text-[0.6rem] py-[0.5px] bg-primary-500 hover:bg-primary-500"
-      >{$launcherVersion}</Badge
-    >
+<div data-tauri-drag-region class="titlebar z-[100]">
+  <div class="titlebar-button rounded transition-colors duration-75" id="titlebar-minimize">
+    <Minimize size={14} />
   </div>
-  <div class="titlebar-button rounded-lg transition-colors duration-75" id="titlebar-minimize">
-    <Minimize size={18} />
-  </div>
-  <div class="titlebar-button close rounded-lg transition-colors duration-75" id="titlebar-close">
-    <Close size={18} />
+  <div class="titlebar-button close rounded transition-colors duration-75" id="titlebar-close">
+    <Close size={14} />
   </div>
 </div>
 
 <style lang="scss">
   .titlebar {
-    height: 50px;
+    height: 35px;
     /* background: #040612; */
     user-select: none;
     display: flex;
@@ -52,14 +43,14 @@
     right: 0;
     margin-bottom: 10px;
     padding-right: 5px;
-    pointer-events: all !important;
+    pointer-events: auto;
   }
   .titlebar-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 40px;
-    height: 40px;
+    width: 25px;
+    height: 25px;
     user-select: none;
     -webkit-user-select: none;
   }

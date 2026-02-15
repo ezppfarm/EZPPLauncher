@@ -85,7 +85,7 @@
     animate(cursor, {
       duration: smoothCursor ? $cursorSmoothness : 0,
       translateX: mouseX,
-      translateY: mouseY - 50,
+      translateY: mouseY,
       ease: (t: number) => (t - 1) ** 5 + 1,
     });
 

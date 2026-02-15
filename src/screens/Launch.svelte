@@ -7,7 +7,6 @@
   import {
     beatmapSets,
     currentSkin,
-    currentView,
     discordPresence,
     launcherStream,
     launcherStreams,
@@ -25,13 +24,9 @@
   } from '@/global';
   import {
     LoaderCircle,
-    Logs,
     Music2,
-    Play,
     Wifi,
-    Gamepad2,
     WifiOff,
-    Settings2,
     Drum,
     Cherry,
     Piano,
@@ -39,10 +34,9 @@
     LogOut,
     LogIn,
     Brush,
-    Heart,
     ArrowRight,
     Settings,
-    ArrowLeft,
+    House,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -50,13 +44,12 @@
   import {
     compareBuildNumbers,
     formatBytes,
-    formatTimeReadable,
     numberHumanReadable,
     openURL,
     releaseStreamToReadable,
     urlIsValidImage,
   } from '@/utils';
-  import { fade, scale } from 'svelte/transition';
+  import { fade, fly, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -72,7 +65,6 @@
   import Input from '@/components/ui/input/input.svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { toast } from 'svelte-sonner';
-  import Login from './Login.svelte';
   import { currentUser, userAuth } from '@/userAuthentication';
   import {
     getGamemodeInt,
@@ -110,21 +102,26 @@
   } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { ezppfarm } from '@/api/ezpp';
-  import Hearts from '@/components/ui/effects/Hearts.svelte';
   import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
   import { onMount } from 'svelte';
   import * as DropdownMenu from '@/components/ui/dropdown-menu';
-  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
+  import { animate } from 'animejs';
+  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
 
   let selectedView = $state('home');
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
+  let ezppLogo: HTMLImageElement;
 
   let askForTrackingPermission = $state(false);
 
   let downloadingUpdate = $state(false);
+
+  let downloadingEZPPFiles = $state(false);
+  let cleanup = $state(false);
 
   let selectedGamemode = $derived(
     getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
@@ -219,12 +216,13 @@
     }
 
     try {
-      launchInfo = 'Looking for EZPPLauncher File updates...';
+      launchInfo = 'Looking for file updates...';
       const updateResult = await getEZPPLauncherUpdateFiles(osuPath, $launcherStream);
 
       if (updateResult) {
         if (updateResult.filesToDownload.length > 0) {
-          launchInfo = 'Found EZPPLauncher File updates!';
+          downloadingEZPPFiles = true;
+          launchInfo = 'Found file updates!';
           await new Promise((res) => setTimeout(res, 1000));
           await downloadEZPPLauncherUpdateFiles(
             osuPath,
@@ -232,12 +230,13 @@
             updateResult.updateFiles,
             (file) => {
               progress = file.progress;
-              launchInfo = `Downloading ${file.fileName}(${formatBytes(
+              launchInfo = `${file.fileName}(${formatBytes(
                 file.downloaded
               )}/${formatBytes(file.size)})...`;
             }
           );
           progress = -1;
+          downloadingEZPPFiles = false;
         } else {
           launchInfo = 'EZPPLauncher Files are up to date!';
           await new Promise((res) => setTimeout(res, 1500));
@@ -477,6 +476,7 @@
 
       await runOsu(osuPath, true);
       if ($trackingEnabled) umami.track('app_exit_osu');
+      cleanup = true;
       launchInfo = 'Cleaning up...';
       await getCurrentWindow().show();
       if (presenceUpdater) {
@@ -520,7 +520,9 @@
       }
 
       launching.set(false);
+      cleanup = false;
     } catch (err) {
+      cleanup = false;
       const error = err as Error;
       if (error.name === 'AbortError') {
         toast.error('Hmmm...', {
@@ -542,6 +544,70 @@
     }
   };
 
+  let username = $state('');
+  let password = $state('');
+  let loginIsLoading = $state(false);
+
+  const performLogin = async () => {
+    loginIsLoading = true;
+
+    try {
+      const loginResult = await ezppfarm.login(username, password);
+      if (loginResult && loginResult.user) {
+        toast.success('Login successful!', {
+          description: `Welcome back, ${loginResult.user.name}!`,
+        });
+
+        $userAuth.value('username').set(username);
+        $userAuth.value('password').set(password);
+        await $userAuth.save();
+
+        currentUser.set(loginResult.user);
+        selectedView = 'home';
+      } else {
+        toast.error('Login failed!', {
+          description: 'Please check your username and password.',
+        });
+        loginIsLoading = false;
+      }
+    } catch {
+      toast.error('Server error occurred during login.', {
+        description: 'There was an issue connecting to the server. Please try again later.',
+      });
+      loginIsLoading = false;
+    }
+
+    if ($currentUser) {
+      const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+      if (userInfo) {
+        currentUserInfo.set(userInfo.player);
+
+        preferredMode.set(userInfo.player.info.preferred_mode);
+        preferredType.set(userInfo.player.info.preferred_type);
+      }
+    }
+  };
+
+  let animateInterval: number | undefined;
+  const doBPMAnimation = () => {
+    if (animateInterval) return;
+    animateInterval = window.setInterval(async () => {
+      animate(ezppLogo, {
+        scale: 1.1,
+        duration: 900,
+        ease: (t: number) => Math.pow(2, -5 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
+        onComplete: () => {},
+      });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      animate(ezppLogo, {
+        scale: 1,
+        duration: 900,
+        ease: (t: number) => (t - 1) ** 7 + 1,
+        onComplete: () => {},
+      });
+    }, 450);
+  };
+
   onMount(() => {
     const config = $userSettings;
     const trackingConsent = config.value('tracking_consent');
@@ -550,6 +616,17 @@
     } else {
       askForTrackingPermission = true;
     }
+
+    animate(ezppLogo, {
+      opacity: [0, 1],
+      scale: [0.95, 1],
+      duration: 900,
+      ease: (t: number) => (t - 1) ** 7 + 1,
+      onComplete: doBPMAnimation,
+    });
+    return () => {
+      window.clearInterval(animateInterval);
+    };
   });
 </script>
 
@@ -708,65 +785,47 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root bind:open={$launching}>
-  <AlertDialog.Content
-    class="bg-theme-950 border-theme-800 p-0"
-    escapeKeydownBehavior="ignore"
-    interactOutsideBehavior="ignore"
+<div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative">
+  <div class="absolute top-0 left-0 w-full h-[100vh] opacity-30 z-0">
+    <AnimatedBg />
+  </div>
+  <div
+    class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >
-    <div
-      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    <div class="bg-pink-950/80 border border-pink-900/50 rounded-[1.1rem] p-1">
+      <img class="pointer-events-none" src={Logo} alt="logo" bind:this={ezppLogo} />
+    </div>
+    <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
+    <Button
+      class="flex size-12 items-center gap-2 {selectedView === 'home'
+        ? 'bg-pink-300/50'
+        : 'bg-black/20'} hover:bg-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+      onclick={() => (selectedView = 'home')}
     >
-      <img class="h-20 w-20" src={Logo} alt="logo" />
-      <span class="font-semibold text-xl">Launching...</span>
-    </div>
-    <div class="flex flex-col items-center justify-center gap-2 p-3 rounded-lg">
-      <Progress indeterminate={progress === -1} value={progress} />
-      <span class="text-muted-foreground text-sm mt-4">{launchInfo}</span>
-    </div>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-
-<div class="grid grid-cols-[0.38fr_1fr] mt-[50px] h-[calc(100vh-50px)]">
-  <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 py-3">
-    <div class="flex flex-col items-center gap-2 border-b pb-3">
+      <House class="text-theme-200 !size-5" />
+    </Button>
+    <Button
+      class="flex size-12 items-center gap-2 {selectedView === 'settings'
+        ? 'bg-pink-300/50'
+        : 'bg-black/20'} hover:bg-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+      onclick={() => (selectedView = 'settings')}
+    >
+      <Settings class="text-theme-200 !size-5" />
+    </Button>
+    <div class="mt-auto">
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger class="w-full px-3">
-          <Button
-            class="w-full justify-start py-6 ps-1 pr-3 border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 border"
-          >
-            <div class="flex flex-row items-center gap-2 relative">
-              {#if $currentUser?.donor}
-                <Hearts className="-top-1 -left-1 z-50 h-[35px] w-[250px] opacity-80 absolute"
-                ></Hearts>
-              {/if}
-              <Avatar.Root class="size-10 border-2 border-theme-800">
-                <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
-                <Avatar.Fallback class="bg-theme-900">
-                  <LoaderCircle class="animate-spin" size={32} />
-                </Avatar.Fallback>
-              </Avatar.Root>
-              <span class="font-semibold text-sm text-muted-foreground truncate max-w-40">
-                {$currentUser?.name ?? 'Guest'}
-              </span>
-            </div>
-            <ChevronDown class="ms-auto text-[#5d6581]" />
-          </Button>
+        <DropdownMenu.Trigger>
+          <Avatar.Root class="size-10">
+            <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
+            <Avatar.Fallback class="bg-theme-900">
+              <LoaderCircle class="animate-spin" size={32} />
+            </Avatar.Fallback>
+          </Avatar.Root>
         </DropdownMenu.Trigger>
-        <DropdownMenu.Content
-          class="w-[calc(var(--bits-dropdown-menu-anchor-width)_-_1.5rem)] bg-theme-950 border border-theme-900 rounded-lg"
-          align="center"
-        >
-          <DropdownMenu.Item
-            class={selectedView === 'settings' ? 'bg-accent text-accent-foreground' : ''}
-            onclick={() => (selectedView = 'settings')}
-          >
-            <Settings class="!size-4" />
-            Settings
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator class="bg-theme-800/45" />
+        <DropdownMenu.Content align="end" side="right" class="w-44">
           {#if $currentUser}
             <DropdownMenu.Item
+              class="text-destructive focus:text-destructive text-xs"
               onclick={async () => {
                 $userAuth.value('username').del();
                 $userAuth.value('password').del();
@@ -776,25 +835,134 @@
                 });
                 currentUser.set(undefined);
                 currentUserInfo.set(undefined);
+                selectedView = 'home';
               }}
             >
-              <LogOut class="!size-4" />
+              <LogOut class="size-3.5 mr-2" />
               Logout
             </DropdownMenu.Item>
           {:else}
-            <DropdownMenu.Item onclick={() => currentView.set(Login)}>
-              <LogIn class="!size-4" />
+            <DropdownMenu.Item class="text-xs" onclick={() => (selectedView = 'login')}>
+              <LogIn class="size-3.5 mr-2" />
               Login
             </DropdownMenu.Item>
           {/if}
         </DropdownMenu.Content>
       </DropdownMenu.Root>
     </div>
-    {#if $currentUser}
-      <div class="flex flex-col gap-6 h-full px-3">
+  </div>
+  <div class="z-10 h-full overflow-hidden">
+    {#if selectedView === 'home'}
+      <div
+        class="flex flex-col-reverse h-full"
+        in:fly={{ duration: 400, delay: 400, y: 10, opacity: 0 }}
+        out:fly={{ duration: 400, y: -10, opacity: 0 }}
+      >
+        <div class="relative z-10 px-8 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <Music2 class="size-3.5 text-blue-400" />
+              <span class="text-[11px] text-white/70 font-medium">
+                {#if !$beatmapSets && $beatmapSets !== 0}
+                  <LoaderCircle class="animate-spin" size={12} />
+                {:else}
+                  {numberHumanReadable($beatmapSets ?? 0)}
+                {/if}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Brush class="size-3.5 text-amber-400" />
+              <span class="text-[11px] text-white/70 font-medium">
+                {#if !$skins && $skins !== 0}
+                  <LoaderCircle class="animate-spin" size={12} />
+                {:else}
+                  {numberHumanReadable($skins ?? 0)}
+                {/if}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              {#if $serverConnectionFails > 1}
+                <WifiOff class="size-3.5 text-red-400" />
+              {:else}
+                <Wifi class="size-3.5 text-emerald-400" />
+              {/if}
+              <span class="relative text-[11px] text-white/70 font-medium">
+                <div
+                  class="absolute top-0.5 left-1/2 -translate-x-1/2 {!$serverPing ||
+                  $serverConnectionFails > 1
+                    ? 'opacity-100'
+                    : 'opacity-0'} transition-opacity duration-1000"
+                >
+                  <LoaderCircle class="size-3.5 animate-spin" />
+                </div>
+                <div
+                  class="{!$serverPing || $serverConnectionFails > 1
+                    ? 'opacity-0'
+                    : 'opacity-100'} transition-opacity duration-1000"
+                >
+                  {#if $reduceAnimations}
+                    <span>{$serverPing}ms</span>
+                  {:else}
+                    <NumberFlow value={$serverPing ?? 0} trend={0} suffix="ms" />
+                  {/if}
+                </div>
+              </span>
+            </div>
+
+            <div class="w-px h-4 bg-white/10"></div>
+
+            <span
+              class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/[0.06]"
+            >
+              {#if $osuStream}
+                {releaseStreamToReadable($osuStream)}
+              {:else}
+                <LoaderCircle class="animate-spin" size={10} />
+              {/if}
+            </span>
+            <span
+              class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/[0.06]"
+            >
+              {#if $osuBuild}
+                {$osuBuild}
+              {:else}
+                <LoaderCircle class="animate-spin" size={10} />
+              {/if}
+            </span>
+            <span
+              class="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/20"
+            >
+              {#if $currentSkin}
+                {#if $currentSkin.length > 23}
+                  {$currentSkin.slice(0, 23) + '...'}
+                {:else}
+                  {$currentSkin}
+                {/if}
+              {:else}
+                <LoaderCircle class="animate-spin" size={10} />
+              {/if}
+            </span>
+          </div>
+
+          <DownloadButton
+            downloading={$launching}
+            {progress}
+            text={$launching
+              ? downloadingEZPPFiles
+                ? 'Downloading...'
+                : cleanup
+                  ? 'Cleaning up...'
+                  : 'Launching...'
+              : $serverConnectionFails > 1
+                ? 'No connection'
+                : 'Launch'}
+            subtext={$launching && !cleanup ? launchInfo : undefined}
+            disabled={$launching || $osuInstallationPath === '' || $serverConnectionFails > 1}
+            onClick={launch}
+          />
+        </div>
         <div
-          in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
-          out:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+          class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md border border-black/40 flex flex-col items-center p-3"
         >
           <Select.Root
             type="single"
@@ -837,28 +1005,10 @@
               {/each}
             </Select.Content>
           </Select.Root>
-        </div>
-        <div
-          class="bg-theme-900/90 border border-theme-800/90 rounded-lg p-2"
-          in:scale={{
-            duration: $reduceAnimations ? 0 : 400,
-            delay: $reduceAnimations ? 0 : 50,
-            start: 0.98,
-          }}
-          out:scale={{
-            duration: $reduceAnimations ? 0 : 400,
-            delay: $reduceAnimations ? 0 : 50,
-            start: 0.98,
-          }}
-        >
-          <div class="flex flex-row items-center gap-2">
-            <Logs class="text-muted-foreground" size="16" />
-            <span class="font-semibold text-muted-foreground text-sm">Mode Stats</span>
-          </div>
-          <div class="grid grid-cols-2 mt-2 border-t border-theme-800 pt-2 pb-2">
-            <div class="flex flex-col gap-0.5">
-              <span class="text-sm text-muted-foreground font-semibold">Rank</span>
-              <div class="flex items-center h-full text-lg font-semibold text-theme-50">
+          <div class="grid grid-cols-2 gap-2 w-full m-3">
+            <div class="flex flex-col">
+              <span class="text-xs text-muted-foreground font-semibold">Rank</span>
+              <div class="flex items-center h-full font-semibold text-theme-50">
                 {#if $currentUserInfo}
                   <div in:fade>
                     {#if $reduceAnimations}
@@ -880,18 +1030,19 @@
                 {/if}
               </div>
             </div>
-            <div class="flex flex-col gap-0.5">
-              <span class="text-sm text-muted-foreground font-semibold">PP</span>
-              <div class="flex items-center h-full text-lg font-semibold text-theme-50">
+            <div class="flex flex-col">
+              <span class="text-xs text-muted-foreground font-semibold">PP</span>
+              <div class="flex items-center h-full font-semibold text-pink-500">
                 {#if $currentUserInfo}
                   <div in:fade>
                     {#if $reduceAnimations}
                       <span>
-                        {numberHumanReadable($currentUserInfo.stats[selectedGamemode].pp ?? 0)}
+                        {numberHumanReadable($currentUserInfo.stats[selectedGamemode].pp ?? 0)}pp
                       </span>
                     {:else}
                       <NumberFlow
                         trend={0}
+                        suffix="pp"
                         value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
                       />
                     {/if}
@@ -903,457 +1054,306 @@
                 {/if}
               </div>
             </div>
-          </div>
-          <div class="grid grid-cols-[1fr_auto] border-t border-theme-800 pt-2">
-            <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
-            <div
-              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
-            >
-              {#if $currentUserInfo}
-                <div in:fade>
-                  {#if $reduceAnimations}
-                    <span>{($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%</span>
-                  {:else}
-                    <NumberFlow
-                      class="leading-none"
-                      trend={0}
-                      suffix="%"
-                      value={($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}
-                    />
-                  {/if}
-                </div>
-              {:else}
-                <div in:fade>
-                  <LoaderCircle class="animate-spin" size={21} />
-                </div>
-              {/if}
-            </div>
-
-            <span class="text-xs text-muted-foreground font-semibold">Play Count</span>
-            <div
-              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
-            >
-              {#if $currentUserInfo}
-                <div in:fade>
-                  {#if $reduceAnimations}
-                    <span
-                      >{numberHumanReadable(
-                        $currentUserInfo.stats[selectedGamemode].plays ?? 0
-                      )}</span
-                    >
-                  {:else}
-                    <NumberFlow
-                      class="leading-none"
-                      trend={0}
-                      value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
-                    />
-                  {/if}
-                </div>
-              {:else}
-                <div in:fade>
-                  <LoaderCircle class="animate-spin" size={21} />
-                </div>
-              {/if}
-            </div>
-
-            <span class="text-xs text-muted-foreground font-semibold">Play Time</span>
-            <div
-              class="flex items-center flex-row-reverse h-full text-xs text-end font-semibold text-theme-50"
-            >
-              {#if $currentUserInfo}
-                <div in:fade>
-                  {formatTimeReadable($currentUserInfo.stats[selectedGamemode].playtime ?? 0)}
-                </div>
-              {:else}
-                <div in:fade>
-                  <LoaderCircle class="animate-spin" size={21} />
-                </div>
-              {/if}
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
-  </div>
-  <div class="flex flex-col gap-6 w-full h-full p-6">
-    {#if selectedView === 'home'}
-      <div
-        class="my-auto bg-theme-900/90 flex flex-col items-center justify-center gap-6 border border-theme-800/90 rounded-lg p-6"
-        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
-      >
-        <div class="grid grid-cols-3 w-full gap-3">
-          <div
-            class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
-          >
-            <div class="flex items-center justify-center p-2 rounded-lg bg-blue-500/20">
-              <Music2 class="text-blue-500" size="26" />
-            </div>
-            <div class="relative font-bold text-xl text-blue-400">
-              <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$beatmapSets
-                  ? 'opacity-100'
-                  : 'opacity-0'} transition-opacity duration-1000"
-              >
-                <LoaderCircle class="animate-spin" />
-              </div>
-              <div
-                class="{!$beatmapSets
-                  ? 'opacity-0'
-                  : 'opacity-100'} transition-opacity duration-1000"
-              >
-                {#if $reduceAnimations}
-                  <span>{numberHumanReadable($beatmapSets ?? 0)}</span>
+            <div class="flex flex-col">
+              <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
+              <div class="flex items-center h-full font-semibold text-theme-50">
+                {#if $currentUserInfo}
+                  <div in:fade>
+                    {#if $reduceAnimations}
+                      <span>
+                        {($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%
+                      </span>
+                    {:else}
+                      <NumberFlow
+                        trend={0}
+                        suffix="%"
+                        value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
+                      />
+                    {/if}
+                  </div>
                 {:else}
-                  <NumberFlow value={$beatmapSets ?? 0} trend={0} />
+                  <div in:fade>
+                    <LoaderCircle class="animate-spin" size={21} />
+                  </div>
                 {/if}
               </div>
             </div>
-            <div class="text-muted-foreground text-[12px] leading-4">Beatmap Sets imported</div>
-          </div>
-          <div
-            class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
-          >
-            <div class="flex items-center justify-center p-2 rounded-lg bg-yellow-500/20">
-              <Brush class="text-yellow-500" size="26" />
-            </div>
-            <div class="relative font-bold text-xl text-yellow-400">
-              <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$skins && $skins !== 0
-                  ? 'opacity-100'
-                  : 'opacity-0'} transition-opacity duration-1000"
-              >
-                <LoaderCircle class="animate-spin" />
-              </div>
-              <div
-                class="{!$skins && $skins !== 0
-                  ? 'opacity-0'
-                  : 'opacity-100'} transition-opacity duration-1000"
-              >
-                {#if $reduceAnimations}
-                  <span>{numberHumanReadable($skins ?? 0)}</span>
+            <div class="flex flex-col">
+              <span class="text-xs text-muted-foreground font-semibold">Playcount</span>
+              <div class="flex items-center h-full font-semibold text-theme-50">
+                {#if $currentUserInfo}
+                  <div in:fade>
+                    {#if $reduceAnimations}
+                      <span>
+                        {numberHumanReadable($currentUserInfo.stats[selectedGamemode].plays ?? 0)}
+                      </span>
+                    {:else}
+                      <NumberFlow
+                        trend={0}
+                        value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
+                      />
+                    {/if}
+                  </div>
                 {:else}
-                  <NumberFlow value={$skins ?? 0} trend={0} />
+                  <div in:fade>
+                    <LoaderCircle class="animate-spin" size={21} />
+                  </div>
                 {/if}
               </div>
             </div>
-            <div class="text-muted-foreground text-[12px] leading-4">Skins</div>
           </div>
-          <div
-            class="bg-theme-800/90 border border-theme-700/90 rounded-lg px-2 py-4 w-full flex flex-col gap-1 items-center justify-center"
+        </div>
+        <div class="flex flex-col mb-auto mt-12 px-6">
+          <span class="text-4xl font-bold drop-shadow-lg">EZPPLauncher</span>
+          <span class="text-muted-foreground font-semibold drop-shadow-lg"
+            >Hello {$currentUser?.name ?? 'Guest'}!</span
           >
-            <div
-              class="flex items-center justify-center p-2 rounded-lg {$serverConnectionFails > 1
-                ? 'bg-red-500/20'
-                : 'bg-green-500/20'}"
-            >
-              {#if $serverConnectionFails > 1}
-                <WifiOff class="text-red-500" size="26" />
-              {:else}
-                <Wifi class="text-green-500" size="26" />
-              {/if}
-            </div>
-            <div
-              class="relative font-bold text-xl {$serverConnectionFails > 1
-                ? 'text-red-400'
-                : 'text-green-400'}"
-            >
-              <div
-                class="absolute top-1 left-1/2 -translate-x-1/2 {!$serverPing ||
-                $serverConnectionFails > 1
-                  ? 'opacity-100'
-                  : 'opacity-0'} transition-opacity duration-1000"
-              >
-                <LoaderCircle class="animate-spin" />
-              </div>
-              <div
-                class="{!$serverPing || $serverConnectionFails > 1
-                  ? 'opacity-0'
-                  : 'opacity-100'} transition-opacity duration-1000"
-              >
-                {#if $reduceAnimations}
-                  <span>{$serverPing}ms</span>
-                {:else}
-                  <NumberFlow value={$serverPing ?? 0} trend={0} suffix="ms" />
-                {/if}
-              </div>
-            </div>
-            <div class="text-muted-foreground text-[12px] leading-4">Ping to Server</div>
-          </div>
-        </div>
-        <Button
-          size="lg"
-          class="text-xl h-16 px-16 border-2 border-violet-500/40"
-          disabled={$launching || $osuInstallationPath === '' || $serverConnectionFails > 1}
-          onclick={launch}
-        >
-          <Play class="!size-5" />
-          {$launching ? 'Launching...' : $serverConnectionFails > 1 ? 'No connection' : 'Launch'}
-        </Button>
-      </div>
-      <div
-        class="mt-auto bg-theme-900/90 border border-theme-800/90 rounded-lg px-6 py-3"
-        in:scale={{
-          duration: $reduceAnimations ? 0 : 400,
-          delay: $reduceAnimations ? 0 : 50,
-          start: 0.98,
-        }}
-      >
-        <div class="flex flex-row items-center gap-2">
-          <Gamepad2 class="text-muted-foreground" size="24" />
-          <span class="font-semibold text-muted-foreground text-sm">Client Info</span>
-        </div>
-        <div class="grid grid-cols-[1fr_auto] gap-1 mt-2 border-t border-theme-800 pt-2 px-2 pb-0">
-          <span class="text-xs text-muted-foreground font-semibold">osu! Release Stream</span>
-          <span class="text-xs font-semibold text-end text-theme-50">
-            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
-              {#if $osuStream}
-                {releaseStreamToReadable($osuStream)}
-              {:else}
-                <LoaderCircle class="animate-spin" size={12} />
-              {/if}
-            </Badge>
-          </span>
-          <span class="text-xs text-muted-foreground font-semibold">osu! Version</span>
-          <span class="text-xs font-semibold text-end text-theme-50">
-            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
-              {#if $osuBuild}
-                {$osuBuild}
-              {:else}
-                <LoaderCircle class="animate-spin" size={12} />
-              {/if}
-            </Badge>
-          </span>
-          <span class="text-xs text-muted-foreground font-semibold">Skin</span>
-          <span class="text-xs font-semibold text-end text-theme-50">
-            <Badge class="text-[0.65rem] py-0.5 px-2 leading-none">
-              {#if $currentSkin}
-                {$currentSkin}
-              {:else}
-                <LoaderCircle class="animate-spin" size={12} />
-              {/if}
-            </Badge>
-          </span>
         </div>
       </div>
     {:else if selectedView === 'settings'}
-      <Button onclick={() => (selectedView = 'home')}>
-        <ArrowLeft />
-        Back
-      </Button>
       <div
-        class="bg-theme-900/90 flex flex-col justify-center gap-3 border border-theme-800/90 rounded-lg"
-        in:scale={{ duration: $reduceAnimations ? 0 : 400, start: 0.98 }}
+        class="h-[100vh] w-full flex flex-col items-center justify-center"
+        in:fly={{ duration: 400, delay: 400, y: 10, opacity: 0 }}
+        out:fly={{ duration: 400, y: -10, opacity: 0 }}
       >
-        <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
-          <Settings2 /> EZPPLauncher Settings
-        </div>
-        <div>
-          <div
-            class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 pt-4 pb-1 px-6"
-          >
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-patch">Patching</Label>
-              <div class="text-muted-foreground text-xs">
-                Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
-                    class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg"
-                    >currently only on windows!</span
-                  >
-                {/if}
-              </div>
-            </div>
-            <Checkbox
-              id="setting-patch"
-              checked={$platform === 'windows' ? $patch : false}
-              disabled={$platform !== 'windows'}
-              onCheckedChange={async (e) => {
-                patch.set(e);
-                $userSettings.save();
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
-              <div class="text-muted-foreground text-xs">
-                Enable a custom cursor in the Launcher like in the lazer build of osu!
-              </div>
-            </div>
-            <Checkbox
-              id="setting-custom-cursor"
-              checked={$customCursor}
-              onCheckedChange={async (e) => {
-                if (!e) {
-                  cursorSmoothening.set(false);
-                }
-                customCursor.set(e);
-
-                $userSettings.save();
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
-              <div class="text-muted-foreground text-xs">
-                Makes the custom cursor movement smoother.
-              </div>
-            </div>
-            <Checkbox
-              id="setting-cursor-smoothening"
-              checked={$cursorSmoothening}
-              onCheckedChange={async (e) => {
-                if (!$customCursor) return;
-                cursorSmoothening.set(e);
-                $userSettings.save();
-              }}
-              disabled={!$customCursor}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
-              <div class="text-muted-foreground text-xs">
-                Disables some animations in the Launcher to improve performance on low-end devices.
-              </div>
-            </div>
-            <Checkbox
-              id="setting-reduce-animations"
-              checked={$reduceAnimations}
-              onCheckedChange={async (e) => {
-                reduceAnimations.set(e);
-                $userSettings.save();
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
-              <div class="text-muted-foreground text-xs">
-                Let other discord users show what you are doing right now 👀
-              </div>
-            </div>
-            <div class="relative">
-              {#if $presenceLoading}
-                <div class="-left-8 absolute" transition:fade>
-                  <LoaderCircle class="animate-spin" />
+        <div class="p-8 w-full">
+          <div class="bg-black/40 backdrop-blur-sm py-8 px-6 rounded-lg">
+            <div class="grid grid-cols-[1fr_auto] gap-y-5 items-center px-6">
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-patch">Patching</Label>
+                <div class="text-muted-foreground text-xs">
+                  Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+                      class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
+                      >currently only on windows!</span
+                    >
+                  {/if}
                 </div>
-              {/if}
+              </div>
               <Checkbox
-                id="setting-rich-presence"
-                bind:checked={$discordPresence}
-                disabled={$presenceLoading}
+                id="setting-patch"
+                checked={$platform === 'windows' ? $patch : false}
+                disabled={$platform !== 'windows'}
+                onCheckedChange={async (e) => {
+                  patch.set(e);
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
+                <div class="text-muted-foreground text-xs">
+                  Enable a custom cursor in the Launcher like in the lazer build of osu!
+                </div>
+              </div>
+              <Checkbox
+                id="setting-custom-cursor"
+                checked={$customCursor}
+                onCheckedChange={async (e) => {
+                  if (!e) {
+                    cursorSmoothening.set(false);
+                  }
+                  customCursor.set(e);
+
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
+                <div class="text-muted-foreground text-xs">
+                  Makes the custom cursor movement smoother.
+                </div>
+              </div>
+              <Checkbox
+                id="setting-cursor-smoothening"
+                checked={$cursorSmoothening}
+                onCheckedChange={async (e) => {
+                  if (!$customCursor) return;
+                  cursorSmoothening.set(e);
+                  $userSettings.save();
+                }}
+                disabled={!$customCursor}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
+                <div class="text-muted-foreground text-xs">
+                  Disables some animations in the Launcher to improve performance on low-end
+                  devices.
+                </div>
+              </div>
+              <Checkbox
+                id="setting-reduce-animations"
+                checked={$reduceAnimations}
+                onCheckedChange={async (e) => {
+                  reduceAnimations.set(e);
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
+                <div class="text-muted-foreground text-xs">
+                  Let other discord users show what you are doing right now 👀
+                </div>
+              </div>
+              <div class="relative">
+                {#if $presenceLoading}
+                  <div class="-left-8 absolute" transition:fade>
+                    <LoaderCircle class="animate-spin" />
+                  </div>
+                {/if}
+                <Checkbox
+                  id="setting-rich-presence"
+                  bind:checked={$discordPresence}
+                  disabled={$presenceLoading}
+                  class="flex items-center justify-center w-5 h-5"
+                ></Checkbox>
+              </div>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-tracking">App Tracking</Label>
+                <div class="text-muted-foreground text-xs">
+                  Allow anonymous usage data to be collected to help improve the application.
+                </div>
+              </div>
+              <Checkbox
+                id="setting-tracking"
+                checked={$trackingEnabled}
+                onCheckedChange={async (e) => {
+                  trackingEnabled.set(e);
+                  $userSettings.value('tracking_consent').set(e);
+                  await $userSettings.save();
+                }}
                 class="flex items-center justify-center w-5 h-5"
               ></Checkbox>
             </div>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-tracking">App Tracking</Label>
-              <div class="text-muted-foreground text-xs">
-                Allow anonymous usage data to be collected to help improve the application.
+            <div
+              class="grid grid-cols-[0.7fr_auto] gap-y-1 items-center border-theme-800 pl-6 pr-5 pb-4"
+            >
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
+                <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
               </div>
-            </div>
-            <Checkbox
-              id="setting-tracking"
-              checked={$trackingEnabled}
-              onCheckedChange={async (e) => {
-                trackingEnabled.set(e);
-                $userSettings.value('tracking_consent').set(e);
-                await $userSettings.save();
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-          </div>
-          <div
-            class="grid grid-cols-[0.7fr_auto] gap-y-1 items-center border-theme-800 pl-6 pr-5 pb-4"
-          >
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
-              <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
-            </div>
-            <div class="flex flex-row w-full">
-              <Input
-                class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
-                type="text"
-                value={$osuInstallationPath}
-                placeholder="Path to osu! installation"
-                readonly
-              />
-              <Button
-                class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
-                variant="outline"
-                onclick={browse_osu_installation}>Browse</Button
-              >
-            </div>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
-              <div class="text-muted-foreground text-xs">
-                test different versions of the patcher
-              </div>
-            </div>
-            <div class="flex flex-row w-full">
-              <Select.Root
-                type="single"
-                bind:value={$launcherStream}
-                onValueChange={async (newStream) => {
-                  const isNet8Installed = await hasNet8();
-                  if (newStream === 'experimental' && !isNet8Installed) {
-                    launcherStream.set('stable');
-                    toast.error('.NET 8.0 Desktop Runtime not found!', {
-                      action: {
-                        label: 'Download .NET 8.0',
-                        onClick: async () =>
-                          await openURL(
-                            'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
-                          ),
-                      },
-                    });
-                    return;
-                  }
-                  $userSettings.value('patcherStream').set(newStream);
-                  launcherStream.set(newStream);
-                  await $userSettings.save();
-                }}
-              >
-                <Select.Trigger
-                  class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+              <div class="flex flex-row w-full">
+                <Input
+                  class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
+                  type="text"
+                  value={$osuInstallationPath}
+                  placeholder="Path to osu! installation"
+                  readonly
+                />
+                <Button
+                  class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
+                  variant="outline"
+                  onclick={browse_osu_installation}>Browse</Button
                 >
-                  <div class="flex flex-row items-center gap-2 font-normal text-foreground">
-                    {$launcherStream}
-                  </div>
-                </Select.Trigger>
-                <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
-                  {#each $launcherStreams as stream (stream)}
-                    <Select.Item value={stream}>
-                      <div class="flex flex-row gap-2 items-center">
-                        {stream}
-                      </div>
-                    </Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
+              </div>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
+                <div class="text-muted-foreground text-xs">
+                  test different versions of the patcher
+                </div>
+              </div>
+              <div class="flex flex-row w-full">
+                <Select.Root
+                  type="single"
+                  bind:value={$launcherStream}
+                  onValueChange={async (newStream) => {
+                    const isNet8Installed = await hasNet8();
+                    if (newStream === 'experimental' && !isNet8Installed) {
+                      launcherStream.set('stable');
+                      toast.error('.NET 8.0 Desktop Runtime not found!', {
+                        action: {
+                          label: 'Download .NET 8.0',
+                          onClick: async () =>
+                            await openURL(
+                              'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
+                            ),
+                        },
+                      });
+                      return;
+                    }
+                    $userSettings.value('patcherStream').set(newStream);
+                    launcherStream.set(newStream);
+                    await $userSettings.save();
+                  }}
+                >
+                  <Select.Trigger
+                    class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+                  >
+                    <div class="flex flex-row items-center gap-2 font-normal text-foreground">
+                      {$launcherStream}
+                    </div>
+                  </Select.Trigger>
+                  <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
+                    {#each $launcherStreams as stream (stream)}
+                      <Select.Item value={stream}>
+                        <div class="flex flex-row gap-2 items-center">
+                          {stream}
+                        </div>
+                      </Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    {/if}
-    <div
-      class="mt-auto mx-auto flex flex-row items-center gap-2"
-      in:scale={{
-        duration: $reduceAnimations ? 0 : 400,
-        delay: $reduceAnimations ? 0 : 50,
-        start: 0.97,
-      }}
-    >
-      <Button
-        variant="link"
-        class="font-light font-mono text-sm text-theme-500"
-        onclick={() => openURL('https://ez-pp.farm/u/1001')}
+    {:else if selectedView === 'login'}
+      <div
+        class="h-[100vh] w-full flex flex-col items-center justify-center"
+        in:fly={{ duration: 400, delay: 400, y: 10, opacity: 0 }}
+        out:fly={{ duration: 400, y: -10, opacity: 0 }}
       >
-        made with
-        <Heart class="text-red-600 fill-red-600 animate-pulse" />
-        by horizoncode
-      </Button>
-    </div>
+        <div class="p-8 w-full">
+          <form onsubmit={performLogin} class="bg-black/40 backdrop-blur-sm rounded-lg p-8">
+            <div class="flex flex-col items-center justify-center mb-4">
+              <span class="text-xl font-semibold">Login to EZPPFarm</span>
+              <span class="text-xs text-muted-foreground"
+                >Use your EZPPFarm account to login to EZPPLauncher</span
+              >
+            </div>
+            <div class="mb-4">
+              <Label for="username" class="block text-sm font-medium">Username</Label>
+              <Input
+                class="mt-4 w-full bg-theme-900 border-theme-800"
+                type="text"
+                id="username"
+                bind:value={username}
+                disabled={loginIsLoading}
+                autocomplete="off"
+                autocorrect="off"
+              />
+            </div>
+            <div class="mb-4">
+              <Label for="password" class="block text-sm font-medium">Password</Label>
+              <Input
+                class="mt-4 w-full bg-theme-900 border-theme-800"
+                type="password"
+                id="password"
+                bind:value={password}
+                disabled={loginIsLoading}
+                autocomplete="off"
+                autocorrect="off"
+              />
+            </div>
+            <Button class="w-full" type="submit" disabled={loginIsLoading}>
+              {#if loginIsLoading}
+                <LoaderCircle class="animate-spin" />
+              {:else}
+                Login
+              {/if}
+            </Button>
+          </form>
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
