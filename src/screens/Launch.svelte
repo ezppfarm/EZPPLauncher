@@ -165,6 +165,11 @@
 
       const skin: string = await getSkin(selectedPath);
       currentSkin.set(skin);
+
+      const osuReleaseStream = await getReleaseStream($osuInstallationPath);
+      osuStream.set(osuReleaseStream);
+      const osuVersion = await getVersion($osuInstallationPath);
+      osuBuild.set(osuVersion);
     }
   };
 
@@ -861,26 +866,28 @@
       >
         <div class="relative z-10 px-8 py-4 flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
-              <Music2 class="size-3.5 text-blue-400" />
-              <span class="text-[11px] text-white/70 font-medium">
-                {#if !$beatmapSets && $beatmapSets !== 0}
-                  <LoaderCircle class="animate-spin" size={12} />
-                {:else}
-                  {numberHumanReadable($beatmapSets ?? 0)}
-                {/if}
-              </span>
-            </div>
-            <div class="flex items-center gap-2">
-              <Brush class="size-3.5 text-amber-400" />
-              <span class="text-[11px] text-white/70 font-medium">
-                {#if !$skins && $skins !== 0}
-                  <LoaderCircle class="animate-spin" size={12} />
-                {:else}
-                  {numberHumanReadable($skins ?? 0)}
-                {/if}
-              </span>
-            </div>
+            {#if $osuInstallationPath !== ''}
+              <div class="flex items-center gap-2">
+                <Music2 class="size-3.5 text-blue-400" />
+                <span class="text-[11px] text-white/70 font-medium">
+                  {#if !$beatmapSets && $beatmapSets !== 0}
+                    <LoaderCircle class="animate-spin" size={12} />
+                  {:else}
+                    {numberHumanReadable($beatmapSets ?? 0)}
+                  {/if}
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <Brush class="size-3.5 text-amber-400" />
+                <span class="text-[11px] text-white/70 font-medium">
+                  {#if !$skins && $skins !== 0}
+                    <LoaderCircle class="animate-spin" size={12} />
+                  {:else}
+                    {numberHumanReadable($skins ?? 0)}
+                  {/if}
+                </span>
+              </div>
+            {/if}
             <div class="flex items-center gap-2">
               {#if $serverConnectionFails > 1}
                 <WifiOff class="size-3.5 text-red-400" />
@@ -910,39 +917,41 @@
               </span>
             </div>
 
-            <div class="w-px h-4 bg-white/10"></div>
+            {#if $osuInstallationPath !== ''}
+              <div class="w-px h-4 bg-white/10"></div>
 
-            <span
-              class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/[0.06]"
-            >
-              {#if $osuStream}
-                {releaseStreamToReadable($osuStream)}
-              {:else}
-                <LoaderCircle class="animate-spin" size={10} />
-              {/if}
-            </span>
-            <span
-              class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/[0.06]"
-            >
-              {#if $osuBuild}
-                {$osuBuild}
-              {:else}
-                <LoaderCircle class="animate-spin" size={10} />
-              {/if}
-            </span>
-            <span
-              class="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/20"
-            >
-              {#if $currentSkin}
-                {#if $currentSkin.length > 23}
-                  {$currentSkin.slice(0, 23) + '...'}
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/[0.06]"
+              >
+                {#if $osuStream}
+                  {releaseStreamToReadable($osuStream)}
                 {:else}
-                  {$currentSkin}
+                  <LoaderCircle class="animate-spin" size={10} />
                 {/if}
-              {:else}
-                <LoaderCircle class="animate-spin" size={10} />
-              {/if}
-            </span>
+              </span>
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/[0.06]"
+              >
+                {#if $osuBuild}
+                  {$osuBuild}
+                {:else}
+                  <LoaderCircle class="animate-spin" size={10} />
+                {/if}
+              </span>
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/20"
+              >
+                {#if $currentSkin}
+                  {#if $currentSkin.length > 23}
+                    {$currentSkin.slice(0, 23) + '...'}
+                  {:else}
+                    {$currentSkin}
+                  {/if}
+                {:else}
+                  <LoaderCircle class="animate-spin" size={10} />
+                {/if}
+              </span>
+            {/if}
           </div>
 
           <DownloadButton
@@ -1326,7 +1335,7 @@
         in:fly={{ duration: 400, delay: 400, y: 10, opacity: 0 }}
         out:fly={{ duration: 400, y: -10, opacity: 0 }}
       >
-        <div class="p-8 w-full">
+        <div class="p-8 px-52 w-full">
           <form onsubmit={performLogin} class="bg-black/40 backdrop-blur-sm rounded-lg p-8">
             <div class="flex flex-col items-center justify-center mb-4">
               <span class="text-xl font-semibold">Login to EZPPFarm</span>
