@@ -56,17 +56,11 @@ pub fn valid_osu_folder(folder: String) -> bool {
         "scores.db",
     ];
 
-    let folder_files: Vec<&str> = osu_folder_files.iter().map(|&s| s).collect();
-    if folder_files.iter().any(|&file| file == "osu!.exe") == false {
+    let path = PathBuf::from(folder);
+    if !path.join("osu!.exe").exists() {
         return false;
     }
-
-    let path = PathBuf::from(folder);
-    let match_percentage = check_folder_completeness(path, &osu_folder_files) >= 70.0;
-    if match_percentage {
-        return true;
-    }
-    return false;
+    check_folder_completeness(path, &osu_folder_files) >= 70.0
 }
 
 #[cfg(not(windows))]
@@ -222,28 +216,28 @@ pub async fn get_skins_count(folder: String) -> Option<u64> {
 #[tauri::command]
 pub fn get_osu_skin(folder: String) -> String {
     let path = PathBuf::from(folder);
-    let osu_user_config = get_osu_user_config(path.clone());
-    return osu_user_config
+    let osu_user_config = get_osu_user_config(path);
+    osu_user_config
         .and_then(|config| config.get("Skin").cloned())
-        .unwrap_or_else(|| "Default".to_string());
+        .unwrap_or_else(|| "Default".to_string())
 }
 
 #[tauri::command]
 pub fn get_osu_version(folder: String) -> String {
     let path = PathBuf::from(folder);
-    let osu_user_config = get_osu_user_config(path.clone());
-    return osu_user_config
+    let osu_user_config = get_osu_user_config(path);
+    osu_user_config
         .and_then(|config| config.get("LastVersion").cloned())
-        .unwrap_or_else(|| "failed".to_string());
+        .unwrap_or_else(|| "failed".to_string())
 }
 
 #[tauri::command]
 pub fn get_osu_release_stream(folder: String) -> String {
     let path = PathBuf::from(folder);
-    let osu_config = get_osu_config(path.clone());
-    return osu_config
+    let osu_config = get_osu_config(path);
+    osu_config
         .and_then(|config| config.get("_ReleaseStream").cloned())
-        .unwrap_or_else(|| "Stable40".to_string());
+        .unwrap_or_else(|| "Stable40".to_string())
 }
 
 #[derive(serde::Deserialize)]
@@ -261,10 +255,7 @@ pub fn set_osu_user_config_values(
         .iter()
         .map(|entry| (entry.key.as_str(), Some(entry.value.as_str())))
         .collect();
-    match set_osu_user_config_vals(&osu_folder_path, &converted) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    Ok(set_osu_user_config_vals(&osu_folder_path, &converted).is_ok())
 }
 
 #[tauri::command]
@@ -276,22 +267,16 @@ pub fn set_osu_config_values(
         .iter()
         .map(|entry| (entry.key.as_str(), Some(entry.value.as_str())))
         .collect();
-    match set_osu_config_vals(&osu_folder_path, &converted) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    Ok(set_osu_config_vals(&osu_folder_path, &converted).is_ok())
 }
 
 #[tauri::command]
 pub async fn run_osu_updater(folder: String) -> Result<(), String> {
-    #[cfg(windows)]
-    const DETACHED_PROCESS: u32 = 0x00000008;
-    #[cfg(windows)]
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-
     let mut updater_process = {
         #[cfg(windows)]
         {
+            const DETACHED_PROCESS: u32 = 0x00000008;
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
             let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
             Command::new(&osu_exe_path)
                 .arg("-repair")
@@ -368,9 +353,6 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
-    /* #[cfg(windows)]
-    use std::os::windows::process::CommandExt; */
-
     #[cfg(windows)]
     const DETACHED_PROCESS: u32 = 0x00000008;
     #[cfg(windows)]
@@ -385,7 +367,7 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
                 .arg("ez-pp.farm")
                 .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
                 .spawn()
-                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+                .map_err(|e| format!("Failed to spawn osu: {}", e))?
         }
 
         #[cfg(not(windows))]
@@ -394,7 +376,7 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
                 .arg("--devserver")
                 .arg("ez-pp.farm")
                 .spawn()
-                .map_err(|e| format!("Failed to spawn updater: {}", e))?
+                .map_err(|e| format!("Failed to spawn osu: {}", e))?
         }
     };
 
@@ -593,7 +575,7 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
     if !revert {
         try_rename(&osu_ui, &osu_ui_bak)?;
         try_rename(&ezpp_ui, &osu_ui)?;
-        
+
         try_rename(&osu_seasonal, &osu_seasonal_bak)?;
         try_rename(&ezpp_seasonal, &osu_seasonal)?;
 
@@ -602,7 +584,7 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
     } else {
         try_rename(&osu_ui, &ezpp_ui)?;
         try_rename(&osu_ui_bak, &osu_ui)?;
-        
+
         try_rename(&osu_seasonal, &ezpp_seasonal)?;
         try_rename(&osu_seasonal_bak, &osu_seasonal)?;
 
@@ -732,12 +714,7 @@ pub async fn has_net8() -> bool {
 
 #[tauri::command]
 pub fn encrypt_string(string: String, entropy: String) -> String {
-    let encrypted = encrypt_password(&string, &entropy);
-
-    match encrypted {
-        Ok(encrypted_vec) => encrypted_vec,
-        Err(_) => string,
-    }
+    encrypt_password(&string, &entropy).unwrap_or(string)
 }
 
 #[tauri::command]
@@ -773,7 +750,7 @@ pub async fn download_ezpp_launcher_update(app: AppHandle, url: String) -> Resul
             UpdateStatus {
                 file_name: "Update".to_string(),
                 downloaded,
-                size: size,
+                size,
                 progress: ((downloaded as f64 / size as f64 * 100.0) * 100.0).trunc() / 100.0,
             },
         )
