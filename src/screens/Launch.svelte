@@ -64,7 +64,6 @@
   } from '@/userSettings';
   import Input from '@/components/ui/input/input.svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { toast } from 'svelte-sonner';
   import { currentUser, userAuth } from '@/userAuthentication';
   import {
     getGamemodeInt,
@@ -109,6 +108,7 @@
   import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
   import { animate } from 'animejs';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
+  import { sileo } from 'sileo';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -146,16 +146,28 @@
       }
       const validFolder = await isValidOsuFolder(selectedPath);
       if (!validFolder) {
-        toast.error('Oops...', {
+        sileo.error({
+          title: 'Hmm...',
           description:
             'The selected folder is not a valid osu! installation folder. Please select the correct folder.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         return;
       }
       osuInstallationPath.set(selectedPath);
       $userSettings.value('osu_installation_path').set(selectedPath);
       $userSettings.save();
-      toast.success('osu! installation path set successfully.');
+      sileo.success({
+        title: 'Yay!',
+        description: 'osu! installation path set successfully.',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
+      });
 
       const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
@@ -177,16 +189,26 @@
     if ($launching) return;
     if ($trackingEnabled) umami.track('app_launch_osu');
     const osuRunning = await isOsuRunning();
-    if (osuRunning) {
-      toast.error('Hold on a second!', {
+    if (!osuRunning) {
+      sileo.error({
+        title: 'Hold on a second!',
         description:
           'osu! is currently running, please exit osu! before launching via EZPPLauncher!',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
       });
       return;
     }
     if (!$osuBuild) {
-      toast.error('Hmmm...', {
+      sileo.error({
+        title: 'Hmmm...',
         description: 'There was an issue detecting your installed osu! version',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
       });
       return;
     }
@@ -197,8 +219,13 @@
 
     const validFolder = await isValidOsuFolder(osuPath);
     if (!validFolder) {
-      toast.error('Hmmm...', {
+      sileo.error({
+        title: 'Hmmm...',
         description: 'Your selected osu! installation folder is not valid.',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
       });
       launching.set(false);
       return;
@@ -206,15 +233,25 @@
 
     if ($platform === 'linux') {
       if (!(await hasWMCTRL())) {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'wmctrl seems to be missing, please install via AUR.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         return;
       }
       if (!(await hasOsuWinello())) {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'osu-winello seems to be missing, please install it.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         return;
@@ -258,8 +295,13 @@
     try {
       const streamInfo = await osuapi.latestBuildVersion('stable40');
       if (!streamInfo) {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'Failed to check for updates, maybe osu! is down?',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         return;
@@ -268,8 +310,13 @@
       const releaseStream = await getReleaseStream(osuPath);
 
       if (releaseStream === undefined) {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'Failed to get osu! release stream.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         return;
@@ -277,8 +324,13 @@
 
       // only stable osu! release streams are supported for now
       if (!releaseStream.toLowerCase().includes('stable')) {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'You are not on the stable release stream, please switch to it.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         return;
@@ -531,8 +583,13 @@
       cleanup = false;
       const error = err as Error;
       if (error.name === 'AbortError') {
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'Failed to launch.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         launchError = {
@@ -541,8 +598,13 @@
         };
       } else {
         launchError = error;
-        toast.error('Hmmm...', {
+        sileo.error({
+          title: 'Hmmm...',
           description: 'Failed to launch.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         launching.set(false);
         if ($trackingEnabled) umami.track('app_launch_fail', { error: err });
@@ -560,8 +622,13 @@
     try {
       const loginResult = await ezppfarm.login(username, password);
       if (loginResult && loginResult.user) {
-        toast.success('Login successful!', {
+        sileo.success({
+          title: 'Login successful!',
           description: `Welcome back, ${loginResult.user.name}!`,
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
 
         $userAuth.value('username').set(username);
@@ -571,14 +638,24 @@
         currentUser.set(loginResult.user);
         selectedView = 'home';
       } else {
-        toast.error('Login failed!', {
+        sileo.error({
+          title: 'Login failed!',
           description: 'Please check your username and password.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
         loginIsLoading = false;
       }
     } catch {
-      toast.error('Server error occurred during login.', {
+      sileo.error({
+        title: 'Login failed!',
         description: 'There was an issue connecting to the server. Please try again later.',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
       });
       loginIsLoading = false;
     }
@@ -706,8 +783,13 @@
             onclick={async () => {
               const updateFile = $newVersion?.assets.find((asset) => asset.name.endsWith('.exe'));
               if (!updateFile) {
-                toast.error('Hmmm...', {
+                sileo.error({
+                  title: 'Hmmm...',
                   description: 'No update file found.',
+                  fill: '#181825',
+                  styles: {
+                    description: 'text-center!',
+                  },
                 });
                 $newVersion = undefined;
                 return;
@@ -836,8 +918,13 @@
                 $userAuth.value('username').del();
                 $userAuth.value('password').del();
                 await $userAuth.save();
-                toast.success('Logout successful!', {
+                sileo.success({
+                  title: 'Logout successful!',
                   description: 'See you soon!',
+                  fill: '#181825',
+                  styles: {
+                    description: 'text-center!',
+                  },
                 });
                 currentUser.set(undefined);
                 currentUserInfo.set(undefined);
@@ -1289,11 +1376,17 @@
                   bind:value={$launcherStream}
                   onValueChange={async (newStream) => {
                     const isNet8Installed = await hasNet8();
-                    if (newStream === 'experimental' && !isNet8Installed) {
+                    if (isNet8Installed) {
                       launcherStream.set('stable');
-                      toast.error('.NET 8.0 Desktop Runtime not found!', {
-                        action: {
-                          label: 'Download .NET 8.0',
+                      sileo.error({
+                        title: 'Hmm...',
+                        description: '.NET 8.0 Desktop Runtime not found!',
+                        fill: '#181825',
+                        styles: {
+                          description: 'text-center!',
+                        },
+                        button: {
+                          title: 'Download .NET 8.0',
                           onClick: async () =>
                             await openURL(
                               'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'

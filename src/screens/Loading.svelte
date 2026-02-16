@@ -28,7 +28,6 @@
   import Launch from './Launch.svelte';
   import { currentUser, userAuth } from '@/userAuthentication';
   import { ezppfarm } from '@/api/ezpp';
-  import { toast } from 'svelte-sonner';
   import { currentUserInfo } from '@/data';
   import {
     getBeatmapSetsCount,
@@ -40,6 +39,7 @@
     isValidOsuFolder,
   } from '@/osuUtil';
   import { git } from '@/api/git';
+  import { sileo } from 'sileo';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -89,19 +89,34 @@
       try {
         const loginResult = await ezppfarm.login(username, password);
         if (loginResult && loginResult.user) {
-          toast.success('Login successful!', {
+          sileo.success({
+            title: 'Login successful!',
             description: `Welcome back, ${loginResult.user.name}!`,
+            fill: '#181825',
+            styles: {
+              description: 'text-center!',
+            },
           });
 
           currentUser.set(loginResult.user);
         } else {
-          toast.error('Login failed!', {
+          sileo.error({
+            title: 'Login failed!',
             description: 'Please check your username and password.',
+            fill: '#181825',
+            styles: {
+              description: 'text-center!',
+            },
           });
         }
       } catch {
-        toast.error('Server error occurred during login.', {
+        sileo.error({
+          title: 'Login failed!',
           description: 'There was an issue connecting to the server. Please try again later.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
       }
     }
@@ -123,8 +138,13 @@
         osuInstallationPath.set('');
         $userSettings.value('osu_installation_path').del();
         await $userSettings.save();
-        toast.error('Oops...', {
+        sileo.error({
+          title: 'Hmm...',
           description: 'Your previously set osu! installation path seems to be invalid.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
         });
       } else {
         currentLoadingInfo.set('Getting osu version...');

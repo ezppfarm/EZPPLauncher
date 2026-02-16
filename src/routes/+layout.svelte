@@ -25,7 +25,7 @@
     userSettings,
   } from '@/userSettings';
   import { Buffer } from 'buffer';
-  import { Toaster } from '@/components/ui/sonner';
+  import SileoToast from '@/components/ui/sileo/sileo-toast.svelte';
   import { userAuth } from '@/userAuthentication';
   import { encryptString, exit, getLauncherVersion, getPlatform } from '@/osuUtil';
   import Button from '@/components/ui/button/button.svelte';
@@ -150,7 +150,7 @@
   <OsuCursor smoothCursor={$cursorSmoothening} />
 {/if}
 
-<Toaster richColors closeButton theme="dark" position="top-right" />
+<SileoToast position="top-center" fill="black" />
 
 <Titlebar />
 
