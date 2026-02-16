@@ -189,7 +189,7 @@
     if ($launching) return;
     if ($trackingEnabled) umami.track('app_launch_osu');
     const osuRunning = await isOsuRunning();
-    if (!osuRunning) {
+    if (osuRunning) {
       sileo.error({
         title: 'Hold on a second!',
         description:
