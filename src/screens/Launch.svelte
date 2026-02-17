@@ -1376,7 +1376,7 @@
                   bind:value={$launcherStream}
                   onValueChange={async (newStream) => {
                     const isNet8Installed = await hasNet8();
-                    if (isNet8Installed) {
+                    if (!isNet8Installed) {
                       launcherStream.set('stable');
                       sileo.error({
                         title: 'Hmm...',
