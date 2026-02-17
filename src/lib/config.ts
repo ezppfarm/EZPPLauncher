@@ -44,8 +44,7 @@ export class Config {
         this.encrypt && this.crypto ? this.crypto.decrypt(fileStream) : fileStream
       ) as Record<string, unknown>;
       this.config = decryptedJSON;
-    } catch (err) {
-      console.log(err);
+    } catch {
       this.config = {};
       await this.save();
     }
@@ -65,13 +64,11 @@ export class Config {
   }
 
   value(key: string) {
-    console.log('Accessing config key:', key, this.config[key]);
     return {
       set: <T>(val: T) => {
         this.config[key] = val;
       },
       exists: () => {
-        console.log('Checking existence of key:', key, this.config[key] !== undefined);
         return this.config[key] !== undefined;
       },
       get: <T>(fallback: T): T => {

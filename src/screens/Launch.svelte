@@ -286,7 +286,6 @@
         }
       }
     } catch (err) {
-      console.log(err);
       launchError = err as Error;
       launching.set(false);
       return;
@@ -539,7 +538,6 @@
       await getCurrentWindow().show();
       if (presenceUpdater) {
         window.clearInterval(presenceUpdater);
-        console.log('clearing discord presence...');
         try {
           await Promise.all([
             presence.updateUser({
@@ -553,7 +551,6 @@
             }),
           ]);
         } catch {}
-        console.log('discord presence cleared...');
       }
       await new Promise((res) => setTimeout(res, 1000));
       await replaceUIFiles(osuPath, true);

@@ -44,7 +44,6 @@ export const formatTimeReadable = (initialSeconds: number) => {
 };
 
 export const releaseStreamToReadable = (releaseStream: string) => {
-  console.log(releaseStream.replaceAll(' ', '').toLowerCase());
   if (releaseStream.replaceAll(' ', '').toLowerCase() === 'cuttingedge') return 'Cutting Edge';
   return 'Stable';
 };

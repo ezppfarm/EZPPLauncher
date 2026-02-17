@@ -82,9 +82,6 @@ export const getEZPPLauncherStreams = async () => {
   if (!resp.error) {
     return resp.data.streams;
   }
-
-  console.log(resp.error);
-
   return undefined;
 };
 

@@ -8,7 +8,6 @@ export function estimateRefreshRate(): Promise<number> {
       frames++;
 
       if (now - last >= 1000) {
-        console.log(`Estimated Refresh Rate: ${frames - 2} FPS`);
         resolve(frames - 2);
       } else {
         requestAnimationFrame(loop);
