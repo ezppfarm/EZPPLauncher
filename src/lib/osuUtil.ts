@@ -3,7 +3,7 @@ import type { UpdateFile, UpdateStatus } from './types';
 import { listen } from '@tauri-apps/api/event';
 import { betterFetch } from '@better-fetch/fetch';
 
-const updateUrl = 'https://next.ez-pp.farm/api/ezpplauncher';
+const updateUrl = 'https://ez-pp.farm/api/ezpplauncher';
 
 export const getHWID = async () => {
   const hwid = await invoke('get_hwid');
@@ -82,6 +82,8 @@ export const getEZPPLauncherStreams = async () => {
   if (!resp.error) {
     return resp.data.streams;
   }
+
+  console.log(resp.error);
 
   return undefined;
 };
