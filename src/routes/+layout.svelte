@@ -33,6 +33,7 @@
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
+  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
 
   let { children } = $props();
 
@@ -178,5 +179,8 @@
 </AlertDialog.Root>
 
 <main>
+  <div class="opacity-30">
+    <AnimatedBg />
+  </div>
   {@render children()}
 </main>
