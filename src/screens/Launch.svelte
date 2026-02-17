@@ -882,17 +882,17 @@
     </div>
     <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
     <Button
-      class="flex size-12 items-center gap-2 {selectedView === 'home'
-        ? 'bg-pink-300/50'
-        : 'bg-black/20'} hover:bg-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+      class="flex size-12 items-center gap-2 border {selectedView === 'home'
+        ? 'bg-pink-300/50 border-pink-300/50'
+        : 'bg-black/20 border-black/20'} hover:bg-pink-300/50 hover:border-pink-300/50 rounded-[0.85rem] p-3 mt-3"
       onclick={() => (selectedView = 'home')}
     >
       <House class="text-theme-200 !size-5" />
     </Button>
     <Button
-      class="flex size-12 items-center gap-2 {selectedView === 'settings'
-        ? 'bg-pink-300/50'
-        : 'bg-black/20'} hover:bg-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+      class="flex size-12 items-center gap-2 border {selectedView === 'settings'
+        ? 'bg-pink-300/50 border-pink-300/50'
+        : 'bg-black/20 border-black/20'} hover:bg-pink-300/50 hover:border-pink-300/50 rounded-[0.85rem] p-3 mt-3"
       onclick={() => (selectedView = 'settings')}
     >
       <Settings class="text-theme-200 !size-5" />
