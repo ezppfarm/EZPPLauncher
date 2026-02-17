@@ -54,7 +54,7 @@
     position: fixed;
     inset: 0;
     overflow: hidden;
-    background: linear-gradient(180deg, #8f2f64 0%, #963f75 40%, #9a6c7f 100%);
+    background: linear-gradient(180deg, var(--color-primary-300) 0%, var(--color-primary-600) 40%, var(--color-primary-900) 100%);
   }
 
   .streak {
