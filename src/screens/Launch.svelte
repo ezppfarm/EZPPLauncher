@@ -871,9 +871,6 @@
 </AlertDialog.Root>
 
 <div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative">
-  <div class="absolute top-0 left-0 w-full h-[100vh] opacity-30 z-0">
-    <AnimatedBg />
-  </div>
   <div
     class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >

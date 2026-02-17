@@ -1,13 +1,13 @@
 <script lang="ts">
   //TODO: maybe dynamic background images fetched from ezpp?
 
-  const COUNT = 120;
+  const COUNT = 60;
 
   function rand(min: number, max: number) {
     return Math.random() * (max - min) + min;
   }
 
-  const streaks = Array.from({ length: COUNT }).map(() => {
+  const streaks = Array.from({ length: COUNT }).map((_, i) => {
     const depth = rand(0, 2);
 
     const scale = 0.6 + depth * 0.8;
@@ -19,7 +19,7 @@
     return {
       width: rand(180, 320) * scale,
       height: rand(16, 32) * scale,
-      x: rand(-80, 100),
+      x: ((i * (180 / COUNT)) % 180) - 80,
       y: rand(-80, 100),
       opacity: 0.25 + depth * 0.65,
       duration,
