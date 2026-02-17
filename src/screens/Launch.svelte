@@ -882,7 +882,10 @@
       class="flex size-12 items-center gap-2 border {selectedView === 'home'
         ? 'bg-primary-300/50 border-primary-300/50'
         : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 hover:border-primary-300/50 rounded-[0.85rem] p-3 mt-3"
-      onclick={() => (selectedView = 'home')}
+      disabled={$launching}
+      onclick={() => {
+        if (!$launching) selectedView = 'home';
+      }}
     >
       <House class="text-theme-200 !size-5" />
     </Button>
@@ -890,13 +893,16 @@
       class="flex size-12 items-center gap-2 border {selectedView === 'settings'
         ? 'bg-primary-300/50 border-primary-300/50'
         : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 hover:border-primary-300/50 rounded-[0.85rem] p-3 mt-3"
-      onclick={() => (selectedView = 'settings')}
+      disabled={$launching}
+      onclick={() => {
+        if (!$launching) selectedView = 'settings';
+      }}
     >
       <Settings class="text-theme-200 !size-5" />
     </Button>
     <div class="mt-auto">
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger>
+        <DropdownMenu.Trigger disabled={$launching}>
           <Avatar.Root class="size-10">
             <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
             <Avatar.Fallback class="bg-theme-900">
