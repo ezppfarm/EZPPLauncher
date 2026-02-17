@@ -874,22 +874,22 @@
   <div
     class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >
-    <div class="bg-pink-950/80 border border-pink-900/50 rounded-[1.1rem] p-1">
+    <div class="bg-primary-800/80 border border-primary-700/50 rounded-[1.1rem] p-1">
       <img class="pointer-events-none" src={Logo} alt="logo" bind:this={ezppLogo} />
     </div>
     <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
     <Button
       class="flex size-12 items-center gap-2 border {selectedView === 'home'
-        ? 'bg-pink-300/50 border-pink-300/50'
-        : 'bg-black/20 border-black/20'} hover:bg-pink-300/50 hover:border-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+        ? 'bg-primary-300/50 border-primary-300/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 hover:border-primary-300/50 rounded-[0.85rem] p-3 mt-3"
       onclick={() => (selectedView = 'home')}
     >
       <House class="text-theme-200 !size-5" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 border {selectedView === 'settings'
-        ? 'bg-pink-300/50 border-pink-300/50'
-        : 'bg-black/20 border-black/20'} hover:bg-pink-300/50 hover:border-pink-300/50 rounded-[0.85rem] p-3 mt-3"
+        ? 'bg-primary-300/50 border-primary-300/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 hover:border-primary-300/50 rounded-[0.85rem] p-3 mt-3"
       onclick={() => (selectedView = 'settings')}
     >
       <Settings class="text-theme-200 !size-5" />
