@@ -24,7 +24,7 @@
   } from '@/global';
   import {
     LoaderCircle,
-    Music2,
+    Music,
     Wifi,
     WifiOff,
     Drum,
@@ -952,7 +952,7 @@
           <div class="flex items-center gap-4">
             {#if $osuInstallationPath !== ''}
               <div class="flex items-center gap-2">
-                <Music2 class="size-3.5 text-blue-400" />
+                <Music class="size-3.5 text-blue-400" />
                 <span class="text-[11px] text-white/70 font-medium">
                   {#if !$beatmapSets && $beatmapSets !== 0}
                     <LoaderCircle class="animate-spin" size={12} />
