@@ -40,6 +40,7 @@
   } from '@/osuUtil';
   import { git } from '@/api/git';
   import { sileo } from 'sileo';
+  import type { EZPPUser } from '@/types';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -84,40 +85,32 @@
 
     const username = $userAuth.value('username').get('');
     const password = $userAuth.value('password').get('');
-    if (username.length > 0 && password.length > 0) {
+
+    const shouldLogin = username.length > 0 && password.length > 0;
+    let userLoginResult: { message: string; user?: EZPPUser } = {
+      message: 'An unknown error occured!',
+    };
+
+    if (shouldLogin) {
       currentLoadingInfo.set('Logging in...');
       try {
         const loginResult = await ezppfarm.login(username, password);
         if (loginResult && loginResult.user) {
-          sileo.success({
-            title: 'Login successful!',
-            description: `Welcome back, ${loginResult.user.name}!`,
-            fill: '#181825',
-            styles: {
-              description: 'text-center!',
-            },
-          });
+          userLoginResult = {
+            message: `Welcome back, ${loginResult.user.name}!`,
+            user: loginResult.user,
+          };
 
           currentUser.set(loginResult.user);
         } else {
-          sileo.error({
-            title: 'Login failed!',
-            description: 'Please check your username and password.',
-            fill: '#181825',
-            styles: {
-              description: 'text-center!',
-            },
-          });
+          userLoginResult = {
+            message: 'Please check your username and password.',
+          };
         }
       } catch {
-        sileo.error({
-          title: 'Login failed!',
-          description: 'There was an issue connecting to the server. Please try again later.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
-        });
+        userLoginResult = {
+          message: 'There was an issue connecting to the server. Please try again later.',
+        };
       }
     }
     if ($currentUser) {
@@ -194,7 +187,31 @@
     });
     setTimeout(() => {
       if ($firstStartup) currentView.set(SetupWizard);
-      else currentView.set(Launch);
+      else {
+        currentView.set(Launch);
+        if (shouldLogin) {
+          if (userLoginResult.user) {
+            sileo.success({
+              title: 'Login successful!',
+              description: userLoginResult.message,
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+              duration: 2500,
+            });
+          } else {
+            sileo.error({
+              title: 'Login failed!',
+              description: userLoginResult.message,
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+            });
+          }
+        }
+      }
     }, 250);
   };
 
