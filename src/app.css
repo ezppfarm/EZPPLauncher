@@ -55,7 +55,7 @@
   --card-foreground: oklch(89.24% 0.079 263.24);
   --popover: oklch(20.3% 0.05 282.86);
   --popover-foreground: oklch(89.24% 0.079 263.24);
-  --primary: oklch(81.45% 0.159 300.53);
+  --primary: oklch(72.08% 0.196 356.34);
   --primary-foreground: oklch(20.22% 0.048 282.86);
   --secondary: oklch(42.99% 0.031 270.49);
   --secondary-foreground: oklch(89.24% 0.079 263.24);
@@ -67,8 +67,8 @@
   --destructive-foreground: oklch(20.22% 0.048 282.86);
   --border: oklch(27.7% 0.041 276.87);
   --input: oklch(27.7% 0.041 276.87);
-  --ring: oklch(81.45% 0.159 300.53);
-  --chart-1: oklch(81.45% 0.159 300.53);
+  --ring: oklch(72.08% 0.196 356.34);
+  --chart-1: oklch(72.08% 0.196 356.34);
   --chart-2: oklch(77.19% 0.121 223.01);
   --chart-3: oklch(79.1% 0.119 150.21);
   --chart-4: oklch(79.74% 0.167 57.97);
@@ -76,12 +76,12 @@
   --sidebar: oklch(13.29% 0.036 282.86);
   --sidebar-background: oklch(13.29% 0.036 282.86);
   --sidebar-foreground: oklch(89.24% 0.079 263.24);
-  --sidebar-primary: oklch(81.45% 0.159 300.53);
+  --sidebar-primary: oklch(72.08% 0.196 356.34);
   --sidebar-primary-foreground: oklch(20.22% 0.048 282.86);
   --sidebar-accent: oklch(75.21% 0.121 293.01);
   --sidebar-accent-foreground: oklch(20.22% 0.048 282.86);
   --sidebar-border: oklch(35.13% 0.03 273.31);
-  --sidebar-ring: oklch(81.45% 0.159 300.53);
+  --sidebar-ring: oklch(72.08% 0.196 356.34);
 }
 
 @theme inline {
@@ -108,20 +108,18 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
-  --color-primary-50: #fefdff;
-  --color-primary-100: #faf6fe;
-  --color-primary-200: #f2e9fc;
-  --color-primary-300: #e9dbfa;
-  --color-primary-400: #e1cef9;
-  --color-primary-500: #d9c0f7;
-  --color-primary-600: #c6a0f3;
-  --color-primary-700: #b381ef;
-  --color-primary-800: #a061eb;
-  --color-primary-900: #8d41e7;
-  --color-primary-950: #8331e5;
+  --color-primary-50: #ffe5f1;
+  --color-primary-100: #ffcce2;
+  --color-primary-200: #ff99c5;
+  --color-primary-300: #ff66a8;
+  --color-primary-400: #ff338b;
+  --color-primary-500: #ff006e;
+  --color-primary-600: #cc0058;
+  --color-primary-700: #990042;
+  --color-primary-800: #66002c;
+  --color-primary-900: #330016;
+  --color-primary-950: #24000f;
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary-50: #fefdff;
-  --color-primary-100: #faf6fe;
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
