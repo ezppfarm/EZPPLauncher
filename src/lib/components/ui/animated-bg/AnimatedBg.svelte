@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Logo from '$assets/logo.png';
+
   //TODO: maybe dynamic background images fetched from ezpp?
 
   const COUNT = 60;
@@ -7,26 +9,28 @@
     return Math.random() * (max - min) + min;
   }
 
-  const streaks = Array.from({ length: COUNT }).map((_, i) => {
-    const depth = rand(0, 2);
+  const streaks = Array.from({ length: COUNT })
+    .map((_, i) => {
+      const depth = rand(0, 2);
 
-    const scale = 0.6 + depth * 0.8;
-    const speed = 0.4 + depth * 1.35;
+      const scale = 0.6 + depth * 0.8;
+      const speed = 0.4 + depth * 1.35;
 
-    const distance = 150;
-    const duration = distance / speed;
+      const distance = 150;
+      const duration = distance / speed;
 
-    return {
-      width: rand(180, 320) * scale,
-      height: rand(16, 32) * scale,
-      x: (i / COUNT) * 200 - 50,
-      y: ((i * 137.5) % 100) - 20,
-      opacity: 0.25 + depth * 0.65,
-      duration,
-      delay: rand(0, duration),
-      scale,
-    };
-  });
+      return {
+        width: rand(300, 320) * scale,
+        height: 32 * scale,
+        x: (i / COUNT) * 200 - 50,
+        y: ((i * 137.5) % 100) - 20,
+        opacity: 0.25 + depth * 0.65,
+        duration,
+        delay: rand(0, duration),
+        scale,
+      };
+    })
+    .sort((a, b) => a.scale - b.scale);
 </script>
 
 <div class="absolute bg blur-[2px]">
@@ -54,7 +58,12 @@
     position: fixed;
     inset: 0;
     overflow: hidden;
-    background: linear-gradient(180deg, var(--color-primary-300) 0%, var(--color-primary-600) 40%, var(--color-primary-900) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--color-primary-300) 0%,
+      var(--color-primary-600) 40%,
+      var(--color-primary-900) 100%
+    );
   }
 
   .streak {
