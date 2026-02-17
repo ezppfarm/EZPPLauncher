@@ -19,8 +19,8 @@
     return {
       width: rand(180, 320) * scale,
       height: rand(16, 32) * scale,
-      x: ((i * (180 / COUNT)) % 180) - 80,
-      y: rand(-80, 100),
+      x: (i / COUNT) * 200 - 50,
+      y: ((i * 137.5) % 100) - 20,
       opacity: 0.25 + depth * 0.65,
       duration,
       delay: rand(0, duration),
