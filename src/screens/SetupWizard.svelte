@@ -5,7 +5,7 @@
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { Check, CheckCircle, CircleOff, Settings2 } from 'lucide-svelte';
+  import { Check, CircleCheckBig, CircleOff, LoaderCircle } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
   import {
@@ -17,7 +17,17 @@
     userSettings,
   } from '@/userSettings';
   import Label from '@/components/ui/label/label.svelte';
-  import { beatmapSets, currentSkin, currentView, osuBuild, osuStream, skins } from '@/global';
+  import {
+    beatmapSets,
+    currentSkin,
+    currentView,
+    discordPresence,
+    osuBuild,
+    osuStream,
+    platform,
+    presenceLoading,
+    skins,
+  } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
   import {
@@ -130,14 +140,16 @@
   </div>
 {:else}
   <div class="grid grid-cols-[0.41fr_1fr] h-[100vh] z-50">
-    <div class="w-full h-full border-r border-theme-800 bg-black/20 backdrop-blur-md flex flex-col gap-6 p-3 z-50">
+    <div
+      class="w-full h-full border-r border-black/40 bg-black/40 backdrop-blur-md flex flex-col gap-6 p-3 z-50"
+    >
       {#each steps as step, i (step)}
         <div
           class="flex flex-row items-center gap-2 border {selectedStep === i + 1
-            ? 'border-primary-800 bg-primary-900'
+            ? 'border-primary-600/30 bg-primary-700/30'
             : selectedStep > i
-              ? 'border-green-800 bg-green-900'
-              : 'border-theme-800 bg-theme-900'} rounded-lg p-2 transition-all"
+              ? 'border-green-800/30 bg-green-900/30'
+              : 'border-black/30 bg-black/30'} rounded-lg p-2 transition-all"
         >
           <div
             class="flex flex-col items-center justify-center h-8 w-8 border-[2px] {selectedStep >
@@ -164,7 +176,7 @@
     <div class="flex flex-col gap-6 w-full h-full backdrop-blur-md p-6 z-50">
       {#if selectedStep === 1}
         <div
-          class="my-auto h-full w-full bg-black/20 rounded-lg border border-theme-900/20 p-6 mt-5 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-black/40 rounded-lg border border-black/40 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <img
@@ -179,13 +191,13 @@
           <p class="text-muted-foreground mt-2">
             This setup wizard will guide you through the initial setup of EZPPLauncher.
           </p>
-          <div class="bg-red-800 border border-red-900 text-red-500 p-4 rounded-lg mt-4">
+          <div class="bg-red-800 border border-red-900 text-red-200 p-4 rounded-lg mt-4">
             Please make sure you have osu! installed on your system before proceeding.
           </div>
         </div>
       {:else if selectedStep === 2}
         <div
-          class="my-auto h-full w-full bg-theme-800 rounded-lg border border-theme-900 p-6 mt-5 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-black/40 rounded-lg border border-black/40 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <h1 class="text-3xl font-semibold">Locate your osu! Installation</h1>
@@ -210,7 +222,7 @@
               <div
                 class="flex flex-row gap-3 bg-green-800 border border-green-900 text-green-500 p-4 rounded-lg mt-4"
               >
-                <CheckCircle />
+                <CircleCheckBig />
                 <span>Auto-detected osu! installation path! Please check if its correct!</span>
               </div>
             {:else}
@@ -226,7 +238,7 @@
             <div
               class="flex flex-row gap-3 bg-green-800 border border-green-900 text-green-500 p-4 rounded-lg mt-4"
             >
-              <CheckCircle />
+              <CircleCheckBig />
               <span>Selected osu! installation path is valid!</span>
             </div>
           {:else}
@@ -242,80 +254,108 @@
           {/if}
         </div>
       {:else if selectedStep === 3}
-        <div
-          class="bg-theme-900 flex flex-col justify-center gap-3 mt-5 border border-theme-800 rounded-lg"
-          in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
-        >
-          <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
-            <Settings2 /> EZPPLauncher Settings
-          </div>
+        <div class="h-full w-full flex items-center justify-center">
           <div
-            class="grid grid-cols-[1fr_auto] gap-y-5 items-center border-t border-theme-800 py-3 px-6"
+            class="bg-black/40 backdrop-blur-sm py-8 px-8 rounded-lg"
+            in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
           >
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">Patching</Label>
-              <div class="text-muted-foreground text-xs">Shows misses in Relax and Autopilot</div>
-            </div>
-            <Checkbox
-              id="setting-custom-cursor"
-              checked={$patch}
-              onCheckedChange={async (e) => {
-                patch.set(e);
-                $userSettings.save();
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
+            <div class="grid grid-cols-[1fr_auto] gap-y-5 items-center px-6">
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-patch">Patching</Label>
+                <div class="text-muted-foreground text-xs">
+                  Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+                      class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
+                      >currently only on windows!</span
+                    >
+                  {/if}
+                </div>
+              </div>
+              <Checkbox
+                id="setting-patch"
+                checked={$platform === 'windows' ? $patch : false}
+                disabled={$platform !== 'windows'}
+                onCheckedChange={async (e) => {
+                  patch.set(e);
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
 
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
-              <div class="text-muted-foreground text-xs">
-                Enable a custom cursor in the Launcher like in the lazer build of osu!
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
+                <div class="text-muted-foreground text-xs">
+                  Enable a custom cursor in the Launcher like in the lazer build of osu!
+                </div>
+              </div>
+              <Checkbox
+                id="setting-custom-cursor"
+                checked={$customCursor}
+                onCheckedChange={async (e) => {
+                  if (!e) {
+                    cursorSmoothening.set(false);
+                  }
+                  customCursor.set(e);
+
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
+                <div class="text-muted-foreground text-xs">
+                  Makes the custom cursor movement smoother.
+                </div>
+              </div>
+              <Checkbox
+                id="setting-cursor-smoothening"
+                checked={$cursorSmoothening}
+                onCheckedChange={async (e) => {
+                  if (!$customCursor) return;
+                  cursorSmoothening.set(e);
+                  $userSettings.save();
+                }}
+                disabled={!$customCursor}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
+                <div class="text-muted-foreground text-xs">
+                  Disables some animations in the Launcher to improve performance on low-end
+                  devices.
+                </div>
+              </div>
+              <Checkbox
+                id="setting-reduce-animations"
+                checked={$reduceAnimations}
+                onCheckedChange={async (e) => {
+                  reduceAnimations.set(e);
+                  $userSettings.save();
+                }}
+                class="flex items-center justify-center w-5 h-5"
+              ></Checkbox>
+
+              <div class="flex flex-col">
+                <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
+                <div class="text-muted-foreground text-xs">
+                  Let other discord users show what you are doing right now 👀
+                </div>
+              </div>
+              <div class="relative">
+                {#if $presenceLoading}
+                  <div class="-left-8 absolute" transition:fade>
+                    <LoaderCircle class="animate-spin" />
+                  </div>
+                {/if}
+                <Checkbox
+                  id="setting-rich-presence"
+                  bind:checked={$discordPresence}
+                  disabled={$presenceLoading}
+                  class="flex items-center justify-center w-5 h-5"
+                ></Checkbox>
               </div>
             </div>
-            <Checkbox
-              id="setting-custom-cursor"
-              checked={$customCursor}
-              onCheckedChange={async (e) => {
-                if (!e) {
-                  cursorSmoothening.set(false);
-                }
-                customCursor.set(e);
-              }}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
-              <div class="text-muted-foreground text-xs">
-                Makes the custom cursor movement smoother.
-              </div>
-            </div>
-            <Checkbox
-              id="setting-cursor-smoothening"
-              checked={$cursorSmoothening}
-              onCheckedChange={async (e) => {
-                if (!$customCursor) return;
-                cursorSmoothening.set(e);
-              }}
-              disabled={!$customCursor}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
-
-            <div class="flex flex-col">
-              <Label class="text-sm" for="setting-cursor-smoothening">Reduce Animations</Label>
-              <div class="text-muted-foreground text-xs">
-                Disables some animations in the Launcher to improve performance on low-end devices.
-              </div>
-            </div>
-            <Checkbox
-              id="setting-cursor-smoothening"
-              checked={$reduceAnimations}
-              onCheckedChange={async (e) => {
-                reduceAnimations.set(e);
-              }}
-              disabled={!$customCursor}
-              class="flex items-center justify-center w-5 h-5"
-            ></Checkbox>
           </div>
         </div>
       {/if}
