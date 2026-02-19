@@ -110,6 +110,7 @@
 
   onMount(async () => {
     const osuPath = await autoDetectOsuInstallFolder();
+    console.log(osuPath);
     if (osuPath) {
       osuInstallPath = osuPath;
       autoDetectedOsuPath = true;
@@ -119,7 +120,7 @@
 </script>
 
 {#if wizardFinished}
-  <div class="relative flex flex-col items-center justify-center h-[100vh]">
+  <div class="relative flex flex-col items-center justify-center h-[100vh] z-50">
     <div class="absolute h-fit w-fit top-1/2 left-1/2">
       <Confetti amount={200} y={[-1, 1.5]} x={[-2.3, 2.3]} colorArray={['#C6A0F3']} />
     </div>
@@ -128,14 +129,14 @@
     <Button class="mt-4" onclick={saveConfig}>Finish</Button>
   </div>
 {:else}
-  <div class="grid grid-cols-[0.41fr_1fr] h-[100vh]">
-    <div class="w-full h-full border-r border-theme-800/90 flex flex-col gap-6 p-3">
+  <div class="grid grid-cols-[0.41fr_1fr] h-[100vh] z-50">
+    <div class="w-full h-full border-r border-theme-800 bg-black/20 backdrop-blur-md flex flex-col gap-6 p-3 z-50">
       {#each steps as step, i (step)}
         <div
           class="flex flex-row items-center gap-2 border {selectedStep === i + 1
-            ? 'border-primary-800/30 bg-primary-900/30'
+            ? 'border-primary-800 bg-primary-900'
             : selectedStep > i
-              ? 'border-green-800/30 bg-green-900/30'
+              ? 'border-green-800 bg-green-900'
               : 'border-theme-800 bg-theme-900'} rounded-lg p-2 transition-all"
         >
           <div
@@ -160,10 +161,10 @@
         </div>
       {/each}
     </div>
-    <div class="flex flex-col gap-6 w-full h-full bg-theme-900/40 p-6">
+    <div class="flex flex-col gap-6 w-full h-full backdrop-blur-md p-6 z-50">
       {#if selectedStep === 1}
         <div
-          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 mt-5 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-black/20 rounded-lg border border-theme-900/20 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <img
@@ -178,13 +179,13 @@
           <p class="text-muted-foreground mt-2">
             This setup wizard will guide you through the initial setup of EZPPLauncher.
           </p>
-          <div class="bg-red-800/20 border border-red-900/20 text-red-500 p-4 rounded-lg mt-4">
+          <div class="bg-red-800 border border-red-900 text-red-500 p-4 rounded-lg mt-4">
             Please make sure you have osu! installed on your system before proceeding.
           </div>
         </div>
       {:else if selectedStep === 2}
         <div
-          class="my-auto h-full w-full bg-theme-800/15 rounded-lg border border-900/60 p-6 mt-5 flex flex-col items-center justify-center"
+          class="my-auto h-full w-full bg-theme-800 rounded-lg border border-theme-900 p-6 mt-5 flex flex-col items-center justify-center"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <h1 class="text-3xl font-semibold">Locate your osu! Installation</h1>
@@ -207,14 +208,14 @@
           {#if !manualSelect}
             {#if autoDetectedOsuPath}
               <div
-                class="flex flex-row gap-3 bg-green-800/20 border border-green-900/20 text-green-500 p-4 rounded-lg mt-4"
+                class="flex flex-row gap-3 bg-green-800 border border-green-900 text-green-500 p-4 rounded-lg mt-4"
               >
                 <CheckCircle />
                 <span>Auto-detected osu! installation path! Please check if its correct!</span>
               </div>
             {:else}
               <div
-                class="flex flex-row gap-3 bg-red-800/20 border border-red-900/20 text-red-500 p-4 rounded-lg mt-4"
+                class="flex flex-row gap-3 bg-red-800 border border-red-900 text-red-500 p-4 rounded-lg mt-4"
               >
                 <CircleOff />
                 <span>Could not auto-detect osu! installation path. Please select it manually.</span
@@ -223,14 +224,14 @@
             {/if}
           {:else if manualSelectValid}
             <div
-              class="flex flex-row gap-3 bg-green-800/20 border border-green-900/20 text-green-500 p-4 rounded-lg mt-4"
+              class="flex flex-row gap-3 bg-green-800 border border-green-900 text-green-500 p-4 rounded-lg mt-4"
             >
               <CheckCircle />
               <span>Selected osu! installation path is valid!</span>
             </div>
           {:else}
             <div
-              class="flex flex-row gap-3 bg-red-800/20 border border-red-900/20 text-red-500 p-4 rounded-lg mt-4"
+              class="flex flex-row gap-3 bg-red-800 border border-red-900 text-red-500 p-4 rounded-lg mt-4"
             >
               <CircleOff />
               <span
@@ -242,7 +243,7 @@
         </div>
       {:else if selectedStep === 3}
         <div
-          class="bg-theme-900/90 flex flex-col justify-center gap-3 mt-5 border border-theme-800/90 rounded-lg"
+          class="bg-theme-900 flex flex-col justify-center gap-3 mt-5 border border-theme-800 rounded-lg"
           in:fade={{ duration: $reduceAnimations ? 0 : 200 }}
         >
           <div class="flex flex-row items-center gap-3 font-semibold text-xl px-3 pt-3">
