@@ -77,10 +77,10 @@ pub fn find_osu_installation() -> Option<String> {
 
     let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
 
-    let hkcr_registry_paths = [
-        "osustable.File.osk\\DefaultIcon",
-        "osustable.File.osr\\DefaultIcon",
-        "osustable.File.osz\\DefaultIcon",
+    let hkcu_registry_paths = [
+        "Software\\Classes\\osustable.File.osk\\DefaultIcon",
+        "Software\\Classes\\osustable.File.osr\\DefaultIcon",
+        "Software\\Classes\\osustable.File.osz\\DefaultIcon",
     ];
 
     let osu_folder_files = [
@@ -129,10 +129,10 @@ pub fn find_osu_installation() -> Option<String> {
         }
     }
 
-    let hkcr = RegKey::predef(HKEY_CLASSES_ROOT);
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-    for reg_path in &hkcr_registry_paths {
-        if let Ok(subkey) = hkcr.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
+    for reg_path in &hkcu_registry_paths {
+        if let Ok(subkey) = hkcu.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
             let value_names = [""];
             for value_name in &value_names {
                 if let Ok(value) = subkey.get_value::<String, _>(value_name) {
