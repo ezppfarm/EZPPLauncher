@@ -8,6 +8,7 @@
   import { onMount } from 'svelte';
   import { launcherVersion } from '@/global';
   import Badge from '../badge/badge.svelte';
+  import { reduceAnimations } from '@/userSettings';
 
   onMount(() => {
     const appWindow = getCurrentWindow();
@@ -20,22 +21,39 @@
 </script>
 
 <div data-tauri-drag-region class="titlebar z-[100]">
-  <div class="titlebar-button rounded transition-colors duration-75" id="titlebar-minimize">
-    <Minimize size={14} />
+  <div class="relative flex items-center justify-center p-1 group" id="titlebar-minimize">
+    <div
+      class="absolute inset-0 bg-background rounded
+           scale-50 opacity-0
+          group-hover:opacity-100
+           group-hover:scale-100
+           {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'} 
+           origin-center"
+    ></div>
+
+    <Minimize class="z-10 pointer-events-none" size={14} />
   </div>
-  <div class="titlebar-button close rounded transition-colors duration-75" id="titlebar-close">
-    <Close size={14} />
+  <div class="relative flex items-center justify-center p-1 group" id="titlebar-close">
+    <div
+      class="absolute inset-0 bg-red-500 rounded
+           scale-50 opacity-0
+            group-hover:opacity-100
+           group-hover:scale-100
+           {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'} 
+           origin-center"
+    ></div>
+
+    <Close class="z-10 pointer-events-none" size={14} />
   </div>
 </div>
 
 <style lang="scss">
   .titlebar {
     height: 35px;
-    /* background: #040612; */
     user-select: none;
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 5px;
     align-items: center;
     position: fixed;
     top: 0;
@@ -44,20 +62,5 @@
     margin-bottom: 10px;
     padding-right: 5px;
     pointer-events: auto;
-  }
-  .titlebar-button {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 25px;
-    height: 25px;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .titlebar-button:hover {
-    &.close {
-      background: #c22e2e;
-    }
-    background: #2d3049;
   }
 </style>
