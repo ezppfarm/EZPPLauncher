@@ -1011,6 +1011,7 @@ version = "3.1.2"
 dependencies = [
  "base64 0.22.1",
  "discord-rich-presence",
+ "futures-util",
  "hardware-id",
  "md5",
  "once_cell",

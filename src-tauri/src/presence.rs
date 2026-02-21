@@ -2,6 +2,7 @@ use discord_rich_presence::{
     DiscordIpc, DiscordIpcClient,
     activity::{Activity, Assets, Button, Timestamps},
 };
+use futures_util::future::BoxFuture;
 use once_cell::sync::Lazy;
 use std::sync::Mutex as StdMutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -24,6 +25,7 @@ enum PresenceCommand {
     Disconnect(oneshot::Sender<()>),
     UpdateData(PresenceData),
     IsConnected(oneshot::Sender<bool>),
+    Tick,
 }
 
 struct PresenceActor {
@@ -58,7 +60,7 @@ impl PresenceActor {
     }
 
     async fn run(&mut self) {
-        let mut update_interval = interval(Duration::from_millis(2500));
+        let mut update_interval = interval(Duration::from_secs(5));
 
         loop {
             tokio::select! {
@@ -74,18 +76,22 @@ impl PresenceActor {
                         PresenceCommand::IsConnected(responder) => {
                             let _ = responder.send(self.client.is_some());
                         }
+                        PresenceCommand::Tick => {
+                            if self.client.is_some() {
+                                self.handle_update().await;
+                            }
+                        }
                     }
                 }
                 _ = update_interval.tick() => {
-                    if self.client.is_some() {
-                        self.handle_update().await;
-                    }
+                    let _ = PRESENCE_TX.send(PresenceCommand::Tick).await;
                 }
             }
         }
     }
 
-    async fn handle_connect(&mut self, responder: oneshot::Sender<bool>) {
+    fn handle_connect(&mut self, responder: oneshot::Sender<bool>) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
         if self.client.is_some() {
             let _ = responder.send(true);
             return;
@@ -101,10 +107,20 @@ impl PresenceActor {
                 let _ = responder.send(true);
             }
             Err(e) => {
-                eprintln!("Failed to create Discord client: {:?}", e);
-                let _ = responder.send(false);
+                eprintln!("Failed to connect to Discord: {:?}. Retrying in 5s...", e);
+                let tx = PRESENCE_TX.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    let (resp_tx, _) = oneshot::channel();
+                    let _ = tx.send(PresenceCommand::Connect(resp_tx)).await;
+                });
+                
+                if !responder.is_closed() {
+                    let _ = responder.send(false);
+                }
             }
         }
+        })
     }
 
     async fn handle_disconnect(&mut self, responder: oneshot::Sender<()>) {
@@ -143,12 +159,14 @@ impl PresenceActor {
                     Button::new("Join EZPPFarm", "https://ez-pp.farm/discord"),
                 ]);
 
-            if let Err(e) = client.set_activity(activity).map_err(|e| e.to_string()) {
+            if let Err(e) = client.set_activity(activity) {
                 eprintln!("Failed to set activity, disconnecting: {:?}", e);
-                if let Some(mut client) = self.client.take() {
-                    let _ = client.clear_activity();
-                    let _ = client.close();
-                }
+                self.client = None;
+
+                let (tx, _) = oneshot::channel();
+                self.handle_connect(tx).await;
+            } else {
+                println!("Actor: Presence updated successfully.");
             }
         }
     }
