@@ -34,10 +34,13 @@
   import '@fontsource/sora';
   import '@fontsource/space-mono';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
+  import NyanCatBg from '@/components/ui/animated-bg/NyanCatBg.svelte';
+  import { sileo } from 'sileo';
 
   let { children } = $props();
 
   let unsupported_platform = $state<boolean>(false);
+  let secret_enabled = $state<boolean>(false);
 
   function disableReload() {
     if (window.location.hostname !== 'tauri.localhost') {
@@ -87,6 +90,19 @@
     );
   }
 
+  let konami_code = [
+    'ArrowUp',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowLeft',
+    'ArrowRight',
+    'b',
+    'a',
+  ];
+
   onMount(async () => {
     window.Buffer = Buffer;
 
@@ -97,6 +113,37 @@
     if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
     $userAuth.init();
+
+    document.addEventListener('keydown', (e) => {
+      if (secret_enabled) return;
+      if (e.key.toLowerCase() === konami_code[0].toLowerCase()) {
+        konami_code.shift();
+        if (konami_code.length === 0) {
+          sileo.success({
+            title: 'Cheatcode activated!',
+            duration: 3000,
+            fill: '#181825',
+            styles: {
+              description: 'text-center!',
+            },
+          });
+          secret_enabled = true;
+        }
+      } else {
+        konami_code = [
+          'ArrowUp',
+          'ArrowUp',
+          'ArrowDown',
+          'ArrowDown',
+          'ArrowLeft',
+          'ArrowRight',
+          'ArrowLeft',
+          'ArrowRight',
+          'b',
+          'a',
+        ];
+      }
+    });
 
     currentLoadingInfo.set('Loading config...');
     const config_patching = $userSettings.value('patching');
@@ -180,7 +227,11 @@
 
 <main>
   <div class="opacity-30">
-    <AnimatedBg />
+    {#if secret_enabled}
+      <NyanCatBg />
+    {:else}
+      <AnimatedBg />
+    {/if}
   </div>
   {@render children()}
 </main>
