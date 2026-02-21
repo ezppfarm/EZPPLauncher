@@ -948,8 +948,13 @@
     {#if selectedView === 'home'}
       <div
         class="flex flex-col-reverse h-full"
-        in:fly={{ duration: 400, delay: 400, y: 5, opacity: 0 }}
-        out:fly={{ duration: 400, y: -5, opacity: 0 }}
+        in:fly={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 400,
+          y: 5,
+          opacity: 0,
+        }}
+        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
         <div class="relative z-10 px-8 py-4 flex items-center justify-between">
           <div class="flex items-center gap-4">
@@ -1070,8 +1075,8 @@
         {#if $currentUserInfo}
           <div
             class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md border border-black/40 flex flex-col items-center p-3"
-            in:fly={{ duration: 400, y: 5, opacity: 0 }}
-            out:fly={{ duration: 400, y: -5, opacity: 0 }}
+            in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
+            out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
           >
             <Select.Root
               type="single"
@@ -1223,8 +1228,13 @@
     {:else if selectedView === 'settings'}
       <div
         class="h-[100vh] w-full flex flex-col items-center justify-center"
-        in:fly={{ duration: 400, delay: 400, y: 5, opacity: 0 }}
-        out:fly={{ duration: 400, y: -5, opacity: 0 }}
+        in:fly={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 400,
+          y: 5,
+          opacity: 0,
+        }}
+        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
         <div class="p-8 w-full">
           <div class="bg-black/40 backdrop-blur-sm py-8 px-6 rounded-lg">
@@ -1425,8 +1435,13 @@
     {:else if selectedView === 'login'}
       <div
         class="h-[100vh] w-full flex flex-col items-center justify-center"
-        in:fly={{ duration: 400, delay: 400, y: 5, opacity: 0 }}
-        out:fly={{ duration: 400, y: -5, opacity: 0 }}
+        in:fly={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 400,
+          y: 5,
+          opacity: 0,
+        }}
+        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
         <div class="p-8 px-52 w-full">
           <form onsubmit={performLogin} class="bg-black/40 backdrop-blur-sm rounded-lg p-8">

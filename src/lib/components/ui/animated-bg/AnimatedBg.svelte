@@ -1,5 +1,7 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
+  import { reduceAnimations } from '@/userSettings';
+  import { fade } from 'svelte/transition';
 
   //TODO: maybe dynamic background images fetched from ezpp?
 
@@ -37,15 +39,15 @@
   <div
     class="relative h-full w-full from-0% to-90% bg-gradient-to-b from-transparent to-black z-50"
   ></div>
-  {#each streaks as s}
+  {#each streaks as s, index (index)}
     <div
-      class="streak drop-shadow-lg"
+      class="streak drop-shadow-lg transition-opacity duration-1000"
       style="
         width:{s.width}px;
         height:{s.height}px;
         left:{s.x}%;
         top:{s.y}%;
-        opacity:{s.opacity};
+        opacity:{$reduceAnimations ? 0 : s.opacity};
         animation-duration:{s.duration}s;
         animation-delay:-{s.delay}s;
       "
