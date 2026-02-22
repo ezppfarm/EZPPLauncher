@@ -32,6 +32,7 @@
   import { encryptString, exit, getLauncherVersion, getPlatform } from '@/osuUtil';
   import Button from '@/components/ui/button/button.svelte';
   import * as presence from '@/presence';
+  import { fade } from 'svelte/transition';
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
@@ -117,10 +118,50 @@
     $userAuth.init();
 
     document.addEventListener('keydown', (e) => {
-      if (secret_enabled) return;
       if (e.key.toLowerCase() === konami_code[0].toLowerCase()) {
         konami_code.shift();
         if (konami_code.length === 0) {
+          if (secret_enabled) {
+            sileo.success({
+              title: 'Cheatcode deactivated!',
+              duration: 3000,
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+            });
+            const audio = $nyanCatSong;
+            if (audio) {
+              const fadeOutDuration = 2000; // 2 seconds
+              const fadeOutSteps = 20;
+              const fadeOutStepTime = fadeOutDuration / fadeOutSteps;
+              const volumeStep = audio.volume / fadeOutSteps;
+
+              const fadeOutInterval = setInterval(() => {
+                if (audio.volume > 0) {
+                  audio.volume = Math.max(0, audio.volume - volumeStep);
+                } else {
+                  audio.pause();
+                  clearInterval(fadeOutInterval);
+                }
+              }, fadeOutStepTime);
+            }
+            nyanCatSong.set(undefined);
+            secret_enabled = false;
+            konami_code = [
+              'ArrowUp',
+              'ArrowUp',
+              'ArrowDown',
+              'ArrowDown',
+              'ArrowLeft',
+              'ArrowRight',
+              'ArrowLeft',
+              'ArrowRight',
+              'b',
+              'a',
+            ];
+            return;
+          }
           sileo.success({
             title: 'Cheatcode activated!',
             duration: 3000,
@@ -129,15 +170,37 @@
               description: 'text-center!',
             },
           });
-          konami_code = [];
-          
           const audio = new Audio(NyanCatSong);
           audio.loop = true;
-          audio.volume = 0.3;
+          audio.volume = 0;
           audio.play();
+          const fadeInDuration = 2000; // 2 seconds
+          const fadeInSteps = 20;
+          const fadeInStepTime = fadeInDuration / fadeInSteps;
+          const volumeStep = (1 - audio.volume) / fadeInSteps;
+
+          const fadeInInterval = setInterval(() => {
+            if (audio.volume < 0.3) {
+              audio.volume = Math.min(0.3, audio.volume + volumeStep);
+            } else {
+              clearInterval(fadeInInterval);
+            }
+          }, fadeInStepTime);
           nyanCatSong.set(audio);
 
           secret_enabled = true;
+          konami_code = [
+            'ArrowUp',
+            'ArrowUp',
+            'ArrowDown',
+            'ArrowDown',
+            'ArrowLeft',
+            'ArrowRight',
+            'ArrowLeft',
+            'ArrowRight',
+            'b',
+            'a',
+          ];
         }
       } else {
         konami_code = [
@@ -238,9 +301,13 @@
 <main>
   <div class="opacity-30">
     {#if secret_enabled}
-      <NyanCatBg />
+      <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+        <NyanCatBg />
+      </div>
     {:else}
-      <AnimatedBg />
+      <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+        <AnimatedBg />
+      </div>
     {/if}
   </div>
   {@render children()}

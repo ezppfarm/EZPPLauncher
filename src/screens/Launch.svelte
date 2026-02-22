@@ -567,8 +567,8 @@
         const volumeStep = (1 - audio.volume) / fadeInSteps;
 
         const fadeInInterval = setInterval(() => {
-          if (audio.volume < 0.5) {
-            audio.volume = Math.min(0.5, audio.volume + volumeStep);
+          if (audio.volume < 0.3) {
+            audio.volume = Math.min(0.3, audio.volume + volumeStep);
           } else {
             clearInterval(fadeInInterval);
           }
