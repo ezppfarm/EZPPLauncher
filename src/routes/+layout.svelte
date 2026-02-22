@@ -1,5 +1,6 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
+  import NyanCatSong from '$assets/nyan-cat.mp3';
   import '../app.css';
 
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
@@ -9,6 +10,7 @@
     discordPresence,
     firstStartup,
     launcherVersion,
+    nyanCatSong,
     platform,
     presenceLoading,
     setupValues,
@@ -127,6 +129,14 @@
               description: 'text-center!',
             },
           });
+          konami_code = [];
+          
+          const audio = new Audio(NyanCatSong);
+          audio.loop = true;
+          audio.volume = 0.3;
+          audio.play();
+          nyanCatSong.set(audio);
+
           secret_enabled = true;
         }
       } else {

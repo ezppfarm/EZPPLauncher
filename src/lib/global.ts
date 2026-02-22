@@ -24,6 +24,7 @@ export const currentLoadingInfo = writable<string>('Initializing...');
 export const firstStartup = writable<boolean>(false);
 
 export const launching = writable<boolean>(false);
+export const nyanCatSong = writable<HTMLAudioElement | undefined>(undefined);
 
 export const serverPing = writable<number | undefined>(undefined);
 export const serverConnectionFails = writable(0);

@@ -13,6 +13,7 @@
     launcherVersion,
     launching,
     newVersion,
+    nyanCatSong,
     osuBuild,
     osuStream,
     platform,
@@ -426,6 +427,25 @@
       }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
+
+      if ($nyanCatSong) {
+        const audio = $nyanCatSong;
+        const fadeOutDuration = 2000; // 2 seconds
+        const fadeOutSteps = 20;
+        const fadeOutStepTime = fadeOutDuration / fadeOutSteps;
+        const volumeStep = audio.volume / fadeOutSteps;
+
+        const fadeOutInterval = setInterval(() => {
+          if (audio.volume > 0) {
+            audio.volume = Math.max(0, audio.volume - volumeStep);
+          } else {
+            clearInterval(fadeOutInterval);
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        }, fadeOutStepTime);
+      }
+
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
@@ -535,6 +555,26 @@
       if ($trackingEnabled) umami.track('app_exit_osu');
       cleanup = true;
       launchInfo = 'Cleaning up...';
+
+      if ($nyanCatSong) {
+        const audio = $nyanCatSong;
+        audio.play();
+        audio.volume = 0;
+
+        const fadeInDuration = 2000; // 2 seconds
+        const fadeInSteps = 20;
+        const fadeInStepTime = fadeInDuration / fadeInSteps;
+        const volumeStep = (1 - audio.volume) / fadeInSteps;
+
+        const fadeInInterval = setInterval(() => {
+          if (audio.volume < 0.5) {
+            audio.volume = Math.min(0.5, audio.volume + volumeStep);
+          } else {
+            clearInterval(fadeInInterval);
+          }
+        }, fadeInStepTime);
+      }
+
       await getCurrentWindow().show();
       if (presenceUpdater) {
         window.clearInterval(presenceUpdater);
