@@ -185,6 +185,75 @@ pub async fn get_beatmapsets_count(folder: String) -> Option<u64> {
     return Some(count);
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinInfo {
+    pub name: String,
+    pub author: Option<String>,
+    pub modified: u64,
+}
+
+#[tauri::command]
+pub async fn get_skins(folder: String) -> Option<Vec<SkinInfo>> {
+    use std::path::PathBuf;
+    use std::time::UNIX_EPOCH;
+    use tokio::fs;
+
+    let skins_folder = PathBuf::from(folder).join("Skins");
+
+    if !skins_folder.exists() {
+        return None;
+    }
+
+    let mut entries = fs::read_dir(skins_folder).await.ok()?;
+
+    let mut skins = Vec::new();
+
+    while let Some(entry) = entries.next_entry().await.ok()? {
+        if !entry.file_type().await.ok()?.is_dir() {
+            continue;
+        }
+
+        let dir_path = entry.path();
+        let skin_ini = dir_path.join("skin.ini");
+
+        if !skin_ini.exists() {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        let author = fs::read_to_string(&skin_ini)
+            .await
+            .ok()
+            .and_then(|content| {
+                content.lines().find_map(|line| {
+                    let (key, value) = line.split_once(':')?;
+                    key.trim()
+                        .eq_ignore_ascii_case("Author")
+                        .then(|| value.trim().to_string())
+                })
+            });
+
+        let modified = entry
+            .metadata()
+            .await
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        skins.push(SkinInfo {
+            name,
+            author,
+            modified,
+        });
+    }
+
+    Some(skins)
+}
+
 #[tauri::command]
 pub async fn get_skins_count(folder: String) -> Option<u64> {
     let path = PathBuf::from(folder);

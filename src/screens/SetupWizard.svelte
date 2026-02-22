@@ -27,6 +27,7 @@
     platform,
     presenceLoading,
     skins,
+    skinsCount,
   } from '@/global';
   import Launch from './Launch.svelte';
   import Confetti from 'svelte-confetti';
@@ -35,7 +36,7 @@
     getBeatmapSetsCount,
     getReleaseStream,
     getSkin,
-    getSkinsCount,
+    getSkins,
     getVersion,
     isValidOsuFolder,
   } from '@/osuUtil';
@@ -102,9 +103,12 @@
       beatmapSets.set(beatmapSetCount);
     }
 
-    const skinsCount: number | null = await getSkinsCount(osuInstallPath);
-    if (skinsCount) {
-      skins.set(skinsCount);
+    const skins_list = await getSkins(osuInstallPath);
+    if (skins_list) {
+      skins.set(skins_list);
+      skinsCount.set(skins_list.length);
+    } else {
+      skinsCount.set(0);
     }
 
     const skin: string = await getSkin(osuInstallPath);

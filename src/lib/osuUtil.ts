@@ -5,6 +5,18 @@ import { betterFetch } from '@better-fetch/fetch';
 
 const updateUrl = 'https://ez-pp.farm/api/ezpplauncher';
 
+export function normalizeOsuName(name: string): string {
+  return (
+    name
+      .trim()
+      // Remove leading symbols/spaces
+      .replace(/^[^a-zA-Z0-9]+/, '')
+      // Normalize spacing
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
+  );
+}
+
 export const getHWID = async () => {
   const hwid = await invoke('get_hwid');
   return typeof hwid === 'string' ? hwid : undefined;
@@ -50,13 +62,6 @@ export const getVersion = async (folder: string) => {
 
 export const getBeatmapSetsCount = async (folder: string) => {
   const result = await invoke('get_beatmapsets_count', {
-    folder,
-  });
-  return typeof result === 'number' ? result : 0;
-};
-
-export const getSkinsCount = async (folder: string) => {
-  const result = await invoke('get_skins_count', {
     folder,
   });
   return typeof result === 'number' ? result : 0;
@@ -151,3 +156,8 @@ export const downloadUpdate = async (
   }
 };
 export const installUpdate = async () => await invoke('install_ezpp_launcher_update');
+export const getSkins = async (folder: string) =>
+  await invoke<{ name: string; author: string | undefined; modified: number }[] | undefined>(
+    'get_skins',
+    { folder }
+  );

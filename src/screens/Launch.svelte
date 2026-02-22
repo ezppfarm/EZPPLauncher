@@ -21,6 +21,7 @@
     serverConnectionFails,
     serverPing,
     skins,
+    skinsCount,
     trackingEnabled,
   } from '@/global';
   import {
@@ -38,6 +39,8 @@
     ArrowRight,
     Settings,
     House,
+    Paintbrush,
+    FileQuestionMark,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -50,7 +53,7 @@
     releaseStreamToReadable,
     urlIsValidImage,
   } from '@/utils';
-  import { fade, fly, scale } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -85,7 +88,7 @@
     getEZPPLauncherUpdateFiles,
     getReleaseStream,
     getSkin,
-    getSkinsCount,
+    getSkins,
     getVersion,
     hasNet8,
     hasOsuWinello,
@@ -108,8 +111,9 @@
   import * as DropdownMenu from '@/components/ui/dropdown-menu';
   import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
   import { animate } from 'animejs';
-  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
   import { sileo } from 'sileo';
+  import Check from '@lucide/svelte/icons/check';
+  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -173,8 +177,11 @@
       const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
-      const skinsCount: number | null = await getSkinsCount(selectedPath);
-      if (skinsCount !== null) skins.set(skinsCount);
+      const skins_list = await getSkins(selectedPath);
+      if (skins_list) {
+        skins.set(skins_list);
+        skinsCount.set(skins_list.length);
+      }
 
       const skin: string = await getSkin(selectedPath);
       currentSkin.set(skin);
@@ -188,6 +195,8 @@
 
   const launch = async () => {
     if ($launching) return;
+    launchInfo = 'Checking if osu! is already running...';
+    launching.set(true);
     if ($trackingEnabled) umami.track('app_launch_osu');
     const osuRunning = await isOsuRunning();
     if (osuRunning) {
@@ -200,8 +209,10 @@
           description: 'text-center!',
         },
       });
+      launching.set(false);
       return;
     }
+    launchInfo = 'Checking osu! installation...';
     if (!$osuBuild) {
       sileo.error({
         title: 'Hmmm...',
@@ -211,12 +222,12 @@
           description: 'text-center!',
         },
       });
+      launching.set(false);
       return;
     }
     const osuPath = $osuInstallationPath;
 
     launchInfo = 'Validating osu! installation...';
-    launching.set(true);
 
     const validFolder = await isValidOsuFolder(osuPath);
     if (!validFolder) {
@@ -603,8 +614,11 @@
       const beatmapSetCount = await getBeatmapSetsCount(osuPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
-      const skinCount = await getSkinsCount(osuPath);
-      if (skinCount !== null) skins.set(skinCount);
+      const skinsList = await getSkins(osuPath);
+      if (skinsList) {
+        skins.set(skinsList);
+        skinsCount.set(skinsList.length);
+      }
 
       const skin = await getSkin(osuPath);
       currentSkin.set(skin);
@@ -931,6 +945,18 @@
       <House class="text-theme-200 !size-5" />
     </Button>
     <Button
+      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15 {selectedView ===
+      'skins'
+        ? 'bg-primary-300/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 rounded-[0.85rem] p-3 mt-3"
+      disabled={$launching}
+      onclick={() => {
+        if (!$launching) selectedView = 'skins';
+      }}
+    >
+      <Paintbrush class="text-theme-200 !size-5" />
+    </Button>
+    <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
       'settings'
         ? 'bg-primary-300/50'
@@ -1014,10 +1040,10 @@
               <div class="flex items-center gap-2">
                 <Brush class="size-3.5 text-amber-400" />
                 <span class="text-[11px] text-white/70 font-medium">
-                  {#if !$skins && $skins !== 0}
+                  {#if !$skinsCount && $skinsCount !== 0}
                     <LoaderCircle class="animate-spin" size={12} />
                   {:else}
-                    {numberHumanReadable($skins ?? 0)}
+                    {numberHumanReadable($skinsCount ?? 0)}
                   {/if}
                 </span>
               </div>
@@ -1116,7 +1142,7 @@
 
         {#if $currentUserInfo}
           <div
-            class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md border border-black/40 flex flex-col items-center p-3"
+            class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center p-3"
             in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
             out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
           >
@@ -1269,7 +1295,7 @@
       </div>
     {:else if selectedView === 'settings'}
       <div
-        class="h-[100vh] w-full flex flex-col items-center justify-center"
+        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1278,205 +1304,198 @@
         }}
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
-        <div class="p-8 w-full">
-          <div class="bg-black/40 backdrop-blur-sm py-8 px-6 rounded-lg">
-            <div class="grid grid-cols-[1fr_auto] gap-y-5 items-center px-6">
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-patch">Patching</Label>
-                <div class="text-muted-foreground text-xs">
-                  Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
-                      class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
-                      >currently only on windows!</span
-                    >
-                  {/if}
-                </div>
-              </div>
-              <Checkbox
-                id="setting-patch"
-                checked={$platform === 'windows' ? $patch : false}
-                disabled={$platform !== 'windows'}
-                onCheckedChange={async (e) => {
-                  patch.set(e);
-                  $userSettings.save();
-                }}
-                class="flex items-center justify-center w-5 h-5"
-              ></Checkbox>
-
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
-                <div class="text-muted-foreground text-xs">
-                  Enable a custom cursor in the Launcher like in the lazer build of osu!
-                </div>
-              </div>
-              <Checkbox
-                id="setting-custom-cursor"
-                checked={$customCursor}
-                onCheckedChange={async (e) => {
-                  if (!e) {
-                    cursorSmoothening.set(false);
-                  }
-                  customCursor.set(e);
-
-                  $userSettings.save();
-                }}
-                class="flex items-center justify-center w-5 h-5"
-              ></Checkbox>
-
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
-                <div class="text-muted-foreground text-xs">
-                  Makes the custom cursor movement smoother.
-                </div>
-              </div>
-              <Checkbox
-                id="setting-cursor-smoothening"
-                checked={$cursorSmoothening}
-                onCheckedChange={async (e) => {
-                  if (!$customCursor) return;
-                  cursorSmoothening.set(e);
-                  $userSettings.save();
-                }}
-                disabled={!$customCursor}
-                class="flex items-center justify-center w-5 h-5"
-              ></Checkbox>
-
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
-                <div class="text-muted-foreground text-xs">
-                  Disables some animations in the Launcher to improve performance on low-end
-                  devices.
-                </div>
-              </div>
-              <Checkbox
-                id="setting-reduce-animations"
-                checked={$reduceAnimations}
-                onCheckedChange={async (e) => {
-                  reduceAnimations.set(e);
-                  $userSettings.save();
-                }}
-                class="flex items-center justify-center w-5 h-5"
-              ></Checkbox>
-
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
-                <div class="text-muted-foreground text-xs">
-                  Let other discord users show what you are doing right now 👀
-                </div>
-              </div>
-              <div class="relative">
-                {#if $presenceLoading}
-                  <div class="-left-8 absolute" transition:fade>
-                    <LoaderCircle class="animate-spin" />
-                  </div>
-                {/if}
-                <Checkbox
-                  id="setting-rich-presence"
-                  bind:checked={$discordPresence}
-                  disabled={$presenceLoading}
-                  class="flex items-center justify-center w-5 h-5"
-                ></Checkbox>
-              </div>
-
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-tracking">App Tracking</Label>
-                <div class="text-muted-foreground text-xs">
-                  Allow anonymous usage data to be collected to help improve the application.
-                </div>
-              </div>
-              <Checkbox
-                id="setting-tracking"
-                checked={$trackingEnabled}
-                onCheckedChange={async (e) => {
-                  trackingEnabled.set(e);
-                  $userSettings.value('tracking_consent').set(e);
-                  await $userSettings.save();
-                }}
-                class="flex items-center justify-center w-5 h-5"
-              ></Checkbox>
+        <div class="grid grid-cols-[1fr_auto] w-full gap-y-5 items-center px-6">
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-patch">Patching</Label>
+            <div class="text-muted-foreground text-xs">
+              Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+                  class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
+                  >currently only on windows!</span
+                >
+              {/if}
             </div>
-            <div
-              class="grid grid-cols-[0.7fr_auto] gap-y-1 items-center border-theme-800 pl-6 pr-5 pb-4"
+          </div>
+          <Checkbox
+            id="setting-patch"
+            checked={$platform === 'windows' ? $patch : false}
+            disabled={$platform !== 'windows'}
+            onCheckedChange={async (e) => {
+              patch.set(e);
+              $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">Lazer-Style Cursor</Label>
+            <div class="text-muted-foreground text-xs">
+              Enable a custom cursor in the Launcher like in the lazer build of osu!
+            </div>
+          </div>
+          <Checkbox
+            id="setting-custom-cursor"
+            checked={$customCursor}
+            onCheckedChange={async (e) => {
+              if (!e) {
+                cursorSmoothening.set(false);
+              }
+              customCursor.set(e);
+
+              $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-cursor-smoothening">Cursor Smoothening</Label>
+            <div class="text-muted-foreground text-xs">
+              Makes the custom cursor movement smoother.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-cursor-smoothening"
+            checked={$cursorSmoothening}
+            onCheckedChange={async (e) => {
+              if (!$customCursor) return;
+              cursorSmoothening.set(e);
+              $userSettings.save();
+            }}
+            disabled={!$customCursor}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-reduce-animations">Reduce Animations</Label>
+            <div class="text-muted-foreground text-xs">
+              Disables some animations in the Launcher to improve performance on low-end devices.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-reduce-animations"
+            checked={$reduceAnimations}
+            onCheckedChange={async (e) => {
+              reduceAnimations.set(e);
+              $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-rich-presence">Discord Rich Presence</Label>
+            <div class="text-muted-foreground text-xs">
+              Let other discord users show what you are doing right now 👀
+            </div>
+          </div>
+          <div class="relative">
+            {#if $presenceLoading}
+              <div class="-left-8 absolute" transition:fade>
+                <LoaderCircle class="animate-spin" />
+              </div>
+            {/if}
+            <Checkbox
+              id="setting-rich-presence"
+              bind:checked={$discordPresence}
+              disabled={$presenceLoading}
+              class="flex items-center justify-center w-5 h-5"
+            ></Checkbox>
+          </div>
+
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-tracking">App Tracking</Label>
+            <div class="text-muted-foreground text-xs">
+              Allow anonymous usage data to be collected to help improve the application.
+            </div>
+          </div>
+          <Checkbox
+            id="setting-tracking"
+            checked={$trackingEnabled}
+            onCheckedChange={async (e) => {
+              trackingEnabled.set(e);
+              $userSettings.value('tracking_consent').set(e);
+              await $userSettings.save();
+            }}
+            class="flex items-center justify-center w-5 h-5"
+          ></Checkbox>
+        </div>
+        <div
+          class="grid grid-cols-[0.7fr_auto] gap-y-1 mt-3 w-full items-center border-theme-800 pl-6 pr-5 pb-4"
+        >
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
+            <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
+          </div>
+          <div class="flex flex-row w-full">
+            <Input
+              class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
+              type="text"
+              value={$osuInstallationPath}
+              placeholder="Path to osu! installation"
+              readonly
+            />
+            <Button
+              class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
+              variant="outline"
+              onclick={browse_osu_installation}>Browse</Button
             >
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-custom-cursor">osu! installation path</Label>
-                <div class="text-muted-foreground text-xs">The path to your osu! installation.</div>
-              </div>
-              <div class="flex flex-row w-full">
-                <Input
-                  class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-r-none"
-                  type="text"
-                  value={$osuInstallationPath}
-                  placeholder="Path to osu! installation"
-                  readonly
-                />
-                <Button
-                  class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
-                  variant="outline"
-                  onclick={browse_osu_installation}>Browse</Button
-                >
-              </div>
+          </div>
 
-              <div class="flex flex-col">
-                <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
-                <div class="text-muted-foreground text-xs">
-                  test different versions of the patcher
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
+            <div class="text-muted-foreground text-xs">test different versions of the patcher</div>
+          </div>
+          <div class="flex flex-row w-full">
+            <Select.Root
+              type="single"
+              bind:value={$launcherStream}
+              onValueChange={async (newStream) => {
+                const isNet8Installed = await hasNet8();
+                if (!isNet8Installed) {
+                  launcherStream.set('stable');
+                  sileo.error({
+                    title: 'Hmm...',
+                    description: '.NET 8.0 Desktop Runtime not found!',
+                    fill: '#181825',
+                    styles: {
+                      description: 'text-center!',
+                    },
+                    button: {
+                      title: 'Download .NET 8.0',
+                      onClick: async () =>
+                        await openURL(
+                          'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
+                        ),
+                    },
+                  });
+                  return;
+                }
+                $userSettings.value('patcherStream').set(newStream);
+                launcherStream.set(newStream);
+                await $userSettings.save();
+              }}
+            >
+              <Select.Trigger
+                class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+              >
+                <div class="flex flex-row items-center gap-2 font-normal text-foreground">
+                  {$launcherStream}
                 </div>
-              </div>
-              <div class="flex flex-row w-full">
-                <Select.Root
-                  type="single"
-                  bind:value={$launcherStream}
-                  onValueChange={async (newStream) => {
-                    const isNet8Installed = await hasNet8();
-                    if (!isNet8Installed) {
-                      launcherStream.set('stable');
-                      sileo.error({
-                        title: 'Hmm...',
-                        description: '.NET 8.0 Desktop Runtime not found!',
-                        fill: '#181825',
-                        styles: {
-                          description: 'text-center!',
-                        },
-                        button: {
-                          title: 'Download .NET 8.0',
-                          onClick: async () =>
-                            await openURL(
-                              'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
-                            ),
-                        },
-                      });
-                      return;
-                    }
-                    $userSettings.value('patcherStream').set(newStream);
-                    launcherStream.set(newStream);
-                    await $userSettings.save();
-                  }}
-                >
-                  <Select.Trigger
-                    class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
-                  >
-                    <div class="flex flex-row items-center gap-2 font-normal text-foreground">
-                      {$launcherStream}
+              </Select.Trigger>
+              <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
+                {#each $launcherStreams as stream (stream)}
+                  <Select.Item value={stream}>
+                    <div class="flex flex-row gap-2 items-center">
+                      {stream}
                     </div>
-                  </Select.Trigger>
-                  <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
-                    {#each $launcherStreams as stream (stream)}
-                      <Select.Item value={stream}>
-                        <div class="flex flex-row gap-2 items-center">
-                          {stream}
-                        </div>
-                      </Select.Item>
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </div>
-            </div>
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
           </div>
         </div>
       </div>
     {:else if selectedView === 'login'}
       <div
-        class="h-[100vh] w-full flex flex-col items-center justify-center"
+        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1485,48 +1504,142 @@
         }}
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
-        <div class="p-8 px-52 w-full">
-          <form onsubmit={performLogin} class="bg-black/40 backdrop-blur-sm rounded-lg p-8">
-            <div class="flex flex-col items-center justify-center mb-4">
-              <span class="text-xl font-semibold">Login to EZPPFarm</span>
-              <span class="text-xs text-muted-foreground"
-                >Use your EZPPFarm account to login to EZPPLauncher</span
+        <form onsubmit={performLogin} class="w-96">
+          <div class="flex flex-col items-center justify-center mb-8">
+            <span class="text-xl font-semibold">Login to EZPPFarm</span>
+            <span class="text-xs text-muted-foreground"
+              >Use your EZPPFarm account to login to EZPPLauncher</span
+            >
+          </div>
+          <div class="mb-4">
+            <Label for="username" class="block text-sm font-medium">Username</Label>
+            <Input
+              class="mt-4 w-full bg-theme-900 border-theme-800"
+              type="text"
+              id="username"
+              bind:value={username}
+              disabled={loginIsLoading}
+              autocomplete="off"
+              autocorrect="off"
+            />
+          </div>
+          <div class="mb-4">
+            <Label for="password" class="block text-sm font-medium">Password</Label>
+            <Input
+              class="mt-4 w-full bg-theme-900 border-theme-800"
+              type="password"
+              id="password"
+              bind:value={password}
+              disabled={loginIsLoading}
+              autocomplete="off"
+              autocorrect="off"
+            />
+          </div>
+          <Button class="w-full" type="submit" disabled={loginIsLoading}>
+            {#if loginIsLoading}
+              <LoaderCircle class="animate-spin" />
+            {:else}
+              Login
+            {/if}
+          </Button>
+        </form>
+      </div>
+    {:else if selectedView === 'skins'}
+      <div
+        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
+        in:fly={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 400,
+          y: 5,
+          opacity: 0,
+        }}
+        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
+      >
+        {#if $skins.length > 0}
+          {@const skinsSorted = $skins.sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+          )}
+          <ScrollContainer
+            class="flex flex-col max-h-[100vh] overflow-y-auto items-center gap-4 p-16 w-full"
+            topOffset={35}
+          >
+            {#each skinsSorted as skin (skin.name)}
+              <div
+                class={`group w-full flex items-center border rounded-lg transition-all duration-150 ${
+                  skin.name === $currentSkin
+                    ? 'bg-primary/20 border-primary/40'
+                    : 'bg-black/40 border-black/60 hover:bg-black/70 hover:border-border'
+                }`}
               >
-            </div>
-            <div class="mb-4">
-              <Label for="username" class="block text-sm font-medium">Username</Label>
-              <Input
-                class="mt-4 w-full bg-theme-900 border-theme-800"
-                type="text"
-                id="username"
-                bind:value={username}
-                disabled={loginIsLoading}
-                autocomplete="off"
-                autocorrect="off"
-              />
-            </div>
-            <div class="mb-4">
-              <Label for="password" class="block text-sm font-medium">Password</Label>
-              <Input
-                class="mt-4 w-full bg-theme-900 border-theme-800"
-                type="password"
-                id="password"
-                bind:value={password}
-                disabled={loginIsLoading}
-                autocomplete="off"
-                autocorrect="off"
-              />
-            </div>
-            <Button class="w-full" type="submit" disabled={loginIsLoading}>
-              {#if loginIsLoading}
-                <LoaderCircle class="animate-spin" />
-              {:else}
-                Login
-              {/if}
-            </Button>
-          </form>
-        </div>
+                <div class="flex-1 min-w-0 px-5 py-3.5">
+                  <p class="text-sm text-foreground/90 truncate font-medium line-clamp-1">
+                    {skin.name}
+                  </p>
+                  <div class="flex items-center gap-4 mt-1">
+                    <span class="text-[11px] text-muted-foreground">
+                      {skin.author || 'Unknown'}
+                    </span>
+                    <span class="text-[11px] text-muted-foreground/50">
+                      {new Date(skin.modified * 1000).toLocaleDateString(undefined, {
+                        year: '2-digit',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  class="flex items-center gap-1.5 pr-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                >
+                  {#if $currentSkin !== skin.name}
+                    <button
+                      transition:fade={{
+                        duration: 150,
+                      }}
+                      class="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      onclick={async () => {
+                        if (skin.name === $currentSkin) return;
+                        await setUserConfigValues($osuInstallationPath, [
+                          { key: 'Skin', value: skin.name },
+                        ]);
+                        currentSkin.set(skin.name);
+                        sileo.success({
+                          title: 'Skin applied!',
+                          description: `${skin.name} is now your active skin!`,
+                          fill: '#181825',
+                          styles: {
+                            description: 'text-center!',
+                          },
+                        });
+                      }}
+                    >
+                      <Check class="w-4 h-4" />
+                    </button>
+                  {/if}
+                  <!-- <button
+                    class="p-2 rounded-md transition-colors text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button> -->
+                </div>
+              </div>
+            {/each}
+          </ScrollContainer>
+        {:else}
+          <div class="flex flex-col items-center justify-center gap-4">
+            <FileQuestionMark class="size-12 text-muted-foreground" strokeWidth={1.5} />
+            <span class="text-sm text-muted-foreground">No skins found!</span>
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
 </div>
+
+<style lang="scss">
+  .custom-scrollbox {
+    scrollbar-color: #999 transparent;
+    scrollbar-width: 0px !important;
+  }
+</style>

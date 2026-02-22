@@ -14,6 +14,7 @@
     osuBuild,
     osuStream,
     skins,
+    skinsCount,
   } from '@/global';
   import {
     cursorSmoothness,
@@ -34,7 +35,7 @@
     getEZPPLauncherStreams,
     getReleaseStream,
     getSkin,
-    getSkinsCount,
+    getSkins,
     getVersion,
     isValidOsuFolder,
   } from '@/osuUtil';
@@ -151,8 +152,15 @@
         if (beatmapSetCount !== null) beatmapSets.set(beatmapSetCount);
 
         currentLoadingInfo.set('Counting skins...');
-        const skinCount = await getSkinsCount($osuInstallationPath);
-        if (skinCount !== null) skins.set(skinCount);
+        const skins_list = await getSkins($osuInstallationPath);
+        console.log(skins_list);
+        if (skins_list) {
+          skins.set(skins_list);
+          skinsCount.set(skins_list.length);
+        } else {
+          skinsCount.set(0);
+        }
+
         const skin: string = await getSkin($osuInstallationPath);
         currentSkin.set(skin);
       }
