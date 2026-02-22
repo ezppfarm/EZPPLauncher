@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { createElement } from 'react'
-	import { createRoot } from 'react-dom/client'
-	import type { SileoOptions } from 'sileo'
+  import { createElement } from 'react';
+  import { createRoot } from 'react-dom/client';
+  import type { SileoOptions } from 'sileo';
 
-	let props: SileoOptions = $props()
-	let rootEl: HTMLElement
+  let props: SileoOptions = $props();
+  let rootEl: HTMLElement;
 
-	$effect(() => {
-		const root = createRoot(rootEl)
+  $effect(() => {
+    const root = createRoot(rootEl);
 
-		import('sileo').then(({ Toaster }) => {
-			const sileo = createElement(Toaster, { ...props })
-			root.render(sileo)
-		})
+    import('sileo').then(({ Toaster }) => {
+      const sileo = createElement(Toaster, { ...props });
+      root.render(sileo);
+    });
 
-		return () => root.unmount()
-	})
+    return () => root.unmount();
+  });
 </script>
 
 <div bind:this={rootEl}></div>
