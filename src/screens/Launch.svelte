@@ -114,6 +114,7 @@
   import { sileo } from 'sileo';
   import Check from '@lucide/svelte/icons/check';
   import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
+  import { sortSkins } from '@/sort';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -1556,9 +1557,7 @@
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
         {#if $skins.length > 0}
-          {@const skinsSorted = $skins.sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-          )}
+          {@const skinsSorted = sortSkins($skins)}
           <ScrollContainer
             class="flex flex-col max-h-[100vh] overflow-y-auto items-center gap-4 p-16 w-full"
             topOffset={35}
