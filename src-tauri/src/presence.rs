@@ -1,9 +1,10 @@
 use discord_rich_presence::{
-    DiscordIpc, DiscordIpcClient,
     activity::{Activity, Assets, Button, Timestamps},
+    DiscordIpc, DiscordIpcClient,
 };
-use futures_util::future::BoxFuture;
 use once_cell::sync::Lazy;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Mutex as StdMutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
@@ -90,7 +91,7 @@ impl PresenceActor {
         }
     }
 
-    fn handle_connect(&mut self, responder: oneshot::Sender<bool>) -> BoxFuture<'_, ()> {
+    fn handle_connect(&mut self, responder: oneshot::Sender<bool>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async move {
         if self.client.is_some() {
             let _ = responder.send(true);
@@ -125,9 +126,9 @@ impl PresenceActor {
 
     async fn handle_disconnect(&mut self, responder: oneshot::Sender<()>) {
         if let Some(mut client) = self.client.take() {
-            println!("Actor: Disconnecting...");
-            let _ = client.clear_activity().map_err(|e| e.to_string());
-            let _ = client.close().map_err(|e| e.to_string());
+            println!("Actor: Disconnecting from Discord...");
+            let _ = client.clear_activity();
+            let _ = client.close();
             println!("Actor: Disconnected successfully.");
         }
         let _ = responder.send(());
@@ -200,14 +201,9 @@ pub async fn connect() -> bool {
 
 pub async fn disconnect() {
     let (tx, rx) = oneshot::channel();
-    if PRESENCE_TX
-        .send(PresenceCommand::Disconnect(tx))
-        .await
-        .is_ok()
-    {
-        let _ = rx.await;
-    } else {
-        println!("Could not send disconnect command; actor may not be running.");
+    // Use a timeout to ensure we don't hang the exit process if Discord is unresponsive
+    if let Ok(_) = PRESENCE_TX.send(PresenceCommand::Disconnect(tx)).await {
+        let _ = tokio::time::timeout(Duration::from_secs(2), rx).await;
     }
 }
 
