@@ -1,4 +1,5 @@
 use hardware_id::get_id;
+use osynic_osudb::entity::osu::osudb::OsuDB;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -156,33 +157,14 @@ pub fn find_osu_installation() -> Option<String> {
 #[tauri::command]
 pub async fn get_beatmapsets_count(folder: String) -> Option<u64> {
     let path = PathBuf::from(folder);
-    let osu_user_config = get_osu_user_config(path.clone());
-    let songs_path = osu_user_config
-        .and_then(|config| config.get("Songs").cloned())
-        .unwrap_or_else(|| path.join("Songs").to_string_lossy().into_owned());
-    let songs_folder = PathBuf::from(songs_path);
-
-    if !songs_folder.exists() {
-        return None;
+    let osu_db_path = path.join("osu!.db");
+    if !osu_db_path.exists() {
+        return Some(0);
     }
-
-    let mut count = 0;
-    if let Ok(mut entries) = fs::read_dir(songs_folder).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry.file_type().await.map_or(false, |ft| ft.is_dir()) {
-                let dir_path = entry.path();
-                if let Ok(mut files) = fs::read_dir(&dir_path).await {
-                    while let Ok(Some(file)) = files.next_entry().await {
-                        if file.path().extension().map_or(false, |ext| ext == "osu") {
-                            count += 1;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return Some(count);
+    let mut osudb = OsuDB::from_file(&osu_db_path).unwrap();
+    let beatmaps = osudb.beatmaps.iter_mut();
+    let beatmap_sets = beatmaps.map(|b| b.beatmapset_id).collect::<HashSet<_>>();
+    return Some(beatmap_sets.len() as u64);
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
