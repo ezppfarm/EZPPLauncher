@@ -112,9 +112,6 @@
   import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
-  import Check from '@lucide/svelte/icons/check';
-  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
-  import { sortSkins } from '@/sort';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -573,14 +570,15 @@
         audio.play();
         audio.volume = 0;
 
+        const fadeInVolume = 0.15;
         const fadeInDuration = 2000; // 2 seconds
         const fadeInSteps = 20;
         const fadeInStepTime = fadeInDuration / fadeInSteps;
-        const volumeStep = (1 - audio.volume) / fadeInSteps;
+        const volumeStep = (fadeInVolume - audio.volume) / fadeInSteps;
 
         const fadeInInterval = setInterval(() => {
-          if (audio.volume < 0.3) {
-            audio.volume = Math.min(0.3, audio.volume + volumeStep);
+          if (audio.volume < fadeInVolume) {
+            audio.volume = Math.min(fadeInVolume, audio.volume + volumeStep);
           } else {
             clearInterval(fadeInInterval);
           }
@@ -944,18 +942,6 @@
       }}
     >
       <House class="text-theme-200 !size-5" />
-    </Button>
-    <Button
-      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15 {selectedView ===
-      'skins'
-        ? 'bg-primary-300/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 rounded-[0.85rem] p-3 mt-3"
-      disabled={$launching}
-      onclick={() => {
-        if (!$launching) selectedView = 'skins';
-      }}
-    >
-      <Paintbrush class="text-theme-200 !size-5" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
@@ -1545,100 +1531,6 @@
           </Button>
         </form>
       </div>
-    {:else if selectedView === 'skins'}
-      <div
-        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
-        in:fly={{
-          duration: $reduceAnimations ? 0 : 400,
-          delay: $reduceAnimations ? 0 : 400,
-          y: 5,
-          opacity: 0,
-        }}
-        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
-      >
-        {#if $skins.length > 0}
-          {@const skinsSorted = sortSkins($skins)}
-          <ScrollContainer
-            class="flex flex-col max-h-[100vh] overflow-y-auto items-center gap-4 p-16 w-full"
-            topOffset={35}
-          >
-            {#each skinsSorted as skin (skin.name)}
-              <div
-                class={`group w-full flex items-center border rounded-lg transition-all duration-150 ${
-                  skin.name === $currentSkin
-                    ? 'bg-primary/20 border-primary/40'
-                    : 'bg-black/40 border-black/60 hover:bg-black/70 hover:border-border'
-                }`}
-              >
-                <div class="flex-1 min-w-0 px-5 py-3.5">
-                  <p class="text-sm text-foreground/90 truncate font-medium line-clamp-1">
-                    {skin.name}
-                  </p>
-                  <div class="flex items-center gap-4 mt-1">
-                    <span class="text-[11px] text-muted-foreground">
-                      {skin.author || 'Unknown'}
-                    </span>
-                    <span class="text-[11px] text-muted-foreground/50">
-                      {new Date(skin.modified * 1000).toLocaleDateString(undefined, {
-                        year: '2-digit',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  class="flex items-center gap-1.5 pr-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                >
-                  {#if $currentSkin !== skin.name}
-                    <button
-                      transition:fade={{
-                        duration: 150,
-                      }}
-                      class="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                      onclick={async () => {
-                        if (skin.name === $currentSkin) return;
-                        await setUserConfigValues($osuInstallationPath, [
-                          { key: 'Skin', value: skin.name },
-                        ]);
-                        currentSkin.set(skin.name);
-                        sileo.success({
-                          title: 'Skin applied!',
-                          description: `${skin.name} is now your active skin!`,
-                          fill: '#181825',
-                          styles: {
-                            description: 'text-center!',
-                          },
-                        });
-                      }}
-                    >
-                      <Check class="w-4 h-4" />
-                    </button>
-                  {/if}
-                  <!-- <button
-                    class="p-2 rounded-md transition-colors text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button> -->
-                </div>
-              </div>
-            {/each}
-          </ScrollContainer>
-        {:else}
-          <div class="flex flex-col items-center justify-center gap-4">
-            <FileQuestionMark class="size-12 text-muted-foreground" strokeWidth={1.5} />
-            <span class="text-sm text-muted-foreground">No skins found!</span>
-          </div>
-        {/if}
-      </div>
     {/if}
   </div>
 </div>
-
-<style lang="scss">
-  .custom-scrollbox {
-    scrollbar-color: #999 transparent;
-    scrollbar-width: 0px !important;
-  }
-</style>

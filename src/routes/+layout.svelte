@@ -174,14 +174,15 @@
           audio.loop = true;
           audio.volume = 0;
           audio.play();
+          const fadeInVolume = 0.15;
           const fadeInDuration = 2000; // 2 seconds
           const fadeInSteps = 20;
           const fadeInStepTime = fadeInDuration / fadeInSteps;
-          const volumeStep = (1 - audio.volume) / fadeInSteps;
+          const volumeStep = (fadeInVolume - audio.volume) / fadeInSteps;
 
           const fadeInInterval = setInterval(() => {
-            if (audio.volume < 0.3) {
-              audio.volume = Math.min(0.3, audio.volume + volumeStep);
+            if (audio.volume < fadeInVolume) {
+              audio.volume = Math.min(fadeInVolume, audio.volume + volumeStep);
             } else {
               clearInterval(fadeInInterval);
             }
