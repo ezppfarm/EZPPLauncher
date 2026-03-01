@@ -24,7 +24,7 @@
   <div class="relative flex items-center justify-center p-1 group" id="titlebar-minimize">
     <div
       class="absolute inset-0 bg-background rounded
-           scale-50 opacity-0
+           scale-80 opacity-0
           group-hover:opacity-100
            group-hover:scale-100
            {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'} 
@@ -36,7 +36,7 @@
   <div class="relative flex items-center justify-center p-1 group" id="titlebar-close">
     <div
       class="absolute inset-0 bg-red-500 rounded
-           scale-50 opacity-0
+           scale-80 opacity-0
             group-hover:opacity-100
            group-hover:scale-100
            {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'} 
