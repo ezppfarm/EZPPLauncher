@@ -3,5 +3,13 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "json.schemaDownload.trustedDomains": {
+    "https://schemastore.azurewebsites.net/": true,
+    "https://raw.githubusercontent.com/": true,
+    "https://www.schemastore.org/": true,
+    "https://json.schemastore.org/": true,
+    "https://json-schema.org/": true,
+    "https://schema.tauri.app/": true
   }
 }
