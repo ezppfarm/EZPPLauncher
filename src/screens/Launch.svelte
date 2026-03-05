@@ -1425,59 +1425,62 @@
               onclick={browse_osu_installation}>Browse</Button
             >
           </div>
-
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
-            <div class="text-muted-foreground text-xs">test different versions of the patcher</div>
-          </div>
-          <div class="flex flex-row w-full">
-            <Select.Root
-              type="single"
-              bind:value={$launcherStream}
-              onValueChange={async (newStream) => {
-                const isNet8Installed = await hasNet8();
-                if (!isNet8Installed) {
-                  launcherStream.set('stable');
-                  sileo.error({
-                    title: 'Hmm...',
-                    description: '.NET 8.0 Desktop Runtime not found!',
-                    fill: '#181825',
-                    styles: {
-                      description: 'text-center!',
-                    },
-                    button: {
-                      title: 'Download .NET 8.0',
-                      onClick: async () =>
-                        await openURL(
-                          'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
-                        ),
-                    },
-                  });
-                  return;
-                }
-                $userSettings.value('patcherStream').set(newStream);
-                launcherStream.set(newStream);
-                await $userSettings.save();
-              }}
-            >
-              <Select.Trigger
-                class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+          {#if $platform === 'windows'}
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
+              <div class="text-muted-foreground text-xs">
+                test different versions of the patcher
+              </div>
+            </div>
+            <div class="flex flex-row w-full">
+              <Select.Root
+                type="single"
+                bind:value={$launcherStream}
+                onValueChange={async (newStream) => {
+                  const isNet8Installed = await hasNet8();
+                  if (!isNet8Installed) {
+                    launcherStream.set('stable');
+                    sileo.error({
+                      title: 'Hmm...',
+                      description: '.NET 8.0 Desktop Runtime not found!',
+                      fill: '#181825',
+                      styles: {
+                        description: 'text-center!',
+                      },
+                      button: {
+                        title: 'Download .NET 8.0',
+                        onClick: async () =>
+                          await openURL(
+                            'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
+                          ),
+                      },
+                    });
+                    return;
+                  }
+                  $userSettings.value('patcherStream').set(newStream);
+                  launcherStream.set(newStream);
+                  await $userSettings.save();
+                }}
               >
-                <div class="flex flex-row items-center gap-2 font-normal text-foreground">
-                  {$launcherStream}
-                </div>
-              </Select.Trigger>
-              <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
-                {#each $launcherStreams as stream (stream)}
-                  <Select.Item value={stream}>
-                    <div class="flex flex-row gap-2 items-center">
-                      {stream}
-                    </div>
-                  </Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </div>
+                <Select.Trigger
+                  class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+                >
+                  <div class="flex flex-row items-center gap-2 font-normal text-foreground">
+                    {$launcherStream}
+                  </div>
+                </Select.Trigger>
+                <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
+                  {#each $launcherStreams as stream (stream)}
+                    <Select.Item value={stream}>
+                      <div class="flex flex-row gap-2 items-center">
+                        {stream}
+                      </div>
+                    </Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </div>
+          {/if}
         </div>
       </div>
     {:else if selectedView === 'login'}
