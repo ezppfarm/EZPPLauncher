@@ -115,13 +115,20 @@
       }
     }
     if ($currentUser) {
-      currentLoadingInfo.set('Loading user info...');
-      const userInfo = await ezppfarm.getUserInfo($currentUser.id);
-      if (userInfo) {
-        currentUserInfo.set(userInfo.player);
+      try {
+        currentLoadingInfo.set('Loading user info...');
+        const userInfo = await ezppfarm.getUserInfo($currentUser.id);
+        if (userInfo) {
+          currentUserInfo.set(userInfo.player);
 
-        preferredMode.set(userInfo.player.info.preferred_mode);
-        preferredType.set(userInfo.player.info.preferred_type);
+          preferredMode.set(userInfo.player.info.preferred_mode);
+          preferredType.set(userInfo.player.info.preferred_type);
+        }
+      } catch {
+        userLoginResult = {
+          message: 'There was an issue connecting to the server. Please try again later.',
+        };
+        currentUser.set(undefined);
       }
     }
 
