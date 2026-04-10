@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Logo from '$assets/logo.png';
   import { reduceAnimations } from '@/userSettings';
-  import { fade } from 'svelte/transition';
 
   //TODO: maybe dynamic background images fetched from ezpp?
 
