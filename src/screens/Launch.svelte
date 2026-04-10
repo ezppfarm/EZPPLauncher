@@ -39,8 +39,6 @@
     ArrowRight,
     Settings,
     House,
-    Paintbrush,
-    FileQuestionMark,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
