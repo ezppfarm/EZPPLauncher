@@ -47,8 +47,6 @@
   let spinnerCircle: SVGCircleElement;
   let animateInterval: number | undefined;
 
-  //TODO: use this to check for updates upon launch
-
   const doBPMAnimation = () => {
     if (animateInterval) return;
     animateInterval = window.setInterval(async () => {
