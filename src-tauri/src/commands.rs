@@ -590,7 +590,6 @@ pub async fn download_ezpp_launcher_update_files(
 #[serde(tag = "type", content = "details")]
 pub enum ReplaceUIError {
     FileNotFound(String),
-    PermissionDenied(String),
     IoError(String),
 }
 
