@@ -615,39 +615,49 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
         }
 
         if dest.exists() {
-            std::fs::remove_file(dest)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e)))?;
+            std::fs::remove_file(dest).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e))
+            })?;
         }
 
-        std::fs::copy(source, dest)
-            .map_err(|e| ReplaceUIError::IoError(format!("Failed to copy {}: {}", name, e)))?;
+        std::fs::copy(source, dest).map_err(|e| {
+            ReplaceUIError::IoError(format!("Failed to copy {}: {}", name, e))
+        })?;
         Ok(())
     };
 
-    let restore_backup = |bak: &PathBuf, dest: &PathBuf, name: &str| -> Result<(), ReplaceUIError> {
+    let restore_backup = |bak: &PathBuf,
+                          dest: &PathBuf,
+                          name: &str|
+     -> Result<(), ReplaceUIError> {
         if bak.exists() {
             if dest.exists() {
-                std::fs::remove_file(dest)
-                    .map_err(|e| ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e)))?;
+                std::fs::remove_file(dest).map_err(|e| {
+                    ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e))
+                })?;
             }
-            std::fs::copy(bak, dest)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to restore {} from backup: {}", name, e)))?;
+            std::fs::rename(bak, dest).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to rename {} from backup: {}", name, e))
+            })?;
         }
         Ok(())
     };
 
     if !revert {
         if osu_ui.exists() && !osu_ui_bak.exists() {
-            std::fs::rename(&osu_ui, &osu_ui_bak)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to backup osu!ui.dll: {}", e)))?;
+            std::fs::rename(&osu_ui, &osu_ui_bak).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to backup osu!ui.dll: {}", e))
+            })?;
         }
         if osu_seasonal.exists() && !osu_seasonal_bak.exists() {
-            std::fs::rename(&osu_seasonal, &osu_seasonal_bak)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to backup osu!seasonal.dll: {}", e)))?;
+            std::fs::rename(&osu_seasonal, &osu_seasonal_bak).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to backup osu!seasonal.dll: {}", e))
+            })?;
         }
         if osu_gameplay.exists() && !osu_gameplay_bak.exists() {
-            std::fs::rename(&osu_gameplay, &osu_gameplay_bak)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to backup osu!gameplay.dll: {}", e)))?;
+            std::fs::rename(&osu_gameplay, &osu_gameplay_bak).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to backup osu!gameplay.dll: {}", e))
+            })?;
         }
 
         copy_file(&ezpp_ui, &osu_ui, "osu!ui.dll")?;
@@ -662,8 +672,9 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
         restore_backup(&osu_gameplay_bak, &osu_gameplay, "osu!gameplay.dll")?;
 
         if osu_ui.exists() && osu_seasonal.exists() && osu_gameplay.exists() {
-            std::fs::remove_file(&temp_file)
-                .map_err(|e| ReplaceUIError::IoError(format!("Failed to remove marker file: {}", e)))?;
+            std::fs::remove_file(&temp_file).map_err(|e| {
+                ReplaceUIError::IoError(format!("Failed to remove marker file: {}", e))
+            })?;
         }
     }
 
@@ -692,37 +703,65 @@ pub async fn check_for_corruption(folder: String) -> Result<bool, CorruptionChec
 
     if temp_file.exists() {
         if osu_ui_bak.exists() {
-            fs::remove_file(&osu_ui)
-                .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to remove osu!ui.dll: {}", e)))?;
-            fs::rename(&osu_ui_bak, &osu_ui)
-                .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to restore osu!ui.dll from backup: {}", e)))?;
+            if osu_ui.exists() {
+                fs::remove_file(&osu_ui).await.map_err(|e| {
+                    CorruptionCheckError::IoError(format!("Failed to remove osu!ui.dll: {}", e))
+                })?;
+            }
+
+            fs::rename(&osu_ui_bak, &osu_ui).await.map_err(|e| {
+                CorruptionCheckError::IoError(format!(
+                    "Failed to restore osu!ui.dll from backup: {}",
+                    e
+                ))
+            })?;
         }
         if osu_gameplay_bak.exists() {
-            fs::remove_file(&osu_gameplay)
-                .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to remove osu!gameplay.dll: {}", e)))?;
+            if osu_gameplay.exists() {
+                fs::remove_file(&osu_gameplay).await.map_err(|e| {
+                    CorruptionCheckError::IoError(format!(
+                        "Failed to remove osu!gameplay.dll: {}",
+                        e
+                    ))
+                })?;
+            }
+
             fs::rename(&osu_gameplay_bak, &osu_gameplay)
                 .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to restore osu!gameplay.dll from backup: {}", e)))?;
+                .map_err(|e| {
+                    CorruptionCheckError::IoError(format!(
+                        "Failed to restore osu!gameplay.dll from backup: {}",
+                        e
+                    ))
+                })?;
         }
         if osu_seasonal_bak.exists() {
-            fs::remove_file(&osu_seasonal)
-                .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to remove osu!seasonal.dll: {}", e)))?;
+            if osu_seasonal.exists() {
+                fs::remove_file(&osu_seasonal).await.map_err(|e| {
+                    CorruptionCheckError::IoError(format!(
+                        "Failed to remove osu!seasonal.dll: {}",
+                        e
+                    ))
+                })?;
+            }
+
             fs::rename(&osu_seasonal_bak, &osu_seasonal)
                 .await
-                .map_err(|e| CorruptionCheckError::IoError(format!("Failed to restore osu!seasonal.dll from backup: {}", e)))?;
+                .map_err(|e| {
+                    CorruptionCheckError::IoError(format!(
+                        "Failed to restore osu!seasonal.dll from backup: {}",
+                        e
+                    ))
+                })?;
         }
         return Ok(false);
     }
 
     if !osu_ui.exists() || !osu_gameplay.exists() || !osu_seasonal.exists() {
-        return Ok(false);
+        return Ok(true);
     }
 
-    Ok(true)
+    Ok(false)
 }
 
 #[tauri::command]
