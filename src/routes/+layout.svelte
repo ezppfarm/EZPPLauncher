@@ -29,7 +29,7 @@
   import { Buffer } from 'buffer';
   import SileoToast from '@/components/ui/sileo/sileo-toast.svelte';
   import { userAuth } from '@/userAuthentication';
-  import { encryptString, exit, getLauncherVersion, getPlatform } from '@/osuUtil';
+  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
   import Button from '@/components/ui/button/button.svelte';
   import * as presence from '@/presence';
   import { fade } from 'svelte/transition';
@@ -115,6 +115,7 @@
     platform.set(await getPlatform());
     if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
+    firstStartup.set(isFirstStartup);
     $userAuth.init();
 
     document.addEventListener('keydown', (e) => {
@@ -263,8 +264,6 @@
         presenceLoading.set(false);
       }
     } catch {}
-
-    firstStartup.set(isFirstStartup);
   });
 </script>
 
