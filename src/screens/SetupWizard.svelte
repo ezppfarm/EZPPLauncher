@@ -280,7 +280,6 @@
                 disabled={$platform !== 'windows'}
                 onCheckedChange={async (e) => {
                   patch.set(e);
-                  $userSettings.save();
                 }}
                 class="flex items-center justify-center w-5 h-5"
               ></Checkbox>
@@ -299,8 +298,6 @@
                     cursorSmoothening.set(false);
                   }
                   customCursor.set(e);
-
-                  $userSettings.save();
                 }}
                 class="flex items-center justify-center w-5 h-5"
               ></Checkbox>
@@ -317,7 +314,6 @@
                 onCheckedChange={async (e) => {
                   if (!$customCursor) return;
                   cursorSmoothening.set(e);
-                  $userSettings.save();
                 }}
                 disabled={!$customCursor}
                 class="flex items-center justify-center w-5 h-5"
@@ -335,7 +331,6 @@
                 checked={$reduceAnimations}
                 onCheckedChange={async (e) => {
                   reduceAnimations.set(e);
-                  $userSettings.save();
                 }}
                 class="flex items-center justify-center w-5 h-5"
               ></Checkbox>
