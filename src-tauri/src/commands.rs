@@ -1,5 +1,4 @@
 use hardware_id::get_id;
-use osynic_osudb::entity::osu::osudb::OsuDB;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -13,6 +12,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::{Duration, sleep};
 
+use crate::osudb::parse_osudb;
 use crate::presence;
 use crate::utils::{
     check_folder_completeness, encrypt_password, get_osu_config, get_osu_user_config,
@@ -161,10 +161,10 @@ pub async fn get_beatmapsets_count(folder: String) -> Option<u64> {
     if !osu_db_path.exists() {
         return Some(0);
     }
-    let mut osudb = OsuDB::from_file(&osu_db_path).unwrap();
-    let beatmaps = osudb.beatmaps.iter_mut();
-    let beatmap_sets = beatmaps.map(|b| b.beatmapset_id).collect::<HashSet<_>>();
-    return Some(beatmap_sets.len() as u64);
+    let osu_db_bytes = fs::read(osu_db_path).await.ok()?;
+    let osu_db = parse_osudb(osu_db_bytes).ok()?;
+    let beatmap_sets = osu_db.beatmaps.iter().map(|b| b.beatmapset_id).collect::<HashSet<_>>().len();
+    Some(beatmap_sets as u64)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -620,28 +620,25 @@ pub fn replace_ui_files(folder: String, revert: bool) -> Result<(), ReplaceUIErr
             })?;
         }
 
-        std::fs::copy(source, dest).map_err(|e| {
-            ReplaceUIError::IoError(format!("Failed to copy {}: {}", name, e))
-        })?;
+        std::fs::copy(source, dest)
+            .map_err(|e| ReplaceUIError::IoError(format!("Failed to copy {}: {}", name, e)))?;
         Ok(())
     };
 
-    let restore_backup = |bak: &PathBuf,
-                          dest: &PathBuf,
-                          name: &str|
-     -> Result<(), ReplaceUIError> {
-        if bak.exists() {
-            if dest.exists() {
-                std::fs::remove_file(dest).map_err(|e| {
-                    ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e))
+    let restore_backup =
+        |bak: &PathBuf, dest: &PathBuf, name: &str| -> Result<(), ReplaceUIError> {
+            if bak.exists() {
+                if dest.exists() {
+                    std::fs::remove_file(dest).map_err(|e| {
+                        ReplaceUIError::IoError(format!("Failed to remove {}: {}", name, e))
+                    })?;
+                }
+                std::fs::rename(bak, dest).map_err(|e| {
+                    ReplaceUIError::IoError(format!("Failed to rename {} from backup: {}", name, e))
                 })?;
             }
-            std::fs::rename(bak, dest).map_err(|e| {
-                ReplaceUIError::IoError(format!("Failed to rename {} from backup: {}", name, e))
-            })?;
-        }
-        Ok(())
-    };
+            Ok(())
+        };
 
     if !revert {
         if osu_ui.exists() && !osu_ui_bak.exists() {

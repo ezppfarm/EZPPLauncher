@@ -4,6 +4,7 @@ use tauri::Manager;
 pub mod commands;
 pub mod presence;
 pub mod utils;
+pub mod osudb;
 use crate::commands::{
     check_for_corruption, download_ezpp_launcher_update, download_ezpp_launcher_update_files,
     encrypt_string, exit, find_osu_installation, get_beatmapsets_count,

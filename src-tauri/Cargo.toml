@@ -31,11 +31,12 @@ sysinfo = "0.38.4"
 reqwest = { version = "0.13.2", features = ["json", "stream", "query"] }
 md5 = "0.8.0"
 tokio = { version = "1.52.1", features = ["full"] }
-open = "5.3.3"
+open = "5.3.4"
 discord-rich-presence = "1.1.0"
 once_cell = "1.21.4"
 futures-util = "0.3.32"
-osynic_osudb = "0.1.5"
+byteorder = "1.5.0"
+anyhow = "1.0.102"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56.0"
