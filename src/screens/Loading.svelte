@@ -158,7 +158,6 @@
 
         currentLoadingInfo.set('Counting skins...');
         const skins_list = await getSkins($osuInstallationPath);
-        console.log(skins_list);
         if (skins_list) {
           skins.set(skins_list);
           skinsCount.set(skins_list.length);
