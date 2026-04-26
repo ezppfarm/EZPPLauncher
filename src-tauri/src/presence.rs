@@ -1,6 +1,6 @@
 use discord_rich_presence::{
-    activity::{Activity, Assets, Button, Timestamps},
     DiscordIpc, DiscordIpcClient,
+    activity::{Activity, Assets, Button, Timestamps},
 };
 use once_cell::sync::Lazy;
 use std::future::Future;
@@ -91,36 +91,53 @@ impl PresenceActor {
         }
     }
 
-    fn handle_connect(&mut self, responder: oneshot::Sender<bool>) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
+    fn handle_connect(
+        &mut self,
+        responder: oneshot::Sender<bool>,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async move {
-        if self.client.is_some() {
-            let _ = responder.send(true);
-            return;
-        }
-
-        println!("Actor: Connecting to Discord...");
-        let mut dc_client = DiscordIpcClient::new("1032772293220384808");
-        match dc_client.connect() {
-            Ok(()) => {
-                self.client = Some(dc_client);
-                println!("Actor: Connected successfully.");
-                self.handle_update().await;
+            if self.client.is_some() {
                 let _ = responder.send(true);
+                return;
             }
-            Err(e) => {
-                eprintln!("Failed to connect to Discord: {:?}. Retrying in 5s...", e);
-                let tx = PRESENCE_TX.clone();
-                tokio::spawn(async move {
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    let (resp_tx, _) = oneshot::channel();
-                    let _ = tx.send(PresenceCommand::Connect(resp_tx)).await;
-                });
-                
-                if !responder.is_closed() {
-                    let _ = responder.send(false);
+
+            println!("Actor: Connecting to Discord...");
+            let mut dc_client = DiscordIpcClient::new("1032772293220384808");
+            match dc_client.connect() {
+                Ok(()) => {
+                    self.client = Some(dc_client);
+                    println!("Actor: Connected successfully.");
+                    self.handle_update().await;
+                    let _ = responder.send(true);
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Failed to connect to Discord: {:?}. Scheduling bounded retry...",
+                        e
+                    );
+                    let tx = PRESENCE_TX.clone();
+                    tokio::spawn(async move {
+                        for attempt in 1..=3 {
+                            tokio::time::sleep(Duration::from_secs(5 * attempt)).await;
+                            let (resp_tx, rx) = oneshot::channel();
+                            if tx.send(PresenceCommand::Connect(resp_tx)).await.is_ok() {
+                                if rx.await.unwrap_or(false) {
+                                    println!("Actor: Reconnection attempt {} succeeded", attempt);
+                                    break;
+                                }
+                                println!(
+                                    "Actor: Reconnection attempt {} failed, retrying...",
+                                    attempt
+                                );
+                            }
+                        }
+                    });
+
+                    if !responder.is_closed() {
+                        let _ = responder.send(false);
+                    }
                 }
             }
-        }
         })
     }
 
@@ -164,8 +181,13 @@ impl PresenceActor {
                 eprintln!("Failed to set activity, disconnecting: {:?}", e);
                 self.client = None;
 
-                let (tx, _) = oneshot::channel();
-                self.handle_connect(tx).await;
+                // Don't await reconnection here - send command to avoid blocking the actor
+                let tx = PRESENCE_TX.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    let (resp_tx, _) = oneshot::channel();
+                    let _ = tx.send(PresenceCommand::Connect(resp_tx)).await;
+                });
             } else {
                 println!("Actor: Presence updated successfully.");
             }
