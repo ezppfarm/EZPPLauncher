@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "ezpplauncher"
-version = "3.1.5"
+version = "3.1.6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
