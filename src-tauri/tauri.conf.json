@@ -44,6 +44,7 @@
       "nsis": {
         "installMode": "currentUser",
         "compression": "lzma",
+        "installerIcon": "icons/icon.ico",
         "installerHooks": "./nsis/nsis-hooks.nsh"
       }
     },
