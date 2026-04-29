@@ -17,7 +17,7 @@
 </script>
 
 <button
-  class="group flex items-center h-12 rounded-full bg-primary-300 disabled:bg-primary-300/70 shadow-lg shadow-primary/25 transition-all not-disabled:hover:shadow-primary/40 not-disabled:hover:brightness-110 not-disabled:active:scale-[0.98] cursor-pointer w-fit"
+  class="group flex items-center h-12 rounded-full bg-primary disabled:bg-primary/70 shadow-lg shadow-primary/25 transition-all not-disabled:hover:shadow-primary/40 not-disabled:hover:brightness-110 not-disabled:active:scale-[0.98] cursor-pointer w-fit"
   disabled={prop.disabled}
   onclick={prop.onClick}
 >

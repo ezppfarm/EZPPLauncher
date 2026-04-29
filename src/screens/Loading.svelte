@@ -15,6 +15,7 @@
     osuStream,
     skins,
     skinsCount,
+    theme,
   } from '@/global';
   import {
     cursorSmoothness,
@@ -42,6 +43,7 @@
   import { git } from '@/api/git';
   import { sileo } from 'sileo';
   import type { EZPPUser } from '@/types';
+  import { THEMES } from '@/themes';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -131,6 +133,9 @@
     }
 
     if (!$firstStartup) {
+      const launcherTheme = $userSettings.value('launcherTheme').get('default');
+      const them = THEMES.find((theme) => theme.name === launcherTheme);
+      if (them) theme.set(them);
       currentLoadingInfo.set('Checking osu installation path...');
       const validFolder = await isValidOsuFolder($osuInstallationPath);
       if (!validFolder) {
@@ -259,11 +264,11 @@
       viewBox="0 0 208 208"
     >
       <circle
+        class="stroke-primary"
         cx="104"
         cy="104"
         r="90"
         fill="none"
-        stroke="#ff0098"
         stroke-width="8"
         stroke-linecap="round"
         stroke-dasharray="180 385"

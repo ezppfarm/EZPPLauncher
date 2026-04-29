@@ -7,7 +7,9 @@ const osuSkinsCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
-export const sortSkins = (skins: { name: string, author: string | undefined, modified: number}[]) =>
+export const sortSkins = (
+  skins: { name: string; author: string | undefined; modified: number }[]
+) =>
   skins.sort((a, b) => {
     const pa = priority[a.name[0]];
     const pb = priority[b.name[0]];

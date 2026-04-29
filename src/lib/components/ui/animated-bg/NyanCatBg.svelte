@@ -1,7 +1,6 @@
 <script lang="ts">
-  import NyanCat from '$assets/nyan-cat.gif';
+  import NyanCat from '$assets/themes/nyan_cat/image.gif';
   import { reduceAnimations } from '@/userSettings';
-  import { fade } from 'svelte/transition';
 
   //TODO: maybe dynamic background images fetched from ezpp?
 

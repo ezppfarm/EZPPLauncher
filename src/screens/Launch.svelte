@@ -13,7 +13,6 @@
     launcherVersion,
     launching,
     newVersion,
-    nyanCatSong,
     osuBuild,
     osuStream,
     platform,
@@ -22,6 +21,8 @@
     serverPing,
     skins,
     skinsCount,
+    theme,
+    theme_video,
     trackingEnabled,
   } from '@/global';
   import {
@@ -110,6 +111,7 @@
   import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
+  import { THEMES } from '@/themes';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -435,20 +437,20 @@
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
-      if ($nyanCatSong) {
-        const audio = $nyanCatSong;
+      if ($theme_video) {
+        const video = $theme_video;
         const fadeOutDuration = 2000; // 2 seconds
         const fadeOutSteps = 20;
         const fadeOutStepTime = fadeOutDuration / fadeOutSteps;
-        const volumeStep = audio.volume / fadeOutSteps;
+        const volumeStep = video.volume / fadeOutSteps;
 
         const fadeOutInterval = setInterval(() => {
-          if (audio.volume > 0) {
-            audio.volume = Math.max(0, audio.volume - volumeStep);
+          if (video.volume > 0) {
+            video.volume = Math.max(0, video.volume - volumeStep);
           } else {
             clearInterval(fadeOutInterval);
-            audio.pause();
-            audio.currentTime = 0;
+            video.pause();
+            video.currentTime = 0;
           }
         }, fadeOutStepTime);
       }
@@ -563,20 +565,21 @@
       cleanup = true;
       launchInfo = 'Cleaning up...';
 
-      if ($nyanCatSong) {
-        const audio = $nyanCatSong;
-        audio.play();
-        audio.volume = 0;
+      if ($theme_video) {
+        const video = $theme_video;
+        video.play();
+        video.currentTime = 0;
+        video.volume = 0;
 
         const fadeInVolume = 0.15;
         const fadeInDuration = 2000; // 2 seconds
         const fadeInSteps = 20;
         const fadeInStepTime = fadeInDuration / fadeInSteps;
-        const volumeStep = (fadeInVolume - audio.volume) / fadeInSteps;
+        const volumeStep = (fadeInVolume - video.volume) / fadeInSteps;
 
         const fadeInInterval = setInterval(() => {
-          if (audio.volume < fadeInVolume) {
-            audio.volume = Math.min(fadeInVolume, audio.volume + volumeStep);
+          if (video.volume < fadeInVolume) {
+            video.volume = Math.min(fadeInVolume, video.volume + volumeStep);
           } else {
             clearInterval(fadeInInterval);
           }
@@ -925,15 +928,15 @@
   <div
     class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >
-    <div class="bg-primary-800/80 ring-1 ring-inset ring-white/15 rounded-[1.1rem] p-1.5">
+    <div class="bg-primary/30 ring-1 ring-inset ring-white/15 rounded-[1.1rem] p-1.5">
       <img class="pointer-events-none" src={Logo} alt="logo" bind:this={ezppLogo} />
     </div>
     <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15 {selectedView ===
       'home'
-        ? 'bg-primary-300/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 rounded-[0.85rem] p-3 mt-3"
+        ? 'bg-primary/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
       disabled={$launching}
       onclick={() => {
         if (!$launching) selectedView = 'home';
@@ -944,8 +947,8 @@
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
       'settings'
-        ? 'bg-primary-300/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary-300/50 rounded-[0.85rem] p-3 mt-3"
+        ? 'bg-primary/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
       disabled={$launching}
       onclick={() => {
         if (!$launching) selectedView = 'settings';
@@ -1009,7 +1012,9 @@
         }}
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
-        <div class="relative z-10 px-8 py-4 flex items-center justify-between">
+        <div
+          class="relative z-10 px-8 py-4 flex items-center justify-between bg-black/40 backdrop-blur-sm border-t border-t-theme-900"
+        >
           <div class="flex items-center gap-4">
             {#if $osuInstallationPath !== ''}
               <div class="flex items-center gap-2">
@@ -1479,6 +1484,39 @@
               </Select.Root>
             </div>
           {/if}
+          <div class="flex flex-col">
+            <Label class="text-sm" for="setting-custom-cursor">launcher theme</Label>
+            <div class="text-muted-foreground text-xs">select the theme of this interface</div>
+          </div>
+          <div class="flex flex-row w-full">
+            <Select.Root
+              type="single"
+              value={$theme.name ?? 'default'}
+              onValueChange={async (them) => {
+                const newTheme = THEMES.find((theme) => theme.name === them);
+                if (newTheme) theme.set(newTheme);
+                $userSettings.value('launcherTheme').set(them);
+                await $userSettings.save();
+              }}
+            >
+              <Select.Trigger
+                class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+              >
+                <div class="flex flex-row items-center gap-2 font-normal text-foreground">
+                  {$theme.display_name}
+                </div>
+              </Select.Trigger>
+              <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
+                {#each THEMES as theme (theme.name)}
+                  <Select.Item value={theme.name}>
+                    <div class="flex flex-row gap-2 items-center">
+                      {theme.display_name}
+                    </div>
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
         </div>
       </div>
     {:else if selectedView === 'login'}

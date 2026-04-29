@@ -1,6 +1,5 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import NyanCatSong from '$assets/nyan-cat.mp3';
   import '../app.css';
 
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
@@ -10,10 +9,11 @@
     discordPresence,
     firstStartup,
     launcherVersion,
-    nyanCatSong,
     platform,
     presenceLoading,
     setupValues,
+    theme,
+    theme_video,
     trackingEnabled,
   } from '@/global';
   import { onMount } from 'svelte';
@@ -38,12 +38,10 @@
   import '@fontsource/space-mono';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
   import NyanCatBg from '@/components/ui/animated-bg/NyanCatBg.svelte';
-  import { sileo } from 'sileo';
 
   let { children } = $props();
 
   let unsupported_platform = $state<boolean>(false);
-  let secret_enabled = $state<boolean>(false);
 
   function disableReload() {
     if (window.location.hostname !== 'tauri.localhost') {
@@ -93,19 +91,6 @@
     );
   }
 
-  let konami_code = [
-    'ArrowUp',
-    'ArrowUp',
-    'ArrowDown',
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowLeft',
-    'ArrowRight',
-    'b',
-    'a',
-  ];
-
   onMount(async () => {
     window.Buffer = Buffer;
 
@@ -117,108 +102,6 @@
     const isFirstStartup = await $userSettings.init();
     firstStartup.set(isFirstStartup);
     $userAuth.init();
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === konami_code[0].toLowerCase()) {
-        konami_code.shift();
-        if (konami_code.length === 0) {
-          if (secret_enabled) {
-            sileo.success({
-              title: 'Cheatcode deactivated!',
-              duration: 3000,
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
-            });
-            const audio = $nyanCatSong;
-            if (audio) {
-              const fadeOutDuration = 2000; // 2 seconds
-              const fadeOutSteps = 20;
-              const fadeOutStepTime = fadeOutDuration / fadeOutSteps;
-              const volumeStep = audio.volume / fadeOutSteps;
-
-              const fadeOutInterval = setInterval(() => {
-                if (audio.volume > 0) {
-                  audio.volume = Math.max(0, audio.volume - volumeStep);
-                } else {
-                  audio.pause();
-                  clearInterval(fadeOutInterval);
-                }
-              }, fadeOutStepTime);
-            }
-            nyanCatSong.set(undefined);
-            secret_enabled = false;
-            konami_code = [
-              'ArrowUp',
-              'ArrowUp',
-              'ArrowDown',
-              'ArrowDown',
-              'ArrowLeft',
-              'ArrowRight',
-              'ArrowLeft',
-              'ArrowRight',
-              'b',
-              'a',
-            ];
-            return;
-          }
-          sileo.success({
-            title: 'Cheatcode activated!',
-            duration: 3000,
-            fill: '#181825',
-            styles: {
-              description: 'text-center!',
-            },
-          });
-          const audio = new Audio(NyanCatSong);
-          audio.loop = true;
-          audio.volume = 0;
-          audio.play();
-          const fadeInVolume = 0.15;
-          const fadeInDuration = 2000; // 2 seconds
-          const fadeInSteps = 20;
-          const fadeInStepTime = fadeInDuration / fadeInSteps;
-          const volumeStep = (fadeInVolume - audio.volume) / fadeInSteps;
-
-          const fadeInInterval = setInterval(() => {
-            if (audio.volume < fadeInVolume) {
-              audio.volume = Math.min(fadeInVolume, audio.volume + volumeStep);
-            } else {
-              clearInterval(fadeInInterval);
-            }
-          }, fadeInStepTime);
-          nyanCatSong.set(audio);
-
-          secret_enabled = true;
-          konami_code = [
-            'ArrowUp',
-            'ArrowUp',
-            'ArrowDown',
-            'ArrowDown',
-            'ArrowLeft',
-            'ArrowRight',
-            'ArrowLeft',
-            'ArrowRight',
-            'b',
-            'a',
-          ];
-        }
-      } else {
-        konami_code = [
-          'ArrowUp',
-          'ArrowUp',
-          'ArrowDown',
-          'ArrowDown',
-          'ArrowLeft',
-          'ArrowRight',
-          'ArrowLeft',
-          'ArrowRight',
-          'b',
-          'a',
-        ];
-      }
-    });
 
     currentLoadingInfo.set('Loading config...');
     const config_patching = $userSettings.value('patching');
@@ -298,12 +181,33 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<main>
+<main data-theme={$theme.name ?? 'default'}>
   <div class="opacity-30">
-    {#if secret_enabled}
-      <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
-        <NyanCatBg />
-      </div>
+    {#if $theme}
+      {#if $theme.assets.background_video}
+        {#key $theme.name}
+          <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+            <video
+              class="absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video"
+              autoplay
+              playsinline
+              loop
+              volume={0.15}
+              bind:this={$theme_video}
+            >
+              <source src={$theme.assets.background_video} />
+            </video>
+          </div>
+        {/key}
+      {:else if $theme.name === 'nyan_cat'}
+        <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+          <NyanCatBg />
+        </div>
+      {:else}
+        <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+          <AnimatedBg />
+        </div>
+      {/if}
     {:else}
       <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
         <AnimatedBg />
