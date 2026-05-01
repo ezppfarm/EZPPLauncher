@@ -5,15 +5,16 @@
   import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import {
+    active_custom_theme,
     currentLoadingInfo,
+    custom_theme_container,
+    custom_themes,
     discordPresence,
     firstStartup,
     launcherVersion,
     platform,
     presenceLoading,
     setupValues,
-    theme,
-    theme_video,
     trackingEnabled,
   } from '@/global';
   import { onMount } from 'svelte';
@@ -36,8 +37,9 @@
 
   import '@fontsource/sora';
   import '@fontsource/space-mono';
+  import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
+  import { sileo } from 'sileo';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
-  import NyanCatBg from '@/components/ui/animated-bg/NyanCatBg.svelte';
 
   let { children } = $props();
 
@@ -102,6 +104,32 @@
     const isFirstStartup = await $userSettings.init();
     firstStartup.set(isFirstStartup);
     $userAuth.init();
+
+    try {
+      currentLoadingInfo.set('Loading themes...');
+      const downloadableThemes = await getDownloadableThemes();
+      const themes = await getThemes();
+      const combinedThemes = [...themes];
+      for (const theme of downloadableThemes) {
+        if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
+      }
+
+      custom_themes.set(combinedThemes);
+      const activeTheme = $userSettings.value('theme').get('Default');
+      const theme = themes.find((theme) => theme.name === activeTheme);
+      if (!theme) {
+        $userSettings.value('theme').set('Default');
+        await $userSettings.save();
+        loadTheme(themes[0], $custom_theme_container!);
+      } else {
+        loadTheme(theme, $custom_theme_container!);
+      }
+    } catch {
+      sileo.error({
+        title: 'An error occured!',
+        description: 'Failed to load theme',
+      });
+    }
 
     currentLoadingInfo.set('Loading config...');
     const config_patching = $userSettings.value('patching');
@@ -181,38 +209,19 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<main data-theme={$theme.name ?? 'default'}>
+<main>
   <div class="opacity-30">
-    {#if $theme}
-      {#if $theme.assets.background_video}
-        {#key $theme.name}
-          <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
-            <video
-              class="absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video"
-              autoplay
-              playsinline
-              loop
-              volume={0.15}
-              bind:this={$theme_video}
-            >
-              <source src={$theme.assets.background_video} />
-            </video>
-          </div>
-        {/key}
-      {:else if $theme.name === 'nyan_cat'}
-        <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
-          <NyanCatBg />
-        </div>
-      {:else}
-        <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
-          <AnimatedBg />
-        </div>
-      {/if}
-    {:else}
-      <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+    <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+      <div
+        class={$active_custom_theme && $active_custom_theme.name === 'Default'
+          ? 'hidden'
+          : 'absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video'}
+        bind:this={$custom_theme_container}
+      ></div>
+      {#if ($active_custom_theme && $active_custom_theme.name === 'Default') || !$active_custom_theme}
         <AnimatedBg />
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
   {@render children()}
 </main>

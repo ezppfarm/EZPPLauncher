@@ -74,12 +74,18 @@
 
 <div class="wrapper" bind:this={wrapper}>
   <!-- Scrollable content -->
-  <div class={`content ${className}`} bind:this={container} onscroll={updateScrollbar}>
+  <div
+    class={`content ${className}`}
+    bind:this={container}
+    onscroll={updateScrollbar}
+    id="scrollable-content"
+  >
     {@render children?.()}
   </div>
 
   <!-- Custom scrollbar -->
   <div class="scrollbar" style="top: {topOffset}px;">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="thumb"
       bind:this={thumb}
@@ -87,6 +93,7 @@
       onpointermove={drag}
       onpointerup={endDrag}
       onpointercancel={endDrag}
+      aria-controls="scrollable-content"
       style="height:{thumbHeight}px; transform:translateY({thumbTop}px);"
     ></div>
   </div>
@@ -117,8 +124,8 @@
     position: absolute;
     right: 2px;
     bottom: 0;
-    width: 12px;
-    background: var(--color-theme-950);
+    width: 8px;
+    background: transparent;
     border-radius: 999px;
   }
 
@@ -126,7 +133,7 @@
   .thumb {
     position: absolute;
     width: 100%;
-    background: var(--color-theme-800);
+    background: var(--color-theme-700);
     border-radius: 999px;
     cursor: grab;
     transition: background 0.15s;

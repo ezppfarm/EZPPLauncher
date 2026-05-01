@@ -1,12 +1,16 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
+  import DefaultThemePreview from '$assets/default_preview.png';
   import * as Avatar from '@/components/ui/avatar';
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
   import * as Select from '@/components/ui/select';
   import {
+    active_custom_theme,
     beatmapSets,
     currentSkin,
+    custom_theme_container,
+    custom_themes,
     discordPresence,
     launcherStream,
     launcherStreams,
@@ -21,8 +25,6 @@
     serverPing,
     skins,
     skinsCount,
-    theme,
-    theme_video,
     trackingEnabled,
   } from '@/global';
   import {
@@ -40,12 +42,14 @@
     ArrowRight,
     Settings,
     House,
+    Paintbrush,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
   import {
     compareBuildNumbers,
+    fadeGlobalVolume,
     formatBytes,
     numberHumanReadable,
     openURL,
@@ -111,7 +115,8 @@
   import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
-  import { THEMES } from '@/themes';
+  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
+  import { downloadTheme, loadTheme } from '@/themes';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -437,23 +442,7 @@
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
-      if ($theme_video) {
-        const video = $theme_video;
-        const fadeOutDuration = 2000; // 2 seconds
-        const fadeOutSteps = 20;
-        const fadeOutStepTime = fadeOutDuration / fadeOutSteps;
-        const volumeStep = video.volume / fadeOutSteps;
-
-        const fadeOutInterval = setInterval(() => {
-          if (video.volume > 0) {
-            video.volume = Math.max(0, video.volume - volumeStep);
-          } else {
-            clearInterval(fadeOutInterval);
-            video.pause();
-            video.currentTime = 0;
-          }
-        }, fadeOutStepTime);
-      }
+      fadeGlobalVolume(0.15, 0, 2000);
 
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
@@ -565,26 +554,7 @@
       cleanup = true;
       launchInfo = 'Cleaning up...';
 
-      if ($theme_video) {
-        const video = $theme_video;
-        video.play();
-        video.currentTime = 0;
-        video.volume = 0;
-
-        const fadeInVolume = 0.15;
-        const fadeInDuration = 2000; // 2 seconds
-        const fadeInSteps = 20;
-        const fadeInStepTime = fadeInDuration / fadeInSteps;
-        const volumeStep = (fadeInVolume - video.volume) / fadeInSteps;
-
-        const fadeInInterval = setInterval(() => {
-          if (video.volume < fadeInVolume) {
-            video.volume = Math.min(fadeInVolume, video.volume + volumeStep);
-          } else {
-            clearInterval(fadeInInterval);
-          }
-        }, fadeInStepTime);
-      }
+      fadeGlobalVolume(0, 0.15, 2000);
 
       await getCurrentWindow().show();
       if (presenceUpdater) {
@@ -943,6 +913,18 @@
       }}
     >
       <House class="text-theme-200 !size-5" />
+    </Button>
+    <Button
+      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
+      'themes'
+        ? 'bg-primary/50'
+        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
+      disabled={$launching}
+      onclick={() => {
+        if (!$launching) selectedView = 'themes';
+      }}
+    >
+      <Paintbrush class="text-theme-200 !size-5" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
@@ -1484,39 +1466,6 @@
               </Select.Root>
             </div>
           {/if}
-          <div class="flex flex-col">
-            <Label class="text-sm" for="setting-custom-cursor">launcher theme</Label>
-            <div class="text-muted-foreground text-xs">select the theme of this interface</div>
-          </div>
-          <div class="flex flex-row w-full">
-            <Select.Root
-              type="single"
-              value={$theme.name ?? 'default'}
-              onValueChange={async (them) => {
-                const newTheme = THEMES.find((theme) => theme.name === them);
-                if (newTheme) theme.set(newTheme);
-                $userSettings.value('launcherTheme').set(them);
-                await $userSettings.save();
-              }}
-            >
-              <Select.Trigger
-                class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
-              >
-                <div class="flex flex-row items-center gap-2 font-normal text-foreground">
-                  {$theme.display_name}
-                </div>
-              </Select.Trigger>
-              <Select.Content class="bg-theme-950 border border-theme-950 rounded-lg">
-                {#each THEMES as theme (theme.name)}
-                  <Select.Item value={theme.name}>
-                    <div class="flex flex-row gap-2 items-center">
-                      {theme.display_name}
-                    </div>
-                  </Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </div>
         </div>
       </div>
     {:else if selectedView === 'login'}
@@ -1569,6 +1518,80 @@
             {/if}
           </Button>
         </form>
+      </div>
+    {:else if selectedView === 'themes'}
+      <div
+        class="h-[100vh] w-full flex flex-col items-center bg-black/20 backdrop-blur-sm"
+        in:fly={{
+          duration: $reduceAnimations ? 0 : 400,
+          delay: $reduceAnimations ? 0 : 400,
+          y: 5,
+          opacity: 0,
+        }}
+        out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
+      >
+        <ScrollContainer class="pt-8" topOffset={45}>
+          <div class="grid w-full gap-1 grid-cols-3 p-3 pr-5">
+            {#each $custom_themes as theme (theme.name)}
+              <div
+                class="group overflow-hidden rounded-3xl border {$active_custom_theme &&
+                $active_custom_theme.name === theme.name
+                  ? 'border-primary'
+                  : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-[295px]"
+              >
+                <img
+                  src={theme.preview || DefaultThemePreview}
+                  alt="Preview of {theme.name}"
+                  class="mb-2 h-40 w-full rounded-t-3xl object-cover object-center pointer-events-none select-none"
+                />
+                <div class="flex flex-col gap-1 p-3">
+                  <div class="mb-4 flex items-center justify-between gap-2">
+                    <div class="flex flex-col items-start">
+                      <span class="text-sm font-semibold">{theme.name}</span>
+                      <span class="text-xs text-muted-foreground">by {theme.author}</span>
+                    </div>
+                    <span class="text-xs text-muted-foreground">v{theme.version}</span>
+                  </div>
+                  <Button
+                    disabled={($active_custom_theme && $active_custom_theme.name === theme.name) ||
+                      theme.status === 'downloading' ||
+                      theme.status === 'extracting'}
+                    onclick={() => {
+                      if (theme.status === 'installed') {
+                        if ($custom_theme_container) {
+                          loadTheme(theme, $custom_theme_container);
+                          $userSettings.value('theme').set(theme.name);
+                          $userSettings.save();
+                        } else {
+                          sileo.error({
+                            title: 'Uhhm..',
+                            description: 'Failed to apply theme.',
+                          });
+                        }
+                      } else {
+                        downloadTheme(theme);
+                      }
+                    }}
+                  >
+                    {#if $active_custom_theme && $active_custom_theme.name === theme.name}
+                      Theme in use
+                    {:else if theme.status !== 'installed'}
+                      {#if theme.status === 'downloading'}
+                        Downloading Theme... ({Math.round(theme.progress * 100)}%)
+                      {:else if theme.status === 'extracting'}
+                        Extracting Theme... ({Math.round(theme.progress * 100)}%)
+                      {:else}
+                        Download Theme
+                      {/if}
+                    {:else}
+                      Use Theme
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </ScrollContainer>
       </div>
     {/if}
   </div>

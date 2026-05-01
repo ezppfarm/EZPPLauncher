@@ -15,7 +15,6 @@
     osuStream,
     skins,
     skinsCount,
-    theme,
   } from '@/global';
   import {
     cursorSmoothness,
@@ -43,7 +42,6 @@
   import { git } from '@/api/git';
   import { sileo } from 'sileo';
   import type { EZPPUser } from '@/types';
-  import { THEMES } from '@/themes';
 
   let ezppLogo: HTMLImageElement;
   let spinnerCircle: SVGCircleElement;
@@ -133,9 +131,9 @@
     }
 
     if (!$firstStartup) {
-      const launcherTheme = $userSettings.value('launcherTheme').get('default');
+/*       const launcherTheme = $userSettings.value('launcherTheme').get('default');
       const them = THEMES.find((theme) => theme.name === launcherTheme);
-      if (them) theme.set(them);
+      if (them) theme.set(them); */
       currentLoadingInfo.set('Checking osu installation path...');
       const validFolder = await isValidOsuFolder($osuInstallationPath);
       if (!validFolder) {
@@ -256,8 +254,8 @@
   });
 </script>
 
-<div class="flex flex-col items-center justify-center h-[100vh] w-full">
-  <div class="relative w-80 h-80 flex items-center justify-center">
+<div class="flex flex-col items-center justify-center h-[100vh] w-full z-10">
+  <div class="relative w-80 h-80 flex items-center justify-center z-10">
     <svg
       class="absolute top-0 left-0 w-full h-full animate-spin"
       style="animation-duration: 5s;"
@@ -283,5 +281,5 @@
       bind:this={ezppLogo}
     />
   </div>
-  <span class="text-theme-200 text-sm mt-5">{$currentLoadingInfo}</span>
+  <span class="text-theme-200 text-sm mt-5 z-10">{$currentLoadingInfo}</span>
 </div>

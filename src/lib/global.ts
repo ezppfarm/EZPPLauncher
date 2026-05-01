@@ -3,8 +3,7 @@ import { ezppfarm } from './api/ezpp';
 import type { Component } from 'svelte';
 import Loading from '../screens/Loading.svelte';
 import type { Release } from './types';
-import { THEMES } from './themes';
-
+import type { Theme } from './themes';
 export const currentView = writable<Component>(Loading);
 
 export const platform = writable<string>('');
@@ -25,8 +24,9 @@ export const currentLoadingInfo = writable<string>('Initializing...');
 export const firstStartup = writable<boolean>(false);
 
 export const launching = writable<boolean>(false);
-export const theme = writable<(typeof THEMES)[number]>(THEMES[0]);
-export const theme_video = writable<HTMLVideoElement | undefined>(undefined);
+export const custom_themes = writable<Theme[]>([]);
+export const custom_theme_container = writable<HTMLElement | undefined>(undefined);
+export const active_custom_theme = writable<Theme | undefined>(undefined);
 
 export const serverPing = writable<number | undefined>(undefined);
 export const serverConnectionFails = writable(0);

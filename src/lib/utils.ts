@@ -99,3 +99,48 @@ export const urlIsValidImage = async (url: string) => {
     return false;
   }
 };
+
+export function toURL(data: Buffer, type: string) {
+  return URL.createObjectURL(new Blob([new Uint8Array(data)], { type }));
+}
+
+export function setGlobalVolume(volume: number) {
+  const audioElements = document.querySelectorAll('audio');
+  audioElements.forEach((audio) => {
+    audio.volume = volume;
+  });
+
+  const videoElements = document.querySelectorAll('video');
+  videoElements.forEach((video) => {
+    video.volume = volume;
+  });
+}
+
+export function fadeGlobalVolume(volumeFrom: number, volumeTo: number, duration: number) {
+  const audioElements = document.querySelectorAll('audio');
+  const videoElements = document.querySelectorAll('video');
+
+  const startTime = performance.now();
+
+  function animate() {
+    const currentTime = performance.now();
+    const elapsedTime = currentTime - startTime;
+    const progress = Math.min(elapsedTime / duration, 1);
+
+    const interpolatedVolume = volumeFrom + (volumeTo - volumeFrom) * progress;
+
+    audioElements.forEach((audio) => {
+      audio.volume = interpolatedVolume;
+    });
+
+    videoElements.forEach((video) => {
+      video.volume = interpolatedVolume;
+    });
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    }
+  }
+
+  animate();
+}
