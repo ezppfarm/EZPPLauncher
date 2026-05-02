@@ -445,7 +445,7 @@
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
-      fadeGlobalVolume(0.15, 0, 2000);
+      fadeGlobalVolume($custom_theme_volume, 0, 2000);
 
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
@@ -557,7 +557,7 @@
       cleanup = true;
       launchInfo = 'Cleaning up...';
 
-      fadeGlobalVolume(0, 0.15, 2000);
+      fadeGlobalVolume(0, $custom_theme_volume, 2000);
 
       await getCurrentWindow().show();
       if (presenceUpdater) {
