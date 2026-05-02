@@ -328,6 +328,6 @@ export const toSafeName = (name: string) => {
       .replace(/[\x00-\x1F\x7F]/g, '_')
       .replace(/[\s-]+/g, '_')
       .replace(/_+/g, '_')
-      .replace(/[. ]+$/g, '')
+      .replace(/[. ]+$/g, '_')
   );
 };
