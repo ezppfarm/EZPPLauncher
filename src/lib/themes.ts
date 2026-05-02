@@ -320,11 +320,14 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
 };
 
 export const toSafeName = (name: string) => {
-  return name
-    .toLowerCase()
-    .replace(/[<>:"/\\|?*]/g, '_')
-    .replace(/[\p{Cc}]/gu, '_')
-    .replace(/[\s-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/[. ]+$/g, '');
+  return (
+    name
+      .toLowerCase()
+      .replace(/[<>:"/\\|?*]/g, '_')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1F\x7F]/g, '_')
+      .replace(/[\s-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/[. ]+$/g, '')
+  );
 };
