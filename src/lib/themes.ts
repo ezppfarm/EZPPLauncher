@@ -292,7 +292,6 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
     const reloadedThemes = [...themes];
     for (const theme of downloadableThemes) {
       if (theme.name === themeToUninstall.name) {
-        //remove theme from reloadedThemes and re insert at same position
         const themeIndex = reloadedThemes.findIndex((t) => t.name === theme.name);
         reloadedThemes.splice(themeIndex, 1);
         reloadedThemes.push(theme);
@@ -309,7 +308,6 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
         }
       }
     }
-    //sort by name, default is always first, first sort installed by name, then the others
     return reloadedThemes.sort((a, b) => {
       if (a.name === 'Default') return -1;
       if (b.name === 'Default') return 1;
