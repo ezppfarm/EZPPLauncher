@@ -322,6 +322,9 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
 export const toSafeName = (name: string) => {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
-    .replace(/-+/g, '_');
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/[\p{Cc}]/gu, '_')
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/[. ]+$/g, '');
 };
