@@ -10,6 +10,7 @@
     beatmapSets,
     currentSkin,
     custom_theme_container,
+    custom_theme_volume,
     custom_themes,
     discordPresence,
     launcherStream,
@@ -1564,7 +1565,7 @@
                       onclick={async () => {
                         if (theme.status === 'installed') {
                           if ($custom_theme_container) {
-                            loadTheme(theme, $custom_theme_container);
+                            loadTheme(theme, $custom_theme_container, $custom_theme_volume);
                             $userSettings.value('theme').set(theme.name);
                             $userSettings.save();
                           } else {
@@ -1607,7 +1608,7 @@
                         onclick={async () => {
                           const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
                           if (defaultTheme) {
-                            loadTheme(defaultTheme, $custom_theme_container!);
+                            loadTheme(defaultTheme, $custom_theme_container!, $custom_theme_volume);
                             $userSettings.value('theme').set(defaultTheme.name);
                             $userSettings.save();
 

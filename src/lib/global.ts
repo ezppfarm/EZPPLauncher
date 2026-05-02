@@ -4,6 +4,8 @@ import type { Component } from 'svelte';
 import Loading from '../screens/Loading.svelte';
 import type { Release } from './types';
 import type { Theme } from './themes';
+import { browser } from '$app/environment';
+import { setGlobalVolume } from './utils';
 export const currentView = writable<Component>(Loading);
 
 export const platform = writable<string>('');
@@ -27,6 +29,13 @@ export const launching = writable<boolean>(false);
 export const custom_themes = writable<Theme[]>([]);
 export const custom_theme_container = writable<HTMLElement | undefined>(undefined);
 export const active_custom_theme = writable<Theme | undefined>(undefined);
+export const custom_theme_audio_playing = writable<boolean>(false);
+export const custom_theme_volume = writable<number>(0.15);
+custom_theme_volume.subscribe((val) => {
+  if (browser) {
+    setGlobalVolume(val);
+  }
+});
 
 export const serverPing = writable<number | undefined>(undefined);
 export const serverConnectionFails = writable(0);

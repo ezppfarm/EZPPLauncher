@@ -8,6 +8,7 @@
     active_custom_theme,
     currentLoadingInfo,
     custom_theme_container,
+    custom_theme_volume,
     custom_themes,
     discordPresence,
     firstStartup,
@@ -41,6 +42,7 @@
   import { sileo } from 'sileo';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
   import { SemVer } from 'semver';
+  import { trackMediaContainer } from '@/utils';
 
   let { children } = $props();
 
@@ -107,14 +109,15 @@
     $userAuth.init();
 
     try {
+      const themeVolume = $userSettings.value('volume').get(0.15);
+      console.log(themeVolume);
+      custom_theme_volume.set(themeVolume);
       currentLoadingInfo.set('Loading themes...');
       const downloadableThemes = await getDownloadableThemes();
       const themes = await getThemes();
       const combinedThemes = [...themes];
       for (const theme of downloadableThemes) {
         if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
-
-        //set updateAvailable to true if downloadableTheme version is higher than installed theme version
         const installedTheme = themes.find((t) => t.name === theme.name);
         if (installedTheme) {
           const installedThemeVersion = new SemVer(installedTheme.version);
@@ -133,9 +136,9 @@
       if (!theme) {
         $userSettings.value('theme').set('Default');
         await $userSettings.save();
-        loadTheme(themes[0], $custom_theme_container!);
+        loadTheme(themes[0], $custom_theme_container!, themeVolume);
       } else {
-        loadTheme(theme, $custom_theme_container!);
+        loadTheme(theme, $custom_theme_container!, themeVolume);
       }
     } catch {
       sileo.error({
@@ -230,6 +233,7 @@
           ? 'hidden'
           : 'absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video'}
         bind:this={$custom_theme_container}
+        use:trackMediaContainer
       ></div>
       {#if ($active_custom_theme && $active_custom_theme.name === 'Default') || !$active_custom_theme}
         <AnimatedBg />

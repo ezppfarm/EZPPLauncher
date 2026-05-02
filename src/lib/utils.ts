@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { custom_theme_audio_playing } from './global';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -143,4 +144,48 @@ export function fadeGlobalVolume(volumeFrom: number, volumeTo: number, duration:
   }
 
   animate();
+}
+
+export function trackMediaContainer(node: HTMLElement) {
+  const media = new Set<HTMLMediaElement>();
+
+  function update() {
+    custom_theme_audio_playing.set(Array.from(media).some((el) => !el.paused));
+  }
+
+  function register(el: HTMLMediaElement) {
+    media.add(el);
+
+    const handler = () => update();
+    el.addEventListener('play', handler);
+    el.addEventListener('pause', handler);
+
+    return () => {
+      media.delete(el);
+      el.removeEventListener('play', handler);
+      el.removeEventListener('pause', handler);
+    };
+  }
+
+  // find existing media inside the div
+  node.querySelectorAll<HTMLMediaElement>('video, audio').forEach(register);
+
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      m.addedNodes.forEach((n) => {
+        if (n instanceof HTMLMediaElement) register(n);
+        if (n instanceof HTMLElement) {
+          n.querySelectorAll<HTMLMediaElement>('video, audio').forEach(register);
+        }
+      });
+    }
+  });
+
+  observer.observe(node, { childList: true, subtree: true });
+
+  return {
+    destroy() {
+      observer.disconnect();
+    },
+  };
 }

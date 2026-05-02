@@ -269,7 +269,7 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
   return true;
 };
 
-export const loadTheme = async (theme: Theme, themeContainer: HTMLElement) => {
+export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volume = 0.15) => {
   active_custom_theme.set(theme);
   themeContainer.innerHTML = '';
   if (theme.scriptUrl.length > 0) {
@@ -277,7 +277,7 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement) => {
     /* @vite-ignore */
     themeScript.mountTheme(themeContainer, { assets: theme.assets });
   }
-  setGlobalVolume(0.15);
+  setGlobalVolume(volume);
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {
