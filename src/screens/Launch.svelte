@@ -43,6 +43,8 @@
     Settings,
     House,
     Paintbrush,
+    Trash,
+    CloudDownload,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -116,7 +118,7 @@
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
   import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
-  import { downloadTheme, loadTheme } from '@/themes';
+  import { deleteTheme, downloadTheme, loadTheme } from '@/themes';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -1552,41 +1554,86 @@
                     </div>
                     <span class="text-xs text-muted-foreground">v{theme.version}</span>
                   </div>
-                  <Button
-                    disabled={($active_custom_theme && $active_custom_theme.name === theme.name) ||
-                      theme.status === 'downloading' ||
-                      theme.status === 'extracting'}
-                    onclick={() => {
-                      if (theme.status === 'installed') {
-                        if ($custom_theme_container) {
-                          loadTheme(theme, $custom_theme_container);
-                          $userSettings.value('theme').set(theme.name);
-                          $userSettings.save();
+                  <div class="flex items-center gap-1">
+                    <Button
+                      class="w-full"
+                      disabled={($active_custom_theme &&
+                        $active_custom_theme.name === theme.name) ||
+                        theme.status === 'downloading' ||
+                        theme.status === 'extracting'}
+                      onclick={async () => {
+                        if (theme.status === 'installed') {
+                          if ($custom_theme_container) {
+                            loadTheme(theme, $custom_theme_container);
+                            $userSettings.value('theme').set(theme.name);
+                            $userSettings.save();
+                          } else {
+                            sileo.error({
+                              title: 'Uhhm..',
+                              description: 'Failed to apply theme.',
+                            });
+                          }
                         } else {
-                          sileo.error({
-                            title: 'Uhhm..',
-                            description: 'Failed to apply theme.',
-                          });
+                          if (!(await downloadTheme(theme))) {
+                            sileo.error({
+                              title: 'Uhhm..',
+                              description: 'Failed to download theme.',
+                            });
+                          }
                         }
-                      } else {
-                        downloadTheme(theme);
-                      }
-                    }}
-                  >
-                    {#if $active_custom_theme && $active_custom_theme.name === theme.name}
-                      Theme in use
-                    {:else if theme.status !== 'installed'}
-                      {#if theme.status === 'downloading'}
-                        Downloading Theme... ({Math.round(theme.progress * 100)}%)
-                      {:else if theme.status === 'extracting'}
-                        Extracting Theme... ({Math.round(theme.progress * 100)}%)
+                      }}
+                    >
+                      {#if $active_custom_theme && $active_custom_theme.name === theme.name}
+                        Theme in use
+                      {:else if theme.status !== 'installed'}
+                        {#if theme.status === 'downloading'}
+                          {theme.updateAvailable ? 'Updating' : 'Downloading'} Theme... ({Math.round(
+                            theme.progress * 100
+                          )}%)
+                        {:else if theme.status === 'extracting'}
+                          Extracting Theme... ({Math.round(theme.progress * 100)}%)
+                        {:else}
+                          Download Theme
+                        {/if}
                       {:else}
-                        Download Theme
+                        Use Theme
                       {/if}
-                    {:else}
-                      Use Theme
+                    </Button>
+                    {#if theme.status === 'installed' && theme.updateAvailable}
+                      <Button
+                        class="min-w-[40px]"
+                        size="icon"
+                        variant="secondary"
+                        onclick={async () => {
+                          const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
+                          if (defaultTheme) {
+                            loadTheme(defaultTheme, $custom_theme_container!);
+                            $userSettings.value('theme').set(defaultTheme.name);
+                            $userSettings.save();
+
+                            if (!(await downloadTheme(theme, true))) {
+                              sileo.error({
+                                title: 'Uhhm..',
+                                description: 'Failed to update theme.',
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <CloudDownload />
+                      </Button>
                     {/if}
-                  </Button>
+                    {#if theme.status === 'installed' && $active_custom_theme && $active_custom_theme.name !== theme.name && theme.name !== 'Default'}
+                      <Button
+                        class="min-w-[40px]"
+                        size="icon"
+                        variant="destructive"
+                        onclick={() => deleteTheme(theme)}
+                      >
+                        <Trash />
+                      </Button>
+                    {/if}
+                  </div>
                 </div>
               </div>
             {/each}

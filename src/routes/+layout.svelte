@@ -40,6 +40,7 @@
   import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
   import { sileo } from 'sileo';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
+  import { SemVer } from 'semver';
 
   let { children } = $props();
 
@@ -112,6 +113,18 @@
       const combinedThemes = [...themes];
       for (const theme of downloadableThemes) {
         if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
+
+        //set updateAvailable to true if downloadableTheme version is higher than installed theme version
+        const installedTheme = themes.find((t) => t.name === theme.name);
+        if (installedTheme) {
+          const installedThemeVersion = new SemVer(installedTheme.version);
+          const downloadableThemeVersion = new SemVer(theme.version);
+          if (downloadableThemeVersion.compare(installedThemeVersion) > 0) {
+            installedTheme.updateAvailable = true;
+            const index = combinedThemes.findIndex((t) => t.name === theme.name);
+            combinedThemes[index] = installedTheme;
+          }
+        }
       }
 
       custom_themes.set(combinedThemes);
