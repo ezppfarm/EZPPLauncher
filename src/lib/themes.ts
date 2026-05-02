@@ -212,15 +212,31 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
       }
     }
   }
+  const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
+  const themeInfoObj = JSON.parse(themeInfo) as {
+    name: string;
+    version: string;
+    apiVersion: string;
+    author: string;
+    entry: string;
+    style: string;
+    preview: string;
+  };
+  const themeScriptUrl = convertFileSrc(
+    await path.normalize(`${themeFolder}/${themeInfoObj.entry}`)
+  );
+  const themeAssets = convertFileSrc(await path.normalize(`${themeFolder}/assets`));
+  const themePreview = convertFileSrc(
+    await path.normalize(`${themeFolder}/assets/${themeInfoObj.preview}`)
+  );
 
-  const currentThemes = await getThemes();
   const downloadableThemes = await getDownloadableThemes();
-  custom_themes.update(() => {
-    const reloadedThemes = [...currentThemes];
+  custom_themes.update((themes) => {
+    const reloadedThemes = [...themes];
     for (const theme of downloadableThemes) {
       if (!reloadedThemes.find((t) => t.name === theme.name)) reloadedThemes.push(theme);
 
-      const installedTheme = currentThemes.find((t) => t.name === theme.name);
+      const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
       if (installedTheme) {
         const installedThemeVersion = new SemVer(installedTheme.version);
         const downloadableThemeVersion = new SemVer(theme.version);
@@ -231,7 +247,24 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
         }
       }
     }
-    return reloadedThemes;
+    for (const installedThemes of reloadedThemes) {
+      if (installedThemes.name === theme.name) {
+        installedThemes.name = themeInfoObj.name;
+        installedThemes.author = themeInfoObj.author;
+        installedThemes.version = themeInfoObj.version;
+        installedThemes.scriptUrl = themeScriptUrl;
+        installedThemes.assets = themeAssets;
+        installedThemes.preview = themePreview;
+        installedThemes.status = 'installed';
+      }
+    }
+    return reloadedThemes.sort((a, b) => {
+      if (a.name === 'Default') return -1;
+      if (b.name === 'Default') return 1;
+      if (a.status === 'installed' && b.status !== 'installed') return -1;
+      if (a.status !== 'installed' && b.status === 'installed') return 1;
+      return a.name.localeCompare(b.name);
+    });
   });
   return true;
 };
@@ -254,14 +287,18 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
   const themeFolder = await path.join(baseThemeFolder, toSafeName(themeToUninstall.name));
   if (!(await fs.exists(themeFolder))) return false;
   await fs.remove(themeFolder, { recursive: true });
-  const currentThemes = await getThemes();
   const downloadableThemes = await getDownloadableThemes();
-  custom_themes.update(() => {
-    const reloadedThemes = [...currentThemes];
+  custom_themes.update((themes) => {
+    const reloadedThemes = [...themes];
     for (const theme of downloadableThemes) {
-      if (!reloadedThemes.find((t) => t.name === theme.name)) reloadedThemes.push(theme);
+      if (theme.name === themeToUninstall.name) {
+        //remove theme from reloadedThemes and re insert at same position
+        const themeIndex = reloadedThemes.findIndex((t) => t.name === theme.name);
+        reloadedThemes.splice(themeIndex, 1);
+        reloadedThemes.push(theme);
+      }
 
-      const installedTheme = currentThemes.find((t) => t.name === theme.name);
+      const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
       if (installedTheme) {
         const installedThemeVersion = new SemVer(installedTheme.version);
         const downloadableThemeVersion = new SemVer(theme.version);
@@ -272,7 +309,14 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
         }
       }
     }
-    return reloadedThemes;
+    //sort by name, default is always first, first sort installed by name, then the others
+    return reloadedThemes.sort((a, b) => {
+      if (a.name === 'Default') return -1;
+      if (b.name === 'Default') return 1;
+      if (a.status === 'installed' && b.status !== 'installed') return -1;
+      if (a.status !== 'installed' && b.status === 'installed') return 1;
+      return a.name.localeCompare(b.name);
+    });
   });
   return true;
 };
