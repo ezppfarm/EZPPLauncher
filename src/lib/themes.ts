@@ -8,6 +8,7 @@ import zip from 'jszip';
 import { SemVer } from 'semver';
 
 export type Theme = {
+  folder_name: string;
   name: string;
   version: string;
   author: string;
@@ -40,6 +41,7 @@ export const getDownloadableThemes = async () => {
   if (downloadableThemes.data) {
     for (const theme of downloadableThemes.data) {
       themes.push({
+        folder_name: `${toSafeName(theme.name)}-${generateRandomString(16)}`,
         name: theme.name,
         version: theme.version,
         author: theme.author,
@@ -61,6 +63,7 @@ export const getDownloadableThemes = async () => {
 export const getThemes = async (): Promise<Theme[]> => {
   const themes: Theme[] = [];
   themes.push({
+    folder_name: 'default',
     author: 'EZPPFarm',
     name: 'Default',
     version: '1.0.0',
@@ -91,6 +94,7 @@ export const getThemes = async (): Promise<Theme[]> => {
         const scriptFile = await path.join(folderPath, themeFolder.name, theme.entry);
         if (await fs.exists(scriptFile)) {
           themes.push({
+            folder_name: themeFolder.name,
             name: theme.name,
             version: theme.version,
             author: theme.author,
@@ -284,7 +288,7 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
   if (themeToUninstall.status !== 'installed') return false;
   const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
   if (!(await fs.exists(baseThemeFolder))) return false;
-  const themeFolder = await path.join(baseThemeFolder, toSafeName(themeToUninstall.name));
+  const themeFolder = await path.join(baseThemeFolder, themeToUninstall.folder_name);
   if (!(await fs.exists(themeFolder))) return false;
   await fs.remove(themeFolder, { recursive: true });
   const downloadableThemes = await getDownloadableThemes();
@@ -293,8 +297,10 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
     for (const theme of downloadableThemes) {
       if (theme.name === themeToUninstall.name) {
         const themeIndex = reloadedThemes.findIndex((t) => t.name === theme.name);
-        reloadedThemes.splice(themeIndex, 1);
-        reloadedThemes.push(theme);
+        if (themeIndex) {
+          reloadedThemes.splice(themeIndex, 1);
+          reloadedThemes.push(theme);
+        }
       }
 
       const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
@@ -308,6 +314,7 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
         }
       }
     }
+
     return reloadedThemes.sort((a, b) => {
       if (a.name === 'Default') return -1;
       if (b.name === 'Default') return 1;
@@ -330,4 +337,11 @@ export const toSafeName = (name: string) => {
       .replace(/_+/g, '_')
       .replace(/[. ]+$/g, '_')
   );
+};
+
+const generateRandomString = (length: number) => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length }, () =>
+    characters.charAt(Math.floor(Math.random() * characters.length))
+  ).join('');
 };

@@ -1535,10 +1535,10 @@
       >
         <ScrollContainer class="pt-8" topOffset={45}>
           <div class="grid w-full gap-1 grid-cols-3 p-3 pr-5">
-            {#each $custom_themes as theme (theme.name)}
+            {#each $custom_themes as theme (theme.folder_name)}
               <div
                 class="group overflow-hidden rounded-3xl border {$active_custom_theme &&
-                $active_custom_theme.name === theme.name
+                $active_custom_theme.folder_name === theme.folder_name
                   ? 'border-primary'
                   : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-[295px]"
               >
@@ -1559,7 +1559,7 @@
                     <Button
                       class="w-full"
                       disabled={($active_custom_theme &&
-                        $active_custom_theme.name === theme.name) ||
+                        $active_custom_theme.folder_name === theme.folder_name) ||
                         theme.status === 'downloading' ||
                         theme.status === 'extracting'}
                       onclick={async () => {
@@ -1584,7 +1584,7 @@
                         }
                       }}
                     >
-                      {#if $active_custom_theme && $active_custom_theme.name === theme.name}
+                      {#if $active_custom_theme && $active_custom_theme.folder_name === theme.folder_name}
                         Theme in use
                       {:else if theme.status !== 'installed'}
                         {#if theme.status === 'downloading'}
@@ -1624,7 +1624,7 @@
                         <CloudDownload />
                       </Button>
                     {/if}
-                    {#if theme.status === 'installed' && $active_custom_theme && $active_custom_theme.name !== theme.name && theme.name !== 'Default'}
+                    {#if theme.status === 'installed' && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
                       <Button
                         class="min-w-[40px]"
                         size="icon"
