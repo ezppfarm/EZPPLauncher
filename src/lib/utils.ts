@@ -106,20 +106,19 @@ export function toURL(data: Buffer, type: string) {
 }
 
 export function setGlobalVolume(volume: number) {
-  const audioElements = document.querySelectorAll('audio');
-  audioElements.forEach((audio) => {
-    audio.volume = volume;
-  });
-
-  const videoElements = document.querySelectorAll('video');
-  videoElements.forEach((video) => {
-    video.volume = volume;
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+  mediaElements.forEach((element) => {
+    element.volume = volume;
   });
 }
 
-export function fadeGlobalVolume(volumeFrom: number, volumeTo: number, duration: number) {
-  const audioElements = document.querySelectorAll('audio');
-  const videoElements = document.querySelectorAll('video');
+export function fadeGlobalVolume(
+  volumeFrom: number,
+  volumeTo: number,
+  duration: number,
+  onDone?: () => void
+) {
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
 
   const startTime = performance.now();
 
@@ -130,21 +129,34 @@ export function fadeGlobalVolume(volumeFrom: number, volumeTo: number, duration:
 
     const interpolatedVolume = volumeFrom + (volumeTo - volumeFrom) * progress;
 
-    audioElements.forEach((audio) => {
-      audio.volume = interpolatedVolume;
-    });
-
-    videoElements.forEach((video) => {
-      video.volume = interpolatedVolume;
+    mediaElements.forEach((element) => {
+      element.volume = interpolatedVolume;
     });
 
     if (progress < 1) {
       requestAnimationFrame(animate);
+    } else {
+      if (onDone) onDone();
     }
   }
 
   animate();
 }
+
+export const pauseGlobalMedia = () => {
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+  mediaElements.forEach((element) => element.pause());
+};
+
+export const resumeGlobalMedia = () => {
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+  mediaElements.forEach((element) => element.play());
+};
+
+export const setCurrentTimeGlobalMedia = (time: number) => {
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+  mediaElements.forEach((element) => (element.currentTime = time));
+};
 
 export function trackMediaContainer(node: HTMLElement) {
   const media = new Set<HTMLMediaElement>();

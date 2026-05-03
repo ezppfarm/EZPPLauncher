@@ -56,7 +56,10 @@
     formatBytes,
     numberHumanReadable,
     openURL,
+    pauseGlobalMedia,
     releaseStreamToReadable,
+    resumeGlobalMedia,
+    setCurrentTimeGlobalMedia,
     urlIsValidImage,
   } from '@/utils';
   import { fade, fly } from 'svelte/transition';
@@ -445,7 +448,7 @@
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
-      fadeGlobalVolume($custom_theme_volume, 0, 2000);
+      fadeGlobalVolume($custom_theme_volume, 0, 2000, pauseGlobalMedia);
 
       await replaceUIFiles(osuPath, false);
       await new Promise((res) => setTimeout(res, 1000));
@@ -557,6 +560,8 @@
       cleanup = true;
       launchInfo = 'Cleaning up...';
 
+      setCurrentTimeGlobalMedia(0);
+      resumeGlobalMedia();
       fadeGlobalVolume(0, $custom_theme_volume, 2000);
 
       await getCurrentWindow().show();
