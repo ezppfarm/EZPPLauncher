@@ -110,7 +110,6 @@
 
     try {
       const themeVolume = $userSettings.value('volume').get(0.15);
-      console.log(themeVolume);
       custom_theme_volume.set(themeVolume);
       currentLoadingInfo.set('Loading themes...');
       const downloadableThemes = await getDownloadableThemes();
@@ -144,6 +143,10 @@
       sileo.error({
         title: 'An error occured!',
         description: 'Failed to load theme',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
       });
     }
 

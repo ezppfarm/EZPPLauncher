@@ -1566,7 +1566,8 @@
                       disabled={($active_custom_theme &&
                         $active_custom_theme.folder_name === theme.folder_name) ||
                         theme.status === 'downloading' ||
-                        theme.status === 'extracting'}
+                        theme.status === 'extracting' ||
+                        theme.status === 'deleting'}
                       onclick={async () => {
                         if (theme.status === 'installed') {
                           if ($custom_theme_container) {
@@ -1580,10 +1581,26 @@
                             });
                           }
                         } else {
-                          if (!(await downloadTheme(theme))) {
-                            sileo.error({
-                              title: 'Uhhm..',
-                              description: 'Failed to download theme.',
+                          const downloadThemeResult = await downloadTheme(theme);
+                          if (!downloadThemeResult.success) {
+                            if (downloadThemeResult.error && downloadThemeResult.error.length > 0) {
+                              sileo.error({
+                                title: 'Uhhm..',
+                                description: downloadThemeResult.error,
+                                fill: '#181825',
+                                styles: {
+                                  description: 'text-center!',
+                                },
+                              });
+                            }
+                          } else {
+                            sileo.success({
+                              title: 'Yaay!',
+                              description: 'Theme installed successfully!',
+                              fill: '#181825',
+                              styles: {
+                                description: 'text-center!',
+                              },
                             });
                           }
                         }
@@ -1598,6 +1615,8 @@
                           )}%)
                         {:else if theme.status === 'extracting'}
                           Extracting Theme... ({Math.round(theme.progress * 100)}%)
+                        {:else if theme.status === 'deleting'}
+                          Uninstalling Theme...
                         {:else}
                           Download Theme
                         {/if}
@@ -1629,14 +1648,19 @@
                         <CloudDownload />
                       </Button>
                     {/if}
-                    {#if theme.status === 'installed' && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
+                    {#if (theme.status === 'installed' || theme.status === 'deleting') && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
                       <Button
                         class="min-w-[40px]"
                         size="icon"
                         variant="destructive"
+                        disabled={theme.status !== 'installed'}
                         onclick={() => deleteTheme(theme)}
                       >
-                        <Trash />
+                        {#if theme.status === 'deleting'}
+                          <LoaderCircle class="animate-spin" />
+                        {:else}
+                          <Trash />
+                        {/if}
                       </Button>
                     {/if}
                   </div>

@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { active_custom_theme, custom_themes } from './global';
-import { setGlobalVolume } from './utils';
+import { calculateGitBlobSha, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
 import zip from 'jszip';
 import { SemVer } from 'semver';
@@ -15,7 +15,7 @@ export type Theme = {
   scriptUrl: string;
   assets: string;
   preview: string;
-  status: 'installed' | 'downloading' | 'extracting' | 'not-installed';
+  status: 'installed' | 'downloading' | 'extracting' | 'deleting' | 'not-installed';
   progress: number;
   updateAvailable: boolean;
 };
@@ -126,8 +126,11 @@ function combineChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
   return result;
 }
 
-export const downloadTheme = async (theme: Theme, force = false): Promise<boolean> => {
-  if (theme.status !== 'not-installed' && !force) return false;
+export const downloadTheme = async (
+  theme: Theme,
+  force = false
+): Promise<{ success: boolean; error?: string }> => {
+  if (theme.status !== 'not-installed' && !force) return { success: false };
 
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === theme.name);
@@ -136,9 +139,29 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
     }
     return themes;
   });
-  const downloadUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${toSafeName(
-    theme.name
-  )}.ezpplauncher-theme`;
+  const themeFileName = `${toSafeName(theme.name)}.ezpplauncher-theme`;
+  const themeContents = await betterFetch<{
+    file_contents: {
+      sha: string;
+      download_url: string;
+    };
+  }>(
+    `https://git.ez-pp.farm/api/v1/repos/EZPPFarm/EZPPLauncher-Themes/contents-ext/themes/${themeFileName}?ref=main`
+  );
+  if (themeContents.error) {
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === theme.name);
+      if (matchedTheme) {
+        matchedTheme.status = 'not-installed';
+      }
+      return themes;
+    });
+    return {
+      success: false,
+      error: themeContents.error.message ?? 'An unknown error occurred',
+    };
+  }
+  const downloadUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${themeFileName}`;
   const downloadReq = await fetch(downloadUrl, {
     method: 'GET',
     headers: {
@@ -148,7 +171,6 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
   });
 
   if (!downloadReq.ok || downloadReq.body === null) {
-    console.log(downloadUrl);
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
       if (matchedTheme) {
@@ -156,7 +178,10 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
       }
       return themes;
     });
-    return false;
+    return {
+      success: false,
+      error: 'Failed to download theme file.',
+    };
   }
   const total = Number(downloadReq.headers.get('content-length')) || 0;
   const reader = downloadReq.body.getReader();
@@ -178,6 +203,25 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
     });
   }
 
+  const fileBuffer = combineChunks(chunks, total);
+
+  const sha = calculateGitBlobSha(Buffer.from(fileBuffer));
+  if (sha !== themeContents.data.file_contents.sha) {
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === theme.name);
+      if (matchedTheme) {
+        matchedTheme.status = 'not-installed';
+      }
+      return themes;
+    });
+    return {
+      success: false,
+      error: 'Failed to verify downloaded theme file hash.',
+    };
+  }
+
+  //TODO: check file hash
+
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === theme.name);
     if (matchedTheme) {
@@ -190,7 +234,7 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
   if (!(await fs.exists(baseThemeFolder))) await fs.mkdir(baseThemeFolder, { recursive: true });
   if (!(await fs.exists(themeFolder))) await fs.mkdir(themeFolder, { recursive: true });
 
-  const zipFile = await zip.loadAsync(combineChunks(chunks, total));
+  const zipFile = await zip.loadAsync(fileBuffer);
   const totalFiles = Object.keys(zipFile.files).length;
   let extractedFiles = 0;
   for (const zipEntry of Object.keys(zipFile.files)) {
@@ -213,6 +257,17 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
         });
       } catch (err) {
         console.log(err);
+        custom_themes.update((themes) => {
+          const matchedTheme = themes.find((t) => t.name === theme.name);
+          if (matchedTheme) {
+            matchedTheme.status = 'not-installed';
+          }
+          return themes;
+        });
+        return {
+          success: false,
+          error: 'Failed to extract theme file.',
+        };
       }
     }
   }
@@ -270,15 +325,17 @@ export const downloadTheme = async (theme: Theme, force = false): Promise<boolea
       return a.name.localeCompare(b.name);
     });
   });
-  return true;
+  return {
+    success: true,
+  };
 };
 
 export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volume = 0.15) => {
   active_custom_theme.set(theme);
   themeContainer.innerHTML = '';
   if (theme.scriptUrl.length > 0) {
-    const themeScript = await import(theme.scriptUrl);
     /* @vite-ignore */
+    const themeScript = await import(theme.scriptUrl);
     themeScript.mountTheme(themeContainer, { assets: theme.assets });
   }
   setGlobalVolume(volume);
@@ -290,6 +347,13 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
   if (!(await fs.exists(baseThemeFolder))) return false;
   const themeFolder = await path.join(baseThemeFolder, themeToUninstall.folder_name);
   if (!(await fs.exists(themeFolder))) return false;
+  custom_themes.update((themes) => {
+    const matchedTheme = themes.find((t) => t.name === themeToUninstall.name);
+    if (matchedTheme) {
+      matchedTheme.status = 'deleting';
+    }
+    return themes;
+  });
   await fs.remove(themeFolder, { recursive: true });
   const downloadableThemes = await getDownloadableThemes();
   custom_themes.update((themes) => {

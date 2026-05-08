@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { custom_theme_audio_playing } from './global';
+import * as crypto from 'crypto-js';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -200,4 +201,11 @@ export function trackMediaContainer(node: HTMLElement) {
       observer.disconnect();
     },
   };
+}
+
+export function calculateGitBlobSha(fileBuffer: Buffer): string {
+  const header = Buffer.from(`blob ${fileBuffer.length}\0`);
+  const store = Buffer.concat([header, fileBuffer]);
+
+  return crypto.SHA1(crypto.lib.WordArray.create(store)).toString(crypto.enc.Hex);
 }

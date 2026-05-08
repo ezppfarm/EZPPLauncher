@@ -124,7 +124,6 @@
 
   onMount(async () => {
     const osuPath = await autoDetectOsuInstallFolder();
-    console.log(osuPath);
     if (osuPath) {
       osuInstallPath = osuPath;
       autoDetectedOsuPath = true;
