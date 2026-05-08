@@ -22,6 +22,7 @@ It enhances the osu! experience with quality-of-life features and integration sp
 - [x] Displays ping to the EZPPFarm server
 - [x] Discord Rich Presence
 - [x] Performance Display Overlay (currently in experimental patcher release stream)
+- [x] Launcher Theming
 
 ---
 
@@ -73,3 +74,9 @@ src-tauri/target/release/ezpplauncher.exe
 ├── package.json            # Bun project config
 └── README.md
 ```
+
+---
+
+## 🎨 Launcher Themes
+
+By default, the launcher includes several downloadable themes. If you want to create your own custom theme, please use the [create-ezpplauncher-theme](https://git.ez-pp.farm/EZPPFarm/create-ezpplauncher-theme) repository for a template and instructions.
