@@ -1,20 +1,24 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::sync::Mutex;
+use std::path::PathBuf;
 use tauri::Manager;
 
 pub mod commands;
+pub mod osudb;
 pub mod presence;
 pub mod utils;
-pub mod osudb;
 use crate::commands::{
     check_for_corruption, download_ezpp_launcher_update, download_ezpp_launcher_update_files,
     encrypt_string, exit, find_osu_installation, get_beatmapsets_count,
     get_ezpp_launcher_update_files, get_hwid, get_launcher_version, get_osu_release_stream,
     get_osu_skin, get_osu_version, get_platform, get_skins, get_skins_count, has_net8,
     has_osuwinello, has_wmctrl, install_ezpp_launcher_update, is_osu_running, open_url_in_browser,
-    presence_connect, presence_disconnect, presence_is_connected, presence_update_status,
-    presence_update_user, replace_ui_files, run_osu, run_osu_updater, set_osu_config_values,
-    set_osu_user_config_values, valid_osu_folder,
+    opened_urls, presence_connect, presence_disconnect, presence_is_connected,
+    presence_update_status, presence_update_user, replace_ui_files, run_osu, run_osu_updater,
+    set_osu_config_values, set_osu_user_config_values, valid_osu_folder,
 };
+
+struct OpenedUrls(Mutex<Vec<PathBuf>>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,7 +37,32 @@ pub fn run() {
     }
 
     let app = builder
+        .manage(OpenedUrls(Mutex::new(vec![])))
+        .setup(|app| {
+            let args = std::env::args().collect::<Vec<_>>();
+            if args.len() > 1 {
+                let mut files = Vec::new();
+
+                for maybe_file in args.iter().skip(1) {
+                    if maybe_file.starts_with("-") {
+                        continue;
+                    }
+
+                    if let Ok(url) = url::Url::parse(&maybe_file) {
+                        if let Ok(path) = url.to_file_path() {
+                            files.push(path);
+                        }
+                    } else {
+                        files.push(PathBuf::from(maybe_file))
+                    }
+                }
+
+                app.state::<OpenedUrls>().0.lock().unwrap().extend(files);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            opened_urls,
             get_hwid,
             find_osu_installation,
             valid_osu_folder,

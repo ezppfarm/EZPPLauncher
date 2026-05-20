@@ -720,6 +720,17 @@
     }, 450);
   };
 
+  const setupThemeImport = async () => {
+    const initialUrls = await invoke('opened_urls');
+    if (initialUrls.length > 0) {
+      console.log(initialUrls);
+    }
+
+    await listen('opened', (event) => {
+      console.log(event.payload);
+    });
+  };
+
   onMount(() => {
     const config = $userSettings;
     const trackingConsent = config.value('tracking_consent');
@@ -736,6 +747,8 @@
       ease: (t: number) => (t - 1) ** 7 + 1,
       onComplete: doBPMAnimation,
     });
+
+    setupThemeImport();
     return () => {
       window.clearInterval(animateInterval);
     };

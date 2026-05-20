@@ -12,6 +12,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::{Duration, sleep};
 
+use crate::OpenedUrls;
 use crate::osudb::parse_osudb;
 use crate::presence;
 use crate::utils::{
@@ -19,6 +20,11 @@ use crate::utils::{
     get_window_title_by_pid, is_net8_installed, is_osuwinello_available, is_wmctrl_available,
     set_osu_config_vals, set_osu_user_config_vals,
 };
+
+#[tauri::command]
+pub fn opened_urls(app: tauri::AppHandle) -> Vec<PathBuf> {
+    app.state::<OpenedUrls>().0.lock().unwrap().clone()
+}
 
 #[tauri::command]
 pub fn get_launcher_version() -> String {
