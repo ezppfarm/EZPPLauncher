@@ -123,6 +123,8 @@
   import { sileo } from 'sileo';
   import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
   import { deleteTheme, downloadTheme, loadTheme } from '@/themes';
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -721,7 +723,7 @@
   };
 
   const setupThemeImport = async () => {
-    const initialUrls = await invoke('opened_urls');
+    const initialUrls = await invoke<string[]>('opened_urls');
     if (initialUrls.length > 0) {
       console.log(initialUrls);
     }
