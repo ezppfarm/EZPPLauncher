@@ -1,13 +1,13 @@
 <script lang="ts">
-  import Minimize from 'lucide-svelte/icons/minus';
-  import Close from 'lucide-svelte/icons/x';
-  import Volume2 from 'lucide-svelte/icons/volume-2';
+  import Minimize from '@lucide/svelte/icons/minus';
+  import Close from '@lucide/svelte/icons/x';
+  import Volume2 from '@lucide/svelte/icons/volume-2';
 
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
   import { custom_theme_audio_playing, custom_theme_volume } from '@/global';
   import { reduceAnimations, userSettings } from '@/userSettings';
-  import { Volume, Volume1, VolumeOff } from 'lucide-svelte';
+  import { Volume, Volume1, VolumeOff } from '@lucide/svelte';
 
   onMount(() => {
     const appWindow = getCurrentWindow();

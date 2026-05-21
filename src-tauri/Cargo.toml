@@ -25,29 +25,29 @@ name = "ezpplauncher_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.6", features = [] }
+tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
-tauri = { version = "2.10.3", features = ["protocol-asset"] }
+tauri = { version = "2.11.2", features = ["protocol-asset"] }
 tauri-plugin-shell = "2.3.5"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 serde_repr = "0.1.20"
-tauri-plugin-dialog = "2.7.0"
-tauri-plugin-fs = "2.5.0"
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-fs = "2.5.1"
 hardware-id = "0.3.0"
 tauri-plugin-cors-fetch = "5.0.0"
-sysinfo = "0.38.4"
-reqwest = { version = "0.13.2", features = ["json", "stream", "query"] }
+sysinfo = "0.39.2"
+reqwest = { version = "0.13.3", features = ["json", "stream", "query"] }
 md5 = "0.8.0"
-tokio = { version = "1.52.1", features = ["full"] }
-open = "5.3.4"
+tokio = { version = "1.52.2", features = ["full"] }
+open = "5.3.5"
 presenceforge = { version = "0.2.1", features = ["tokio-runtime"] }
 once_cell = "1.21.4"
 futures-util = "0.3.32"
 byteorder = "1.5.0"
 anyhow = "1.0.102"
-url = "2"
+url = "2.5.8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56.0"
@@ -57,5 +57,5 @@ widestring = "1.2.1"
 windows-sys = "0.61.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-single-instance = "2.4.1"
+tauri-plugin-single-instance = "2.4.2"
 

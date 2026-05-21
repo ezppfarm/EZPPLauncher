@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
-  import { Heart } from 'lucide-svelte';
+  import { Heart } from '@lucide/svelte';
 
   interface Sparkle {
     id: string;

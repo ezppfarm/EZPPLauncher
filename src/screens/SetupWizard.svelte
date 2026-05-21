@@ -5,7 +5,7 @@
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { Check, CircleCheckBig, CircleOff, LoaderCircle } from 'lucide-svelte';
+  import { Check, CircleCheckBig, CircleOff, LoaderCircle } from '@lucide/svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
   import {

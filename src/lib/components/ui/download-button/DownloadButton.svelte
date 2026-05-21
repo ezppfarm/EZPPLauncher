@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Ellipsis from 'lucide-svelte/icons/ellipsis';
-  import Play from 'lucide-svelte/icons/play';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import Play from '@lucide/svelte/icons/play';
 
   const prop: {
     downloading: boolean;

@@ -47,7 +47,7 @@
     Trash,
     CloudDownload,
     Import,
-  } from 'lucide-svelte';
+  } from '@lucide/svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
   import Progress from '@/components/ui/progress/progress.svelte';
