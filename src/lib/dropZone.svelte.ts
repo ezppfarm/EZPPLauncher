@@ -1,5 +1,5 @@
-import { listen } from "@tauri-apps/api/event";
-import { onDestroy } from "svelte";
+import { listen } from '@tauri-apps/api/event';
+import { onDestroy } from 'svelte';
 
 type TauriDragDropEvent = {
   paths: string[];
@@ -14,10 +14,10 @@ export const useDropZone = ({ onDrop }: { onDrop: (paths: string[]) => void }) =
   const isOver = (x: number, y: number) => {
     if (!element) return false;
     const el = document.elementFromPoint(x, y);
-    return element === el || element.contains(el);  // ← fix
+    return element === el || element.contains(el); // ← fix
   };
 
-  const dropUnlisten = listen<TauriDragDropEvent>("tauri://drag-drop", (e) => {
+  const dropUnlisten = listen<TauriDragDropEvent>('tauri://drag-drop', (e) => {
     const { x, y } = e.payload.position;
     if (isOver(x, y)) {
       onDrop(e.payload.paths);
@@ -26,13 +26,13 @@ export const useDropZone = ({ onDrop }: { onDrop: (paths: string[]) => void }) =
     isDraggingOverApp = false;
   });
 
-  const overUnlisten = listen<TauriDragDropEvent>("tauri://drag-over", (e) => {
+  const overUnlisten = listen<TauriDragDropEvent>('tauri://drag-over', (e) => {
     const { x, y } = e.payload.position;
     isDraggingOverApp = true;
     dragIn = isOver(x, y);
   });
 
-  const leaveUnlisten = listen("tauri://drag-leave", () => {
+  const leaveUnlisten = listen('tauri://drag-leave', () => {
     dragIn = false;
     isDraggingOverApp = false;
   });
@@ -44,9 +44,17 @@ export const useDropZone = ({ onDrop }: { onDrop: (paths: string[]) => void }) =
   });
 
   return {
-    get ref() { return element; },
-    set ref(el: HTMLDivElement | null) { element = el; },
-    get dragIn() { return dragIn; },
-    get isDraggingOverApp() { return isDraggingOverApp; },
+    get ref() {
+      return element;
+    },
+    set ref(el: HTMLDivElement | null) {
+      element = el;
+    },
+    get dragIn() {
+      return dragIn;
+    },
+    get isDraggingOverApp() {
+      return isDraggingOverApp;
+    },
   };
 };

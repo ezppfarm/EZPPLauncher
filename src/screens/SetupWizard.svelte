@@ -372,7 +372,7 @@
             else selectedStep = Math.min(selectedStep + 1, steps.length);
           }}
           disabled={selectedStep > steps.length ||
-            (selectedStep === 2 && (!dev && osuInstallPath.length <= 0))}
+            (selectedStep === 2 && !dev && osuInstallPath.length <= 0)}
           >{selectedStep >= steps.length ? 'Finish' : 'Next'}</Button
         >
       </div>
