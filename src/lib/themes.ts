@@ -20,6 +20,16 @@ export type Theme = {
   updateAvailable: boolean;
 };
 
+export type ThemeInfo = {
+  name: string;
+  version: string;
+  apiVersion: string;
+  author: string;
+  entry: string;
+  style: string;
+  preview: string;
+};
+
 export const getDownloadableThemes = async () => {
   const themes: Theme[] = [];
 
@@ -82,15 +92,7 @@ export const getThemes = async (): Promise<Theme[]> => {
       const themeConfigFilePath = await path.join(folderPath, themeFolder.name, 'theme.json');
       if (await fs.exists(themeConfigFilePath)) {
         const themeConfig = await fs.readTextFile(themeConfigFilePath);
-        const theme = JSON.parse(themeConfig) as {
-          name: string;
-          version: string;
-          apiVersion: string;
-          author: string;
-          entry: string;
-          style: string;
-          preview: string;
-        };
+        const theme = JSON.parse(themeConfig) as ThemeInfo;
         const scriptFile = await path.join(folderPath, themeFolder.name, theme.entry);
         if (await fs.exists(scriptFile)) {
           themes.push({
@@ -272,15 +274,7 @@ export const downloadTheme = async (
     }
   }
   const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
-  const themeInfoObj = JSON.parse(themeInfo) as {
-    name: string;
-    version: string;
-    apiVersion: string;
-    author: string;
-    entry: string;
-    style: string;
-    preview: string;
-  };
+  const themeInfoObj = JSON.parse(themeInfo) as ThemeInfo;
   const themeScriptUrl = convertFileSrc(
     await path.normalize(`${themeFolder}/${themeInfoObj.entry}`)
   );
@@ -388,6 +382,129 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
     });
   });
   return true;
+};
+
+export const checkThemeFromFile = async (filePath: string) => {
+  const normalizedFilePath = await path.normalize(filePath);
+  if (!(await fs.exists(normalizedFilePath))) {
+    return {
+      success: false,
+      error: 'File not found',
+    };
+  }
+  const fileBuffer = await fs.readFile(normalizedFilePath);
+
+  let themeInfo: ThemeInfo | undefined = undefined;
+
+  try {
+    const zipFile = await zip.loadAsync(fileBuffer);
+
+    const themeConfig = zipFile.file('theme.json');
+    if (!themeConfig) {
+      return {
+        success: false,
+        error: 'Theme config file not found',
+      };
+    }
+    const themeConfigData = await themeConfig.async('string');
+    themeInfo = JSON.parse(themeConfigData) as {
+      name: string;
+      version: string;
+      apiVersion: string;
+      author: string;
+      entry: string;
+      style: string;
+      preview: string;
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Could not read theme file',
+    };
+  }
+
+  return {
+    success: !!themeInfo,
+    themeInfo,
+  };
+};
+
+export const importThemeFromFile = async (themeName: string, filePath: string) => {
+  const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
+  const themeFolder = await path.join(baseThemeFolder, toSafeName(themeName));
+  if (!(await fs.exists(baseThemeFolder))) await fs.mkdir(baseThemeFolder, { recursive: true });
+  if (!(await fs.exists(themeFolder))) await fs.mkdir(themeFolder, { recursive: true });
+
+  const fileBuffer = await fs.readFile(filePath);
+  const zipFile = await zip.loadAsync(fileBuffer);
+  for (const zipEntry of Object.keys(zipFile.files)) {
+    const file = zipFile.file(zipEntry);
+    if (file) {
+      try {
+        const fileData = await file.async('uint8array');
+        const filePath = await path.join(themeFolder, zipEntry);
+        const dirPath = await path.dirname(filePath);
+        if (!(await fs.exists(dirPath))) await fs.mkdir(dirPath, { recursive: true });
+        await new Promise((res) => setTimeout(res, 250));
+        await fs.writeFile(filePath, fileData);
+      } catch (err) {
+        console.log(err);
+        return {
+          success: false,
+          error: 'Failed to extract theme file.',
+        };
+      }
+    }
+  }
+  const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
+  const themeInfoObj = JSON.parse(themeInfo) as ThemeInfo;
+  const themeScriptUrl = convertFileSrc(
+    await path.normalize(`${themeFolder}/${themeInfoObj.entry}`)
+  );
+  const themeAssets = convertFileSrc(await path.normalize(`${themeFolder}/assets`));
+  const themePreview = convertFileSrc(
+    await path.normalize(`${themeFolder}/assets/${themeInfoObj.preview}`)
+  );
+
+  const downloadableThemes = await getDownloadableThemes();
+  custom_themes.update((themes) => {
+    const reloadedThemes = [...themes];
+    for (const theme of downloadableThemes) {
+      if (!reloadedThemes.find((t) => t.name === theme.name)) reloadedThemes.push(theme);
+
+      const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
+      if (installedTheme) {
+        const installedThemeVersion = new SemVer(installedTheme.version);
+        const downloadableThemeVersion = new SemVer(theme.version);
+        if (downloadableThemeVersion.compare(installedThemeVersion) > 0) {
+          installedTheme.updateAvailable = true;
+          const index = reloadedThemes.findIndex((t) => t.name === theme.name);
+          reloadedThemes[index] = installedTheme;
+        }
+      }
+    }
+    for (const installedThemes of reloadedThemes) {
+      if (installedThemes.name === themeName) {
+        installedThemes.name = themeInfoObj.name;
+        installedThemes.author = themeInfoObj.author;
+        installedThemes.version = themeInfoObj.version;
+        installedThemes.scriptUrl = themeScriptUrl;
+        installedThemes.assets = themeAssets;
+        installedThemes.preview = themePreview;
+        installedThemes.status = 'installed';
+      }
+    }
+    return reloadedThemes.sort((a, b) => {
+      if (a.name === 'Default') return -1;
+      if (b.name === 'Default') return 1;
+      if (a.status === 'installed' && b.status !== 'installed') return -1;
+      if (a.status !== 'installed' && b.status === 'installed') return 1;
+      return a.name.localeCompare(b.name);
+    });
+  });
+  return {
+    success: true,
+  };
 };
 
 export const toSafeName = (name: string) => {

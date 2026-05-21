@@ -123,7 +123,14 @@
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
   import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
-  import { deleteTheme, downloadTheme, loadTheme } from '@/themes';
+  import {
+    checkThemeFromFile,
+    deleteTheme,
+    downloadTheme,
+    importThemeFromFile,
+    loadTheme,
+    type ThemeInfo,
+  } from '@/themes';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { useDropZone } from '@/dropZone.svelte';
@@ -140,9 +147,44 @@
 
   let dragAndDrop = useDropZone({
     onDrop: async (file) => {
-      console.log('dropped', file);
+      const firstFile = file[0];
+      if (!firstFile.endsWith('.ezpplauncher-theme')) {
+        sileo.error({
+          title: 'Uhh...',
+          description: 'Dropped file is not a valid theme file.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
+        });
+        return;
+      }
+      const importResult = await checkThemeFromFile(firstFile);
+      if (!importResult.success || !importResult.themeInfo) {
+        sileo.error({
+          title: 'Hmmm...',
+          description: importResult.error || 'An unknown error occurred.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
+        });
+        return;
+      }
+      droppedTheme = {
+        filePath: firstFile,
+        themeInfo: importResult.themeInfo,
+      };
     },
   });
+  let droppedTheme = $state<
+    | {
+        filePath: string;
+        themeInfo: ThemeInfo;
+      }
+    | undefined
+  >(undefined);
+  let themeInstalling = $state(false);
 
   let downloadingEZPPFiles = $state(false);
   let cleanup = $state(false);
@@ -765,21 +807,6 @@
   });
 </script>
 
-{#if dragAndDrop.isDraggingOverApp}
-  <div
-    class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm pointer-events-none"
-    transition:fade={{ duration: 300 }}
-  >
-    <div
-      class="w-[90vw] h-[90vh] flex flex-col items-center justify-center bg-theme-900 border border-theme-800 rounded-lg"
-      transition:scale={{ start: 0.7, duration: 300 }}
-    >
-      <Import size={64} />
-      <p>Drag and Drop a .ezpplauncher-theme file here to import</p>
-    </div>
-  </div>
-{/if}
-
 <AlertDialog.Root open={launchError !== undefined}>
   <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0 max-w-[90vw]">
     <div
@@ -940,7 +967,127 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
+<AlertDialog.Root open={$newVersion === undefined && !!droppedTheme}>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0 max-w-2xl"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <Import size={40} />
+      <span class="font-semibold text-xl">Import Theme</span>
+    </div>
+
+    <div
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      <p class="mb-4">
+        You are about to import the theme <strong>"{droppedTheme?.themeInfo.name}"</strong> by
+        <strong>{droppedTheme?.themeInfo.author}</strong>.
+      </p>
+      <div
+        class="mb-4 text-red-400 bg-red-800/20 border border-red-700/20 rounded-lg p-2 flex flex-col items-center justify-center"
+      >
+        <div class="text-base font-semibold">Warning</div>
+        <div>Themes from external sources may contain malicious code or assets.</div>
+        <div>Only import themes from creators you trust.</div>
+      </div>
+      <p>Are you sure you want to proceed with the installation?</p>
+    </div>
+    <div class="flex items-center justify-center mb-3 gap-4 mt-4">
+      <Button
+        class="min-w-28"
+        onclick={async () => {
+          if (!droppedTheme) {
+            sileo.error({
+              title: 'Hmmm...',
+              description: 'Failed to install theme.',
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+            });
+            return;
+          }
+          themeInstalling = true;
+          try {
+            const importResult = await importThemeFromFile(
+              droppedTheme.themeInfo.name,
+              droppedTheme.filePath
+            );
+            if (!importResult.success) {
+              sileo.error({
+                title: 'Hmmm...',
+                description:
+                  importResult.error || 'An unknown error occurred while importing your theme.',
+                fill: '#181825',
+                styles: {
+                  description: 'text-center!',
+                },
+              });
+              return;
+            }
+            sileo.success({
+              title: 'Yay!',
+              description: 'Theme imported successfully',
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+            });
+          } catch {
+            sileo.error({
+              title: 'Hmmm...',
+              description: 'An unknown error occurred while importing your theme.',
+              fill: '#181825',
+              styles: {
+                description: 'text-center!',
+              },
+            });
+          } finally {
+            droppedTheme = undefined;
+            themeInstalling = false;
+          }
+        }}
+        disabled={themeInstalling}
+      >
+        {#if themeInstalling}
+          <LoaderCircle class="animate-spin" size={18} />
+        {:else}
+          Yes, import
+        {/if}
+      </Button>
+      <Button
+        variant="outline"
+        onclick={async () => {
+          themeInstalling = false;
+          droppedTheme = undefined;
+        }}
+        disabled={themeInstalling}
+      >
+        No, don't import
+      </Button>
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
 <div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative" bind:this={dragAndDrop.ref}>
+  {#if dragAndDrop.isDraggingOverApp}
+    <div
+      class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm"
+      transition:fade={{ duration: 300 }}
+    >
+      <div
+        class="w-[90vw] h-[90vh] flex flex-col items-center justify-center bg-theme-900 border border-theme-800 rounded-lg"
+        transition:scale={{ start: 0.7, duration: 300 }}
+      >
+        <Import size={64} />
+        <p>Drag and Drop a .ezpplauncher-theme file here to import</p>
+      </div>
+    </div>
+  {/if}
   <div
     class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >
