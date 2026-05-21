@@ -878,7 +878,7 @@ pub struct PresenceButton {
 pub async fn presence_update_button(button: PresenceButton) {
     match (button.text.as_deref(), button.url.as_deref()) {
         (Some(text), Some(url)) => presence::set_button(text, url),
-        _ => presence::clear_button(),
+        _ =>presence::clear_button()
     }
 }
 

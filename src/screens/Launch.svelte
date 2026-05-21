@@ -599,18 +599,20 @@
                   username += ` (#${currentModeStats.rank})`;
 
                 await Promise.all([
-                  presence.updateButton(customButton),
                   presence.updateUser({
                     username,
                     id: $currentUser.id.toFixed(),
                   }),
+                  presence.updateButton(customButton),
                   presence.updateStatus({
                     details,
                     state,
                     largeImageKey,
                   }),
                 ]);
-              } catch {}
+              } catch (err) {
+                console.log(err);
+              }
             }
           }
         }, 1000 * 2);
