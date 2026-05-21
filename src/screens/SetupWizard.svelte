@@ -40,6 +40,7 @@
     getVersion,
     isValidOsuFolder,
   } from '@/osuUtil';
+  import { dev } from '$app/environment';
 
   let selectedStep = $state(1);
   const steps = ['Welcome', 'Locate your osu! Installation', 'Appearance Settings'];
@@ -371,7 +372,7 @@
             else selectedStep = Math.min(selectedStep + 1, steps.length);
           }}
           disabled={selectedStep > steps.length ||
-            (selectedStep === 2 && osuInstallPath.length <= 0)}
+            (selectedStep === 2 && (!dev && osuInstallPath.length <= 0))}
           >{selectedStep >= steps.length ? 'Finish' : 'Next'}</Button
         >
       </div>

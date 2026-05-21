@@ -46,6 +46,7 @@
     Paintbrush,
     Trash,
     CloudDownload,
+    Import,
   } from 'lucide-svelte';
   import NumberFlow from '@number-flow/svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
@@ -62,7 +63,7 @@
     setCurrentTimeGlobalMedia,
     urlIsValidImage,
   } from '@/utils';
-  import { fade, fly } from 'svelte/transition';
+  import { fade, fly, scale } from 'svelte/transition';
   import { Checkbox } from '@/components/ui/checkbox';
   import Label from '@/components/ui/label/label.svelte';
   import {
@@ -123,8 +124,9 @@
   import { sileo } from 'sileo';
   import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
   import { deleteTheme, downloadTheme, loadTheme } from '@/themes';
-  import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
+  import { invoke } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
+  import { useDropZone } from '@/dropZone.svelte';
 
   let selectedView = $state('home');
   let progress = $state(-1);
@@ -135,6 +137,12 @@
   let askForTrackingPermission = $state(false);
 
   let downloadingUpdate = $state(false);
+
+  let dragAndDrop = useDropZone({
+    onDrop: async (file) => {
+      console.log('dropped', file);
+    },
+  });
 
   let downloadingEZPPFiles = $state(false);
   let cleanup = $state(false);
@@ -757,6 +765,21 @@
   });
 </script>
 
+{#if dragAndDrop.isDraggingOverApp}
+  <div
+    class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm pointer-events-none"
+    transition:fade={{ duration: 300 }}
+  >
+    <div
+      class="w-[90vw] h-[90vh] flex flex-col items-center justify-center bg-theme-900 border border-theme-800 rounded-lg"
+      transition:scale={{ start: 0.7, duration: 300 }}
+    >
+      <Import size={64} />
+      <p>Drag and Drop a .ezpplauncher-theme file here to import</p>
+    </div>
+  </div>
+{/if}
+
 <AlertDialog.Root open={launchError !== undefined}>
   <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0 max-w-[90vw]">
     <div
@@ -917,7 +940,7 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative">
+<div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative" bind:this={dragAndDrop.ref}>
   <div
     class="p-3 border-r border-r-theme-900 flex flex-col items-center gap-2 z-10 bg-black/40 backdrop-blur-sm"
   >
