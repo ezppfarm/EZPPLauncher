@@ -286,8 +286,13 @@ export const downloadTheme = async (
   const downloadableThemes = await getDownloadableThemes();
   custom_themes.update((themes) => {
     const reloadedThemes = [...themes];
+
     for (const theme of downloadableThemes) {
-      if (!reloadedThemes.find((t) => t.name === theme.name)) reloadedThemes.push(theme);
+      if (theme.name === 'Default') continue; // never overwrite Default from remote
+
+      if (!reloadedThemes.find((t) => t.name === theme.name)) {
+        reloadedThemes.push(theme);
+      }
 
       const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
       if (installedTheme) {
@@ -300,17 +305,21 @@ export const downloadTheme = async (
         }
       }
     }
-    for (const installedThemes of reloadedThemes) {
-      if (installedThemes.name === theme.name) {
-        installedThemes.name = themeInfoObj.name;
-        installedThemes.author = themeInfoObj.author;
-        installedThemes.version = themeInfoObj.version;
-        installedThemes.scriptUrl = themeScriptUrl;
-        installedThemes.assets = themeAssets;
-        installedThemes.preview = themePreview;
-        installedThemes.status = 'installed';
+
+    for (const installedTheme of reloadedThemes) {
+      if (installedTheme.name === 'Default') continue; // never touch Default
+
+      if (installedTheme.name === theme.name) {
+        installedTheme.name = themeInfoObj.name;
+        installedTheme.author = themeInfoObj.author;
+        installedTheme.version = themeInfoObj.version;
+        installedTheme.scriptUrl = themeScriptUrl;
+        installedTheme.assets = themeAssets;
+        installedTheme.preview = themePreview;
+        installedTheme.status = 'installed';
       }
     }
+
     return reloadedThemes.sort((a, b) => {
       if (a.name === 'Default') return -1;
       if (b.name === 'Default') return 1;
@@ -469,8 +478,13 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
   const downloadableThemes = await getDownloadableThemes();
   custom_themes.update((themes) => {
     const reloadedThemes = [...themes];
+
     for (const theme of downloadableThemes) {
-      if (!reloadedThemes.find((t) => t.name === theme.name)) reloadedThemes.push(theme);
+      if (theme.name === 'Default') continue; // never overwrite Default from remote
+
+      if (!reloadedThemes.find((t) => t.name === theme.name)) {
+        reloadedThemes.push(theme);
+      }
 
       const installedTheme = reloadedThemes.find((t) => t.name === theme.name);
       if (installedTheme) {
@@ -483,17 +497,21 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
         }
       }
     }
-    for (const installedThemes of reloadedThemes) {
-      if (installedThemes.name === themeName) {
-        installedThemes.name = themeInfoObj.name;
-        installedThemes.author = themeInfoObj.author;
-        installedThemes.version = themeInfoObj.version;
-        installedThemes.scriptUrl = themeScriptUrl;
-        installedThemes.assets = themeAssets;
-        installedThemes.preview = themePreview;
-        installedThemes.status = 'installed';
+
+    for (const installedTheme of reloadedThemes) {
+      if (installedTheme.name === 'Default') continue; // never touch Default
+
+      if (installedTheme.name === themeName) {
+        installedTheme.name = themeInfoObj.name;
+        installedTheme.author = themeInfoObj.author;
+        installedTheme.version = themeInfoObj.version;
+        installedTheme.scriptUrl = themeScriptUrl;
+        installedTheme.assets = themeAssets;
+        installedTheme.preview = themePreview;
+        installedTheme.status = 'installed';
       }
     }
+
     return reloadedThemes.sort((a, b) => {
       if (a.name === 'Default') return -1;
       if (b.name === 'Default') return 1;

@@ -808,7 +808,7 @@
     await listen<string[]>('opened', async (event) => {
       const files = event.payload;
       if (files.length > 0) {
-        const firstFile = initialUrls[0];
+        const firstFile = files[0];
         if (!firstFile.endsWith('.ezpplauncher-theme')) {
           sileo.error({
             title: 'Uhh...',

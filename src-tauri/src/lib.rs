@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri_plugin_fs::FsExt;
 
 pub mod commands;
 pub mod osudb;
@@ -30,9 +31,32 @@ pub fn run() {
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             let app_window = app.get_webview_window("main").expect("no main window");
             app_window.set_focus().expect("failed to focus");
+            if args.len() > 1 {
+                use tauri::Emitter;
+
+                let mut files = Vec::new();
+
+                for maybe_file in args.iter().skip(1) {
+                    if maybe_file.starts_with("-") {
+                        continue;
+                    }
+
+                    let path = PathBuf::from(maybe_file);
+
+                    if path.extension().and_then(|e| e.to_str()) == Some("ezpplauncher-theme") {
+                        app.fs_scope().allow_file(&path).ok();
+                        files.push(path);
+                    }
+                }
+
+                app.state::<OpenedUrls>().0.lock().unwrap().extend(files.clone());
+
+                app.emit("opened", files.clone()).ok();
+            }
+
         }));
     }
 
@@ -48,19 +72,10 @@ pub fn run() {
                         continue;
                     }
 
-                    if let Ok(url) = url::Url::parse(&maybe_file) {
-                        if let Ok(path) = url.to_file_path() {
-                            if path.extension().and_then(|str| str.to_str())
-                                == Some("ezpplauncher-theme")
-                            {
-                                files.push(path);
-                            }
-                        }
-                    } else {
-                        let maybe_file_path = PathBuf::from(maybe_file);
-                        if maybe_file_path.extension().and_then(|str| str.to_str()) == Some("ezpplauncher-theme") {
-                            files.push(maybe_file_path);
-                        }
+                    let path = PathBuf::from(maybe_file);
+                    if path.extension().and_then(|e| e.to_str()) == Some("ezpplauncher-theme") {
+                        app.fs_scope().allow_file(&path).ok();
+                        files.push(path);
                     }
                 }
 
