@@ -42,6 +42,15 @@
       "nsis",
       "appimage"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["ezpplauncher-theme"],
+        "name": "ezppLauncher Theme",
+        "description": "ezppLauncher Theme File",
+        "role": "Viewer",
+        "mimeType": "application/x-ezpplauncher-theme"
+      }
+    ],
     "windows": {
       "webviewInstallMode": {
         "silent": true,
