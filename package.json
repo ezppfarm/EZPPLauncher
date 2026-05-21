@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "debug": "bun run tauri dev",
-    "debug:theme": "bun run tauri dev -- -- \"C:\\Users\\moebius\\Desktop\\dance.ezpplauncher-theme\"",
     "build": "bun ./scripts/build.ts",
     "vite:dev": "vite dev",
     "vite:build": "vite build && exit 0",
