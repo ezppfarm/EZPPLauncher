@@ -728,7 +728,7 @@
       console.log(initialUrls);
     }
 
-    await listen('opened', (event) => {
+    await listen<string[]>('opened', (event) => {
       console.log(event.payload);
     });
   };

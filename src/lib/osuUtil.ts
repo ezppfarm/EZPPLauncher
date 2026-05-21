@@ -17,20 +17,14 @@ export function normalizeOsuName(name: string): string {
   );
 }
 
-export const getHWID = async () => {
-  const hwid = await invoke('get_hwid');
-  return typeof hwid === 'string' ? hwid : undefined;
-};
+export const getHWID = async (): Promise<string | undefined> =>
+  await invoke<string | undefined>('get_hwid');
 
-export const isValidOsuFolder = async (folder: string): Promise<boolean> => {
-  const result = await invoke('valid_osu_folder', { folder });
-  return typeof result === 'boolean' ? result : false;
-};
+export const isValidOsuFolder = async (folder: string): Promise<boolean | undefined> =>
+  await invoke<boolean | undefined>('valid_osu_folder', { folder });
 
-export const autoDetectOsuInstallFolder = async () => {
-  const result = await invoke('find_osu_installation');
-  return typeof result === 'string' ? result : undefined;
-};
+export const autoDetectOsuInstallFolder = async () =>
+  await invoke<string | undefined>('find_osu_installation');
 
 export const setUserConfigValues = async (
   osuFolderPath: string,
@@ -50,29 +44,23 @@ export const setConfigValues = async (
     entries,
   });
 
-export const getReleaseStream = async (folder: string) => {
-  const result = await invoke('get_osu_release_stream', { folder });
-  return typeof result === 'string' ? result : undefined;
-};
+export const getReleaseStream = async (folder: string): Promise<string | undefined> =>
+  await invoke<string | undefined>('get_osu_release_stream', { folder });
 
-export const getVersion = async (folder: string) => {
-  const result = await invoke('get_osu_version', { folder });
-  return typeof result === 'string' ? result : undefined;
-};
+export const getVersion = async (folder: string): Promise<string | undefined> =>
+  await invoke<string | undefined>('get_osu_version', { folder });
 
-export const getBeatmapSetsCount = async (folder: string) => {
-  const result = await invoke('get_beatmapsets_count', {
+export const getBeatmapSetsCount = async (folder: string): Promise<number | undefined> =>
+  await invoke<number | undefined>('get_beatmapsets_count', {
     folder,
   });
-  return typeof result === 'number' ? result : 0;
-};
 
 export const getSkin = async (folder: string) => {
-  const result = await invoke('get_osu_skin', {
+  const result = await invoke<string | undefined>('get_osu_skin', {
     folder,
   });
 
-  return typeof result === 'string' ? result : 'Default';
+  return result || 'Default';
 };
 
 export const runUpdater = async (folder: string) => await invoke('run_osu_updater', { folder });
@@ -113,8 +101,8 @@ export const downloadEZPPLauncherUpdateFiles = async (
   allFiles: UpdateFile[],
   progressCallback: (file: UpdateStatus) => void
 ) => {
-  const downloadStatusListen = await listen('download-progress', (event) =>
-    progressCallback(event.payload as UpdateStatus)
+  const downloadStatusListen = await listen<UpdateStatus>('download-progress', (event) =>
+    progressCallback(event.payload)
   );
   try {
     await invoke('download_ezpp_launcher_update_files', { folder, updateFiles, allFiles });
@@ -127,20 +115,17 @@ export const replaceUIFiles = async (folder: string, revert: boolean) => {
   await invoke('replace_ui_files', { folder, revert });
 };
 
-export const isOsuRunning = async () => {
-  const result = await invoke('is_osu_running');
-  return typeof result === 'boolean' ? result : false;
-};
+export const isOsuRunning = async (): Promise<boolean> => await invoke<boolean>('is_osu_running');
 
 export const getLauncherVersion = async () => await invoke<string>('get_launcher_version');
 export const exit = async () => await invoke('exit');
-export const getPlatform = async () => await invoke<string>('get_platform');
-export const isOsuCorrupted = async (folder: string) =>
+export const getPlatform = async (): Promise<string> => await invoke<string>('get_platform');
+export const isOsuCorrupted = async (folder: string): Promise<boolean> =>
   await invoke<boolean>('check_for_corruption', { folder });
-export const hasWMCTRL = async () => await invoke<boolean>('has_wmctrl');
-export const hasOsuWinello = async () => await invoke<boolean>('has_osuwinello');
-export const hasNet8 = async () => await invoke<boolean>('has_net8');
-export const encryptString = async (str: string, entropy: string) =>
+export const hasWMCTRL = async (): Promise<boolean> => await invoke<boolean>('has_wmctrl');
+export const hasOsuWinello = async (): Promise<boolean> => await invoke<boolean>('has_osuwinello');
+export const hasNet8 = async (): Promise<boolean> => await invoke<boolean>('has_net8');
+export const encryptString = async (str: string, entropy: string): Promise<string> =>
   await invoke<string>('encrypt_string', { string: str, entropy });
 export const downloadUpdate = async (
   url: string,
