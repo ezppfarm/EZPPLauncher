@@ -524,6 +524,10 @@
             if (userStatus?.player_status.online) {
               let largeImageKey = 'ezppfarm';
               let details = 'Idle...';
+              let customButton: { text?: string; url?: string } = {
+                text: undefined,
+                url: undefined,
+              };
               let state =
                 userStatus.player_status.status.info_text.length > 0
                   ? userStatus.player_status.status.info_text
@@ -579,6 +583,10 @@
                 const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
                 const isValidImage = await urlIsValidImage(beatmapCoverImage);
                 if (isValidImage) largeImageKey = beatmapCoverImage;
+                customButton = {
+                  text: 'View Beatmap',
+                  url: `https://ez-pp.farm/beatmapsets/${userStatus.player_status.status.beatmap.set_id}/${userStatus.player_status.status.beatmap.id}`,
+                };
               }
 
               details = `[${gamemodeName}] ${details}`;
@@ -591,6 +599,7 @@
                   username += ` (#${currentModeStats.rank})`;
 
                 await Promise.all([
+                  presence.updateButton(customButton),
                   presence.updateUser({
                     username,
                     id: $currentUser.id.toFixed(),

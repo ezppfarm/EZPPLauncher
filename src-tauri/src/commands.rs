@@ -867,6 +867,21 @@ pub async fn presence_update_user(user: PresenceUser) {
     presence::update_user(user.username.as_deref(), user.id.as_deref());
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceButton {
+    text: Option<String>,
+    url: Option<String>,
+}
+
+#[tauri::command]
+pub async fn presence_update_button(button: PresenceButton) {
+    match (button.text.as_deref(), button.url.as_deref()) {
+        (Some(text), Some(url)) => presence::set_button(text, url),
+        _ => presence::clear_button(),
+    }
+}
+
 #[tauri::command]
 pub async fn presence_is_connected() -> bool {
     presence::has_presence().await
