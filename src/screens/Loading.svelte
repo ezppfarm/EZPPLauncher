@@ -1,6 +1,6 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import { estimateRefreshRate } from '@/displayUtils';
+  import { estimateFrameRate } from '@/displayUtils';
   import {
     beatmapSets,
     currentLoadingInfo,
@@ -67,15 +67,15 @@
   };
 
   const calculateCursorSmoothness = async () => {
-    const refreshRate = await estimateRefreshRate();
+    const refreshRate = await estimateFrameRate();
     const hzMin = 60;
-    const hzMax = 144;
-    const durationMin = 70;
-    const durationMax = 180;
-
+    const hzMax = 500;
+    const durationMin = 350;
+    const durationMax = 600;
+    const clamped = Math.min(Math.max(refreshRate, hzMin), hzMax);
     const duration =
-      durationMin + ((refreshRate - hzMin) / (hzMax - hzMin)) * (durationMax - durationMin);
-
+      durationMin + ((clamped - hzMin) / (hzMax - hzMin)) * (durationMax - durationMin);
+    console.log(Math.round(duration));
     cursorSmoothness.set(Math.round(duration));
   };
 

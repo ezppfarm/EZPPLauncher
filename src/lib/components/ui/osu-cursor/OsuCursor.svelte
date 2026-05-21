@@ -101,7 +101,7 @@
       duration: smoothCursor ? $cursorSmoothness : 0,
       translateX: mouseX,
       translateY: mouseY,
-      ease: (t: number) => (t - 1) ** 5 + 1,
+      ease: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
     });
 
     animate(cursor, {
