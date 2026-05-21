@@ -56,7 +56,6 @@ pub fn run() {
 
                 app.emit("opened", files.clone()).ok();
             }
-
         }));
     }
 
