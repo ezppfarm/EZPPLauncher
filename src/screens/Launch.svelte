@@ -185,7 +185,7 @@
         },
       });
 
-      const beatmapSetCount: number | null = await getBeatmapSetsCount(selectedPath);
+      const beatmapSetCount = await getBeatmapSetsCount(selectedPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
       const skins_list = await getSkins(selectedPath);
