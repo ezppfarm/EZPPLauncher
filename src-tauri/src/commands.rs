@@ -169,7 +169,12 @@ pub async fn get_beatmapsets_count(folder: String) -> Option<u64> {
     }
     let osu_db_bytes = fs::read(osu_db_path).await.ok()?;
     let osu_db = parse_osudb(osu_db_bytes).ok()?;
-    let beatmap_sets = osu_db.beatmaps.iter().map(|b| b.beatmapset_id).collect::<HashSet<_>>().len();
+    let beatmap_sets = osu_db
+        .beatmaps
+        .iter()
+        .map(|b| b.beatmapset_id)
+        .collect::<HashSet<_>>()
+        .len();
     Some(beatmap_sets as u64)
 }
 
@@ -248,7 +253,7 @@ pub async fn get_skins_count(folder: String) -> Option<u64> {
     let skins_folder = path.join("Skins");
 
     if !skins_folder.exists() {
-        return None;
+        return Some(0);
     }
 
     let mut count = 0;
@@ -437,21 +442,48 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
         }
     };
 
-    if patch {
-        sleep(Duration::from_secs(3)).await;
+    #[cfg(windows)]
+    {
+        if patch {
+            let patcher_exe_path = PathBuf::from(&folder)
+                .join("EZPPLauncher")
+                .join("patcher")
+                .join("osu!.patcher.exe");
 
-        let patcher_exe_path = PathBuf::from(&folder)
-            .join("EZPPLauncher")
-            .join("patcher")
-            .join("osu!.patcher.exe");
+            if patcher_exe_path.exists() {
+                #[cfg(windows)]
+                {
+                    let mut sys = System::new_all();
 
-        if patcher_exe_path.exists() {
-            #[cfg(windows)]
-            {
-                let _ = Command::new(&patcher_exe_path)
-                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                    .spawn()
-                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
+                    loop {
+                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+                        let mut found = false;
+
+                        for (_pid, process) in sys.processes() {
+                            if process.name() == "osu!.exe" {
+                                let pid = process.pid();
+                                let title = get_window_title_by_pid(pid);
+
+                                if !title.is_empty() && !title.contains("updater") {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if found {
+                            break;
+                        }
+
+                        sleep(Duration::from_millis(500)).await;
+                    }
+
+                    let _ = Command::new(&patcher_exe_path)
+                        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                        .spawn()
+                        .map_err(|e| format!("Failed to run patcher: {e}"))?;
+                }
             }
         }
     }
