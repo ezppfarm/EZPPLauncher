@@ -19,7 +19,7 @@
   "license": "GPL-3.0-only",
   "dependencies": {
     "@better-fetch/fetch": "^1.1.21",
-    "@fontsource/sora": "^5.2.8",
+    "@fontsource-variable/sora": "^5.2.8",
     "@fontsource/space-mono": "^5.2.9",
     "@number-flow/svelte": "^0.4.0",
     "@tailwindcss/typography": "^0.5.19",

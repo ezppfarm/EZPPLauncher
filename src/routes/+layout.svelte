@@ -35,9 +35,6 @@
   import Button from '@/components/ui/button/button.svelte';
   import * as presence from '@/presence';
   import { fade } from 'svelte/transition';
-
-  import '@fontsource/sora';
-  import '@fontsource/space-mono';
   import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
   import { sileo } from 'sileo';
   import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
