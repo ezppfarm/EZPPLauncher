@@ -337,8 +337,7 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
   active_custom_theme.set(theme);
   themeContainer.innerHTML = '';
   if (theme.scriptUrl.length > 0) {
-    /* @vite-ignore */
-    const themeScript = await import(theme.scriptUrl);
+    const themeScript = await import(/* @vite-ignore */ theme.scriptUrl);
     themeScript.mountTheme(themeContainer, { assets: theme.assets });
   }
   setGlobalVolume(volume);
