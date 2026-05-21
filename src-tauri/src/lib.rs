@@ -1,6 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use std::sync::Mutex;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::Manager;
 
 pub mod commands;
@@ -50,10 +50,17 @@ pub fn run() {
 
                     if let Ok(url) = url::Url::parse(&maybe_file) {
                         if let Ok(path) = url.to_file_path() {
-                            files.push(path);
+                            if path.extension().and_then(|str| str.to_str())
+                                == Some("ezpplauncher-theme")
+                            {
+                                files.push(path);
+                            }
                         }
                     } else {
-                        files.push(PathBuf::from(maybe_file))
+                        let maybe_file_path = PathBuf::from(maybe_file);
+                        if maybe_file_path.extension().and_then(|str| str.to_str()) == Some("ezpplauncher-theme") {
+                            files.push(maybe_file_path);
+                        }
                     }
                 }
 
