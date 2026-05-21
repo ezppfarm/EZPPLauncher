@@ -775,11 +775,68 @@
   const setupThemeImport = async () => {
     const initialUrls = await invoke<string[]>('opened_urls');
     if (initialUrls.length > 0) {
-      console.log(initialUrls);
+      const firstFile = initialUrls[0];
+      if (!firstFile.endsWith('.ezpplauncher-theme')) {
+        sileo.error({
+          title: 'Uhh...',
+          description: 'Dropped file is not a valid theme file.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
+        });
+        return;
+      }
+      const importResult = await checkThemeFromFile(firstFile);
+      if (!importResult.success || !importResult.themeInfo) {
+        sileo.error({
+          title: 'Hmmm...',
+          description: importResult.error || 'An unknown error occurred.',
+          fill: '#181825',
+          styles: {
+            description: 'text-center!',
+          },
+        });
+        return;
+      }
+      droppedTheme = {
+        filePath: firstFile,
+        themeInfo: importResult.themeInfo,
+      };
     }
 
-    await listen<string[]>('opened', (event) => {
-      console.log(event.payload);
+    await listen<string[]>('opened', async (event) => {
+      const files = event.payload;
+      if (files.length > 0) {
+        const firstFile = initialUrls[0];
+        if (!firstFile.endsWith('.ezpplauncher-theme')) {
+          sileo.error({
+            title: 'Uhh...',
+            description: 'Dropped file is not a valid theme file.',
+            fill: '#181825',
+            styles: {
+              description: 'text-center!',
+            },
+          });
+          return;
+        }
+        const importResult = await checkThemeFromFile(firstFile);
+        if (!importResult.success || !importResult.themeInfo) {
+          sileo.error({
+            title: 'Hmmm...',
+            description: importResult.error || 'An unknown error occurred.',
+            fill: '#181825',
+            styles: {
+              description: 'text-center!',
+            },
+          });
+          return;
+        }
+        droppedTheme = {
+          filePath: firstFile,
+          themeInfo: importResult.themeInfo,
+        };
+      }
     });
   };
 
