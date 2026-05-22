@@ -337,16 +337,6 @@ pub fn clear_button() {
     });
 }
 
-/// Register a Tauri event handler that cleanly disconnects presence when the
-/// application exits. Call this once in your main.rs `tauri::Builder` run callback:
-///
-/// ```rust
-/// .build(tauri::generate_context!())
-/// .expect("error building app")
-/// .run(|app, event| {
-///     presence::handle_run_event(app, &event);
-/// });
-/// ```
 pub fn handle_run_event(_app: &AppHandle, event: &RunEvent) {
     if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
         tauri::async_runtime::block_on(async {
