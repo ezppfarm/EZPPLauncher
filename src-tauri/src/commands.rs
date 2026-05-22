@@ -23,7 +23,10 @@ use crate::utils::{
 
 #[tauri::command]
 pub fn opened_urls(app: tauri::AppHandle) -> Vec<PathBuf> {
-    app.state::<OpenedUrls>().0.lock().unwrap().clone()
+    let args = app.state::<OpenedUrls>().0.lock().unwrap().clone();
+    app.state::<OpenedUrls>().0.lock().unwrap().clear();
+
+    args
 }
 
 #[tauri::command]

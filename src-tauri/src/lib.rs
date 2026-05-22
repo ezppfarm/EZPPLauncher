@@ -52,8 +52,6 @@ pub fn run() {
                     }
                 }
 
-                app.state::<OpenedUrls>().0.lock().unwrap().extend(files.clone());
-
                 app.emit("opened", files.clone()).ok();
             }
         }));
