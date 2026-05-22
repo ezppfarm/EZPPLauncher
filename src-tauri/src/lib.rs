@@ -15,7 +15,7 @@ use crate::commands::{
     get_osu_skin, get_osu_version, get_platform, get_skins, get_skins_count, has_net8,
     has_osuwinello, has_wmctrl, install_ezpp_launcher_update, is_osu_running, open_url_in_browser,
     opened_urls, presence_connect, presence_disconnect, presence_is_connected,
-    presence_update_status, presence_update_user, replace_ui_files, run_osu, run_osu_updater,
+    presence_update_status, presence_update_user, presence_update_button, replace_ui_files, run_osu, run_osu_updater,
     set_osu_config_values, set_osu_user_config_values, valid_osu_folder,
 };
 
@@ -108,6 +108,7 @@ pub fn run() {
             presence_disconnect,
             presence_update_status,
             presence_update_user,
+            presence_update_button,
             presence_is_connected,
             has_osuwinello,
             has_wmctrl,
@@ -123,12 +124,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|_app_handle, event| {
-        if let tauri::RunEvent::ExitRequested { api, .. } = event {
-            api.prevent_exit();
-
-            tauri::async_runtime::block_on(presence::disconnect());
-            std::process::exit(0);
-        }
+    app.run(|app, event| {
+        presence::handle_run_event(app, &event);
     });
 }

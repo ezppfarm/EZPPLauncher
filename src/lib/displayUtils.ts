@@ -1,19 +1,21 @@
-export function estimateRefreshRate(): Promise<number> {
+export async function estimateFrameRate(): Promise<number> {
   return new Promise((resolve) => {
-    const last = performance.now();
-    let frames = 0;
+    const samples: number[] = [];
+    let last = performance.now();
 
-    function loop() {
+    const tick = () => {
       const now = performance.now();
-      frames++;
+      samples.push(now - last);
+      last = now;
 
-      if (now - last >= 1000) {
-        resolve(frames - 2);
+      if (samples.length < 60) {
+        requestAnimationFrame(tick);
       } else {
-        requestAnimationFrame(loop);
+        const avgDelta = samples.reduce((a, b) => a + b) / samples.length;
+        resolve(Math.round(1000 / avgDelta));
       }
-    }
+    };
 
-    requestAnimationFrame(loop);
+    requestAnimationFrame(tick);
   });
 }

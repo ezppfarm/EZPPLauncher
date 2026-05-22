@@ -4,6 +4,9 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@import "@fontsource-variable/sora";
+@import "@fontsource/space-mono";
+
 :root {
   --radius: 0.625rem;
   --background: oklch(95.36% 0.017 256.57);
@@ -41,7 +44,7 @@
   --sidebar-ring: oklch(60.7% 0.226 299.68);
 
   --font-sans:
-    "Sora", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Sora Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji";
   --font-mono:
     "Space Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",

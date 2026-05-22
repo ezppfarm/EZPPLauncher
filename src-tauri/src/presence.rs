@@ -1,10 +1,8 @@
-use discord_rich_presence::{
-    DiscordIpc, DiscordIpcClient,
-    activity::{Activity, Assets, Button, Timestamps},
-};
 use once_cell::sync::Lazy;
+use presenceforge::{ActivityBuilder, AsyncDiscordIpcClient};
 use std::sync::Mutex as StdMutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, RunEvent};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, interval};
 
@@ -48,7 +46,7 @@ enum PresenceCommand {
 }
 
 enum ReconnectResult {
-    Connected(DiscordIpcClient),
+    Connected(AsyncDiscordIpcClient),
     Failed,
 }
 
@@ -56,7 +54,7 @@ struct PresenceActor {
     receiver: mpsc::Receiver<PresenceCommand>,
     reconnect_rx: mpsc::Receiver<ReconnectResult>,
     reconnect_tx: mpsc::Sender<ReconnectResult>,
-    client: Option<DiscordIpcClient>,
+    client: Option<AsyncDiscordIpcClient>,
     data: PresenceData,
     start_timestamp: i64,
     reconnecting: bool,
@@ -129,7 +127,7 @@ impl PresenceActor {
             return;
         }
 
-        match try_connect_once() {
+        match try_connect_once().await {
             Some(client) => {
                 self.client = Some(client);
                 self.reconnecting = false;
@@ -146,8 +144,7 @@ impl PresenceActor {
 
     async fn cmd_disconnect(&mut self, resp: oneshot::Sender<()>) {
         if let Some(mut client) = self.client.take() {
-            let _ = client.clear_activity();
-            let _ = client.close();
+            let _ = client.clear_activity().await;
             println!("Presence: disconnected.");
         }
         let _ = resp.send(());
@@ -159,37 +156,34 @@ impl PresenceActor {
             None => return,
         };
 
-        let mut assets = Assets::new()
+        let mut builder = ActivityBuilder::new()
+            .state(&self.data.state)
+            .details(&self.data.details)
+            .start_timestamp(self.start_timestamp as u64)
             .large_image(&self.data.large_image_key)
             .large_text(&self.data.large_image_text);
 
         if let Some(key) = &self.data.small_image_key {
-            assets = assets.small_image(key);
+            builder = builder.small_image(key);
         }
         if let Some(text) = &self.data.small_image_text {
-            assets = assets.small_text(text);
+            builder = builder.small_text(text);
         }
 
-        let buttons = if let Some(btn) = &self.data.dynamic_button {
-            vec![
-                Button::new(&btn.label, &btn.url),
-                Button::new("Join EZPPFarm", "https://ez-pp.farm/discord"),
-            ]
+        if let Some(btn) = &self.data.dynamic_button {
+            builder = builder.button(&btn.label, &btn.url);
         } else {
-            vec![
-                Button::new("Download the Launcher", "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest"),
-                Button::new("Join EZPPFarm", "https://ez-pp.farm/discord"),
-            ]
-        };
+            builder = builder.button(
+                "Download the Launcher",
+                "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest",
+            );
+        }
+        builder = builder.button("Join EZPPFarm", "https://ez-pp.farm/discord");
 
-        let activity = Activity::new()
-            .state(&self.data.state)
-            .details(&self.data.details)
-            .timestamps(Timestamps::new().start(self.start_timestamp))
-            .assets(assets)
-            .buttons(buttons);
+        let activity = builder.build();
 
-        if let Err(e) = client.set_activity(activity) {
+        /* println!("Presence: updating activity: {:?}", activity); */
+        if let Err(e) = client.set_activity(&activity).await {
             eprintln!("Presence: set_activity failed ({:?}); will reconnect.", e);
             self.client = None;
             self.spawn_reconnect_task();
@@ -213,7 +207,7 @@ impl PresenceActor {
                 );
                 tokio::time::sleep(delay).await;
 
-                if let Some(client) = try_connect_once() {
+                if let Some(client) = try_connect_once().await {
                     let _ = tx.send(ReconnectResult::Connected(client)).await;
                     return;
                 }
@@ -223,15 +217,20 @@ impl PresenceActor {
     }
 }
 
-fn try_connect_once() -> Option<DiscordIpcClient> {
-    let mut client = DiscordIpcClient::new("1032772293220384808");
-    match client.connect() {
-        Ok(()) => {
-            println!("Presence: IPC connected.");
-            Some(client)
-        }
+async fn try_connect_once() -> Option<AsyncDiscordIpcClient> {
+    match AsyncDiscordIpcClient::new("1032772293220384808").await {
+        Ok(mut client) => match client.connect().await {
+            Ok(_) => {
+                println!("Presence: IPC connected.");
+                Some(client)
+            }
+            Err(e) => {
+                eprintln!("Presence: IPC connect error: {:?}", e);
+                None
+            }
+        },
         Err(e) => {
-            eprintln!("Presence: IPC connect error: {:?}", e);
+            eprintln!("Presence: failed to create client: {:?}", e);
             None
         }
     }
@@ -295,6 +294,20 @@ pub fn update_status(state: Option<&str>, details: Option<&str>, large_image_key
     });
 }
 
+pub fn update_user(username: Option<&str>, id: Option<&str>) {
+    let data = {
+        let mut guard = PRESENCE_DATA.lock().unwrap();
+        guard.small_image_key = id.map(|s| format!("https://a.ez-pp.farm/{}", s));
+        guard.small_image_text = username.map(str::to_string);
+        guard.clone()
+    };
+
+    let tx = PRESENCE_TX.clone();
+    tokio::spawn(async move {
+        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+    });
+}
+
 pub fn set_button(label: &str, url: &str) {
     let data = {
         let mut guard = PRESENCE_DATA.lock().unwrap();
@@ -324,16 +337,20 @@ pub fn clear_button() {
     });
 }
 
-pub fn update_user(username: Option<&str>, id: Option<&str>) {
-    let data = {
-        let mut guard = PRESENCE_DATA.lock().unwrap();
-        guard.small_image_key = id.map(|s| format!("https://a.ez-pp.farm/{}", s));
-        guard.small_image_text = username.map(str::to_string);
-        guard.clone()
-    };
-
-    let tx = PRESENCE_TX.clone();
-    tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
-    });
+/// Register a Tauri event handler that cleanly disconnects presence when the
+/// application exits. Call this once in your main.rs `tauri::Builder` run callback:
+///
+/// ```rust
+/// .build(tauri::generate_context!())
+/// .expect("error building app")
+/// .run(|app, event| {
+///     presence::handle_run_event(app, &event);
+/// });
+/// ```
+pub fn handle_run_event(_app: &AppHandle, event: &RunEvent) {
+    if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+        tauri::async_runtime::block_on(async {
+            disconnect().await;
+        });
+    }
 }

@@ -7,16 +7,25 @@
 
   let { smoothCursor = true }: { smoothCursor?: boolean } = $props();
 
+  const VELOCITY_WINDOW_MS = 16;
+  const SPEED_THRESHOLD = 9;
+  const REQUIRED_CONSECUTIVE = 3;
+
   let mouseX = $state(0);
   let mouseY = $state(0);
-  let lastMouseX = $state(0);
-  let lastMouseY = $state(0);
+  let lastMouseX = 0;
+  let lastMouseY = 0;
   let isMouseDown = $state(false);
   let isHoveringInteractive = $state(false);
-  let dragStartX = $state(0);
-  let dragStartY = $state(0);
+  let dragStartX = 0;
+  let dragStartY = 0;
   let degrees = $state(0);
   let applyRotation = $state(false);
+
+  let lastVelocityTime = 0;
+  let consecutiveHighSpeed = 0;
+  let velocityAccumX = 0;
+  let velocityAccumY = 0;
 
   function isInteractive(el: Element | null): boolean {
     while (el) {
@@ -30,7 +39,6 @@
       ) {
         return true;
       }
-
       el = el.parentElement;
     }
     return false;
@@ -43,17 +51,32 @@
     const deltaX = e.pageX - window.pageXOffset - dragStartX;
     const deltaY = e.pageY - window.pageYOffset - dragStartY;
 
-    const velocityX = mouseX - lastMouseX;
-    const velocityY = mouseY - lastMouseY;
+    velocityAccumX += mouseX - lastMouseX;
+    velocityAccumY += mouseY - lastMouseY;
 
-    const dist = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+    const now = performance.now();
+    const dt = now - lastVelocityTime;
 
-    if (!applyRotation && isMouseDown && dist > 80) applyRotation = true;
+    if (dt >= VELOCITY_WINDOW_MS) {
+      const speed = Math.sqrt(velocityAccumX ** 2 + velocityAccumY ** 2) / dt;
+
+      if (speed > SPEED_THRESHOLD) {
+        consecutiveHighSpeed++;
+        if (!applyRotation && isMouseDown && consecutiveHighSpeed >= REQUIRED_CONSECUTIVE) {
+          applyRotation = true;
+        }
+      } else {
+        consecutiveHighSpeed = 0;
+      }
+
+      velocityAccumX = 0;
+      velocityAccumY = 0;
+      lastVelocityTime = now;
+    }
 
     let newDegrees = (Math.atan2(-deltaX, deltaY) * 180) / Math.PI + 24.3;
 
     let diff = (newDegrees - degrees) % 360;
-
     if (diff < -180) diff += 360;
     if (diff > 180) diff -= 360;
 
@@ -67,26 +90,18 @@
     isHoveringInteractive = isInteractive(el);
 
     if (!isMouseDown) {
-      if (isHoveringInteractive) {
-        animate(cursorAdditive, {
-          opacity: 1,
-          duration: 800,
-          ease: (t: number) => (t - 1) ** 5 + 1,
-        });
-      } else {
-        animate(cursorAdditive, {
-          opacity: 0,
-          duration: 800,
-          ease: (t: number) => (t - 1) ** 5 + 1,
-        });
-      }
+      animate(cursorAdditive, {
+        opacity: isHoveringInteractive ? 1 : 0,
+        duration: 800,
+        ease: (t: number) => (t - 1) ** 5 + 1,
+      });
     }
 
     animate(cursor, {
       duration: smoothCursor ? $cursorSmoothness : 0,
       translateX: mouseX,
       translateY: mouseY,
-      ease: (t: number) => (t - 1) ** 5 + 1,
+      ease: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
     });
 
     animate(cursor, {
@@ -107,6 +122,11 @@
     dragStartX = event.clientX;
     dragStartY = event.clientY;
 
+    velocityAccumX = 0;
+    velocityAccumY = 0;
+    consecutiveHighSpeed = 0;
+    lastVelocityTime = performance.now();
+
     isMouseDown = true;
     animate(cursorInner, {
       scale: 0.9,
@@ -124,6 +144,10 @@
   const handleMouseUp = () => {
     isMouseDown = false;
     applyRotation = false;
+    consecutiveHighSpeed = 0;
+    velocityAccumX = 0;
+    velocityAccumY = 0;
+
     animate(cursorInner, {
       scale: 1,
       duration: 500,
