@@ -106,7 +106,8 @@
             message: 'Please check your username and password.',
           };
         }
-      } catch {
+      } catch (err) {
+        console.log(err);
         userLoginResult = {
           message: 'There was an issue connecting to the server. Please try again later.',
         };
@@ -122,7 +123,8 @@
           preferredMode.set(userInfo.player.info.preferred_mode);
           preferredType.set(userInfo.player.info.preferred_type);
         }
-      } catch {
+      } catch (err) {
+        console.log(err);
         userLoginResult = {
           message: 'There was an issue connecting to the server. Please try again later.',
         };

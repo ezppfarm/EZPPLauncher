@@ -99,55 +99,13 @@
     disableReload();
     setupValues();
     launcherVersion.set(await getLauncherVersion());
-    platform.set(await getPlatform());
-    if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
     const isFirstStartup = await $userSettings.init();
     firstStartup.set(isFirstStartup);
     $userAuth.init();
 
-    try {
-      const themeVolume = $userSettings.value('volume').get(0.15);
-      custom_theme_volume.set(themeVolume);
-      currentLoadingInfo.set('Loading themes...');
-      const downloadableThemes = await getDownloadableThemes();
-      const themes = await getThemes();
-      const combinedThemes = [...themes];
-      for (const theme of downloadableThemes) {
-        if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
-        const installedTheme = themes.find((t) => t.name === theme.name);
-        if (installedTheme) {
-          const installedThemeVersion = new SemVer(installedTheme.version);
-          const downloadableThemeVersion = new SemVer(theme.version);
-          if (downloadableThemeVersion.compare(installedThemeVersion) > 0) {
-            installedTheme.updateAvailable = true;
-            const index = combinedThemes.findIndex((t) => t.name === theme.name);
-            combinedThemes[index] = installedTheme;
-          }
-        }
-      }
-
-      custom_themes.set(combinedThemes);
-      const activeTheme = $userSettings.value('theme').get('Default');
-      const theme = themes.find((theme) => theme.name === activeTheme);
-      if (!theme) {
-        $userSettings.value('theme').set('Default');
-        await $userSettings.save();
-        loadTheme(themes[0], $custom_theme_container!, themeVolume);
-      } else {
-        loadTheme(theme, $custom_theme_container!, themeVolume);
-      }
-    } catch {
-      sileo.error({
-        title: 'An error occured!',
-        description: 'Failed to load theme',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
-      });
-    }
-
     currentLoadingInfo.set('Loading config...');
+    const config_theme = $userSettings.value('theme');
+    const config_theme_volume = $userSettings.value('volume');
     const config_patching = $userSettings.value('patching');
     const config_custom_cursor = $userSettings.value('custom_cursor');
     const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
@@ -156,6 +114,17 @@
     const config_discord_presence = $userSettings.value('discord_presence');
     const config_tracking_enabled = $userSettings.value('tracking_consent');
 
+    const localThemes = await getThemes();
+    const last_theme = localThemes.find((t) => t.name === config_theme.get('Default'));
+    if (!last_theme) {
+      $userSettings.value('theme').set('Default');
+      await $userSettings.save();
+      loadTheme(localThemes[0], $custom_theme_container!, config_theme_volume.get(0.15));
+    } else {
+      loadTheme(last_theme, $custom_theme_container!, config_theme_volume.get(0.15));
+    }
+
+    custom_theme_volume.set(config_theme_volume.get(0.15));
     patch.set(config_patching.get(true));
     customCursor.set(config_custom_cursor.get(true));
     cursorSmoothening.set(config_cursor_smoothening.get(true));
@@ -170,6 +139,7 @@
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
     reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
+
     discordPresence.subscribe(async (val) => {
       config_discord_presence.set(val);
       try {
@@ -180,7 +150,10 @@
           await presence.disconnect();
         }
         presenceLoading.set(false);
-      } catch {}
+      } catch (err) {
+        console.log(err);
+        presenceLoading.set(false);
+      }
     });
 
     try {
@@ -190,7 +163,44 @@
         await presence.connect();
         presenceLoading.set(false);
       }
-    } catch {}
+    } catch (err) {
+      console.log(err);
+      presenceLoading.set(false);
+    }
+
+    try {
+      currentLoadingInfo.set('Loading themes...');
+      const downloadableThemes = await getDownloadableThemes();
+      const combinedThemes = [...localThemes];
+      for (const theme of downloadableThemes) {
+        if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
+        const installedTheme = localThemes.find((t) => t.name === theme.name);
+        if (installedTheme) {
+          const installedThemeVersion = new SemVer(installedTheme.version);
+          const downloadableThemeVersion = new SemVer(theme.version);
+          if (downloadableThemeVersion.compare(installedThemeVersion) > 0) {
+            installedTheme.updateAvailable = true;
+            const index = combinedThemes.findIndex((t) => t.name === theme.name);
+            combinedThemes[index] = installedTheme;
+          }
+        }
+      }
+
+      custom_themes.set(combinedThemes);
+    } catch (err) {
+      console.log(err);
+      sileo.error({
+        title: 'An error occured!',
+        description: 'Failed to load themes',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
+      });
+    }
+
+    platform.set(await getPlatform());
+    if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
   });
 </script>
 

@@ -44,7 +44,8 @@ export class Config {
         this.encrypt && this.crypto ? this.crypto.decrypt(fileStream) : fileStream
       ) as Record<string, unknown>;
       this.config = decryptedJSON;
-    } catch {
+    } catch (err) {
+      console.log(err);
       this.config = {};
       await this.save();
     }
@@ -61,6 +62,10 @@ export class Config {
     await writeFile(this.configFilePath, Buffer.from(encryptedJSON), {
       append: false,
     });
+  }
+
+  values () {
+    return this.config;
   }
 
   value(key: string) {

@@ -225,7 +225,7 @@
       }
       osuInstallationPath.set(selectedPath);
       $userSettings.value('osu_installation_path').set(selectedPath);
-      $userSettings.save();
+      await $userSettings.save();
       sileo.success({
         title: 'Yay!',
         description: 'osu! installation path set successfully.',
@@ -642,7 +642,9 @@
               largeImageKey: 'ezppfarm',
             }),
           ]);
-        } catch {}
+        } catch (err) {
+          console.log(err);
+        }
       }
       await new Promise((res) => setTimeout(res, 1000));
       await replaceUIFiles(osuPath, true);
@@ -740,7 +742,8 @@
         });
         loginIsLoading = false;
       }
-    } catch {
+    } catch (err) {
+      console.log(err);
       sileo.error({
         title: 'Login failed!',
         description: 'There was an issue connecting to the server. Please try again later.',
@@ -1105,7 +1108,8 @@
                 description: 'text-center!',
               },
             });
-          } catch {
+          } catch (err) {
+            console.log(err);
             sileo.error({
               title: 'Hmmm...',
               description: 'An unknown error occurred while importing your theme.',
