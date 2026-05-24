@@ -1376,181 +1376,188 @@
             onClick={launch}
           />
         </div>
-
-        {#if $currentUserInfo}
-          <div
-            class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center p-3"
-            in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
-            out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
-          >
-            <Select.Root
-              type="single"
-              value={selectedGamemode.toFixed()}
-              onValueChange={updateGamemode}
+        <div class="relative h-50">
+          {#if $currentUserInfo}
+            <div
+              class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center p-3 absolute top-0 left-0"
+              in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
+              out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
             >
-              <Select.Trigger
-                class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 !text-muted-foreground font-semibold"
+              <Select.Root
+                type="single"
+                value={selectedGamemode.toFixed()}
+                onValueChange={updateGamemode}
               >
-                <div class="flex flex-row items-center gap-2">
-                  {#if selectedMode === 0}
-                    <Circle size={16} class="text-theme-200" />
-                  {:else if selectedMode === 1}
-                    <Drum size={16} class="text-theme-200" />
-                  {:else if selectedMode === 2}
-                    <Cherry size={16} class="text-theme-200" />
-                  {:else if selectedMode === 3}
-                    <Piano size={16} class="text-theme-200" />
-                  {/if}
-                  {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
+                <Select.Trigger
+                  class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 !text-muted-foreground font-semibold"
+                >
+                  <div class="flex flex-row items-center gap-2">
+                    {#if selectedMode === 0}
+                      <Circle size={16} class="text-theme-200" />
+                    {:else if selectedMode === 1}
+                      <Drum size={16} class="text-theme-200" />
+                    {:else if selectedMode === 2}
+                      <Cherry size={16} class="text-theme-200" />
+                    {:else if selectedMode === 3}
+                      <Piano size={16} class="text-theme-200" />
+                    {/if}
+                    {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
+                  </div>
+                </Select.Trigger>
+                <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
+                  {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
+                    {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
+                    <Select.Item value={gamemode.toFixed()}>
+                      <div class="flex flex-row gap-2 items-center">
+                        {#if gamemod.mode === 0}
+                          <Circle size={16} />
+                        {:else if gamemod.mode === 1}
+                          <Drum size={16} />
+                        {:else if gamemod.mode === 2}
+                          <Cherry size={16} />
+                        {:else if gamemod.mode === 3}
+                          <Piano size={16} />
+                        {/if}
+                        {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
+                      </div>
+                    </Select.Item>
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+              <div class="grid grid-cols-2 gap-2 w-full m-3">
+                <div class="flex flex-col">
+                  <span class="text-xs text-muted-foreground font-semibold">Rank</span>
+                  <div class="flex items-center h-full font-semibold text-theme-50">
+                    {#if $currentUserInfo}
+                      <div in:fade>
+                        {#if $reduceAnimations}
+                          <span>
+                            #{numberHumanReadable(
+                              $currentUserInfo.stats[selectedGamemode].rank ?? 0
+                            )}
+                          </span>
+                        {:else}
+                          <NumberFlow
+                            trend={0}
+                            prefix="#"
+                            value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
+                          />
+                        {/if}
+                      </div>
+                    {:else}
+                      <div in:fade>
+                        <LoaderCircle class="animate-spin" size={21} />
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              </Select.Trigger>
-              <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
-                {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
-                  {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
-                  <Select.Item value={gamemode.toFixed()}>
-                    <div class="flex flex-row gap-2 items-center">
-                      {#if gamemod.mode === 0}
-                        <Circle size={16} />
-                      {:else if gamemod.mode === 1}
-                        <Drum size={16} />
-                      {:else if gamemod.mode === 2}
-                        <Cherry size={16} />
-                      {:else if gamemod.mode === 3}
-                        <Piano size={16} />
-                      {/if}
-                      {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
-                    </div>
-                  </Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-            <div class="grid grid-cols-2 gap-2 w-full m-3">
-              <div class="flex flex-col">
-                <span class="text-xs text-muted-foreground font-semibold">Rank</span>
-                <div class="flex items-center h-full font-semibold text-theme-50">
-                  {#if $currentUserInfo}
-                    <div in:fade>
-                      {#if $reduceAnimations}
-                        <span>
-                          #{numberHumanReadable($currentUserInfo.stats[selectedGamemode].rank ?? 0)}
-                        </span>
-                      {:else}
-                        <NumberFlow
-                          trend={0}
-                          prefix="#"
-                          value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
-                        />
-                      {/if}
-                    </div>
-                  {:else}
-                    <div in:fade>
-                      <LoaderCircle class="animate-spin" size={21} />
-                    </div>
-                  {/if}
+                <div class="flex flex-col">
+                  <span class="text-xs text-muted-foreground font-semibold">PP</span>
+                  <div class="flex items-center h-full font-semibold text-primary-200">
+                    {#if $currentUserInfo}
+                      <div in:fade>
+                        {#if $reduceAnimations}
+                          <span>
+                            {numberHumanReadable(
+                              $currentUserInfo.stats[selectedGamemode].pp ?? 0
+                            )}pp
+                          </span>
+                        {:else}
+                          <NumberFlow
+                            trend={0}
+                            suffix="pp"
+                            value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
+                          />
+                        {/if}
+                      </div>
+                    {:else}
+                      <div in:fade>
+                        <LoaderCircle class="animate-spin" size={21} />
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              </div>
-              <div class="flex flex-col">
-                <span class="text-xs text-muted-foreground font-semibold">PP</span>
-                <div class="flex items-center h-full font-semibold text-primary-200">
-                  {#if $currentUserInfo}
-                    <div in:fade>
-                      {#if $reduceAnimations}
-                        <span>
-                          {numberHumanReadable($currentUserInfo.stats[selectedGamemode].pp ?? 0)}pp
-                        </span>
-                      {:else}
-                        <NumberFlow
-                          trend={0}
-                          suffix="pp"
-                          value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
-                        />
-                      {/if}
-                    </div>
-                  {:else}
-                    <div in:fade>
-                      <LoaderCircle class="animate-spin" size={21} />
-                    </div>
-                  {/if}
+                <div class="flex flex-col">
+                  <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
+                  <div class="flex items-center h-full font-semibold text-theme-50">
+                    {#if $currentUserInfo}
+                      <div in:fade>
+                        {#if $reduceAnimations}
+                          <span>
+                            {($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%
+                          </span>
+                        {:else}
+                          <NumberFlow
+                            trend={0}
+                            suffix="%"
+                            value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
+                          />
+                        {/if}
+                      </div>
+                    {:else}
+                      <div in:fade>
+                        <LoaderCircle class="animate-spin" size={21} />
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              </div>
-              <div class="flex flex-col">
-                <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
-                <div class="flex items-center h-full font-semibold text-theme-50">
-                  {#if $currentUserInfo}
-                    <div in:fade>
-                      {#if $reduceAnimations}
-                        <span>
-                          {($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%
-                        </span>
-                      {:else}
-                        <NumberFlow
-                          trend={0}
-                          suffix="%"
-                          value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
-                        />
-                      {/if}
-                    </div>
-                  {:else}
-                    <div in:fade>
-                      <LoaderCircle class="animate-spin" size={21} />
-                    </div>
-                  {/if}
-                </div>
-              </div>
-              <div class="flex flex-col">
-                <span class="text-xs text-muted-foreground font-semibold">Playcount</span>
-                <div class="flex items-center h-full font-semibold text-theme-50">
-                  {#if $currentUserInfo}
-                    <div in:fade>
-                      {#if $reduceAnimations}
-                        <span>
-                          {numberHumanReadable($currentUserInfo.stats[selectedGamemode].plays ?? 0)}
-                        </span>
-                      {:else}
-                        <NumberFlow
-                          trend={0}
-                          value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
-                        />
-                      {/if}
-                    </div>
-                  {:else}
-                    <div in:fade>
-                      <LoaderCircle class="animate-spin" size={21} />
-                    </div>
-                  {/if}
+                <div class="flex flex-col">
+                  <span class="text-xs text-muted-foreground font-semibold">Playcount</span>
+                  <div class="flex items-center h-full font-semibold text-theme-50">
+                    {#if $currentUserInfo}
+                      <div in:fade>
+                        {#if $reduceAnimations}
+                          <span>
+                            {numberHumanReadable(
+                              $currentUserInfo.stats[selectedGamemode].plays ?? 0
+                            )}
+                          </span>
+                        {:else}
+                          <NumberFlow
+                            trend={0}
+                            value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
+                          />
+                        {/if}
+                      </div>
+                    {:else}
+                      <div in:fade>
+                        <LoaderCircle class="animate-spin" size={21} />
+                      </div>
+                    {/if}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        {:else}
-          <div
-            class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center justify-center p-3 gap-3"
-            in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
-            out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
-          >
-            <div class="flex flex-col items-center gap-1 text-center">
-              <span class="font-semibold text-theme-50 text-sm">See your stats here</span>
-              <span class="text-xs text-muted-foreground"
-                >Log in with your EZPPFarm account to track your rank, PP, accuracy and playcount.</span
-              >
+          {:else}
+            <div
+              class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center justify-center p-3 gap-3 absolute top-0 left-0"
+              in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
+              out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
+            >
+              <div class="flex flex-col items-center gap-1 text-center">
+                <span class="font-semibold text-theme-50 text-sm">See your stats here</span>
+                <span class="text-xs text-muted-foreground"
+                  >Log in with your EZPPFarm account to track your rank, PP, accuracy and playcount.</span
+                >
+              </div>
+              <div class="flex flex-col gap-2 w-full">
+                <Button
+                  class="flex-1 h-7 text-xs"
+                  onclick={() => {
+                    selectedView = 'login';
+                  }}>Log In</Button
+                >
+                <Button
+                  variant="outline"
+                  class="flex-1 h-7 text-xs border-theme-800 text-muted-foreground hover:text-theme-50"
+                  onclick={async () => {
+                    await openURL('https://ez-pp.farm/register');
+                  }}>Register</Button
+                >
+              </div>
             </div>
-            <div class="flex flex-col gap-2 w-full">
-              <Button
-                class="flex-1 h-7 text-xs"
-                onclick={() => {
-                  selectedView = 'login';
-                }}>Log In</Button
-              >
-              <Button
-                variant="outline"
-                class="flex-1 h-7 text-xs border-theme-800 text-muted-foreground hover:text-theme-50"
-                onclick={async () => {
-                  await openURL('https://ez-pp.farm/register');
-                }}>Register</Button
-              >
-            </div>
-          </div>
-        {/if}
+          {/if}
+        </div>
         <div class="flex flex-col mb-auto mt-12 px-6">
           <span class="text-4xl font-bold drop-shadow-lg">EZPPLauncher</span>
           <span class="text-muted-foreground font-semibold drop-shadow-lg"
