@@ -1522,6 +1522,34 @@
               </div>
             </div>
           </div>
+        {:else}
+          <div
+            class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center justify-center p-3 gap-3"
+            in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
+            out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
+          >
+            <div class="flex flex-col items-center gap-1 text-center">
+              <span class="font-semibold text-theme-50 text-sm">See your stats here</span>
+              <span class="text-xs text-muted-foreground"
+                >Log in with your EZPPFarm account to track your rank, PP, accuracy and playcount.</span
+              >
+            </div>
+            <div class="flex flex-col gap-2 w-full">
+              <Button
+                class="flex-1 h-7 text-xs"
+                onclick={() => {
+                  selectedView = 'login';
+                }}>Log In</Button
+              >
+              <Button
+                variant="outline"
+                class="flex-1 h-7 text-xs border-theme-800 text-muted-foreground hover:text-theme-50"
+                onclick={async () => {
+                  await openURL('https://ez-pp.farm/register');
+                }}>Register</Button
+              >
+            </div>
+          </div>
         {/if}
         <div class="flex flex-col mb-auto mt-12 px-6">
           <span class="text-4xl font-bold drop-shadow-lg">EZPPLauncher</span>
