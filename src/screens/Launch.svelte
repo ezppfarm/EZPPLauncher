@@ -18,6 +18,8 @@
     launcherVersion,
     launching,
     newVersion,
+    openTabletDriverEnabled,
+    openTabletDriverPath,
     osuBuild,
     osuStream,
     platform,
@@ -112,6 +114,8 @@
     runUpdater,
     setConfigValues,
     setUserConfigValues,
+    startOpenTabletDriver,
+    stopOpenTabletDriver,
   } from '@/osuUtil';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { ezppfarm } from '@/api/ezpp';
@@ -618,10 +622,23 @@
         }, 1000 * 2);
       }
 
+      let otd_run = false;
+
+      if ($openTabletDriverEnabled && $openTabletDriverPath.length > 0) {
+        try {
+          await startOpenTabletDriver($openTabletDriverPath);
+          otd_run = true;
+        } catch (err) {
+          console.log('Failed to start OpenTabletDriver:', err);
+        }
+      }
+
       await runOsu(osuPath, true);
       if ($trackingEnabled) umami.track('app_exit_osu');
       cleanup = true;
       launchInfo = 'Cleaning up...';
+
+      if (otd_run) await stopOpenTabletDriver($openTabletDriverPath);
 
       setCurrentTimeGlobalMedia(0);
       resumeGlobalMedia();
@@ -852,6 +869,48 @@
         };
       }
     });
+  };
+
+  const browse_otd = async () => {
+    const selectedPath = await open({
+      directory: false,
+      multiple: false,
+      title: 'Select OpenTabletDriver Executable',
+      filters:
+        $platform === 'windows'
+          ? [
+              {
+                name: 'OpenTabletDriver',
+                extensions: ['exe'],
+              },
+            ]
+          : undefined,
+    });
+
+    if (typeof selectedPath === 'string') {
+      const fileName = selectedPath.split(/[\\/]/).pop();
+      if ($platform === 'windows' && fileName?.toLowerCase() !== 'opentabletdriver.daemon.exe') {
+        sileo.error({
+          title: 'Wrong executable',
+          description: 'Please select OpenTabletDriver.Daemon.exe',
+          fill: '#181825',
+          styles: { description: 'text-center!' },
+        });
+        return;
+      }
+
+      openTabletDriverPath.set(selectedPath);
+      $userSettings.value('otd_path').set(selectedPath);
+      await $userSettings.save();
+      sileo.success({
+        title: 'Yay!',
+        description: 'OpenTabletDriver set successfully.',
+        fill: '#181825',
+        styles: {
+          description: 'text-center!',
+        },
+      });
+    }
   };
 
   onMount(() => {
@@ -1711,6 +1770,33 @@
             >
           </div>
           {#if $platform === 'windows'}
+            <div class="flex flex-col">
+              <Label class="text-sm" for="setting-otd-path">OpenTabletDriver path</Label>
+              <div class="text-muted-foreground text-xs">
+                Automatically start OpenTabletDriver when launching osu!.
+              </div>
+            </div>
+            <div class="flex flex-row w-full">
+              <div
+                class="mt-4 flex items-center bg-theme-950 border border-theme-800 border-r-0 rounded-l-md px-3"
+              >
+                <Checkbox id="setting-otd" bind:checked={$openTabletDriverEnabled} />
+              </div>
+              <Input
+                class="mt-4 w-full bg-theme-950 border-theme-800 border-r-0 rounded-none"
+                type="text"
+                value={$openTabletDriverPath}
+                placeholder="Path to OpenTabletDriver.Daemon.exe"
+                readonly
+                disabled={!$openTabletDriverEnabled}
+              />
+              <Button
+                class="mt-4 bg-theme-950 border-theme-800 rounded-l-none"
+                variant="outline"
+                disabled={!$openTabletDriverEnabled}
+                onclick={browse_otd}>Browse</Button
+              >
+            </div>
             <div class="flex flex-col">
               <Label class="text-sm" for="setting-custom-cursor">patcher release stream</Label>
               <div class="text-muted-foreground text-xs">

@@ -985,3 +985,69 @@ pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> 
 pub async fn install_ezpp_launcher_update(_app: AppHandle) -> Result<(), String> {
     Ok(())
 }
+
+#[tauri::command]
+pub async fn run_open_tablet_driver(path: String) -> Result<(), String> {
+    let otd_path = PathBuf::from(&path);
+    if !otd_path.exists() {
+        return Err(format!("OpenTabletDriver not found at: {}", path));
+    }
+
+    #[cfg(windows)]
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    #[cfg(windows)]
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+
+    {
+        #[cfg(windows)]
+        Command::new(&otd_path)
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+            .spawn()
+            .map_err(|e| format!("Failed to start OpenTabletDriver: {}", e))?;
+
+        #[cfg(not(windows))]
+        Command::new(&otd_path)
+            .spawn()
+            .map_err(|e| format!("Failed to start OpenTabletDriver: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn stop_open_tablet_driver(path: String) -> Result<(), String> {
+    let binary_name = PathBuf::from(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("Invalid OpenTabletDriver path")?
+        .to_string();
+
+    let mut sys = System::new_all();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+    let process = sys.processes().values().find(|p| {
+        p.name().eq_ignore_ascii_case(&binary_name)
+    }).ok_or("OpenTabletDriver is not running")?;
+
+    process.kill();
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn is_open_tablet_driver_running() -> bool {
+    #[cfg(windows)]
+    {
+        let mut sys = System::new_all();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+        sys.processes().values().any(|p| {
+            p.name().eq_ignore_ascii_case("OpenTabletDriver.Daemon.exe")
+        })
+    }
+
+    #[cfg(not(windows))]
+    {
+        true
+    }
+}

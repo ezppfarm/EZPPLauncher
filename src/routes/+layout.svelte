@@ -13,6 +13,8 @@
     discordPresence,
     firstStartup,
     launcherVersion,
+    openTabletDriverEnabled,
+    openTabletDriverPath,
     platform,
     presenceLoading,
     setupValues,
@@ -113,6 +115,8 @@
     const config_osu_installation_path = $userSettings.value('osu_installation_path');
     const config_discord_presence = $userSettings.value('discord_presence');
     const config_tracking_enabled = $userSettings.value('tracking_consent');
+    const config_otd_enabled = $userSettings.value('otd_enabled');
+    const config_otd_path = $userSettings.value('otd_path');
 
     const localThemes = await getThemes();
     const last_theme = localThemes.find((t) => t.name === config_theme.get('Default'));
@@ -131,6 +135,8 @@
     reduceAnimations.set(config_reduce_animations.get(false));
     osuInstallationPath.set(config_osu_installation_path.get(''));
     discordPresence.set(config_discord_presence.get(true));
+    openTabletDriverEnabled.set(config_otd_enabled.get(false));
+    openTabletDriverPath.set(config_otd_path.get(''));
     if (config_tracking_enabled.exists()) {
       trackingEnabled.set(config_tracking_enabled.get(false));
     }
@@ -139,6 +145,7 @@
     customCursor.subscribe((val) => config_custom_cursor.set(val));
     cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
     reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
+    openTabletDriverEnabled.subscribe((val) => config_otd_enabled.set(val));
 
     discordPresence.subscribe(async (val) => {
       config_discord_presence.set(val);

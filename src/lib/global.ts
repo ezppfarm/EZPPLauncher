@@ -37,6 +37,9 @@ custom_theme_volume.subscribe((val) => {
   }
 });
 
+export const openTabletDriverEnabled = writable<boolean>(false);
+export const openTabletDriverPath = writable<string>('');
+
 export const serverPing = writable<number | undefined>(undefined);
 export const serverConnectionFails = writable(0);
 
