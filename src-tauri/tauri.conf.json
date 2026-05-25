@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "EZPPLauncher",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "identifier": "farm.EZPPFarm.Launcher",
   "mainBinaryName": "ezpplauncher",
   "build": {
@@ -16,14 +16,17 @@
         "title": "EZPPLauncher",
         "width": 1000,
         "height": 650,
+        "minWidth": 1000,
+        "minHeight": 650,
         "decorations": false,
         "resizable": false,
-        "maximizable": false
+        "maximizable": false,
+        "shadow": true
       }
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": null,
+      "csp": "default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct; connect-src 'self' https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct; media-src 'self' asset: blob:;",
       "assetProtocol": {
         "enable": true,
         "scope": [
@@ -35,6 +38,8 @@
   "bundle": {
     "publisher": "EZPPFarm",
     "copyright": "EZPPFarm",
+    "shortDescription": "osu! launcher for EZPPFarm",
+    "longDescription": "EZPPLauncher is a custom osu! launcher for the EZPPFarm server, featuring automatic updates, ingame login, stat tracking and launcher theming.",
     "homepage": "https://ez-pp.farm",
     "license": "GPL-3.0",
     "active": true,
@@ -44,9 +49,11 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["ezpplauncher-theme"],
-        "name": "ezppLauncher Theme",
-        "description": "ezppLauncher Theme File",
+        "ext": [
+          "ezpplauncher-theme"
+        ],
+        "name": "EZPPLauncher Theme",
+        "description": "EZPPLauncher Theme File",
         "role": "Viewer",
         "mimeType": "application/x-ezpplauncher-theme"
       }
