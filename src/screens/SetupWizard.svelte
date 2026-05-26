@@ -1,21 +1,10 @@
 <script lang="ts">
+  import { dev } from '$app/environment';
   import Logo from '$assets/logo.png';
+  import Launch from './Launch.svelte';
   import Button from '@/components/ui/button/button.svelte';
-  import Input from '@/components/ui/input/input.svelte';
-  import { animate } from 'animejs';
-  import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
-  import { Check, CircleCheckBig, CircleOff, LoaderCircle } from '@lucide/svelte';
-  import { open } from '@tauri-apps/plugin-dialog';
   import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
-  import {
-    cursorSmoothening,
-    customCursor,
-    osuInstallationPath,
-    patch,
-    reduceAnimations,
-    userSettings,
-  } from '@/userSettings';
+  import Input from '@/components/ui/input/input.svelte';
   import Label from '@/components/ui/label/label.svelte';
   import {
     beatmapSets,
@@ -29,8 +18,6 @@
     skins,
     skinsCount,
   } from '@/global';
-  import Launch from './Launch.svelte';
-  import Confetti from 'svelte-confetti';
   import {
     autoDetectOsuInstallFolder,
     getBeatmapSetsCount,
@@ -40,7 +27,20 @@
     getVersion,
     isValidOsuFolder,
   } from '@/osuUtil';
-  import { dev } from '$app/environment';
+  import {
+    cursorSmoothening,
+    customCursor,
+    osuInstallationPath,
+    patch,
+    reduceAnimations,
+    userSettings,
+  } from '@/userSettings';
+  import { Check, CircleCheckBig, CircleOff, LoaderCircle } from '@lucide/svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { animate } from 'animejs';
+  import { onMount } from 'svelte';
+  import Confetti from 'svelte-confetti';
+  import { fade } from 'svelte/transition';
 
   let selectedStep = $state(1);
   const steps = ['Welcome', 'Locate your osu! Installation', 'Appearance Settings'];

@@ -1,7 +1,7 @@
-import { exists, mkdir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
-import * as path from '@tauri-apps/api/path';
 import { Crypto } from './crypto';
 import { getHWID } from './osuUtil';
+import * as path from '@tauri-apps/api/path';
+import { exists, mkdir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
 
 export class Config {
   private fileName: string;
@@ -64,7 +64,7 @@ export class Config {
     });
   }
 
-  values () {
+  values() {
     return this.config;
   }
 

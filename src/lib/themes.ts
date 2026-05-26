@@ -1,9 +1,9 @@
-import * as path from '@tauri-apps/api/path';
-import * as fs from '@tauri-apps/plugin-fs';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import { active_custom_theme, custom_themes } from './global';
 import { calculateGitBlobSha, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import * as path from '@tauri-apps/api/path';
+import * as fs from '@tauri-apps/plugin-fs';
 import zip from 'jszip';
 import { SemVer } from 'semver';
 

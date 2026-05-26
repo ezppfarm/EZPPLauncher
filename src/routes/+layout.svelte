@@ -1,9 +1,12 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
   import '../app.css';
-
-  import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
   import * as AlertDialog from '@/components/ui/alert-dialog';
+  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
+  import Button from '@/components/ui/button/button.svelte';
+  import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
+  import SileoToast from '@/components/ui/sileo/sileo-toast.svelte';
+  import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
   import {
     active_custom_theme,
     currentLoadingInfo,
@@ -20,8 +23,10 @@
     setupValues,
     trackingEnabled,
   } from '@/global';
-  import { onMount } from 'svelte';
-  import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
+  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
+  import * as presence from '@/presence';
+  import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
+  import { userAuth } from '@/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -30,18 +35,12 @@
     reduceAnimations,
     userSettings,
   } from '@/userSettings';
-  import { Buffer } from 'buffer';
-  import SileoToast from '@/components/ui/sileo/sileo-toast.svelte';
-  import { userAuth } from '@/userAuthentication';
-  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
-  import Button from '@/components/ui/button/button.svelte';
-  import * as presence from '@/presence';
-  import { fade } from 'svelte/transition';
-  import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
-  import { sileo } from 'sileo';
-  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
-  import { SemVer } from 'semver';
   import { trackMediaContainer } from '@/utils';
+  import { Buffer } from 'buffer';
+  import { SemVer } from 'semver';
+  import { sileo } from 'sileo';
+  import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
 
   let { children } = $props();
 

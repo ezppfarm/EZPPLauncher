@@ -1,10 +1,30 @@
 <script lang="ts">
-  import Logo from '$assets/logo.png';
   import DefaultThemePreview from '$assets/default_preview.png';
+  import Logo from '$assets/logo.png';
+  import { ezppfarm } from '@/api/ezpp';
+  import { osuapi } from '@/api/osuapi';
+  import * as AlertDialog from '@/components/ui/alert-dialog';
   import * as Avatar from '@/components/ui/avatar';
   import Badge from '@/components/ui/badge/badge.svelte';
   import Button from '@/components/ui/button/button.svelte';
+  import { Checkbox } from '@/components/ui/checkbox';
+  import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
+  import * as DropdownMenu from '@/components/ui/dropdown-menu';
+  import Input from '@/components/ui/input/input.svelte';
+  import Label from '@/components/ui/label/label.svelte';
+  import Progress from '@/components/ui/progress/progress.svelte';
+  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '@/components/ui/select';
+  import { currentUserInfo } from '@/data';
+  import { useDropZone } from '@/dropZone.svelte';
+  import {
+    getGamemodeInt,
+    getGamemodeName,
+    getModeAndTypeFromGamemode,
+    modeIntToStr,
+    typeIntToStr,
+    validModeTypeCombinationsSorted,
+  } from '@/gamemode';
   import {
     active_custom_theme,
     beatmapSets,
@@ -31,67 +51,6 @@
     trackingEnabled,
   } from '@/global';
   import {
-    LoaderCircle,
-    Music,
-    Wifi,
-    WifiOff,
-    Drum,
-    Cherry,
-    Piano,
-    Circle,
-    LogOut,
-    LogIn,
-    Brush,
-    ArrowRight,
-    Settings,
-    House,
-    Paintbrush,
-    Trash,
-    CloudDownload,
-    Import,
-  } from '@lucide/svelte';
-  import NumberFlow from '@number-flow/svelte';
-  import * as AlertDialog from '@/components/ui/alert-dialog';
-  import Progress from '@/components/ui/progress/progress.svelte';
-  import {
-    compareBuildNumbers,
-    fadeGlobalVolume,
-    formatBytes,
-    numberHumanReadable,
-    openURL,
-    pauseGlobalMedia,
-    releaseStreamToReadable,
-    resumeGlobalMedia,
-    setCurrentTimeGlobalMedia,
-    urlIsValidImage,
-  } from '@/utils';
-  import { fade, fly, scale } from 'svelte/transition';
-  import { Checkbox } from '@/components/ui/checkbox';
-  import Label from '@/components/ui/label/label.svelte';
-  import {
-    cursorSmoothening,
-    customCursor,
-    osuInstallationPath,
-    patch,
-    preferredMode,
-    preferredType,
-    reduceAnimations,
-    userSettings,
-  } from '@/userSettings';
-  import Input from '@/components/ui/input/input.svelte';
-  import { open } from '@tauri-apps/plugin-dialog';
-  import { currentUser, userAuth } from '@/userAuthentication';
-  import {
-    getGamemodeInt,
-    getGamemodeName,
-    getModeAndTypeFromGamemode,
-    modeIntToStr,
-    typeIntToStr,
-    validModeTypeCombinationsSorted,
-  } from '@/gamemode';
-  import { currentUserInfo } from '@/data';
-  import { osuapi } from '@/api/osuapi';
-  import {
     downloadEZPPLauncherUpdateFiles,
     downloadUpdate,
     encryptString,
@@ -117,16 +76,7 @@
     startOpenTabletDriver,
     stopOpenTabletDriver,
   } from '@/osuUtil';
-  import { getCurrentWindow } from '@tauri-apps/api/window';
-  import { ezppfarm } from '@/api/ezpp';
-  import { EZPPActionStatus } from '@/types';
   import * as presence from '@/presence';
-  import { onMount } from 'svelte';
-  import * as DropdownMenu from '@/components/ui/dropdown-menu';
-  import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
-  import { animate } from 'animejs';
-  import { sileo } from 'sileo';
-  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
   import {
     checkThemeFromFile,
     deleteTheme,
@@ -135,9 +85,59 @@
     loadTheme,
     type ThemeInfo,
   } from '@/themes';
+  import { EZPPActionStatus } from '@/types';
+  import { currentUser, userAuth } from '@/userAuthentication';
+  import {
+    cursorSmoothening,
+    customCursor,
+    osuInstallationPath,
+    patch,
+    preferredMode,
+    preferredType,
+    reduceAnimations,
+    userSettings,
+  } from '@/userSettings';
+  import {
+    compareBuildNumbers,
+    fadeGlobalVolume,
+    formatBytes,
+    numberHumanReadable,
+    openURL,
+    pauseGlobalMedia,
+    releaseStreamToReadable,
+    resumeGlobalMedia,
+    setCurrentTimeGlobalMedia,
+    urlIsValidImage,
+  } from '@/utils';
+  import {
+    LoaderCircle,
+    Music,
+    Wifi,
+    WifiOff,
+    Drum,
+    Cherry,
+    Piano,
+    Circle,
+    LogOut,
+    LogIn,
+    Brush,
+    ArrowRight,
+    Settings,
+    House,
+    Paintbrush,
+    Trash,
+    CloudDownload,
+    Import,
+  } from '@lucide/svelte';
+  import NumberFlow from '@number-flow/svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { useDropZone } from '@/dropZone.svelte';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { animate } from 'animejs';
+  import { sileo } from 'sileo';
+  import { onMount } from 'svelte';
+  import { fade, fly, scale } from 'svelte/transition';
 
   let selectedView = $state('home');
   let progress = $state(-1);

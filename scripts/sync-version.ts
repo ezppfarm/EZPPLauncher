@@ -1,6 +1,6 @@
+import * as toml from '@iarna/toml';
 import fs from 'fs';
 import path from 'path';
-import * as toml from '@iarna/toml';
 import { cwd } from 'process';
 
 const packageJsonPath = path.join(cwd(), 'package.json');

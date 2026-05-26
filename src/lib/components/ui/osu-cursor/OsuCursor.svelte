@@ -1,9 +1,9 @@
 <script lang="ts">
-  import cursor_default from '$assets/cursor.png';
   import cursor_additive from '$assets/cursor-additive.png';
+  import cursor_default from '$assets/cursor.png';
+  import { cursorSmoothness } from '@/userSettings';
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
-  import { cursorSmoothness } from '@/userSettings';
 
   let { smoothCursor = true }: { smoothCursor?: boolean } = $props();
 
@@ -101,7 +101,7 @@
       duration: smoothCursor ? $cursorSmoothness : 0,
       translateX: mouseX,
       translateY: mouseY,
-      ease: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+      ease: (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
     });
 
     animate(cursor, {

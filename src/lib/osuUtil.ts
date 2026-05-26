@@ -1,7 +1,7 @@
-import { invoke } from '@tauri-apps/api/core';
 import type { UpdateFile, UpdateStatus } from './types';
-import { listen } from '@tauri-apps/api/event';
 import { betterFetch } from '@better-fetch/fetch';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 const updateUrl = 'https://ez-pp.farm/api/ezpplauncher';
 
