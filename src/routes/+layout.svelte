@@ -58,18 +58,12 @@
         event.key === 'F8' ||
         event.key === 'F10' ||
         event.key === 'F12' ||
-        (event.ctrlKey && event.key === 'r') ||
-        (event.metaKey && event.key === 'r') ||
-        (event.ctrlKey && event.key === 'f') ||
-        (event.metaKey && event.key === 'f') ||
-        (event.ctrlKey && event.key === 'g') ||
-        (event.metaKey && event.key === 'g') ||
-        (event.ctrlKey && event.key === 'j') ||
-        (event.metaKey && event.key === 'j') ||
-        (event.ctrlKey && event.key === 'p') ||
-        (event.metaKey && event.key === 'p') ||
-        (event.ctrlKey && event.key === 'u') ||
-        (event.metaKey && event.key === 'u')
+        ((event.ctrlKey || event.metaKey) && event.key === 'r') ||
+        ((event.ctrlKey || event.metaKey) && event.key === 'f') ||
+        ((event.ctrlKey || event.metaKey) && event.key === 'g') ||
+        ((event.ctrlKey || event.metaKey) && event.key === 'j') ||
+        ((event.ctrlKey || event.metaKey) && event.key === 'p') ||
+        ((event.ctrlKey || event.metaKey) && event.key === 'u')
       ) {
         event.preventDefault();
       }
@@ -150,11 +144,10 @@
       config_discord_presence.set(val);
       try {
         presenceLoading.set(true);
-        if (val) {
-          await presence.connect();
-        } else {
-          await presence.disconnect();
-        }
+
+        if (val) await presence.connect();
+        else await presence.disconnect();
+
         presenceLoading.set(false);
       } catch (err) {
         console.log(err);

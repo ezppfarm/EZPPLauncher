@@ -416,6 +416,28 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
     }
   }
 
+  const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
+  const themeInfoObj = JSON.parse(themeInfo) as ThemeInfo;
+  const themeScriptUrl = convertFileSrc(
+    await path.normalize(`${themeFolder}/${themeInfoObj.entry}`)
+  );
+  const themeAssets = convertFileSrc(await path.normalize(`${themeFolder}/assets`));
+  const themePreview = convertFileSrc(
+    await path.normalize(`${themeFolder}/assets/${themeInfoObj.preview}`)
+  );
+
+  custom_themes.update((themes) => {
+    const matchedTheme = themes.find((t) => t.name === themeInfoObj.name);
+    if (matchedTheme) {
+      matchedTheme.scriptUrl = themeScriptUrl;
+      matchedTheme.assets = themeAssets;
+      matchedTheme.preview = themePreview;
+      matchedTheme.status = 'installed';
+      matchedTheme.progress = 1;
+    }
+    return themes;
+  });
+
   await reloadThemes();
   return {
     success: true,
