@@ -133,9 +133,6 @@
     }
 
     if (!$firstStartup) {
-      /*       const launcherTheme = $userSettings.value('launcherTheme').get('default');
-      const them = THEMES.find((theme) => theme.name === launcherTheme);
-      if (them) theme.set(them); */
       currentLoadingInfo.set('Checking osu installation path...');
       const validFolder = await isValidOsuFolder($osuInstallationPath);
       if (!validFolder) {
