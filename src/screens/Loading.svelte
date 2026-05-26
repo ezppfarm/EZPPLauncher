@@ -145,10 +145,6 @@
         sileo.error({
           title: 'Hmm...',
           description: 'Your previously set osu! installation path seems to be invalid.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
         });
       } else {
         currentLoadingInfo.set('Getting osu version...');
@@ -211,20 +207,12 @@
             sileo.success({
               title: 'Login successful!',
               description: userLoginResult.message,
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
               duration: 2500,
             });
           } else {
             sileo.error({
               title: 'Login failed!',
               description: userLoginResult.message,
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
             });
           }
         }

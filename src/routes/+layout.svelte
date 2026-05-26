@@ -191,10 +191,6 @@
       sileo.error({
         title: 'An error occured!',
         description: 'Failed to load themes',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
       });
     }
 
@@ -207,7 +203,15 @@
   <OsuCursor smoothCursor={$cursorSmoothening} />
 {/if}
 
-<SileoToast position="top-center" fill="black" />
+<SileoToast
+  position="top-center"
+  options={{
+    fill: '#181825',
+    styles: {
+      description: 'text-white/90 text-center!',
+    },
+  }}
+/>
 
 <Titlebar />
 

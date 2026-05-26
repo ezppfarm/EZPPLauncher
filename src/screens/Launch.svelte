@@ -155,11 +155,7 @@
       if (!firstFile.endsWith('.ezpplauncher-theme')) {
         sileo.error({
           title: 'Uhh...',
-          description: 'Dropped file is not a valid theme file.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Dropped file is not a valid theme file.'
         });
         return;
       }
@@ -167,11 +163,7 @@
       if (!importResult.success || !importResult.themeInfo) {
         sileo.error({
           title: 'Hmmm...',
-          description: importResult.error || 'An unknown error occurred.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: importResult.error || 'An unknown error occurred.'
         });
         return;
       }
@@ -219,11 +211,7 @@
         sileo.error({
           title: 'Hmm...',
           description:
-            'The selected folder is not a valid osu! installation folder. Please select the correct folder.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+            'The selected folder is not a valid osu! installation folder. Please select the correct folder.'
         });
         return;
       }
@@ -232,11 +220,7 @@
       await $userSettings.save();
       sileo.success({
         title: 'Yay!',
-        description: 'osu! installation path set successfully.',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+        description: 'osu! installation path set successfully.'
       });
 
       const beatmapSetCount = await getBeatmapSetsCount(selectedPath);
@@ -268,11 +252,7 @@
       sileo.error({
         title: 'Hold on a second!',
         description:
-          'osu! is currently running, please exit osu! before launching via EZPPLauncher!',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+          'osu! is currently running, please exit osu! before launching via EZPPLauncher!'
       });
       launching.set(false);
       return;
@@ -281,11 +261,7 @@
     if (!$osuBuild) {
       sileo.error({
         title: 'Hmmm...',
-        description: 'There was an issue detecting your installed osu! version',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+        description: 'There was an issue detecting your installed osu! version'
       });
       launching.set(false);
       return;
@@ -298,11 +274,7 @@
     if (!validFolder) {
       sileo.error({
         title: 'Hmmm...',
-        description: 'Your selected osu! installation folder is not valid.',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+        description: 'Your selected osu! installation folder is not valid.'
       });
       launching.set(false);
       return;
@@ -312,11 +284,7 @@
       if (!(await hasWMCTRL())) {
         sileo.error({
           title: 'Hmmm...',
-          description: 'wmctrl seems to be missing, please install via AUR.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'wmctrl seems to be missing, please install via AUR.'
         });
         launching.set(false);
         return;
@@ -324,11 +292,7 @@
       if (!(await hasOsuWinello())) {
         sileo.error({
           title: 'Hmmm...',
-          description: 'osu-winello seems to be missing, please install it.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'osu-winello seems to be missing, please install it.'
         });
         launching.set(false);
         return;
@@ -373,11 +337,7 @@
       if (!streamInfo) {
         sileo.error({
           title: 'Hmmm...',
-          description: 'Failed to check for updates, maybe osu! is down?',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Failed to check for updates, maybe osu! is down?'
         });
         launching.set(false);
         return;
@@ -388,11 +348,7 @@
       if (releaseStream === undefined) {
         sileo.error({
           title: 'Hmmm...',
-          description: 'Failed to get osu! release stream.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Failed to get osu! release stream.'
         });
         launching.set(false);
         return;
@@ -402,11 +358,7 @@
       if (!releaseStream.toLowerCase().includes('stable')) {
         sileo.error({
           title: 'Hmmm...',
-          description: 'You are not on the stable release stream, please switch to it.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'You are not on the stable release stream, please switch to it.'
         });
         launching.set(false);
         return;
@@ -696,11 +648,7 @@
       if (error.name === 'AbortError') {
         sileo.error({
           title: 'Hmmm...',
-          description: 'Failed to launch.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Failed to launch.'
         });
         launching.set(false);
         launchError = {
@@ -711,11 +659,7 @@
         launchError = error;
         sileo.error({
           title: 'Hmmm...',
-          description: 'Failed to launch.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Failed to launch.'
         });
         launching.set(false);
         if ($trackingEnabled) umami.track('app_launch_fail', { error: err });
@@ -735,11 +679,7 @@
       if (loginResult && loginResult.user) {
         sileo.success({
           title: 'Login successful!',
-          description: `Welcome back, ${loginResult.user.name}!`,
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: `Welcome back, ${loginResult.user.name}!`
         });
 
         $userAuth.value('username').set(username);
@@ -751,11 +691,7 @@
       } else {
         sileo.error({
           title: 'Login failed!',
-          description: 'Please check your username and password.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Please check your username and password.'
         });
         loginIsLoading = false;
       }
@@ -763,11 +699,7 @@
       console.log(err);
       sileo.error({
         title: 'Login failed!',
-        description: 'There was an issue connecting to the server. Please try again later.',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+        description: 'There was an issue connecting to the server. Please try again later.'
       });
       loginIsLoading = false;
     }
@@ -810,11 +742,7 @@
       if (!firstFile.endsWith('.ezpplauncher-theme')) {
         sileo.error({
           title: 'Uhh...',
-          description: 'Dropped file is not a valid theme file.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: 'Dropped file is not a valid theme file.'
         });
         return;
       }
@@ -822,11 +750,7 @@
       if (!importResult.success || !importResult.themeInfo) {
         sileo.error({
           title: 'Hmmm...',
-          description: importResult.error || 'An unknown error occurred.',
-          fill: '#181825',
-          styles: {
-            description: 'text-center!',
-          },
+          description: importResult.error || 'An unknown error occurred.'
         });
         return;
       }
@@ -843,11 +767,7 @@
         if (!firstFile.endsWith('.ezpplauncher-theme')) {
           sileo.error({
             title: 'Uhh...',
-            description: 'Dropped file is not a valid theme file.',
-            fill: '#181825',
-            styles: {
-              description: 'text-center!',
-            },
+            description: 'Dropped file is not a valid theme file.'
           });
           return;
         }
@@ -855,11 +775,7 @@
         if (!importResult.success || !importResult.themeInfo) {
           sileo.error({
             title: 'Hmmm...',
-            description: importResult.error || 'An unknown error occurred.',
-            fill: '#181825',
-            styles: {
-              description: 'text-center!',
-            },
+            description: importResult.error || 'An unknown error occurred.'
           });
           return;
         }
@@ -892,9 +808,7 @@
       if ($platform === 'windows' && fileName?.toLowerCase() !== 'opentabletdriver.daemon.exe') {
         sileo.error({
           title: 'Wrong executable',
-          description: 'Please select OpenTabletDriver.Daemon.exe',
-          fill: '#181825',
-          styles: { description: 'text-center!' },
+          description: 'Please select OpenTabletDriver.Daemon.exe'
         });
         return;
       }
@@ -904,11 +818,7 @@
       await $userSettings.save();
       sileo.success({
         title: 'Yay!',
-        description: 'OpenTabletDriver set successfully.',
-        fill: '#181825',
-        styles: {
-          description: 'text-center!',
-        },
+        description: 'OpenTabletDriver set successfully.'
       });
     }
   };
@@ -1009,11 +919,7 @@
               if (!updateFile) {
                 sileo.error({
                   title: 'Hmmm...',
-                  description: 'No update file found.',
-                  fill: '#181825',
-                  styles: {
-                    description: 'text-center!',
-                  },
+                  description: 'No update file found.'
                 });
                 $newVersion = undefined;
                 return;
@@ -1133,11 +1039,7 @@
           if (!droppedTheme) {
             sileo.error({
               title: 'Hmmm...',
-              description: 'Failed to install theme.',
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
+              description: 'Failed to install theme.'
             });
             return;
           }
@@ -1151,31 +1053,19 @@
               sileo.error({
                 title: 'Hmmm...',
                 description:
-                  importResult.error || 'An unknown error occurred while importing your theme.',
-                fill: '#181825',
-                styles: {
-                  description: 'text-center!',
-                },
+                  importResult.error || 'An unknown error occurred while importing your theme.'
               });
               return;
             }
             sileo.success({
               title: 'Yay!',
-              description: 'Theme imported successfully',
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
+              description: 'Theme imported successfully'
             });
           } catch (err) {
             console.log(err);
             sileo.error({
               title: 'Hmmm...',
-              description: 'An unknown error occurred while importing your theme.',
-              fill: '#181825',
-              styles: {
-                description: 'text-center!',
-              },
+              description: 'An unknown error occurred while importing your theme.'
             });
           } finally {
             droppedTheme = undefined;
@@ -1283,10 +1173,7 @@
                 sileo.success({
                   title: 'Logout successful!',
                   description: 'See you soon!',
-                  fill: '#181825',
-                  styles: {
-                    description: 'text-center!',
-                  },
+                  fill: '#181825'
                 });
                 currentUser.set(undefined);
                 currentUserInfo.set(undefined);
@@ -1814,10 +1701,6 @@
                     sileo.error({
                       title: 'Hmm...',
                       description: '.NET 8.0 Desktop Runtime not found!',
-                      fill: '#181825',
-                      styles: {
-                        description: 'text-center!',
-                      },
                       button: {
                         title: 'Download .NET 8.0',
                         onClick: async () =>
@@ -1964,21 +1847,13 @@
                             if (downloadThemeResult.error && downloadThemeResult.error.length > 0) {
                               sileo.error({
                                 title: 'Uhhm..',
-                                description: downloadThemeResult.error,
-                                fill: '#181825',
-                                styles: {
-                                  description: 'text-center!',
-                                },
+                                description: downloadThemeResult.error
                               });
                             }
                           } else {
                             sileo.success({
                               title: 'Yaay!',
-                              description: 'Theme installed successfully!',
-                              fill: '#181825',
-                              styles: {
-                                description: 'text-center!',
-                              },
+                              description: 'Theme installed successfully!'
                             });
                           }
                         }

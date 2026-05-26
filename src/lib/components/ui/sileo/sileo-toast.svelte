@@ -1,9 +1,9 @@
 <script lang="ts">
+  import type { SileoToasterProps } from './types';
   import { createElement } from 'react';
   import { createRoot } from 'react-dom/client';
-  import type { SileoOptions } from 'sileo';
 
-  let props: SileoOptions = $props();
+  let props: SileoToasterProps = $props();
   let rootEl: HTMLElement;
 
   $effect(() => {
