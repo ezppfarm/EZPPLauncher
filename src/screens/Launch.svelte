@@ -638,7 +638,7 @@
       cleanup = true;
       launchInfo = 'Cleaning up...';
 
-      if (otd_run) await stopOpenTabletDriver($openTabletDriverPath);
+      if (otd_run) await stopOpenTabletDriver();
 
       setCurrentTimeGlobalMedia(0);
       resumeGlobalMedia();

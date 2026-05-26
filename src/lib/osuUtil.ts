@@ -148,4 +148,4 @@ export const getSkins = async (folder: string) =>
   );
 export const startOpenTabletDriver = async (otdDaemonPath: string) =>
   await invoke('run_open_tablet_driver', { path: otdDaemonPath });
-export const stopOpenTabletDriver = async (otdDaemonPath: string) => await invoke('stop_open_tablet_driver', { path: otdDaemonPath });
+export const stopOpenTabletDriver = async () => await invoke('stop_open_tablet_driver');

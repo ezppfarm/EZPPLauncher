@@ -73,87 +73,86 @@ pub fn valid_osu_folder(folder: String) -> bool {
     check_folder_completeness(path, &osu_folder_files) >= 70.0
 }
 
-#[cfg(not(windows))]
-#[tauri::command]
-pub fn find_osu_installation() -> Option<String> {
-    None
-}
-
 #[cfg(windows)]
 #[tauri::command]
 pub fn find_osu_installation() -> Option<String> {
-    use winreg::RegKey;
-    use winreg::enums::*;
+    #[cfg(windows)]
+    {
+        use winreg::RegKey;
+        use winreg::enums::*;
 
-    let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
+        let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
 
-    let hkcu_registry_paths = [
-        "Software\\Classes\\osustable.File.osk\\DefaultIcon",
-        "Software\\Classes\\osustable.File.osr\\DefaultIcon",
-        "Software\\Classes\\osustable.File.osz\\DefaultIcon",
-    ];
+        let hkcu_registry_paths = [
+            "Software\\Classes\\osustable.File.osk\\DefaultIcon",
+            "Software\\Classes\\osustable.File.osr\\DefaultIcon",
+            "Software\\Classes\\osustable.File.osz\\DefaultIcon",
+        ];
 
-    let osu_folder_files = [
-        "avcodec-51.dll",
-        "avformat-52.dll",
-        "avutil-49.dll",
-        "bass.dll",
-        "bass_fx.dll",
-        "collection.db",
-        "d3dcompiler_47.dll",
-        "libEGL.dll",
-        "libGLESv2.dll",
-        "Microsoft.Ink.dll",
-        "OpenTK.dll",
-        "osu!.cfg",
-        "osu!.db",
-        "osu!.exe",
-        "osu!auth.dll",
-        "osu!gameplay.dll",
-        "osu!seasonal.dll",
-        "osu!ui.dll",
-        "presence.db",
-        "pthreadGC2.dll",
-        "scores.db",
-    ];
+        let osu_folder_files = [
+            "avcodec-51.dll",
+            "avformat-52.dll",
+            "avutil-49.dll",
+            "bass.dll",
+            "bass_fx.dll",
+            "collection.db",
+            "d3dcompiler_47.dll",
+            "libEGL.dll",
+            "libGLESv2.dll",
+            "Microsoft.Ink.dll",
+            "OpenTK.dll",
+            "osu!.cfg",
+            "osu!.db",
+            "osu!.exe",
+            "osu!auth.dll",
+            "osu!gameplay.dll",
+            "osu!seasonal.dll",
+            "osu!ui.dll",
+            "presence.db",
+            "pthreadGC2.dll",
+            "scores.db",
+        ];
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
 
-    for reg_path in &hklm_registry_paths {
-        if let Ok(subkey) = hklm.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
-            let value_names = [""];
-            for value_name in &value_names {
-                if let Ok(value) = subkey.get_value::<String, _>(value_name) {
-                    let trimmed = value.trim_matches('"');
-                    let stripped = trimmed.strip_suffix(",0").unwrap_or(trimmed);
-                    let path = PathBuf::from(stripped.trim());
-                    if let Some(parent) = path.parent() {
-                        let match_percentage = check_folder_completeness(parent, &osu_folder_files);
+        for reg_path in &hklm_registry_paths {
+            if let Ok(subkey) = hklm.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
+                let value_names = [""];
+                for value_name in &value_names {
+                    if let Ok(value) = subkey.get_value::<String, _>(value_name) {
+                        let trimmed = value.trim_matches('"');
+                        let stripped = trimmed.strip_suffix(",0").unwrap_or(trimmed);
+                        let path = PathBuf::from(stripped.trim());
+                        if let Some(parent) = path.parent() {
+                            let match_percentage =
+                                check_folder_completeness(parent, &osu_folder_files);
 
-                        if match_percentage >= 70.0 {
-                            return Some(parent.to_string_lossy().into());
+                            if match_percentage >= 70.0 {
+                                return Some(parent.to_string_lossy().into());
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-    for reg_path in &hkcu_registry_paths {
-        if let Ok(subkey) = hkcu.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
-            let value_names = [""];
-            for value_name in &value_names {
-                if let Ok(value) = subkey.get_value::<String, _>(value_name) {
-                    let trimmed = value.trim_matches('"');
-                    let stripped = trimmed.strip_suffix(",1").unwrap_or(trimmed);
-                    let path = PathBuf::from(stripped.trim());
-                    if let Some(parent) = path.parent() {
-                        let match_percentage = check_folder_completeness(parent, &osu_folder_files);
+        for reg_path in &hkcu_registry_paths {
+            if let Ok(subkey) = hkcu.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
+                let value_names = [""];
+                for value_name in &value_names {
+                    if let Ok(value) = subkey.get_value::<String, _>(value_name) {
+                        let trimmed = value.trim_matches('"');
+                        let stripped = trimmed.strip_suffix(",1").unwrap_or(trimmed);
+                        let path = PathBuf::from(stripped.trim());
+                        if let Some(parent) = path.parent() {
+                            let match_percentage =
+                                check_folder_completeness(parent, &osu_folder_files);
 
-                        if match_percentage >= 70.0 {
-                            return Some(parent.to_string_lossy().into());
+                            if match_percentage >= 70.0 {
+                                return Some(parent.to_string_lossy().into());
+                            }
                         }
                     }
                 }
@@ -881,7 +880,7 @@ pub struct PresenceButton {
 pub async fn presence_update_button(button: PresenceButton) {
     match (button.text.as_deref(), button.url.as_deref()) {
         (Some(text), Some(url)) => presence::set_button(text, url),
-        _ =>presence::clear_button()
+        _ => presence::clear_button(),
     }
 }
 
@@ -956,33 +955,30 @@ pub async fn download_ezpp_launcher_update(app: AppHandle, url: String) -> Resul
 #[cfg(windows)]
 #[tauri::command]
 pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> {
-    let temp_dir = app.path().temp_dir().expect("Failed to get temp directory");
-    let file_path = temp_dir.join("ezpplauncher_update.exe");
-    if !file_path.exists() {
-        return Err("Update file does not exist".to_string());
+    #[cfg(windows)]
+    {
+        let temp_dir = app.path().temp_dir().expect("Failed to get temp directory");
+        let file_path = temp_dir.join("ezpplauncher_update.exe");
+        if !file_path.exists() {
+            return Err("Update file does not exist".to_string());
+        }
+
+        // run this app detached and exit
+
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+
+        Command::new(&file_path)
+            .arg("/S")
+            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+            .spawn()
+            .map_err(|e| format!("Failed to spawn updater: {}", e))?;
+
+        sleep(Duration::from_millis(250)).await;
+
+        app.exit(0x0100);
     }
 
-    // run this app detached and exit
-
-    const DETACHED_PROCESS: u32 = 0x00000008;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-
-    Command::new(&file_path)
-        .arg("/S")
-        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-        .spawn()
-        .map_err(|e| format!("Failed to spawn updater: {}", e))?;
-
-    sleep(Duration::from_millis(250)).await;
-
-    app.exit(0x0100);
-
-    Ok(())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-pub async fn install_ezpp_launcher_update(_app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
@@ -994,19 +990,11 @@ pub async fn run_open_tablet_driver(path: String) -> Result<(), String> {
     }
 
     #[cfg(windows)]
-    const DETACHED_PROCESS: u32 = 0x00000008;
-    #[cfg(windows)]
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-
     {
-        #[cfg(windows)]
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         Command::new(&otd_path)
             .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-            .spawn()
-            .map_err(|e| format!("Failed to start OpenTabletDriver: {}", e))?;
-
-        #[cfg(not(windows))]
-        Command::new(&otd_path)
             .spawn()
             .map_err(|e| format!("Failed to start OpenTabletDriver: {}", e))?;
     }
@@ -1015,21 +1003,20 @@ pub async fn run_open_tablet_driver(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn stop_open_tablet_driver(path: String) -> Result<(), String> {
-    let binary_name = PathBuf::from(&path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or("Invalid OpenTabletDriver path")?
-        .to_string();
+pub async fn stop_open_tablet_driver() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let mut sys = System::new_all();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-    let mut sys = System::new_all();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        let process = sys
+            .processes()
+            .values()
+            .find(|p| p.name().eq_ignore_ascii_case("OpenTabletDriver.Daemon.exe"))
+            .ok_or("OpenTabletDriver is not running")?;
 
-    let process = sys.processes().values().find(|p| {
-        p.name().eq_ignore_ascii_case(&binary_name)
-    }).ok_or("OpenTabletDriver is not running")?;
-
-    process.kill();
+        process.kill();
+    }
 
     Ok(())
 }
@@ -1041,9 +1028,9 @@ pub fn is_open_tablet_driver_running() -> bool {
         let mut sys = System::new_all();
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-        sys.processes().values().any(|p| {
-            p.name().eq_ignore_ascii_case("OpenTabletDriver.Daemon.exe")
-        })
+        sys.processes()
+            .values()
+            .any(|p| p.name().eq_ignore_ascii_case("OpenTabletDriver.Daemon.exe"))
     }
 
     #[cfg(not(windows))]
