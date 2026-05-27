@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::Stdio;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -993,7 +994,6 @@ pub async fn run_open_tablet_driver(path: String) -> Result<(), String> {
 
     #[cfg(windows)]
     {
-        use std::process::Stdio;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
         Command::new(&otd_path)
