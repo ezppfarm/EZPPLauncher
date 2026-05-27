@@ -1,4 +1,4 @@
-import type { StreamsResult } from '@/types';
+import type { StreamsResult } from '$lib/types';
 import { betterFetch } from '@better-fetch/fetch';
 
 const API_ENDPOINT = 'https://osu.ppy.sh/api/';

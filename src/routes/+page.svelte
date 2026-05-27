@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentView, launcherVersion, trackingEnabled } from '@/global';
+  import { currentView, launcherVersion, trackingEnabled } from '$lib/global';
   import { fade } from 'svelte/transition';
 
   const View = $derived($currentView);

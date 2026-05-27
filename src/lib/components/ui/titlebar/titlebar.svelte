@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { custom_theme_audio_playing, custom_theme_volume } from '@/global';
-  import { reduceAnimations, userSettings } from '@/userSettings';
+  import { custom_theme_audio_playing, custom_theme_volume } from '$lib/global';
+  import { reduceAnimations, userSettings } from '$lib/userSettings';
   import { Volume, Volume1, VolumeOff } from '@lucide/svelte';
   import Minimize from '@lucide/svelte/icons/minus';
   import Volume2 from '@lucide/svelte/icons/volume-2';

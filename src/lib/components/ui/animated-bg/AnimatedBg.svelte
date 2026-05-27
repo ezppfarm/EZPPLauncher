@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { reduceAnimations } from '@/userSettings';
+  import { reduceAnimations } from '$lib/userSettings';
 
   //TODO: maybe dynamic background images fetched from ezpp?
 

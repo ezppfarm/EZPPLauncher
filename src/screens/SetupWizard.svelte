@@ -1,11 +1,10 @@
 <script lang="ts">
   import { dev } from '$app/environment';
   import Logo from '$assets/logo.png';
-  import Launch from './Launch.svelte';
-  import Button from '@/components/ui/button/button.svelte';
-  import Checkbox from '@/components/ui/checkbox/checkbox.svelte';
-  import Input from '@/components/ui/input/input.svelte';
-  import Label from '@/components/ui/label/label.svelte';
+  import Button from '$lib/components/ui/button/button.svelte';
+  import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
+  import Input from '$lib/components/ui/input/input.svelte';
+  import Label from '$lib/components/ui/label/label.svelte';
   import {
     beatmapSets,
     currentSkin,
@@ -17,7 +16,7 @@
     presenceLoading,
     skins,
     skinsCount,
-  } from '@/global';
+  } from '$lib/global';
   import {
     autoDetectOsuInstallFolder,
     getBeatmapSetsCount,
@@ -26,7 +25,7 @@
     getSkins,
     getVersion,
     isValidOsuFolder,
-  } from '@/osuUtil';
+  } from '$lib/osuUtil';
   import {
     cursorSmoothening,
     customCursor,
@@ -34,7 +33,8 @@
     patch,
     reduceAnimations,
     userSettings,
-  } from '@/userSettings';
+  } from '$lib/userSettings';
+  import Launch from './Launch.svelte';
   import { Check, CircleCheckBig, CircleOff, LoaderCircle } from '@lucide/svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { animate } from 'animejs';

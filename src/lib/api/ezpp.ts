@@ -3,7 +3,7 @@ import type {
   EZPPUserInfoResponse,
   EZPPUserResponse,
   EZPPUSerStatusResponse,
-} from '@/types';
+} from '$lib/types';
 import { betterFetch } from '@better-fetch/fetch';
 
 const BANCHO_ENDPOINT = 'https://c.ez-pp.farm/';

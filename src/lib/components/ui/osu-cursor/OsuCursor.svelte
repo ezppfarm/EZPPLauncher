@@ -1,7 +1,7 @@
 <script lang="ts">
   import cursor_additive from '$assets/cursor-additive.png';
   import cursor_default from '$assets/cursor.png';
-  import { cursorSmoothness } from '@/userSettings';
+  import { cursorSmoothness } from '$lib/userSettings';
   import { animate } from 'animejs';
   import { onMount } from 'svelte';
 

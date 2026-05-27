@@ -1,12 +1,12 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
   import '../app.css';
-  import * as AlertDialog from '@/components/ui/alert-dialog';
-  import AnimatedBg from '@/components/ui/animated-bg/AnimatedBg.svelte';
-  import Button from '@/components/ui/button/button.svelte';
-  import OsuCursor from '@/components/ui/osu-cursor/OsuCursor.svelte';
-  import SileoToast from '@/components/ui/sileo/sileo-toast.svelte';
-  import Titlebar from '@/components/ui/titlebar/titlebar.svelte';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
+  import AnimatedBg from '$lib/components/ui/animated-bg/AnimatedBg.svelte';
+  import Button from '$lib/components/ui/button/button.svelte';
+  import OsuCursor from '$lib/components/ui/osu-cursor/OsuCursor.svelte';
+  import SileoToast from '$lib/components/ui/sileo/sileo-toast.svelte';
+  import Titlebar from '$lib/components/ui/titlebar/titlebar.svelte';
   import {
     active_custom_theme,
     currentLoadingInfo,
@@ -22,11 +22,11 @@
     presenceLoading,
     setupValues,
     trackingEnabled,
-  } from '@/global';
-  import { exit, getLauncherVersion, getPlatform } from '@/osuUtil';
-  import * as presence from '@/presence';
-  import { getDownloadableThemes, getThemes, loadTheme } from '@/themes';
-  import { userAuth } from '@/userAuthentication';
+  } from '$lib/global';
+  import { exit, getLauncherVersion, getPlatform } from '$lib/osuUtil';
+  import * as presence from '$lib/presence';
+  import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
+  import { userAuth } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -34,8 +34,8 @@
     patch,
     reduceAnimations,
     userSettings,
-  } from '@/userSettings';
-  import { trackMediaContainer } from '@/utils';
+  } from '$lib/userSettings';
+  import { trackMediaContainer } from '$lib/utils';
   import { Buffer } from 'buffer';
   import { SemVer } from 'semver';
   import { sileo } from 'sileo';

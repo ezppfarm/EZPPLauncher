@@ -1,4 +1,4 @@
-import type { Release } from '@/types';
+import type { Release } from '$lib/types';
 import { betterFetch } from '@better-fetch/fetch';
 import semver from 'semver';
 

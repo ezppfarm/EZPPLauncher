@@ -1,22 +1,22 @@
 <script lang="ts">
   import DefaultThemePreview from '$assets/default_preview.png';
   import Logo from '$assets/logo.png';
-  import { ezppfarm } from '@/api/ezpp';
-  import { osuapi } from '@/api/osuapi';
-  import * as AlertDialog from '@/components/ui/alert-dialog';
-  import * as Avatar from '@/components/ui/avatar';
-  import Badge from '@/components/ui/badge/badge.svelte';
-  import Button from '@/components/ui/button/button.svelte';
-  import { Checkbox } from '@/components/ui/checkbox';
-  import DownloadButton from '@/components/ui/download-button/DownloadButton.svelte';
-  import * as DropdownMenu from '@/components/ui/dropdown-menu';
-  import Input from '@/components/ui/input/input.svelte';
-  import Label from '@/components/ui/label/label.svelte';
-  import Progress from '@/components/ui/progress/progress.svelte';
-  import ScrollContainer from '@/components/ui/scroll-container/ScrollContainer.svelte';
-  import * as Select from '@/components/ui/select';
-  import { currentUserInfo } from '@/data';
-  import { useDropZone } from '@/dropZone.svelte';
+  import { ezppfarm } from '$lib/api/ezpp';
+  import { osuapi } from '$lib/api/osuapi';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
+  import * as Avatar from '$lib/components/ui/avatar';
+  import Badge from '$lib/components/ui/badge/badge.svelte';
+  import Button from '$lib/components/ui/button/button.svelte';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import DownloadButton from '$lib/components/ui/download-button/DownloadButton.svelte';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import Input from '$lib/components/ui/input/input.svelte';
+  import Label from '$lib/components/ui/label/label.svelte';
+  import Progress from '$lib/components/ui/progress/progress.svelte';
+  import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
+  import * as Select from '$lib/components/ui/select';
+  import { currentUserInfo } from '$lib/data';
+  import { useDropZone } from '$lib/dropZone.svelte';
   import {
     getGamemodeInt,
     getGamemodeName,
@@ -24,7 +24,7 @@
     modeIntToStr,
     typeIntToStr,
     validModeTypeCombinationsSorted,
-  } from '@/gamemode';
+  } from '$lib/gamemode';
   import {
     active_custom_theme,
     beatmapSets,
@@ -49,7 +49,7 @@
     skins,
     skinsCount,
     trackingEnabled,
-  } from '@/global';
+  } from '$lib/global';
   import {
     downloadEZPPLauncherUpdateFiles,
     downloadUpdate,
@@ -75,8 +75,8 @@
     setUserConfigValues,
     startOpenTabletDriver,
     stopOpenTabletDriver,
-  } from '@/osuUtil';
-  import * as presence from '@/presence';
+  } from '$lib/osuUtil';
+  import * as presence from '$lib/presence';
   import {
     checkThemeFromFile,
     deleteTheme,
@@ -84,9 +84,9 @@
     importThemeFromFile,
     loadTheme,
     type ThemeInfo,
-  } from '@/themes';
-  import { EZPPActionStatus } from '@/types';
-  import { currentUser, userAuth } from '@/userAuthentication';
+  } from '$lib/themes';
+  import { EZPPActionStatus } from '$lib/types';
+  import { currentUser, userAuth } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -96,7 +96,7 @@
     preferredType,
     reduceAnimations,
     userSettings,
-  } from '@/userSettings';
+  } from '$lib/userSettings';
   import {
     compareBuildNumbers,
     fadeGlobalVolume,
@@ -108,7 +108,7 @@
     resumeGlobalMedia,
     setCurrentTimeGlobalMedia,
     urlIsValidImage,
-  } from '@/utils';
+  } from '$lib/utils';
   import {
     LoaderCircle,
     Music,

@@ -1,11 +1,9 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import Launch from './Launch.svelte';
-  import SetupWizard from './SetupWizard.svelte';
-  import { ezppfarm } from '@/api/ezpp';
-  import { git } from '@/api/git';
-  import { currentUserInfo } from '@/data';
-  import { estimateFrameRate } from '@/displayUtils';
+  import { ezppfarm } from '$lib/api/ezpp';
+  import { git } from '$lib/api/git';
+  import { currentUserInfo } from '$lib/data';
+  import { estimateFrameRate } from '$lib/displayUtils';
   import {
     beatmapSets,
     currentLoadingInfo,
@@ -20,7 +18,7 @@
     osuStream,
     skins,
     skinsCount,
-  } from '@/global';
+  } from '$lib/global';
   import {
     getBeatmapSetsCount,
     getEZPPLauncherStreams,
@@ -29,16 +27,18 @@
     getSkins,
     getVersion,
     isValidOsuFolder,
-  } from '@/osuUtil';
-  import type { EZPPUser } from '@/types';
-  import { currentUser, userAuth } from '@/userAuthentication';
+  } from '$lib/osuUtil';
+  import type { EZPPUser } from '$lib/types';
+  import { currentUser, userAuth } from '$lib/userAuthentication';
   import {
     cursorSmoothness,
     osuInstallationPath,
     preferredMode,
     preferredType,
     userSettings,
-  } from '@/userSettings';
+  } from '$lib/userSettings';
+  import Launch from './Launch.svelte';
+  import SetupWizard from './SetupWizard.svelte';
   import { animate, utils } from 'animejs';
   import { sileo } from 'sileo';
   import { onMount } from 'svelte';
