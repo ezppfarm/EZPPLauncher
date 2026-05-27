@@ -14,10 +14,10 @@ use crate::commands::{
     find_osu_installation, get_beatmapsets_count, get_ezpp_launcher_update_files, get_hwid,
     get_launcher_version, get_osu_release_stream, get_osu_skin, get_osu_version, get_platform,
     get_skins, get_skins_count, has_net8, has_osuwinello, has_wmctrl, install_ezpp_launcher_update,
-    is_open_tablet_driver_running, is_osu_running, open_url_in_browser, opened_urls,
-    presence_connect, presence_disconnect, presence_is_connected, presence_update_button,
-    presence_update_status, presence_update_user, read_theme_info, replace_ui_files,
-    run_open_tablet_driver, run_osu, run_osu_updater, set_osu_config_values,
+    is_open_tablet_driver_path_valid, is_open_tablet_driver_running, is_osu_running,
+    open_url_in_browser, opened_urls, presence_connect, presence_disconnect, presence_is_connected,
+    presence_update_button, presence_update_status, presence_update_user, read_theme_info,
+    replace_ui_files, run_open_tablet_driver, run_osu, run_osu_updater, set_osu_config_values,
     set_osu_user_config_values, stop_open_tablet_driver, valid_osu_folder,
 };
 
@@ -123,7 +123,8 @@ pub fn run() {
             download_and_extract_theme,
             run_open_tablet_driver,
             stop_open_tablet_driver,
-            is_open_tablet_driver_running
+            is_open_tablet_driver_running,
+            is_open_tablet_driver_path_valid
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())

@@ -150,3 +150,5 @@ export const startOpenTabletDriver = async (otdDaemonPath: string) =>
   await invoke('run_open_tablet_driver', { path: otdDaemonPath });
 export const stopOpenTabletDriver = async () => await invoke('stop_open_tablet_driver');
 export const isOpenTabletDriverRunning = async () => await invoke('is_open_tablet_driver_running');
+export const isOpenTabletDriverPathValid = async (path: string) =>
+  await invoke('is_open_tablet_driver_path_valid', { path });
