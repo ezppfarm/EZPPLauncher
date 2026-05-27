@@ -352,8 +352,6 @@ export const checkThemeFromFile = async (filePath: string) => {
   }
   const fileBuffer = await fs.readFile(normalizedFilePath);
 
-  let themeInfo: ThemeInfo | undefined = undefined;
-
   try {
     const zipFile = await zip.loadAsync(fileBuffer);
 
@@ -365,14 +363,10 @@ export const checkThemeFromFile = async (filePath: string) => {
       };
     }
     const themeConfigData = await themeConfig.async('string');
-    themeInfo = JSON.parse(themeConfigData) as {
-      name: string;
-      version: string;
-      apiVersion: string;
-      author: string;
-      entry: string;
-      style: string;
-      preview: string;
+    const themeInfo = JSON.parse(themeConfigData) as ThemeInfo;
+    return {
+      success: !!themeInfo,
+      themeInfo,
     };
   } catch (err) {
     console.log(err);
@@ -381,11 +375,6 @@ export const checkThemeFromFile = async (filePath: string) => {
       error: 'Could not read theme file',
     };
   }
-
-  return {
-    success: !!themeInfo,
-    themeInfo,
-  };
 };
 
 export const importThemeFromFile = async (themeName: string, filePath: string) => {

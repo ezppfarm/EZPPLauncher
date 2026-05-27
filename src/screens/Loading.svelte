@@ -241,7 +241,7 @@
   });
 </script>
 
-<div class="flex flex-col items-center justify-center h-[100vh] w-full z-10">
+<div class="flex flex-col items-center justify-center h-screen w-full z-10">
   <div class="relative w-80 h-80 flex items-center justify-center z-10">
     <svg
       class="absolute top-0 left-0 w-full h-full animate-spin"

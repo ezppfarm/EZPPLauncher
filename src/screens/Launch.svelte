@@ -1094,7 +1094,7 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<div class="grid grid-cols-[0.085fr_1fr] h-[100vh] relative" bind:this={dragAndDrop.ref}>
+<div class="grid grid-cols-[0.085fr_1fr] h-screen relative" bind:this={dragAndDrop.ref}>
   {#if dragAndDrop.isDraggingOverApp}
     <div
       class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm"
@@ -1126,7 +1126,7 @@
         if (!$launching) selectedView = 'home';
       }}
     >
-      <House class="text-theme-200 !size-5" />
+      <House class="text-theme-200 size-5!" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
@@ -1138,7 +1138,7 @@
         if (!$launching) selectedView = 'themes';
       }}
     >
-      <Paintbrush class="text-theme-200 !size-5" />
+      <Paintbrush class="text-theme-200 size-5!" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
@@ -1150,7 +1150,7 @@
         if (!$launching) selectedView = 'settings';
       }}
     >
-      <Settings class="text-theme-200 !size-5" />
+      <Settings class="text-theme-200 size-5!" />
     </Button>
     <div class="mt-auto">
       <DropdownMenu.Root>
@@ -1264,7 +1264,7 @@
               <div class="w-px h-4 bg-white/10"></div>
 
               <span
-                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/[0.06]"
+                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/6"
               >
                 {#if $osuStream}
                   {releaseStreamToReadable($osuStream)}
@@ -1273,7 +1273,7 @@
                 {/if}
               </span>
               <span
-                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/[0.06]"
+                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/6"
               >
                 {#if $osuBuild}
                   {$osuBuild}
@@ -1335,7 +1335,7 @@
                 onValueChange={updateGamemode}
               >
                 <Select.Trigger
-                  class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 !text-muted-foreground font-semibold"
+                  class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 text-muted-foreground! font-semibold"
                 >
                   <div class="flex flex-row items-center gap-2">
                     {#if selectedMode === 0}
@@ -1513,7 +1513,7 @@
       </div>
     {:else if selectedView === 'settings'}
       <div
-        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
+        class="h-screen w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1527,7 +1527,7 @@
             <Label class="text-sm" for="setting-patch">Patching</Label>
             <div class="text-muted-foreground text-xs">
               Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
-                  class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
+                  class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg text-[0.55rem]!"
                   >currently only on windows!</span
                 >
               {/if}
@@ -1717,7 +1717,7 @@
                 }}
               >
                 <Select.Trigger
-                  class="border-theme-800 bg-theme-950 !text-muted-foreground font-semibold"
+                  class="border-theme-800 bg-theme-950 text-muted-foreground! font-semibold"
                 >
                   <div class="flex flex-row items-center gap-2 font-normal text-foreground">
                     {$launcherStream}
@@ -1739,7 +1739,7 @@
       </div>
     {:else if selectedView === 'login'}
       <div
-        class="h-[100vh] w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
+        class="h-screen w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1790,7 +1790,7 @@
       </div>
     {:else if selectedView === 'themes'}
       <div
-        class="h-[100vh] w-full flex flex-col items-center bg-black/20 backdrop-blur-sm"
+        class="h-screen w-full flex flex-col items-center bg-black/20 backdrop-blur-sm"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1806,7 +1806,7 @@
                 class="group overflow-hidden rounded-3xl border {$active_custom_theme &&
                 $active_custom_theme.folder_name === theme.folder_name
                   ? 'border-primary'
-                  : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-[295px]"
+                  : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-73.75"
               >
                 <img
                   src={theme.preview || DefaultThemePreview}
@@ -1879,7 +1879,7 @@
                     </Button>
                     {#if theme.status === 'installed' && theme.updateAvailable}
                       <Button
-                        class="min-w-[40px]"
+                        class="min-w-10"
                         size="icon"
                         variant="secondary"
                         onclick={async () => {
@@ -1903,7 +1903,7 @@
                     {/if}
                     {#if (theme.status === 'installed' || theme.status === 'deleting') && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
                       <Button
-                        class="min-w-[40px]"
+                        class="min-w-10"
                         size="icon"
                         variant="destructive"
                         disabled={theme.status !== 'installed'}

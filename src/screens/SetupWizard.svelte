@@ -134,7 +134,7 @@
 </script>
 
 {#if wizardFinished}
-  <div class="relative flex flex-col items-center justify-center h-[100vh] z-50">
+  <div class="relative flex flex-col items-center justify-center h-screen z-50">
     <div class="absolute h-fit w-fit top-1/2 left-1/2">
       <Confetti amount={200} y={[-1, 1.5]} x={[-2.3, 2.3]} colorArray={['#C6A0F3']} />
     </div>
@@ -143,7 +143,7 @@
     <Button class="mt-4" onclick={saveConfig}>Finish</Button>
   </div>
 {:else}
-  <div class="grid grid-cols-[0.41fr_1fr] h-[100vh] z-50">
+  <div class="grid grid-cols-[0.41fr_1fr] h-screen z-50">
     <div
       class="w-full h-full border-r border-black/40 bg-black/40 backdrop-blur-md flex flex-col gap-6 p-3 z-50"
     >
@@ -156,8 +156,7 @@
               : 'border-black/30 bg-black/30'} rounded-lg p-2 transition-all"
         >
           <div
-            class="flex flex-col items-center justify-center h-8 w-8 border-[2px] {selectedStep >
-            i + 1
+            class="flex flex-col items-center justify-center h-8 w-8 border-2 {selectedStep > i + 1
               ? 'border-green-600'
               : 'border-theme-600'} rounded-full"
           >
@@ -268,7 +267,7 @@
                 <Label class="text-sm" for="setting-patch">Patching</Label>
                 <div class="text-muted-foreground text-xs">
                   Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
-                      class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg !text-[0.55rem]"
+                      class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg text-[0.55rem]!"
                       >currently only on windows!</span
                     >
                   {/if}
