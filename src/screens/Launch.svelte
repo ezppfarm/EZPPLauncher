@@ -65,6 +65,7 @@
     hasOsuWinello,
     hasWMCTRL,
     installUpdate,
+    isOpenTabletDriverRunning,
     isOsuCorrupted,
     isOsuRunning,
     isValidOsuFolder,
@@ -575,13 +576,15 @@
       }
 
       let otd_run = false;
-
       if ($openTabletDriverEnabled && $openTabletDriverPath.length > 0) {
-        try {
-          await startOpenTabletDriver($openTabletDriverPath);
-          otd_run = true;
-        } catch (err) {
-          console.log('Failed to start OpenTabletDriver:', err);
+        const otdRunning = await isOpenTabletDriverRunning();
+        if (!otdRunning) {
+          try {
+            await startOpenTabletDriver($openTabletDriverPath);
+            otd_run = true;
+          } catch (err) {
+            console.log('Failed to start OpenTabletDriver:', err);
+          }
         }
       }
 
