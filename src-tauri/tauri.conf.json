@@ -26,7 +26,7 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct; connect-src 'self' https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct; media-src 'self' asset: blob:;",
+      "csp": null,
       "assetProtocol": {
         "enable": true,
         "scope": [
