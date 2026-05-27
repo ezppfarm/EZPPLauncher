@@ -1912,7 +1912,18 @@
                         disabled={theme.status !== 'installed'}
                         onclick={async () => {
                           try {
-                            await deleteTheme(theme);
+                            const deleteResult = await deleteTheme(theme);
+                            if (deleteResult) {
+                              sileo.success({
+                                title: 'Yaay!',
+                                description: 'Theme uninstalled successfully!',
+                              });
+                            } else {
+                              sileo.error({
+                                title: 'Uhhm..',
+                                description: 'Failed to uninstall theme.',
+                              });
+                            }
                           } catch (err) {
                             console.log(err);
                             sileo.error({
