@@ -18,4 +18,4 @@
   });
 </script>
 
-<div bind:this={rootEl}></div>
+<div class="z-9999" bind:this={rootEl}></div>

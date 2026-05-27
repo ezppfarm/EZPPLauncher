@@ -1,6 +1,5 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import '../app.css';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import AnimatedBg from '$lib/components/ui/animated-bg/AnimatedBg.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -36,6 +35,7 @@
     userSettings,
   } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
+  import '../app.css';
   import { Buffer } from 'buffer';
   import { SemVer } from 'semver';
   import { sileo } from 'sileo';
@@ -184,6 +184,14 @@
           }
         }
       }
+
+      combinedThemes.sort((a, b) => {
+        if (a.name === 'Default') return -1;
+        if (b.name === 'Default') return 1;
+        if (a.status === 'installed' && b.status !== 'installed') return -1;
+        if (a.status !== 'installed' && b.status === 'installed') return 1;
+        return a.name.localeCompare(b.name);
+      });
 
       custom_themes.set(combinedThemes);
     } catch (err) {

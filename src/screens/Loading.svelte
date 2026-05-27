@@ -264,7 +264,7 @@
     <img
       src={Logo}
       alt="EZPPLauncher Logo"
-      class="w-52 h-52 mb-2 relative z-10"
+      class="w-52 h-52 mb-2 relative z-10 select-auto pointer-events-none"
       bind:this={ezppLogo}
     />
   </div>

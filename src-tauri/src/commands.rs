@@ -2,6 +2,7 @@ use hardware_id::get_id;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::io::Read;
 use std::path::PathBuf;
 use sysinfo::System;
 use tauri::AppHandle;
@@ -1037,4 +1038,121 @@ pub fn is_open_tablet_driver_running() -> bool {
     {
         true
     }
+}
+
+#[derive(Serialize, Clone)]
+pub struct ExtractProgress {
+    pub theme_name: String,
+    pub total: usize,
+    pub extracted: usize,
+    pub progress: f64,
+    pub current_file: String,
+}
+
+#[tauri::command]
+pub async fn extract_theme(
+    app: AppHandle,
+    file_path: String,
+    theme_folder: String,
+    theme_name: String,
+) -> Result<(), String> {
+    let entries: Vec<(String, Vec<u8>, bool)> = tokio::task::spawn_blocking(move || {
+        let file = std::fs::File::open(&file_path)
+            .map_err(|e| format!("Failed to open theme file: {}", e))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| format!("Failed to read zip archive: {}", e))?;
+
+        let mut entries = Vec::new();
+        for i in 0..archive.len() {
+            let mut zip_entry = archive
+                .by_index(i)
+                .map_err(|e| format!("Failed to read zip entry: {}", e))?;
+
+            let name = match zip_entry.enclosed_name() {
+                Some(p) => p.to_string_lossy().to_string(),
+                None => continue,
+            };
+
+            let is_dir = zip_entry.is_dir();
+            let mut buf = Vec::new();
+            if !is_dir {
+                zip_entry
+                    .read_to_end(&mut buf)
+                    .map_err(|e| format!("Failed to read zip entry data: {}", e))?;
+            }
+            entries.push((name, buf, is_dir));
+        }
+
+        Ok::<_, String>(entries)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {}", e))??;
+
+    let total = entries.len();
+    let mut extracted = 0;
+
+    for (name, buf, is_dir) in entries {
+        let entry_path = std::path::Path::new(&theme_folder).join(&name);
+
+        if is_dir {
+            tokio::fs::create_dir_all(&entry_path)
+                .await
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        } else {
+            if let Some(parent) = entry_path.parent() {
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+            }
+            tokio::fs::write(&entry_path, &buf)
+                .await
+                .map_err(|e| format!("Failed to write file: {}", e))?;
+        }
+
+        extracted += 1;
+        let _ = app.emit(
+            "extract_progress",
+            ExtractProgress {
+                theme_name: theme_name.clone(),
+                total,
+                extracted,
+                progress: extracted as f64 / total as f64,
+                current_file: name,
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ThemeInfo {
+    pub name: String,
+    pub entry: String,
+    pub preview: String,
+}
+
+#[tauri::command]
+pub async fn read_theme_info(file_path: String) -> Result<ThemeInfo, String> {
+    tokio::task::spawn_blocking(move || {
+        let file = std::fs::File::open(&file_path)
+            .map_err(|e| format!("Failed to open theme file: {}", e))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| format!("Failed to read zip archive: {}", e))?;
+
+        let mut theme_config = archive
+            .by_name("theme.json")
+            .map_err(|_| "Theme config file not found".to_string())?;
+
+        let mut contents = String::new();
+        std::io::Read::read_to_string(&mut theme_config, &mut contents)
+            .map_err(|e| format!("Failed to read theme config: {}", e))?;
+
+        let theme_info: ThemeInfo = serde_json::from_str(&contents)
+            .map_err(|e| format!("Failed to parse theme config: {}", e))?;
+
+        Ok(theme_info)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {}", e))?
 }

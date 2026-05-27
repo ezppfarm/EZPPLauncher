@@ -87,7 +87,7 @@
   <div class="scrollbar" style="top: {topOffset}px;">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="thumb"
+      class="thumb bg-theme-600/60! hover:bg-theme-700! active:bg-theme-700 transition-colors"
       bind:this={thumb}
       onpointerdown={startDrag}
       onpointermove={drag}

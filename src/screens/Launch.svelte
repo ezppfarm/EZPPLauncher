@@ -737,7 +737,7 @@
 
   const setupThemeImport = async () => {
     const initialUrls = await invoke<string[]>('opened_urls');
-    if (initialUrls.length > 0) {
+    if (initialUrls.length > 0 && !droppedTheme) {
       const firstFile = initialUrls[0];
       if (!firstFile.endsWith('.ezpplauncher-theme')) {
         sileo.error({
@@ -761,6 +761,7 @@
     }
 
     await listen<string[]>('opened', async (event) => {
+      if (droppedTheme) return;
       const files = event.payload;
       if (files.length > 0) {
         const firstFile = files[0];
@@ -1003,7 +1004,7 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root open={$newVersion === undefined && !!droppedTheme}>
+<AlertDialog.Root open={$newVersion === undefined && !!droppedTheme && !themeInstalling}>
   <AlertDialog.Content
     class="bg-theme-950 border-theme-800 p-0 max-w-2xl"
     escapeKeydownBehavior="ignore"
@@ -1044,29 +1045,31 @@
             return;
           }
           themeInstalling = true;
+
           try {
-            const importResult = await importThemeFromFile(
-              droppedTheme.themeInfo.name,
-              droppedTheme.filePath
+            await sileo.promise(
+              importThemeFromFile(droppedTheme.themeInfo.name, droppedTheme.filePath),
+              {
+                loading: {
+                  title: 'Importing theme...',
+                },
+                error() {
+                  return {
+                    title: 'Hmmm...',
+                    description: 'An unknown error occurred while importing your theme.',
+                  };
+                },
+                success(data) {
+                  return {
+                    title: data.success ? 'Yay!' : 'Hmmm...',
+                    description: data.success
+                      ? 'Theme imported successfully'
+                      : data.error || 'An unknown error occurred while importing your theme.',
+                    type: data.success ? 'success' : 'error',
+                  };
+                },
+              }
             );
-            if (!importResult.success) {
-              sileo.error({
-                title: 'Hmmm...',
-                description:
-                  importResult.error || 'An unknown error occurred while importing your theme.',
-              });
-              return;
-            }
-            sileo.success({
-              title: 'Yay!',
-              description: 'Theme imported successfully',
-            });
-          } catch (err) {
-            console.log(err);
-            sileo.error({
-              title: 'Hmmm...',
-              description: 'An unknown error occurred while importing your theme.',
-            });
           } finally {
             droppedTheme = undefined;
             themeInstalling = false;
@@ -1095,7 +1098,7 @@
 </AlertDialog.Root>
 
 <div class="grid grid-cols-[0.085fr_1fr] h-screen relative" bind:this={dragAndDrop.ref}>
-  {#if dragAndDrop.isDraggingOverApp}
+  {#if dragAndDrop.isDraggingOverApp && !droppedTheme}
     <div
       class="fixed top-0 left-0 w-full h-full z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm"
       transition:fade={{ duration: 300 }}

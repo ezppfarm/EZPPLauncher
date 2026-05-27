@@ -2,9 +2,10 @@ import { active_custom_theme, custom_themes } from './global';
 import { calculateGitBlobSha, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
-import zip from 'jszip';
 import { SemVer } from 'semver';
 
 export type Theme = {
@@ -28,6 +29,14 @@ export type ThemeInfo = {
   entry: string;
   style: string;
   preview: string;
+};
+
+type ExtractProgress = {
+  theme_name: string;
+  total: number;
+  extracted: number;
+  progress: number;
+  current_file: string;
 };
 
 export const getDownloadableThemes = async () => {
@@ -136,26 +145,21 @@ export const downloadTheme = async (
 
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === theme.name);
-    if (matchedTheme) {
-      matchedTheme.status = 'downloading';
-    }
+    if (matchedTheme) matchedTheme.status = 'downloading';
     return themes;
   });
+
   const themeFileName = `${toSafeName(theme.name)}.ezpplauncher-theme`;
   const themeContents = await betterFetch<{
-    file_contents: {
-      sha: string;
-      download_url: string;
-    };
+    file_contents: { sha: string; download_url: string };
   }>(
     `https://git.ez-pp.farm/api/v1/repos/EZPPFarm/EZPPLauncher-Themes/contents-ext/themes/${themeFileName}?ref=main`
   );
+
   if (themeContents.error) {
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) {
-        matchedTheme.status = 'not-installed';
-      }
+      if (matchedTheme) matchedTheme.status = 'not-installed';
       return themes;
     });
     return {
@@ -163,6 +167,7 @@ export const downloadTheme = async (
       error: themeContents.error.message ?? 'An unknown error occurred',
     };
   }
+
   const downloadUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${themeFileName}`;
   const downloadReq = await fetch(downloadUrl, {
     method: 'GET',
@@ -175,104 +180,90 @@ export const downloadTheme = async (
   if (!downloadReq.ok || downloadReq.body === null) {
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) {
-        matchedTheme.status = 'not-installed';
-      }
+      if (matchedTheme) matchedTheme.status = 'not-installed';
       return themes;
     });
-    return {
-      success: false,
-      error: 'Failed to download theme file.',
-    };
+    return { success: false, error: 'Failed to download theme file.' };
   }
+
+  custom_themes.update((themes) => {
+    const matchedTheme = themes.find((t) => t.name === theme.name);
+    if (matchedTheme) matchedTheme.progress = 0;
+    return themes;
+  });
+
   const total = Number(downloadReq.headers.get('content-length')) || 0;
   const reader = downloadReq.body.getReader();
   let received = 0;
-  const chunks = [];
+  const chunks: Uint8Array[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
     received += value.length;
-    const progress = received / total;
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) {
-        matchedTheme.progress = progress;
-      }
+      if (matchedTheme) matchedTheme.progress = received / total;
       return themes;
     });
   }
 
   const fileBuffer = combineChunks(chunks, total);
-
   const sha = calculateGitBlobSha(Buffer.from(fileBuffer));
+
   if (sha !== themeContents.data.file_contents.sha) {
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) {
-        matchedTheme.status = 'not-installed';
-      }
+      if (matchedTheme) matchedTheme.status = 'not-installed';
       return themes;
     });
-    return {
-      success: false,
-      error: 'Failed to verify downloaded theme file hash.',
-    };
+    return { success: false, error: 'Failed to verify downloaded theme file hash.' };
   }
-
-  //TODO: check file hash
 
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === theme.name);
-    if (matchedTheme) {
-      matchedTheme.status = 'extracting';
-    }
+    if (matchedTheme) matchedTheme.status = 'extracting';
     return themes;
   });
+
   const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
   const themeFolder = await path.join(baseThemeFolder, toSafeName(theme.name));
   if (!(await fs.exists(baseThemeFolder))) await fs.mkdir(baseThemeFolder, { recursive: true });
   if (!(await fs.exists(themeFolder))) await fs.mkdir(themeFolder, { recursive: true });
 
-  const zipFile = await zip.loadAsync(fileBuffer);
-  const totalFiles = Object.keys(zipFile.files).length;
-  let extractedFiles = 0;
-  for (const zipEntry of Object.keys(zipFile.files)) {
-    const file = zipFile.file(zipEntry);
-    if (file) {
-      try {
-        const fileData = await file.async('uint8array');
-        const filePath = await path.join(themeFolder, zipEntry);
-        const dirPath = await path.dirname(filePath);
-        if (!(await fs.exists(dirPath))) await fs.mkdir(dirPath, { recursive: true });
-        await new Promise((res) => setTimeout(res, 250));
-        await fs.writeFile(filePath, fileData);
-        extractedFiles++;
-        custom_themes.update((themes) => {
-          const matchedTheme = themes.find((t) => t.name === theme.name);
-          if (matchedTheme) {
-            matchedTheme.progress = extractedFiles / totalFiles;
-          }
-          return themes;
-        });
-      } catch (err) {
-        console.log(err);
-        custom_themes.update((themes) => {
-          const matchedTheme = themes.find((t) => t.name === theme.name);
-          if (matchedTheme) {
-            matchedTheme.status = 'not-installed';
-          }
-          return themes;
-        });
-        return {
-          success: false,
-          error: 'Failed to extract theme file.',
-        };
-      }
-    }
+  // Write buffer to temp file for Tauri invoke
+  const tempPath = await path.join(await path.tempDir(), themeFileName);
+  await fs.writeFile(tempPath, fileBuffer);
+
+  const unlisten = await listen<ExtractProgress>('extract_progress', (event) => {
+    if (event.payload.theme_name !== theme.name) return;
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === theme.name);
+      if (matchedTheme) matchedTheme.progress = event.payload.progress;
+      return themes;
+    });
+  });
+
+  try {
+    await invoke('extract_theme', {
+      filePath: tempPath,
+      themeFolder,
+      themeName: theme.name,
+    });
+  } catch (err) {
+    console.log(err);
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === theme.name);
+      if (matchedTheme) matchedTheme.status = 'not-installed';
+      return themes;
+    });
+    return { success: false, error: 'Failed to extract theme file.' };
+  } finally {
+    unlisten();
+    await fs.remove(tempPath).catch(() => {});
   }
+
   const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
   const themeInfoObj = JSON.parse(themeInfo) as ThemeInfo;
   const themeScriptUrl = convertFileSrc(
@@ -296,9 +287,7 @@ export const downloadTheme = async (
   });
 
   await reloadThemes();
-  return {
-    success: true,
-  };
+  return { success: true };
 };
 
 export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volume = 0.15) => {
@@ -345,35 +334,17 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
 export const checkThemeFromFile = async (filePath: string) => {
   const normalizedFilePath = await path.normalize(filePath);
   if (!(await fs.exists(normalizedFilePath))) {
-    return {
-      success: false,
-      error: 'File not found',
-    };
+    return { success: false, error: 'File not found' };
   }
-  const fileBuffer = await fs.readFile(normalizedFilePath);
 
   try {
-    const zipFile = await zip.loadAsync(fileBuffer);
-
-    const themeConfig = zipFile.file('theme.json');
-    if (!themeConfig) {
-      return {
-        success: false,
-        error: 'Theme config file not found',
-      };
-    }
-    const themeConfigData = await themeConfig.async('string');
-    const themeInfo = JSON.parse(themeConfigData) as ThemeInfo;
-    return {
-      success: !!themeInfo,
-      themeInfo,
-    };
+    const themeInfo = await invoke<ThemeInfo>('read_theme_info', {
+      filePath: normalizedFilePath,
+    });
+    return { success: true, themeInfo };
   } catch (err) {
     console.log(err);
-    return {
-      success: false,
-      error: 'Could not read theme file',
-    };
+    return { success: false, error: 'Could not read theme file' };
   }
 };
 
@@ -383,26 +354,26 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
   if (!(await fs.exists(baseThemeFolder))) await fs.mkdir(baseThemeFolder, { recursive: true });
   if (!(await fs.exists(themeFolder))) await fs.mkdir(themeFolder, { recursive: true });
 
-  const fileBuffer = await fs.readFile(filePath);
-  const zipFile = await zip.loadAsync(fileBuffer);
-  for (const zipEntry of Object.keys(zipFile.files)) {
-    const file = zipFile.file(zipEntry);
-    if (file) {
-      try {
-        const fileData = await file.async('uint8array');
-        const filePath = await path.join(themeFolder, zipEntry);
-        const dirPath = await path.dirname(filePath);
-        if (!(await fs.exists(dirPath))) await fs.mkdir(dirPath, { recursive: true });
-        await new Promise((res) => setTimeout(res, 250));
-        await fs.writeFile(filePath, fileData);
-      } catch (err) {
-        console.log(err);
-        return {
-          success: false,
-          error: 'Failed to extract theme file.',
-        };
-      }
-    }
+  const unlisten = await listen<ExtractProgress>('extract_progress', (event) => {
+    if (event.payload.theme_name !== themeName) return;
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === themeName);
+      if (matchedTheme) matchedTheme.progress = event.payload.progress;
+      return themes;
+    });
+  });
+
+  try {
+    await invoke('extract_theme', {
+      filePath,
+      themeFolder,
+      themeName,
+    });
+  } catch (err) {
+    console.log(err);
+    return { success: false, error: 'Failed to extract theme file.' };
+  } finally {
+    unlisten();
   }
 
   const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
@@ -428,9 +399,7 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
   });
 
   await reloadThemes();
-  return {
-    success: true,
-  };
+  return { success: true };
 };
 
 export const reloadThemes = async () => {
