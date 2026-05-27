@@ -264,17 +264,14 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
 export const deleteTheme = async (themeToUninstall: Theme) => {
   console.log('Uninstall', themeToUninstall);
   if (themeToUninstall.status !== 'installed') {
-    console.log('Theme is not installed', themeToUninstall.status);
     return false;
   }
   const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
   if (!(await fs.exists(baseThemeFolder))) {
-    console.log('Theme base folder does not exist');
     return false;
   }
   const themeFolder = await path.join(baseThemeFolder, themeToUninstall.folder_name);
   if (!(await fs.exists(themeFolder))) {
-    console.log('Theme folder does not exist', themeFolder);
     return false;
   }
   custom_themes.update((themes) => {
