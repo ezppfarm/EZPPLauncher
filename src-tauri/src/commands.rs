@@ -8,6 +8,7 @@ use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri_plugin_fs::FsExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
@@ -1049,6 +1050,143 @@ pub struct ExtractProgress {
     pub current_file: String,
 }
 
+#[derive(Serialize, Clone)]
+pub struct DownloadProgress {
+    pub theme_name: String,
+    pub received: u64,
+    pub total: u64,
+    pub progress: f64,
+}
+
+#[tauri::command]
+pub async fn download_and_extract_theme(
+    app: AppHandle,
+    download_url: String,
+    expected_sha: String,
+    theme_folder: String,
+    theme_name: String,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&download_url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        )
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download theme: {}", e))?;
+
+    let total = response.content_length().unwrap_or(0);
+    let mut received: u64 = 0;
+    let mut chunks: Vec<u8> = Vec::new();
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = futures_util::StreamExt::next(&mut stream).await {
+        let chunk = chunk.map_err(|e| format!("Failed to read chunk: {}", e))?;
+        received += chunk.len() as u64;
+        chunks.extend_from_slice(&chunk);
+        let _ = app.emit(
+            "download_progress",
+            DownloadProgress {
+                theme_name: theme_name.clone(),
+                received,
+                total,
+                progress: if total > 0 {
+                    received as f64 / total as f64
+                } else {
+                    0.0
+                },
+            },
+        );
+    }
+
+    let sha = tokio::task::spawn_blocking({
+        let chunks = chunks.clone();
+        move || {
+            use sha1::{Digest, Sha1};
+            let header = format!("blob {}\0", chunks.len());
+            let mut hasher = Sha1::new();
+            hasher.update(header.as_bytes());
+            hasher.update(&chunks);
+            hex::encode(hasher.finalize())
+        }
+    })
+    .await
+    .map_err(|e| format!("Thread error: {}", e))?;
+
+    if sha != expected_sha {
+        return Err("Failed to verify downloaded theme file hash.".to_string());
+    }
+
+    // Parse zip on blocking thread
+    let entries: Vec<(String, Vec<u8>, bool)> = tokio::task::spawn_blocking(move || {
+        let cursor = std::io::Cursor::new(chunks);
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| format!("Failed to read zip archive: {}", e))?;
+
+        let mut entries = Vec::new();
+        for i in 0..archive.len() {
+            let mut zip_entry = archive
+                .by_index(i)
+                .map_err(|e| format!("Failed to read zip entry: {}", e))?;
+
+            let name = match zip_entry.enclosed_name() {
+                Some(p) => p.to_string_lossy().to_string(),
+                None => continue,
+            };
+
+            let is_dir = zip_entry.is_dir();
+            let mut buf = Vec::new();
+            if !is_dir {
+                std::io::copy(&mut zip_entry, &mut buf)
+                    .map_err(|e| format!("Failed to read zip entry data: {}", e))?;
+            }
+            entries.push((name, buf, is_dir));
+        }
+
+        Ok::<_, String>(entries)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {}", e))??;
+
+    let total_files = entries.len();
+    let mut extracted = 0;
+
+    for (name, buf, is_dir) in entries {
+        let entry_path = std::path::Path::new(&theme_folder).join(&name);
+
+        if is_dir {
+            tokio::fs::create_dir_all(&entry_path)
+                .await
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        } else {
+            if let Some(parent) = entry_path.parent() {
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| format!("Failed to create parent directory: {}", e))?;
+            }
+            tokio::fs::write(&entry_path, &buf)
+                .await
+                .map_err(|e| format!("Failed to write file: {}", e))?;
+        }
+
+        extracted += 1;
+        let _ = app.emit(
+            "extract_progress",
+            ExtractProgress {
+                theme_name: theme_name.clone(),
+                total: total_files,
+                extracted,
+                progress: extracted as f64 / total_files as f64,
+                current_file: name,
+            },
+        );
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn extract_theme(
     app: AppHandle,
@@ -1056,6 +1194,7 @@ pub async fn extract_theme(
     theme_folder: String,
     theme_name: String,
 ) -> Result<(), String> {
+    app.fs_scope().allow_file(&file_path).ok();
     let entries: Vec<(String, Vec<u8>, bool)> = tokio::task::spawn_blocking(move || {
         let file = std::fs::File::open(&file_path)
             .map_err(|e| format!("Failed to open theme file: {}", e))?;
@@ -1133,7 +1272,8 @@ pub struct ThemeInfo {
 }
 
 #[tauri::command]
-pub async fn read_theme_info(file_path: String) -> Result<ThemeInfo, String> {
+pub async fn read_theme_info(app: AppHandle, file_path: String) -> Result<ThemeInfo, String> {
+    app.fs_scope().allow_file(&file_path).ok();
     tokio::task::spawn_blocking(move || {
         let file = std::fs::File::open(&file_path)
             .map_err(|e| format!("Failed to open theme file: {}", e))?;

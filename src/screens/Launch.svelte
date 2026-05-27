@@ -1910,7 +1910,17 @@
                         size="icon"
                         variant="destructive"
                         disabled={theme.status !== 'installed'}
-                        onclick={() => deleteTheme(theme)}
+                        onclick={async () => {
+                          try {
+                            await deleteTheme(theme);
+                          } catch (err) {
+                            console.log(err);
+                            sileo.error({
+                              title: 'Uhhm..',
+                              description: 'Failed to uninstall theme.',
+                            });
+                          }
+                        }}
                       >
                         {#if theme.status === 'deleting'}
                           <LoaderCircle class="animate-spin" />

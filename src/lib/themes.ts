@@ -1,5 +1,5 @@
 import { active_custom_theme, custom_themes } from './global';
-import { calculateGitBlobSha, setGlobalVolume } from './utils';
+import { setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@tauri-apps/api/core';
@@ -29,6 +29,13 @@ export type ThemeInfo = {
   entry: string;
   style: string;
   preview: string;
+};
+
+type DownloadProgress = {
+  theme_name: string;
+  received: number;
+  total: number;
+  progress: number;
 };
 
 type ExtractProgress = {
@@ -125,18 +132,6 @@ export const getThemes = async (): Promise<Theme[]> => {
   return themes;
 };
 
-function combineChunks(chunks: Uint8Array[], totalLength: number): Uint8Array {
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
-}
-
 export const downloadTheme = async (
   theme: Theme,
   force = false
@@ -168,100 +163,65 @@ export const downloadTheme = async (
     };
   }
 
-  const downloadUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${themeFileName}`;
-  const downloadReq = await fetch(downloadUrl, {
-    method: 'GET',
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-    },
-  });
-
-  if (!downloadReq.ok || downloadReq.body === null) {
-    custom_themes.update((themes) => {
-      const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) matchedTheme.status = 'not-installed';
-      return themes;
-    });
-    return { success: false, error: 'Failed to download theme file.' };
-  }
-
-  custom_themes.update((themes) => {
-    const matchedTheme = themes.find((t) => t.name === theme.name);
-    if (matchedTheme) matchedTheme.progress = 0;
-    return themes;
-  });
-
-  const total = Number(downloadReq.headers.get('content-length')) || 0;
-  const reader = downloadReq.body.getReader();
-  let received = 0;
-  const chunks: Uint8Array[] = [];
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    custom_themes.update((themes) => {
-      const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) matchedTheme.progress = received / total;
-      return themes;
-    });
-  }
-
-  const fileBuffer = combineChunks(chunks, total);
-  const sha = calculateGitBlobSha(Buffer.from(fileBuffer));
-
-  if (sha !== themeContents.data.file_contents.sha) {
-    custom_themes.update((themes) => {
-      const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) matchedTheme.status = 'not-installed';
-      return themes;
-    });
-    return { success: false, error: 'Failed to verify downloaded theme file hash.' };
-  }
-
-  custom_themes.update((themes) => {
-    const matchedTheme = themes.find((t) => t.name === theme.name);
-    if (matchedTheme) matchedTheme.status = 'extracting';
-    return themes;
-  });
-
   const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
   const themeFolder = await path.join(baseThemeFolder, toSafeName(theme.name));
   if (!(await fs.exists(baseThemeFolder))) await fs.mkdir(baseThemeFolder, { recursive: true });
   if (!(await fs.exists(themeFolder))) await fs.mkdir(themeFolder, { recursive: true });
 
-  // Write buffer to temp file for Tauri invoke
-  const tempPath = await path.join(await path.tempDir(), themeFileName);
-  await fs.writeFile(tempPath, fileBuffer);
+  const downloadUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${themeFileName}`;
 
-  const unlisten = await listen<ExtractProgress>('extract_progress', (event) => {
+  custom_themes.update((themes) => {
+    const matchedTheme = themes.find((t) => t.name === theme.name);
+    if (matchedTheme) {
+      matchedTheme.status = 'downloading';
+      matchedTheme.progress = 0;
+    }
+    return themes;
+  });
+
+  const unlistenDownload = await listen<DownloadProgress>('download_progress', (event) => {
     if (event.payload.theme_name !== theme.name) return;
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
-      if (matchedTheme) matchedTheme.progress = event.payload.progress;
+      if (matchedTheme) {
+        matchedTheme.status = 'downloading';
+        matchedTheme.progress = event.payload.progress;
+      }
+      return themes;
+    });
+  });
+
+  const unlistenExtract = await listen<ExtractProgress>('extract_progress', (event) => {
+    if (event.payload.theme_name !== theme.name) return;
+    custom_themes.update((themes) => {
+      const matchedTheme = themes.find((t) => t.name === theme.name);
+      if (matchedTheme) {
+        matchedTheme.status = 'extracting';
+        matchedTheme.progress = event.payload.progress;
+      }
       return themes;
     });
   });
 
   try {
-    await invoke('extract_theme', {
-      filePath: tempPath,
+    await invoke('download_and_extract_theme', {
+      downloadUrl,
+      expectedSha: themeContents.data.file_contents.sha,
       themeFolder,
       themeName: theme.name,
     });
   } catch (err) {
     console.log(err);
+    const erro = err as Error;
     custom_themes.update((themes) => {
       const matchedTheme = themes.find((t) => t.name === theme.name);
       if (matchedTheme) matchedTheme.status = 'not-installed';
       return themes;
     });
-    return { success: false, error: 'Failed to extract theme file.' };
+    return { success: false, error: erro.message || 'Failed to download or extract theme.' };
   } finally {
-    unlisten();
-    await fs.remove(tempPath).catch(() => {});
+    unlistenDownload();
+    unlistenExtract();
   }
 
   const themeInfo = await fs.readTextFile(await path.join(themeFolder, 'theme.json'));
@@ -282,6 +242,7 @@ export const downloadTheme = async (
       matchedTheme.preview = themePreview;
       matchedTheme.status = 'installed';
       matchedTheme.progress = 1;
+      matchedTheme.folder_name = toSafeName(theme.name);
     }
     return themes;
   });
@@ -301,11 +262,21 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {
-  if (themeToUninstall.status !== 'installed') return false;
+  console.log('Uninstall', themeToUninstall);
+  if (themeToUninstall.status !== 'installed') {
+    console.log('Theme is not installed', themeToUninstall.status);
+    return false;
+  }
   const baseThemeFolder = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
-  if (!(await fs.exists(baseThemeFolder))) return false;
+  if (!(await fs.exists(baseThemeFolder))) {
+    console.log('Theme base folder does not exist');
+    return false;
+  }
   const themeFolder = await path.join(baseThemeFolder, themeToUninstall.folder_name);
-  if (!(await fs.exists(themeFolder))) return false;
+  if (!(await fs.exists(themeFolder))) {
+    console.log('Theme folder does not exist', themeFolder);
+    return false;
+  }
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === themeToUninstall.name);
     if (matchedTheme) {
