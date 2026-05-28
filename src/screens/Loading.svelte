@@ -133,36 +133,38 @@
 
     if (!$firstStartup) {
       currentLoadingInfo.set('Checking osu installation path...');
-      const validFolder = await isValidOsuFolder($osuInstallationPath);
-      if (!validFolder) {
-        osuInstallationPath.set('');
-        await config.value<string>('osu_installation_path').set('');
-        sileo.error({
-          title: 'Hmm...',
-          description: 'Your previously set osu! installation path seems to be invalid.',
-        });
-      } else {
-        currentLoadingInfo.set('Getting osu version...');
-        const osuReleaseStream = await getReleaseStream($osuInstallationPath);
-        osuStream.set(osuReleaseStream);
-        const osuVersion = await getVersion($osuInstallationPath);
-        osuBuild.set(osuVersion);
-
-        currentLoadingInfo.set('Counting beatmapsets...');
-        const beatmapSetCount = await getBeatmapSetsCount($osuInstallationPath);
-        if (beatmapSetCount !== null) beatmapSets.set(beatmapSetCount);
-
-        currentLoadingInfo.set('Counting skins...');
-        const skins_list = await getSkins($osuInstallationPath);
-        if (skins_list) {
-          skins.set(skins_list);
-          skinsCount.set(skins_list.length);
+      if ($osuInstallationPath && $osuInstallationPath.length > 0) {
+        const validFolder = await isValidOsuFolder($osuInstallationPath);
+        if (!validFolder) {
+          await config.value<string>('osu_installation_path').set('');
+          osuInstallationPath.set('');
+          sileo.error({
+            title: 'Hmm...',
+            description: 'Your previously set osu! installation path seems to be invalid.',
+          });
         } else {
-          skinsCount.set(0);
-        }
+          currentLoadingInfo.set('Getting osu version...');
+          const osuReleaseStream = await getReleaseStream($osuInstallationPath);
+          osuStream.set(osuReleaseStream);
+          const osuVersion = await getVersion($osuInstallationPath);
+          osuBuild.set(osuVersion);
 
-        const skin: string = await getSkin($osuInstallationPath);
-        currentSkin.set(skin);
+          currentLoadingInfo.set('Counting beatmapsets...');
+          const beatmapSetCount = await getBeatmapSetsCount($osuInstallationPath);
+          if (beatmapSetCount !== null) beatmapSets.set(beatmapSetCount);
+
+          currentLoadingInfo.set('Counting skins...');
+          const skins_list = await getSkins($osuInstallationPath);
+          if (skins_list) {
+            skins.set(skins_list);
+            skinsCount.set(skins_list.length);
+          } else {
+            skinsCount.set(0);
+          }
+
+          const skin: string = await getSkin($osuInstallationPath);
+          currentSkin.set(skin);
+        }
       }
     }
 
