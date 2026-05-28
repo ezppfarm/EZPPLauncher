@@ -27,13 +27,7 @@
   import { exit, getLauncherVersion, getPlatform } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
-  import {
-    cursorSmoothening,
-    customCursor,
-    osuInstallationPath,
-    patch,
-    reduceAnimations,
-  } from '$lib/userSettings';
+  import { cursorSmoothening, customCursor, patch, reduceAnimations } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import '../app.css';
   import { Buffer } from 'buffer';
@@ -133,7 +127,6 @@
     const config_custom_cursor = config.value<boolean>('custom_cursor');
     const config_cursor_smoothening = config.value<boolean>('cursor_smoothening');
     const config_reduce_animations = config.value<boolean>('reduce_animations');
-    const config_osu_installation_path = config.value<string>('osu_installation_path');
     const config_discord_presence = config.value<boolean>('discord_presence');
     const config_tracking_enabled = config.value<boolean>('tracking_consent');
     const config_otd_enabled = config.value<boolean>('otd_enabled');
@@ -154,7 +147,6 @@
     customCursor.set(await config_custom_cursor.get(true));
     cursorSmoothening.set(await config_cursor_smoothening.get(true));
     reduceAnimations.set(await config_reduce_animations.get(false));
-    osuInstallationPath.set(await config_osu_installation_path.get(''));
     discordPresence.set(await config_discord_presence.get(true));
     openTabletDriverEnabled.set(await config_otd_enabled.get(false));
     openTabletDriverPath.set(await config_otd_path.get(''));
@@ -167,7 +159,6 @@
     cursorSmoothening.subscribe(async (val) => await config_cursor_smoothening.set(val));
     reduceAnimations.subscribe(async (val) => await config_reduce_animations.set(val));
     openTabletDriverEnabled.subscribe(async (val) => config_otd_enabled.set(val));
-    osuInstallationPath.subscribe(async (val) => await config_osu_installation_path.set(val));
 
     discordPresence.subscribe(async (val) => {
       config_discord_presence.set(val);
