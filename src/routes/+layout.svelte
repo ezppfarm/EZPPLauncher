@@ -167,6 +167,7 @@
     cursorSmoothening.subscribe(async (val) => await config_cursor_smoothening.set(val));
     reduceAnimations.subscribe(async (val) => await config_reduce_animations.set(val));
     openTabletDriverEnabled.subscribe(async (val) => config_otd_enabled.set(val));
+    osuInstallationPath.subscribe(async (val) => await config_osu_installation_path.set(val));
 
     discordPresence.subscribe(async (val) => {
       config_discord_presence.set(val);
@@ -234,6 +235,11 @@
     if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
   });
 </script>
+
+<svelte:head>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  {@html `<style>${$active_custom_theme?.cssStyle || ''}</style>`}
+</svelte:head>
 
 {#if $customCursor}
   <OsuCursor smoothCursor={$cursorSmoothening} />

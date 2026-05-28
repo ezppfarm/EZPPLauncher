@@ -14,6 +14,7 @@ export type Theme = {
   version: string;
   author: string;
   scriptUrl: string;
+  cssStyle: string;
   assets: string;
   preview: string;
   status: 'installed' | 'downloading' | 'extracting' | 'deleting' | 'not-installed';
@@ -77,6 +78,7 @@ export const getDownloadableThemes = async () => {
         status: 'not-installed',
         progress: 0,
         updateAvailable: false,
+        cssStyle: '',
       });
     }
   } else {
@@ -99,6 +101,7 @@ export const getThemes = async (): Promise<Theme[]> => {
     status: 'installed',
     progress: 0,
     updateAvailable: false,
+    cssStyle: '',
   });
   const folderPath = await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
   if (await fs.exists(folderPath)) {
@@ -110,6 +113,8 @@ export const getThemes = async (): Promise<Theme[]> => {
         const themeConfig = await fs.readTextFile(themeConfigFilePath);
         const theme = JSON.parse(themeConfig) as ThemeInfo;
         const scriptFile = await path.join(folderPath, themeFolder.name, theme.entry);
+        const cssStylePath = await path.join(folderPath, themeFolder.name, theme.style);
+        const cssStyle = (await fs.exists(cssStylePath)) ? await fs.readTextFile(cssStylePath) : '';
         if (await fs.exists(scriptFile)) {
           themes.push({
             folder_name: themeFolder.name,
@@ -124,6 +129,7 @@ export const getThemes = async (): Promise<Theme[]> => {
             status: 'installed',
             progress: 0,
             updateAvailable: false,
+            cssStyle,
           });
         }
       }
@@ -233,11 +239,14 @@ export const downloadTheme = async (
   const themePreview = convertFileSrc(
     await path.normalize(`${themeFolder}/assets/${themeInfoObj.preview}`)
   );
+  const cssStylePath = await path.join(themeFolder, themeInfoObj.style);
+  const cssStyle = (await fs.exists(cssStylePath)) ? await fs.readTextFile(cssStylePath) : '';
 
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === theme.name);
     if (matchedTheme) {
       matchedTheme.scriptUrl = themeScriptUrl;
+      matchedTheme.cssStyle = cssStyle;
       matchedTheme.assets = themeAssets;
       matchedTheme.preview = themePreview;
       matchedTheme.status = 'installed';
@@ -286,6 +295,7 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
     const matchedTheme = themes.find((t) => t.name === themeToUninstall.name);
     if (matchedTheme) {
       matchedTheme.scriptUrl = '';
+      matchedTheme.cssStyle = '';
       matchedTheme.assets = '';
       matchedTheme.preview = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/${toSafeName(themeToUninstall.name)}.png`;
       matchedTheme.status = 'not-installed';
@@ -352,11 +362,14 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
   const themePreview = convertFileSrc(
     await path.normalize(`${themeFolder}/assets/${themeInfoObj.preview}`)
   );
+  const cssStylePath = await path.join(themeFolder, themeInfoObj.style);
+  const cssStyle = (await fs.exists(cssStylePath)) ? await fs.readTextFile(cssStylePath) : '';
 
   custom_themes.update((themes) => {
     const matchedTheme = themes.find((t) => t.name === themeInfoObj.name);
     if (matchedTheme) {
       matchedTheme.scriptUrl = themeScriptUrl;
+      matchedTheme.cssStyle = cssStyle;
       matchedTheme.assets = themeAssets;
       matchedTheme.preview = themePreview;
       matchedTheme.status = 'installed';
@@ -406,6 +419,7 @@ export const reloadThemes = async () => {
       storeTheme.version = theme.version;
       storeTheme.author = theme.author;
       storeTheme.updateAvailable = theme.updateAvailable;
+      storeTheme.cssStyle = theme.cssStyle;
     }
 
     const newThemes = combinedThemes.filter((t) => !storeMap.has(t.name));
