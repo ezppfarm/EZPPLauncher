@@ -683,8 +683,8 @@
           description: `Welcome back, ${loginResult.user.name}!`,
         });
         await Promise.all([
-          config.value<string>('username').set(username),
-          config.value<string>('password').set(password),
+          config.value<string>('username').set(username, { encrypt: true }),
+          config.value<string>('password').set(password, { encrypt: true }),
         ]);
 
         currentUser.set(loginResult.user);
@@ -816,7 +816,7 @@
       }
 
       openTabletDriverPath.set(selectedPath);
-      await config.value('otd_path').set(selectedPath);
+      await config.value<string>('otd_path').set(selectedPath);
       sileo.success({
         title: 'Yay!',
         description: 'OpenTabletDriver set successfully.',
@@ -1168,8 +1168,8 @@
               class="text-destructive focus:text-destructive text-xs"
               onclick={async () => {
                 await Promise.all([
-                  config.value('username').set(''),
-                  config.value('password').set(''),
+                  config.value<string>('username').set(''),
+                  config.value<string>('password').set(''),
                 ]);
                 sileo.success({
                   title: 'Logout successful!',

@@ -27,7 +27,6 @@
   import { exit, getLauncherVersion, getPlatform } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
-  import { userAuth } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -101,7 +100,7 @@
     if (oldUserConfigExists) {
       const oldUserConfigValues = oldUserConfig.values();
       if (Object.keys(oldUserConfigValues).length > 0) {
-        await config.value('setup_complete').set(true);
+        await config.value<boolean>('setup_complete').set(true);
 
         for (const key in oldUserConfigValues) {
           const value = oldUserConfigValues[key];
@@ -126,7 +125,6 @@
 
     const isSetupComplete = await config.value<boolean>('setup_complete').get(false);
     firstStartup.set(!isSetupComplete);
-    $userAuth.init();
 
     currentLoadingInfo.set('Loading config...');
     const config_theme = config.value<string>('theme');
@@ -145,7 +143,7 @@
     const lastThemeName = await config_theme.get('Default');
     const last_theme = localThemes.find((t) => t.name === lastThemeName);
     if (!last_theme) {
-      await config.value('theme').set('Default');
+      await config.value<string>('theme').set('Default');
       loadTheme(localThemes[0], $custom_theme_container!, await config_theme_volume.get(0.15));
     } else {
       loadTheme(last_theme, $custom_theme_container!, await config_theme_volume.get(0.15));
