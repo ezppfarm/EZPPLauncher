@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::Stdio;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -996,10 +997,13 @@ pub async fn run_open_tablet_driver(path: String) -> Result<(), String> {
 
     #[cfg(windows)]
     {
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
         Command::new(&otd_path)
-            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("Failed to start OpenTabletDriver: {}", e))?;
     }
@@ -1036,6 +1040,21 @@ pub fn is_open_tablet_driver_running() -> bool {
         sys.processes()
             .values()
             .any(|p| p.name().eq_ignore_ascii_case("OpenTabletDriver.Daemon.exe"))
+    }
+
+    #[cfg(not(windows))]
+    {
+        true
+    }
+}
+
+#[tauri::command]
+pub async fn is_open_tablet_driver_path_valid(app: AppHandle, path: String) -> bool {
+    #[cfg(windows)]
+    {
+        app.fs_scope().allow_file(&path).ok();
+        let otd_path = PathBuf::from(&path);
+        otd_path.exists()
     }
 
     #[cfg(not(windows))]

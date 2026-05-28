@@ -14,6 +14,7 @@ It enhances the osu! experience with quality-of-life features and integration sp
 ## 🚀 Features
 
 - [x] Automatically updates osu! before launching
+- [x] Automatically start/stop the OpenTabletDriver Daemon
 - [x] Automatic ingame login
 - [x] Patches the osu! client to show misses in Relax and Autopilot
 - [x] Displays your EZPPFarm stats in the launcher

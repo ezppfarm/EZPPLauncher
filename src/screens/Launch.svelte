@@ -66,6 +66,8 @@
     hasOsuWinello,
     hasWMCTRL,
     installUpdate,
+    isOpenTabletDriverPathValid,
+    isOpenTabletDriverRunning,
     isOsuCorrupted,
     isOsuRunning,
     isValidOsuFolder,
@@ -200,6 +202,8 @@
       directory: true,
       multiple: false,
       title: 'Select osu! Installation Folder',
+      canCreateDirectories: false,
+      defaultPath: $osuInstallationPath ?? undefined,
     });
 
     if (typeof selectedPath === 'string') {
@@ -454,6 +458,35 @@
           },
         ]);
       }
+
+      let otd_run = false;
+      if ($openTabletDriverEnabled && $openTabletDriverPath.length > 0) {
+        const otdRunning = await isOpenTabletDriverRunning();
+        if (!otdRunning) {
+          launchInfo = 'Starting OpenTabletDriver...';
+          const validDaemon = await isOpenTabletDriverPathValid($openTabletDriverPath);
+          if (!validDaemon) {
+            sileo.error({
+              title: 'Hmmm...',
+              description: 'Failed to start OpenTabletDriver, executable not found.',
+            });
+            launching.set(false);
+            return;
+          }
+          try {
+            await startOpenTabletDriver($openTabletDriverPath);
+            otd_run = true;
+          } catch (err) {
+            console.log('Failed to start OpenTabletDriver:', err);
+            sileo.error({
+              title: 'Hmmm...',
+              description: 'Failed to start OpenTabletDriver.',
+            });
+            launching.set(false);
+            return;
+          }
+        }
+      }
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
@@ -573,17 +606,6 @@
             }
           }
         }, 1000 * 2);
-      }
-
-      let otd_run = false;
-
-      if ($openTabletDriverEnabled && $openTabletDriverPath.length > 0) {
-        try {
-          await startOpenTabletDriver($openTabletDriverPath);
-          otd_run = true;
-        } catch (err) {
-          console.log('Failed to start OpenTabletDriver:', err);
-        }
       }
 
       await runOsu(osuPath, true);
@@ -793,12 +815,14 @@
     const selectedPath = await open({
       directory: false,
       multiple: false,
-      title: 'Select OpenTabletDriver Executable',
+      title: 'Select OpenTabletDriver.Daemon Executable',
+      defaultPath: $openTabletDriverPath ?? undefined,
+      canCreateDirectories: false,
       filters:
         $platform === 'windows'
           ? [
               {
-                name: 'OpenTabletDriver',
+                name: 'OpenTabletDriver.Daemon.exe',
                 extensions: ['exe'],
               },
             ]

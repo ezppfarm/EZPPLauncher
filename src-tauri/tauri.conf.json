@@ -26,7 +26,20 @@
     ],
     "withGlobalTauri": true,
     "security": {
-      "csp": "default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct; connect-src 'self' https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct; media-src 'self' asset: blob:;",
+      "csp": {
+        "default-src": "'self' tauri: customprotocol: asset:",
+        "script-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost https://analytics.ez-pp.farm",
+        "style-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost",
+        "img-src": "'self' asset: http://asset.localhost https://asset.localhost blob: data: https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct",
+        "connect-src": "'self' ipc: http://ipc.localhost https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct https://osu.ppy.sh",
+        "media-src": "'self' asset: http://asset.localhost https://asset.localhost blob:",
+        "font-src": [
+          "'self'",
+          "asset:",
+          "http://asset.localhost",
+          "https://asset.localhost"
+        ]
+      },
       "assetProtocol": {
         "enable": true,
         "scope": [
