@@ -135,7 +135,6 @@
       currentLoadingInfo.set('Checking osu installation path...');
       const config_osu_installation_path = config.value<string>('osu_installation_path');
       const osuInstallationPathVal = await config_osu_installation_path.get('');
-      console.log('Checking osu! installation path:', osuInstallationPath);
       const validFolder = await isValidOsuFolder(osuInstallationPathVal);
       if (!validFolder) {
         await config_osu_installation_path.set('');
