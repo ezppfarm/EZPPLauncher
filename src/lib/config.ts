@@ -1,87 +1,39 @@
-import { Crypto } from './crypto';
-import { getHWID } from './osuUtil';
-import * as path from '@tauri-apps/api/path';
-import { exists, mkdir, readTextFile, writeFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 
-export class Config {
-  private fileName: string;
-  private config: Record<string, unknown> = {};
-  private crypto: Crypto | undefined;
-  private configFilePath: string | undefined;
-  private encrypt: boolean;
+interface ConfigValue<T> {
+  set(value: T, opts?: { encrypt?: boolean }): Promise<void>;
+  get(fallback: T): Promise<T>;
+  exists(): Promise<boolean>;
+  delete(): Promise<void>;
+}
 
-  constructor(fileName: string, encrypt?: boolean) {
-    this.fileName = fileName;
-    this.encrypt = encrypt ?? false;
-  }
-
-  async init(): Promise<boolean> {
-    const hwid = (await getHWID()) ?? 'recorderinsandybridge';
-
-    this.crypto = new Crypto(hwid);
-
-    const homeDir = await path.homeDir();
-    const folderPath = await path.join(homeDir, '.ezpplauncher');
-    this.configFilePath = await path.join(folderPath, this.fileName);
-
-    const createFolder = !(await exists(folderPath));
-    if (createFolder) await mkdir(folderPath);
-
-    const configExists = await exists(this.configFilePath);
-    if (!configExists) return true;
-
-    await this.load();
-    return false;
-  }
-
-  private async load() {
-    if (!this.configFilePath) throw Error('configFilePath not set');
-    if (this.encrypt && !this.crypto) throw Error('crypto not initialized');
-
-    const fileStream = await readTextFile(this.configFilePath);
-    try {
-      const decryptedJSON = JSON.parse(
-        this.encrypt && this.crypto ? this.crypto.decrypt(fileStream) : fileStream
-      ) as Record<string, unknown>;
-      this.config = decryptedJSON;
-    } catch (err) {
-      console.log(err);
-      this.config = {};
-      await this.save();
-    }
-  }
-
-  async save() {
-    if (!this.configFilePath) throw Error('configFilePath not set');
-    if (this.encrypt && !this.crypto) throw Error('crypto not initialized');
-    const encryptedJSON =
-      this.encrypt && this.crypto
-        ? this.crypto.encrypt(JSON.stringify(this.config))
-        : JSON.stringify(this.config);
-
-    await writeFile(this.configFilePath, Buffer.from(encryptedJSON), {
-      append: false,
-    });
-  }
-
-  values() {
-    return this.config;
-  }
-
-  value(key: string) {
+export const config = {
+  value<T = unknown>(key: string): ConfigValue<T> {
     return {
-      set: <T>(val: T) => {
-        this.config[key] = val;
+      set(value: T, opts?: { encrypt?: boolean }): Promise<void> {
+        return invoke('config_set', { key, value, encrypt: opts?.encrypt ?? false });
       },
-      exists: () => {
-        return this.config[key] !== undefined;
+
+      async get(fallback: T): Promise<T> {
+        const result = await invoke<T | null>('config_get', { key });
+        return result ?? fallback;
       },
-      get: <T>(fallback: T): T => {
-        return (this.config[key] as T) ?? fallback;
+
+      exists(): Promise<boolean> {
+        return invoke<boolean>('config_exists', { key });
       },
-      del: () => {
-        delete this.config[key];
+
+      delete(): Promise<void> {
+        return invoke('config_delete', { key });
       },
     };
-  }
-}
+  },
+
+  all(): Promise<[string, unknown][]> {
+    return invoke<[string, unknown][]>('config_all');
+  },
+
+  clear(): Promise<void> {
+    return invoke('config_clear');
+  },
+};

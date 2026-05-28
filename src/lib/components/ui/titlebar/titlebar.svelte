@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { config } from '$lib/config';
   import { custom_theme_audio_playing, custom_theme_volume } from '$lib/global';
-  import { reduceAnimations, userSettings } from '$lib/userSettings';
+  import { reduceAnimations } from '$lib/userSettings';
   import { Volume, Volume1, VolumeOff } from '@lucide/svelte';
   import Minimize from '@lucide/svelte/icons/minus';
   import Volume2 from '@lucide/svelte/icons/volume-2';
@@ -62,8 +63,7 @@
               step="0.01"
               bind:value={$custom_theme_volume}
               on:input={() => {
-                $userSettings.value('volume').set($custom_theme_volume);
-                $userSettings.save();
+                config.value<number>('volume').set($custom_theme_volume);
               }}
               class="volume-slider"
             />

@@ -6,6 +6,8 @@
   import OsuCursor from '$lib/components/ui/osu-cursor/OsuCursor.svelte';
   import SileoToast from '$lib/components/ui/sileo/sileo-toast.svelte';
   import Titlebar from '$lib/components/ui/titlebar/titlebar.svelte';
+  import { config } from '$lib/config';
+  import { Config } from '$lib/config_old';
   import {
     active_custom_theme,
     currentLoadingInfo,
@@ -32,7 +34,6 @@
     osuInstallationPath,
     patch,
     reduceAnimations,
-    userSettings,
   } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import '../app.css';
@@ -94,51 +95,80 @@
     disableReload();
     setupValues();
     launcherVersion.set(await getLauncherVersion());
-    const isFirstStartup = await $userSettings.init();
-    firstStartup.set(isFirstStartup);
+
+    const oldUserConfig = new Config('user_settings', false);
+    const oldUserConfigExists = await oldUserConfig.init();
+    if (oldUserConfigExists) {
+      const oldUserConfigValues = oldUserConfig.values();
+      if (Object.keys(oldUserConfigValues).length > 0) {
+        await config.value('setup_complete').set(true);
+
+        for (const key in oldUserConfigValues) {
+          const value = oldUserConfigValues[key];
+          await config.value<typeof value>(key).set(value);
+        }
+      }
+      await oldUserConfig.delete();
+    }
+
+    const oldUserAuth = new Config('user_auth', true);
+    const oldUserAuthExists = await oldUserAuth.init();
+    if (oldUserAuthExists) {
+      const oldUserAuthValues = oldUserAuth.values();
+      if (Object.keys(oldUserAuthValues).length > 0) {
+        for (const key in oldUserAuthValues) {
+          const value = oldUserAuthValues[key];
+          await config.value<typeof value>(key).set(value);
+        }
+      }
+      await oldUserAuth.delete();
+    }
+
+    const isSetupComplete = await config.value<boolean>('setup_complete').get(false);
+    firstStartup.set(!isSetupComplete);
     $userAuth.init();
 
     currentLoadingInfo.set('Loading config...');
-    const config_theme = $userSettings.value('theme');
-    const config_theme_volume = $userSettings.value('volume');
-    const config_patching = $userSettings.value('patching');
-    const config_custom_cursor = $userSettings.value('custom_cursor');
-    const config_cursor_smoothening = $userSettings.value('cursor_smoothening');
-    const config_reduce_animations = $userSettings.value('reduce_animations');
-    const config_osu_installation_path = $userSettings.value('osu_installation_path');
-    const config_discord_presence = $userSettings.value('discord_presence');
-    const config_tracking_enabled = $userSettings.value('tracking_consent');
-    const config_otd_enabled = $userSettings.value('otd_enabled');
-    const config_otd_path = $userSettings.value('otd_path');
+    const config_theme = config.value<string>('theme');
+    const config_theme_volume = config.value<number>('volume');
+    const config_patching = config.value<boolean>('patching');
+    const config_custom_cursor = config.value<boolean>('custom_cursor');
+    const config_cursor_smoothening = config.value<boolean>('cursor_smoothening');
+    const config_reduce_animations = config.value<boolean>('reduce_animations');
+    const config_osu_installation_path = config.value<string>('osu_installation_path');
+    const config_discord_presence = config.value<boolean>('discord_presence');
+    const config_tracking_enabled = config.value<boolean>('tracking_consent');
+    const config_otd_enabled = config.value<boolean>('otd_enabled');
+    const config_otd_path = config.value<string>('otd_path');
 
     const localThemes = await getThemes();
-    const last_theme = localThemes.find((t) => t.name === config_theme.get('Default'));
+    const lastThemeName = await config_theme.get('Default');
+    const last_theme = localThemes.find((t) => t.name === lastThemeName);
     if (!last_theme) {
-      $userSettings.value('theme').set('Default');
-      await $userSettings.save();
-      loadTheme(localThemes[0], $custom_theme_container!, config_theme_volume.get(0.15));
+      await config.value('theme').set('Default');
+      loadTheme(localThemes[0], $custom_theme_container!, await config_theme_volume.get(0.15));
     } else {
-      loadTheme(last_theme, $custom_theme_container!, config_theme_volume.get(0.15));
+      loadTheme(last_theme, $custom_theme_container!, await config_theme_volume.get(0.15));
     }
 
-    custom_theme_volume.set(config_theme_volume.get(0.15));
-    patch.set(config_patching.get(true));
-    customCursor.set(config_custom_cursor.get(true));
-    cursorSmoothening.set(config_cursor_smoothening.get(true));
-    reduceAnimations.set(config_reduce_animations.get(false));
-    osuInstallationPath.set(config_osu_installation_path.get(''));
-    discordPresence.set(config_discord_presence.get(true));
-    openTabletDriverEnabled.set(config_otd_enabled.get(false));
-    openTabletDriverPath.set(config_otd_path.get(''));
-    if (config_tracking_enabled.exists()) {
-      trackingEnabled.set(config_tracking_enabled.get(false));
+    custom_theme_volume.set(await config_theme_volume.get(0.15));
+    patch.set(await config_patching.get(true));
+    customCursor.set(await config_custom_cursor.get(true));
+    cursorSmoothening.set(await config_cursor_smoothening.get(true));
+    reduceAnimations.set(await config_reduce_animations.get(false));
+    osuInstallationPath.set(await config_osu_installation_path.get(''));
+    discordPresence.set(await config_discord_presence.get(true));
+    openTabletDriverEnabled.set(await config_otd_enabled.get(false));
+    openTabletDriverPath.set(await config_otd_path.get(''));
+    if (await config_tracking_enabled.exists()) {
+      trackingEnabled.set(await config_tracking_enabled.get(false));
     }
 
-    patch.subscribe((val) => config_patching.set(val));
-    customCursor.subscribe((val) => config_custom_cursor.set(val));
-    cursorSmoothening.subscribe((val) => config_cursor_smoothening.set(val));
-    reduceAnimations.subscribe((val) => config_reduce_animations.set(val));
-    openTabletDriverEnabled.subscribe((val) => config_otd_enabled.set(val));
+    patch.subscribe(async (val) => await config_patching.set(val));
+    customCursor.subscribe(async (val) => await config_custom_cursor.set(val));
+    cursorSmoothening.subscribe(async (val) => await config_cursor_smoothening.set(val));
+    reduceAnimations.subscribe(async (val) => await config_reduce_animations.set(val));
+    openTabletDriverEnabled.subscribe(async (val) => config_otd_enabled.set(val));
 
     discordPresence.subscribe(async (val) => {
       config_discord_presence.set(val);

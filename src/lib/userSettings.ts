@@ -1,7 +1,4 @@
-import { Config } from './config';
 import { writable } from 'svelte/store';
-
-export const userSettings = writable<Config>(new Config('user_settings', false));
 
 export const customCursor = writable<boolean>(false);
 export const cursorSmoothening = writable<boolean>(false);

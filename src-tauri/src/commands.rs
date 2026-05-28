@@ -1,6 +1,8 @@
+use crate::config::ConfigError;
 use hardware_id::get_id;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
@@ -8,15 +10,16 @@ use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri::State;
 use tauri_plugin_fs::FsExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::time::{Duration, sleep};
 
-use crate::OpenedUrls;
 use crate::osudb::parse_osudb;
 use crate::presence;
+use crate::state::AppState;
 use crate::utils::{
     check_folder_completeness, encrypt_password, get_osu_config, get_osu_user_config,
     get_window_title_by_pid, is_net8_installed, is_osuwinello_available, is_wmctrl_available,
@@ -25,8 +28,8 @@ use crate::utils::{
 
 #[tauri::command]
 pub fn opened_urls(app: tauri::AppHandle) -> Vec<PathBuf> {
-    let args = app.state::<OpenedUrls>().0.lock().unwrap().clone();
-    app.state::<OpenedUrls>().0.lock().unwrap().clear();
+    let args = app.state::<AppState>().opened_files.lock().unwrap().clone();
+    app.state::<AppState>().opened_files.lock().unwrap().clear();
 
     args
 }
@@ -1295,4 +1298,39 @@ pub async fn read_theme_info(app: AppHandle, file_path: String) -> Result<ThemeI
     })
     .await
     .map_err(|e| format!("Thread error: {}", e))?
+}
+
+#[tauri::command]
+pub fn config_get(key: String, state: State<AppState>) -> Result<Option<Value>, ConfigError> {
+    state.config.lock().unwrap().get(&key)
+}
+
+#[tauri::command]
+pub fn config_set(
+    key: String,
+    value: Value,
+    encrypt: bool,
+    state: State<AppState>,
+) -> Result<(), ConfigError> {
+    state.config.lock().unwrap().set(&key, value, encrypt)
+}
+
+#[tauri::command]
+pub fn config_exists(key: String, state: State<AppState>) -> Result<bool, ConfigError> {
+    state.config.lock().unwrap().exists(&key)
+}
+
+#[tauri::command]
+pub fn config_delete(key: String, state: State<AppState>) -> Result<(), ConfigError> {
+    state.config.lock().unwrap().delete(&key)
+}
+
+#[tauri::command]
+pub fn config_clear(state: State<AppState>) -> Result<(), ConfigError> {
+    state.config.lock().unwrap().clear()
+}
+
+#[tauri::command]
+pub fn config_all(state: State<AppState>) -> Result<Vec<(String, Value)>, ConfigError> {
+    state.config.lock().unwrap().all()
 }

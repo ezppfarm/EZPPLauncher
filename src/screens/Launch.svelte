@@ -15,6 +15,7 @@
   import Progress from '$lib/components/ui/progress/progress.svelte';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '$lib/components/ui/select';
+  import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
   import { useDropZone } from '$lib/dropZone.svelte';
   import {
@@ -86,7 +87,7 @@
     type ThemeInfo,
   } from '$lib/themes';
   import { EZPPActionStatus } from '$lib/types';
-  import { currentUser, userAuth } from '$lib/userAuthentication';
+  import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -95,7 +96,6 @@
     preferredMode,
     preferredType,
     reduceAnimations,
-    userSettings,
   } from '$lib/userSettings';
   import {
     compareBuildNumbers,
@@ -216,8 +216,7 @@
         return;
       }
       osuInstallationPath.set(selectedPath);
-      $userSettings.value('osu_installation_path').set(selectedPath);
-      await $userSettings.save();
+      await config.value<string>('osu_installation_path').set(selectedPath);
       sileo.success({
         title: 'Yay!',
         description: 'osu! installation path set successfully.',
@@ -400,8 +399,10 @@
         launchInfo = 'You are up to date!';
       }
       if ($currentUser) {
-        const username = $userAuth.value('username').get('');
-        const password = $userAuth.value('password').get('');
+        const [username, password] = await Promise.all([
+          config.value<string>('username').get(''),
+          config.value<string>('password').get(''),
+        ]);
         if (username.length > 0 && password.length > 0) {
           await setUserConfigValues(osuPath, [
             {
@@ -681,10 +682,10 @@
           title: 'Login successful!',
           description: `Welcome back, ${loginResult.user.name}!`,
         });
-
-        $userAuth.value('username').set(username);
-        $userAuth.value('password').set(password);
-        await $userAuth.save();
+        await Promise.all([
+          config.value<string>('username').set(username),
+          config.value<string>('password').set(password),
+        ]);
 
         currentUser.set(loginResult.user);
         selectedView = 'home';
@@ -815,8 +816,7 @@
       }
 
       openTabletDriverPath.set(selectedPath);
-      $userSettings.value('otd_path').set(selectedPath);
-      await $userSettings.save();
+      await config.value('otd_path').set(selectedPath);
       sileo.success({
         title: 'Yay!',
         description: 'OpenTabletDriver set successfully.',
@@ -825,13 +825,14 @@
   };
 
   onMount(() => {
-    const config = $userSettings;
-    const trackingConsent = config.value('tracking_consent');
-    if (trackingConsent.exists()) {
-      trackingEnabled.set(trackingConsent.get(false));
-    } else {
-      askForTrackingPermission = true;
-    }
+    (async () => {
+      const trackingConsent = config.value<boolean>('tracking_consent');
+      if (await trackingConsent.exists()) {
+        trackingEnabled.set(await trackingConsent.get(false));
+      } else {
+        askForTrackingPermission = true;
+      }
+    })();
 
     animate(ezppLogo, {
       opacity: [0, 1],
@@ -984,9 +985,7 @@
       <Button
         onclick={async () => {
           trackingEnabled.set(true);
-          const config = $userSettings;
-          config.value('tracking_consent').set(true);
-          await config.save();
+          await config.value<boolean>('tracking_consent').set(true);
           askForTrackingPermission = false;
         }}>Yes, I consent</Button
       >
@@ -994,9 +993,7 @@
         variant="outline"
         onclick={async () => {
           trackingEnabled.set(false);
-          const config = $userSettings;
-          config.value('tracking_consent').set(false);
-          await config.save();
+          await config.value<boolean>('tracking_consent').set(false);
           askForTrackingPermission = false;
         }}>No, I do not consent</Button
       >
@@ -1170,9 +1167,10 @@
             <DropdownMenu.Item
               class="text-destructive focus:text-destructive text-xs"
               onclick={async () => {
-                $userAuth.value('username').del();
-                $userAuth.value('password').del();
-                await $userAuth.save();
+                await Promise.all([
+                  config.value('username').set(''),
+                  config.value('password').set(''),
+                ]);
                 sileo.success({
                   title: 'Logout successful!',
                   description: 'See you soon!',
@@ -1542,7 +1540,6 @@
             disabled={$platform !== 'windows'}
             onCheckedChange={async (e) => {
               patch.set(e);
-              $userSettings.save();
             }}
             class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
@@ -1561,8 +1558,6 @@
                 cursorSmoothening.set(false);
               }
               customCursor.set(e);
-
-              $userSettings.save();
             }}
             class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
@@ -1579,7 +1574,6 @@
             onCheckedChange={async (e) => {
               if (!$customCursor) return;
               cursorSmoothening.set(e);
-              $userSettings.save();
             }}
             disabled={!$customCursor}
             class="flex items-center justify-center w-5 h-5"
@@ -1596,7 +1590,6 @@
             checked={$reduceAnimations}
             onCheckedChange={async (e) => {
               reduceAnimations.set(e);
-              $userSettings.save();
             }}
             class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
@@ -1632,8 +1625,7 @@
             checked={$trackingEnabled}
             onCheckedChange={async (e) => {
               trackingEnabled.set(e);
-              $userSettings.value('tracking_consent').set(e);
-              await $userSettings.save();
+              await config.value<boolean>('tracking_consent').set(e);
             }}
             class="flex items-center justify-center w-5 h-5"
           ></Checkbox>
@@ -1714,9 +1706,8 @@
                     });
                     return;
                   }
-                  $userSettings.value('patcherStream').set(newStream);
+                  await config.value<string>('patcherStream').set(newStream);
                   launcherStream.set(newStream);
-                  await $userSettings.save();
                 }}
               >
                 <Select.Trigger
@@ -1836,8 +1827,7 @@
                         if (theme.status === 'installed') {
                           if ($custom_theme_container) {
                             loadTheme(theme, $custom_theme_container, $custom_theme_volume);
-                            $userSettings.value('theme').set(theme.name);
-                            $userSettings.save();
+                            await config.value<string>('theme').set(theme.name);
                           } else {
                             sileo.error({
                               title: 'Uhhm..',
@@ -1889,8 +1879,7 @@
                           const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
                           if (defaultTheme) {
                             loadTheme(defaultTheme, $custom_theme_container!, $custom_theme_volume);
-                            $userSettings.value('theme').set(defaultTheme.name);
-                            $userSettings.save();
+                            await config.value<string>('theme').set(defaultTheme.name);
 
                             if (!(await downloadTheme(theme, true))) {
                               sileo.error({

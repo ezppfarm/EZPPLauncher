@@ -5,6 +5,7 @@
   import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
+  import { config } from '$lib/config';
   import {
     beatmapSets,
     currentSkin,
@@ -32,7 +33,6 @@
     osuInstallationPath,
     patch,
     reduceAnimations,
-    userSettings,
   } from '$lib/userSettings';
   import Launch from './Launch.svelte';
   import { Check, CircleCheckBig, CircleOff, LoaderCircle } from '@lucide/svelte';
@@ -95,9 +95,9 @@
   };
 
   const saveConfig = async () => {
-    $userSettings.value('osu_installation_path').set(osuInstallPath);
-    await $userSettings.save();
+    await config.value<string>('osu_installation_path').set(osuInstallPath);
     osuInstallationPath.set(osuInstallPath);
+    await config.value<boolean>('setup_complete').set(true);
 
     const beatmapSetCount = await getBeatmapSetsCount(osuInstallPath);
     if (beatmapSetCount) {
@@ -128,7 +128,7 @@
     if (osuPath) {
       osuInstallPath = osuPath;
       autoDetectedOsuPath = true;
-      $userSettings.value('osu_installation_path').set(osuInstallPath);
+      await config.value<string>('osu_installation_path').set(osuInstallPath);
     }
   });
 </script>

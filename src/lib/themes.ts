@@ -262,7 +262,6 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {
-  console.log('Uninstall', themeToUninstall);
   if (themeToUninstall.status !== 'installed') {
     return false;
   }

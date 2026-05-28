@@ -51,11 +51,15 @@ url = "2.5.8"
 zip = "8.6.0"
 sha1 = "0.11.0"
 hex = "0.4.3"
+rusqlite = { version = "0.40.0", features = ["bundled"] }
+aes-gcm = "0.10.3"
+base64 = "0.22.1"
+sha2 = "0.11.0"
+thiserror = "2.0.18"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56.0"
 winapi = { version = "0.3.9", features = ["winuser", "wincrypt", "memoryapi", "winbase", "dpapi"] }
-base64 = "0.22.1"
 widestring = "1.2.1"
 windows-sys = "0.61.2"
 

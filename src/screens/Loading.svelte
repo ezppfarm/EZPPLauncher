@@ -2,6 +2,7 @@
   import Logo from '$assets/logo.png';
   import { ezppfarm } from '$lib/api/ezpp';
   import { git } from '$lib/api/git';
+  import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
   import { estimateFrameRate } from '$lib/displayUtils';
   import {
@@ -29,13 +30,12 @@
     isValidOsuFolder,
   } from '$lib/osuUtil';
   import type { EZPPUser } from '$lib/types';
-  import { currentUser, userAuth } from '$lib/userAuthentication';
+  import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothness,
     osuInstallationPath,
     preferredMode,
     preferredType,
-    userSettings,
   } from '$lib/userSettings';
   import Launch from './Launch.svelte';
   import SetupWizard from './SetupWizard.svelte';
@@ -75,15 +75,14 @@
     const clamped = Math.min(Math.max(refreshRate, hzMin), hzMax);
     const duration =
       durationMin + ((clamped - hzMin) / (hzMax - hzMin)) * (durationMax - durationMin);
-    console.log(Math.round(duration));
     cursorSmoothness.set(Math.round(duration));
   };
 
   const prepare = async () => {
     await calculateCursorSmoothness();
 
-    const username = $userAuth.value('username').get('');
-    const password = $userAuth.value('password').get('');
+    const username = await config.value<string>('username').get('');
+    const password = await config.value<string>('password').get('');
 
     const shouldLogin = username.length > 0 && password.length > 0;
     let userLoginResult: { message: string; user?: EZPPUser } = {
@@ -137,8 +136,7 @@
       const validFolder = await isValidOsuFolder($osuInstallationPath);
       if (!validFolder) {
         osuInstallationPath.set('');
-        $userSettings.value('osu_installation_path').del();
-        await $userSettings.save();
+        await config.value<string>('osu_installation_path').set('');
         sileo.error({
           title: 'Hmm...',
           description: 'Your previously set osu! installation path seems to be invalid.',
@@ -177,7 +175,7 @@
     const ezpplauncherStreams = await getEZPPLauncherStreams();
     if (ezpplauncherStreams) launcherStreams.set(ezpplauncherStreams);
 
-    const selectedLauncherStream = $userSettings.value('patcherStream').get('stable');
+    const selectedLauncherStream = await config.value<string>('patcherStream').get('stable');
     if ($launcherStreams.includes(selectedLauncherStream)) {
       launcherStream.set(selectedLauncherStream);
     }
