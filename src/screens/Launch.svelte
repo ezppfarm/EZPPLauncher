@@ -1068,6 +1068,13 @@
           themeInstalling = true;
 
           try {
+            if ($active_custom_theme && $active_custom_theme.name === droppedTheme.themeInfo.name) {
+              const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
+              if (defaultTheme) {
+                loadTheme(defaultTheme, $custom_theme_container!, $custom_theme_volume);
+                await config.value<string>('theme').set(defaultTheme.name);
+              }
+            }
             await sileo.promise(
               importThemeFromFile(droppedTheme.themeInfo.name, droppedTheme.filePath),
               {
