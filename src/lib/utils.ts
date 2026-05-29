@@ -203,6 +203,43 @@ export function trackMediaContainer(node: HTMLElement) {
   };
 }
 
+const MEDIA_ACTIONS: MediaSessionAction[] = [
+  'play',
+  'pause',
+  'stop',
+  'previoustrack',
+  'nexttrack',
+  'seekbackward',
+  'seekforward',
+];
+
+export function disableMediaControls() {
+  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+
+  if ('mediaSession' in navigator) {
+    MEDIA_ACTIONS.forEach((action) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, () => {});
+      } catch {}
+    });
+  }
+
+  document.addEventListener(
+    'keydown',
+    (e: KeyboardEvent) => {
+      if (e.key.startsWith('Media')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    true
+  );
+
+  mediaElements.forEach((el) => {
+    el.disableRemotePlayback = true;
+  });
+}
+
 export function calculateGitBlobSha(fileBuffer: Buffer): string {
   const header = Buffer.from(`blob ${fileBuffer.length}\0`);
   const store = Buffer.concat([header, fileBuffer]);

@@ -1,5 +1,5 @@
 import { active_custom_theme, custom_themes } from './global';
-import { setGlobalVolume } from './utils';
+import { disableMediaControls, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@tauri-apps/api/core';
@@ -268,6 +268,7 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
     themeScript.mountTheme(themeContainer, { assets: theme.assets });
   }
   setGlobalVolume(volume);
+  disableMediaControls();
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {
