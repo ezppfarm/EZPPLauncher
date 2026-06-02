@@ -79,7 +79,6 @@ pub fn valid_osu_folder(folder: String) -> bool {
     check_folder_completeness(path, &osu_folder_files) >= 70.0
 }
 
-#[cfg(windows)]
 #[tauri::command]
 pub fn find_osu_installation() -> Option<String> {
     #[cfg(windows)]
@@ -962,7 +961,6 @@ pub async fn download_ezpp_launcher_update(app: AppHandle, url: String) -> Resul
     Ok(())
 }
 
-#[cfg(windows)]
 #[tauri::command]
 pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> {
     #[cfg(windows)]

@@ -304,7 +304,9 @@
 
     try {
       launchInfo = 'Looking for file updates...';
-      const updateResult = await getEZPPLauncherUpdateFiles(osuPath, $launcherStream);
+      let launchStream = $launcherStream;
+      if ($platform !== 'windows') launchStream = 'stable'; //fallback to stable for non windows systems
+      const updateResult = await getEZPPLauncherUpdateFiles(osuPath, launchStream);
 
       if (updateResult) {
         if (updateResult.filesToDownload.length > 0) {
@@ -1558,17 +1560,16 @@
           <div class="flex flex-col">
             <Label class="text-sm" for="setting-patch">Patching</Label>
             <div class="text-muted-foreground text-xs">
-              Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+              Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<!-- <span
                   class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg text-[0.55rem]!"
                   >currently only on windows!</span
-                >
+                > -->
               {/if}
             </div>
           </div>
           <Checkbox
             id="setting-patch"
-            checked={$platform === 'windows' ? $patch : false}
-            disabled={$platform !== 'windows'}
+            checked={$patch}
             onCheckedChange={async (e) => {
               patch.set(e);
             }}
@@ -1717,6 +1718,7 @@
               </div>
             </div>
             <div class="flex flex-row w-full">
+              <!-- only stable release stream for linux -->
               <Select.Root
                 type="single"
                 bind:value={$launcherStream}
