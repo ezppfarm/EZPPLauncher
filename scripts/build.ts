@@ -34,4 +34,7 @@ function run(cmd: string, args: string[]): Promise<void> {
 
 await run('bun', ['./scripts/sync-version.ts']);
 await runVite();
+
+//set NO_STRIP=1 in env for linux to prevent stripping of debug symbols in tauri builds, which causes issues with source maps
+if (process.platform === 'linux') process.env.NO_STRIP = '1';
 await run('bunx', ['tauri', 'build']);
