@@ -450,48 +450,52 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
         }
     };
 
-    #[cfg(windows)]
-    {
-        if patch {
-            let patcher_exe_path = PathBuf::from(&folder)
-                .join("EZPPLauncher")
-                .join("patcher")
-                .join("osu!.patcher.exe");
+    if patch {
+        let patcher_exe_path = PathBuf::from(&folder)
+            .join("EZPPLauncher")
+            .join("patcher")
+            .join("osu!.patcher.exe");
 
-            if patcher_exe_path.exists() {
-                #[cfg(windows)]
-                {
-                    let mut sys = System::new_all();
+        if patcher_exe_path.exists() {
+            let mut sys = System::new_all();
 
-                    loop {
-                        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            loop {
+                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-                        let mut found = false;
+                let mut found = false;
 
-                        for (_pid, process) in sys.processes() {
-                            if process.name() == "osu!.exe" {
-                                let pid = process.pid();
-                                let title = get_window_title_by_pid(pid);
+                for (_pid, process) in sys.processes() {
+                    if process.name() == "osu!.exe" {
+                        let pid = process.pid();
+                        let title = get_window_title_by_pid(pid);
 
-                                if !title.is_empty() && !title.contains("updater") {
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if found {
+                        if !title.is_empty() && !title.contains("updater") {
+                            found = true;
                             break;
                         }
-
-                        sleep(Duration::from_millis(500)).await;
                     }
-
-                    let _ = Command::new(&patcher_exe_path)
-                        .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                        .spawn()
-                        .map_err(|e| format!("Failed to run patcher: {e}"))?;
                 }
+
+                if found {
+                    break;
+                }
+
+                sleep(Duration::from_millis(500)).await;
+            }
+            #[cfg(windows)]
+            {
+                let _ = Command::new(&patcher_exe_path)
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                    .spawn()
+                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = Command::new("osu-wine")
+                    .arg("--wine")
+                    .arg(&patcher_exe_path)
+                    .spawn()
+                    .map_err(|e| format!("Failed to run patcher: {}", e))?;
             }
         }
     }
