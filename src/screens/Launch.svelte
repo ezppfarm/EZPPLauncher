@@ -88,7 +88,7 @@
     loadTheme,
     type ThemeInfo,
   } from '$lib/themes';
-  import { EZPPActionStatus } from '$lib/types';
+  import { EZPPActionStatus, type LaunchView } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
@@ -141,7 +141,7 @@
   import { onMount } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
 
-  let selectedView = $state('home');
+  let selectedView = $state<LaunchView>('HOME');
   let progress = $state(-1);
   let launchInfo = $state('');
   let launchError = $state<Error | undefined>(undefined);
@@ -710,7 +710,7 @@
         ]);
 
         currentUser.set(loginResult.user);
-        selectedView = 'home';
+        selectedView = 'HOME';
       } else {
         sileo.error({
           title: 'Login failed!',
@@ -1149,36 +1149,36 @@
     <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15 {selectedView ===
-      'home'
+      'HOME'
         ? 'bg-primary/50'
         : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
       disabled={$launching}
       onclick={() => {
-        if (!$launching) selectedView = 'home';
+        if (!$launching) selectedView = 'HOME';
       }}
     >
       <House class="text-theme-200 size-5!" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
-      'themes'
+      'THEMES'
         ? 'bg-primary/50'
         : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
       disabled={$launching}
       onclick={() => {
-        if (!$launching) selectedView = 'themes';
+        if (!$launching) selectedView = 'THEMES';
       }}
     >
       <Paintbrush class="text-theme-200 size-5!" />
     </Button>
     <Button
       class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
-      'settings'
+      'SETTINGS'
         ? 'bg-primary/50'
         : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
       disabled={$launching}
       onclick={() => {
-        if (!$launching) selectedView = 'settings';
+        if (!$launching) selectedView = 'SETTINGS';
       }}
     >
       <Settings class="text-theme-200 size-5!" />
@@ -1209,14 +1209,14 @@
                 });
                 currentUser.set(undefined);
                 currentUserInfo.set(undefined);
-                selectedView = 'home';
+                selectedView = 'HOME';
               }}
             >
               <LogOut class="size-3.5 mr-2" />
               Logout
             </DropdownMenu.Item>
           {:else}
-            <DropdownMenu.Item class="text-xs" onclick={() => (selectedView = 'login')}>
+            <DropdownMenu.Item class="text-xs" onclick={() => (selectedView = 'LOGIN')}>
               <LogIn class="size-3.5 mr-2" />
               Login
             </DropdownMenu.Item>
@@ -1226,7 +1226,7 @@
     </div>
   </div>
   <div class="z-10 h-full overflow-hidden">
-    {#if selectedView === 'home'}
+    {#if selectedView === 'HOME'}
       <div
         class="flex flex-col-reverse h-full"
         in:fly={{
@@ -1522,7 +1522,7 @@
                 <Button
                   class="flex-1 h-7 text-xs"
                   onclick={() => {
-                    selectedView = 'login';
+                    selectedView = 'LOGIN';
                   }}>Log In</Button
                 >
                 <Button
@@ -1543,7 +1543,7 @@
           >
         </div>
       </div>
-    {:else if selectedView === 'settings'}
+    {:else if selectedView === 'SETTINGS'}
       <div
         class="h-screen w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
@@ -1762,7 +1762,7 @@
           {/if}
         </div>
       </div>
-    {:else if selectedView === 'login'}
+    {:else if selectedView === 'LOGIN'}
       <div
         class="h-screen w-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm"
         in:fly={{
@@ -1813,7 +1813,7 @@
           </Button>
         </form>
       </div>
-    {:else if selectedView === 'themes'}
+    {:else if selectedView === 'THEMES'}
       <div
         class="h-screen w-full flex flex-col items-center bg-black/20 backdrop-blur-sm"
         in:fly={{

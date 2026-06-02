@@ -1,3 +1,5 @@
+export type LaunchView = 'HOME' | 'LOGIN' | 'SETTINGS' | 'THEMES';
+
 export type EZPPUserResponse = {
   code: number;
   message: string;
