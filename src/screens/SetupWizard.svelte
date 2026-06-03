@@ -13,7 +13,6 @@
     discordPresence,
     osuBuild,
     osuStream,
-    platform,
     presenceLoading,
     skins,
     skinsCount,
@@ -266,17 +265,16 @@
               <div class="flex flex-col">
                 <Label class="text-sm" for="setting-patch">Patching</Label>
                 <div class="text-muted-foreground text-xs">
-                  Shows misses in Relax and Autopilot {#if $platform !== 'windows'}<span
+                  Shows misses in Relax and Autopilot <!-- {#if $platform !== 'windows'}<span
                       class="text-red-500 bg-red-800/20 border border-red-600/20 p-0.5 mx-1 px-2 rounded-lg text-[0.55rem]!"
                       >currently only on windows!</span
                     >
-                  {/if}
+                  {/if} -->
                 </div>
               </div>
               <Checkbox
                 id="setting-patch"
-                checked={$platform === 'windows' ? $patch : false}
-                disabled={$platform !== 'windows'}
+                checked={$patch}
                 onCheckedChange={async (e) => {
                   patch.set(e);
                 }}
