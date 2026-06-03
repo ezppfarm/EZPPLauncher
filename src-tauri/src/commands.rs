@@ -36,14 +36,15 @@ pub fn opened_urls(app: tauri::AppHandle) -> Vec<PathBuf> {
 }
 
 #[tauri::command]
-pub fn get_launcher_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+pub fn get_launcher_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 #[tauri::command]
 pub fn get_hwid() -> String {
-    let hwid = get_id().unwrap();
-    hwid.into()
+    get_id()
+        .unwrap_or("recorderinsandybridge".to_string())
+        .into()
 }
 
 #[tauri::command(rename_all = "snake_case")]
