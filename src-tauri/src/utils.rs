@@ -51,7 +51,9 @@ pub fn set_osu_user_config_vals(
     osu_folder_path: &str,
     key_values: &[(&str, Option<&str>)],
 ) -> Result<bool, String> {
-    let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
+    let current_user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
 
     if !osu_config_path.exists() {
