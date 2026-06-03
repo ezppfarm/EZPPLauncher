@@ -1826,148 +1826,173 @@
         }}
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
-        <ScrollContainer class="pt-8" topOffset={45}>
-          <div class="grid w-full gap-1 grid-cols-3 p-3 pr-5">
-            {#each $custom_themes as theme (theme.folder_name)}
-              <div
-                class="group overflow-hidden rounded-3xl border {$active_custom_theme &&
-                $active_custom_theme.folder_name === theme.folder_name
-                  ? 'border-primary'
-                  : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-73.75"
-              >
-                <img
-                  src={theme.preview || DefaultThemePreview}
-                  alt="Preview of {theme.name}"
-                  class="mb-2 h-40 w-full rounded-t-3xl object-cover object-center pointer-events-none select-none"
-                />
-                <div class="flex flex-col gap-1 p-3">
-                  <div class="mb-4 flex items-center justify-between gap-2">
-                    <div class="flex flex-col items-start">
-                      <span class="text-sm font-semibold">{theme.name}</span>
-                      <span class="text-xs text-muted-foreground">by {theme.author}</span>
+        {#if $platform === 'linux'}
+          <div
+            class="flex flex-col items-center gap-4 mt-12 px-6 text-center h-full justify-center"
+          >
+            <!-- currently there is a bug when applying themes on Linux, the Launcher freezes, also when trying to load assets via the assetProtocol it fails because it says the asset was loaded insecurely -->
+            <span class="text-2xl font-bold drop-shadow-lg"
+              >Custom themes are not supported on Linux yet(we are working on it!)</span
+            >
+            <span class="text-muted-foreground font-semibold drop-shadow-lg"
+              >Due to technical limitations on Linux, custom themes are currently not supported.
+            </span>
+            <span class="text-muted-foreground font-semibold drop-shadow-lg"
+              >We are working on a solution to bring custom themes to Linux in a future update, but
+              we don't have an ETA yet. Stay tuned!</span
+            >
+          </div>
+        {:else}
+          <ScrollContainer class="pt-8" topOffset={45}>
+            <div class="grid w-full gap-1 grid-cols-3 p-3 pr-5">
+              {#each $custom_themes as theme (theme.folder_name)}
+                <div
+                  class="group overflow-hidden rounded-3xl border {$active_custom_theme &&
+                  $active_custom_theme.folder_name === theme.folder_name
+                    ? 'border-primary'
+                    : 'border-theme-800'} bg-theme-950 transition hover:border-white/20 h-73.75"
+                >
+                  <img
+                    src={theme.preview || DefaultThemePreview}
+                    alt="Preview of {theme.name}"
+                    class="mb-2 h-40 w-full rounded-t-3xl object-cover object-center pointer-events-none select-none"
+                  />
+                  <div class="flex flex-col gap-1 p-3">
+                    <div class="mb-4 flex items-center justify-between gap-2">
+                      <div class="flex flex-col items-start">
+                        <span class="text-sm font-semibold">{theme.name}</span>
+                        <span class="text-xs text-muted-foreground">by {theme.author}</span>
+                      </div>
+                      <span class="text-xs text-muted-foreground">v{theme.version}</span>
                     </div>
-                    <span class="text-xs text-muted-foreground">v{theme.version}</span>
-                  </div>
-                  <div class="flex items-center gap-1">
-                    <Button
-                      class="w-full"
-                      disabled={($active_custom_theme &&
-                        $active_custom_theme.folder_name === theme.folder_name) ||
-                        theme.status === 'downloading' ||
-                        theme.status === 'extracting' ||
-                        theme.status === 'deleting'}
-                      onclick={async () => {
-                        if (theme.status === 'installed') {
-                          if ($custom_theme_container) {
-                            loadTheme(theme, $custom_theme_container, $custom_theme_volume);
-                            await config.value<string>('theme').set(theme.name);
-                          } else {
-                            sileo.error({
-                              title: 'Uhhm..',
-                              description: 'Failed to apply theme.',
-                            });
-                          }
-                        } else {
-                          const downloadThemeResult = await downloadTheme(theme);
-                          if (!downloadThemeResult.success) {
-                            if (downloadThemeResult.error && downloadThemeResult.error.length > 0) {
+                    <div class="flex items-center gap-1">
+                      <Button
+                        class="w-full"
+                        disabled={($active_custom_theme &&
+                          $active_custom_theme.folder_name === theme.folder_name) ||
+                          theme.status === 'downloading' ||
+                          theme.status === 'extracting' ||
+                          theme.status === 'deleting'}
+                        onclick={async () => {
+                          if (theme.status === 'installed') {
+                            if ($custom_theme_container) {
+                              loadTheme(theme, $custom_theme_container, $custom_theme_volume);
+                              await config.value<string>('theme').set(theme.name);
+                            } else {
                               sileo.error({
                                 title: 'Uhhm..',
-                                description: downloadThemeResult.error,
+                                description: 'Failed to apply theme.',
                               });
                             }
                           } else {
-                            sileo.success({
-                              title: 'Yaay!',
-                              description: 'Theme installed successfully!',
-                            });
-                          }
-                        }
-                      }}
-                    >
-                      {#if $active_custom_theme && $active_custom_theme.folder_name === theme.folder_name}
-                        Theme in use
-                      {:else if theme.status !== 'installed'}
-                        {#if theme.status === 'downloading'}
-                          {theme.updateAvailable ? 'Updating' : 'Downloading'} Theme... ({Math.round(
-                            theme.progress * 100
-                          )}%)
-                        {:else if theme.status === 'extracting'}
-                          Extracting Theme... ({Math.round(theme.progress * 100)}%)
-                        {:else if theme.status === 'deleting'}
-                          Uninstalling Theme...
-                        {:else}
-                          Download Theme
-                        {/if}
-                      {:else}
-                        Use Theme
-                      {/if}
-                    </Button>
-                    {#if theme.status === 'installed' && theme.updateAvailable}
-                      <Button
-                        class="min-w-10"
-                        size="icon"
-                        variant="secondary"
-                        onclick={async () => {
-                          const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
-                          if (defaultTheme) {
-                            loadTheme(defaultTheme, $custom_theme_container!, $custom_theme_volume);
-                            await config.value<string>('theme').set(defaultTheme.name);
-
-                            if (!(await downloadTheme(theme, true))) {
-                              sileo.error({
-                                title: 'Uhhm..',
-                                description: 'Failed to update theme.',
+                            const downloadThemeResult = await downloadTheme(theme);
+                            if (!downloadThemeResult.success) {
+                              if (
+                                downloadThemeResult.error &&
+                                downloadThemeResult.error.length > 0
+                              ) {
+                                sileo.error({
+                                  title: 'Uhhm..',
+                                  description: downloadThemeResult.error,
+                                });
+                              }
+                            } else {
+                              sileo.success({
+                                title: 'Yaay!',
+                                description: 'Theme installed successfully!',
                               });
                             }
                           }
                         }}
                       >
-                        <CloudDownload />
+                        {#if $active_custom_theme && $active_custom_theme.folder_name === theme.folder_name}
+                          Theme in use
+                        {:else if theme.status !== 'installed'}
+                          {#if theme.status === 'downloading'}
+                            {theme.updateAvailable ? 'Updating' : 'Downloading'} Theme... ({Math.round(
+                              theme.progress * 100
+                            )}%)
+                          {:else if theme.status === 'extracting'}
+                            Extracting Theme... ({Math.round(theme.progress * 100)}%)
+                          {:else if theme.status === 'deleting'}
+                            Uninstalling Theme...
+                          {:else}
+                            Download Theme
+                          {/if}
+                        {:else}
+                          Use Theme
+                        {/if}
                       </Button>
-                    {/if}
-                    {#if (theme.status === 'installed' || theme.status === 'deleting') && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
-                      <Button
-                        class="min-w-10"
-                        size="icon"
-                        variant="destructive"
-                        disabled={theme.status !== 'installed'}
-                        onclick={async () => {
-                          try {
-                            const deleteResult = await deleteTheme(theme);
-                            if (deleteResult) {
-                              sileo.success({
-                                title: 'Yaay!',
-                                description: 'Theme uninstalled successfully!',
-                              });
-                            } else {
+                      {#if theme.status === 'installed' && theme.updateAvailable}
+                        <Button
+                          class="min-w-10"
+                          size="icon"
+                          variant="secondary"
+                          onclick={async () => {
+                            const defaultTheme = $custom_themes.find((t) => t.name === 'Default');
+                            if (defaultTheme) {
+                              loadTheme(
+                                defaultTheme,
+                                $custom_theme_container!,
+                                $custom_theme_volume
+                              );
+                              await config.value<string>('theme').set(defaultTheme.name);
+
+                              if (!(await downloadTheme(theme, true))) {
+                                sileo.error({
+                                  title: 'Uhhm..',
+                                  description: 'Failed to update theme.',
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          <CloudDownload />
+                        </Button>
+                      {/if}
+                      {#if (theme.status === 'installed' || theme.status === 'deleting') && $active_custom_theme && $active_custom_theme.folder_name !== theme.folder_name && theme.name !== 'Default'}
+                        <Button
+                          class="min-w-10"
+                          size="icon"
+                          variant="destructive"
+                          disabled={theme.status !== 'installed'}
+                          onclick={async () => {
+                            try {
+                              const deleteResult = await deleteTheme(theme);
+                              if (deleteResult) {
+                                sileo.success({
+                                  title: 'Yaay!',
+                                  description: 'Theme uninstalled successfully!',
+                                });
+                              } else {
+                                sileo.error({
+                                  title: 'Uhhm..',
+                                  description: 'Failed to uninstall theme.',
+                                });
+                              }
+                            } catch (err) {
+                              console.log(err);
                               sileo.error({
                                 title: 'Uhhm..',
                                 description: 'Failed to uninstall theme.',
                               });
                             }
-                          } catch (err) {
-                            console.log(err);
-                            sileo.error({
-                              title: 'Uhhm..',
-                              description: 'Failed to uninstall theme.',
-                            });
-                          }
-                        }}
-                      >
-                        {#if theme.status === 'deleting'}
-                          <LoaderCircle class="animate-spin" />
-                        {:else}
-                          <Trash />
-                        {/if}
-                      </Button>
-                    {/if}
+                          }}
+                        >
+                          {#if theme.status === 'deleting'}
+                            <LoaderCircle class="animate-spin" />
+                          {:else}
+                            <Trash />
+                          {/if}
+                        </Button>
+                      {/if}
+                    </div>
                   </div>
                 </div>
-              </div>
-            {/each}
-          </div>
-        </ScrollContainer>
+              {/each}
+            </div>
+          </ScrollContainer>
+        {/if}
       </div>
     {/if}
   </div>
