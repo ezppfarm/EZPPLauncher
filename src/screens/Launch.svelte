@@ -575,10 +575,11 @@
                 const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
                 const isValidImage = await urlIsValidImage(beatmapCoverImage);
                 if (isValidImage) largeImageKey = beatmapCoverImage;
-                customButton = {
-                  text: 'View Beatmap',
-                  url: `https://ez-pp.farm/beatmapsets/${userStatus.player_status.status.beatmap.set_id}/${userStatus.player_status.status.beatmap.id}`,
-                };
+                if (userStatus.player_status.status.action !== EZPPActionStatus.DIRECT)
+                  customButton = {
+                    text: 'View Beatmap',
+                    url: `https://ez-pp.farm/beatmapsets/${userStatus.player_status.status.beatmap.set_id}/${userStatus.player_status.status.beatmap.id}`,
+                  };
               }
 
               details = `[${gamemodeName}] ${details}`;
