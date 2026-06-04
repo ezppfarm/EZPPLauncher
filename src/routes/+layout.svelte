@@ -135,7 +135,7 @@
     const localThemes = await getThemes();
     const lastThemeName = await config_theme.get('Default');
     const last_theme = localThemes.find((t) => t.name === lastThemeName);
-    if (!last_theme) {
+    if (!last_theme || $platform === 'linux') {
       await config.value<string>('theme').set('Default');
       loadTheme(localThemes[0], $custom_theme_container!, await config_theme_volume.get(0.15));
     } else {

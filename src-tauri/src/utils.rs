@@ -24,10 +24,13 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
         return None;
     }
 
-    let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
+    let current_user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = osu_folder_path
         .as_ref()
         .join(format!("osu!.{}.cfg", current_user));
+    println!("Looking for user config at: {:?}", osu_config_path);
     if !osu_config_path.exists() {
         return None;
     }
@@ -48,7 +51,9 @@ pub fn set_osu_user_config_vals(
     osu_folder_path: &str,
     key_values: &[(&str, Option<&str>)],
 ) -> Result<bool, String> {
-    let current_user = std::env::var("USERNAME").unwrap_or_else(|_| "Admin".to_string());
+    let current_user = std::env::var("USERNAME")
+        .or_else(|_| std::env::var("USER"))
+        .unwrap_or_else(|_| "Admin".to_string());
     let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
 
     if !osu_config_path.exists() {
@@ -310,7 +315,9 @@ pub async fn is_net8_installed() -> bool {
             }
 
             let stdout_str = String::from_utf8_lossy(&output.stdout);
-            stdout_str.lines().any(|line| line.starts_with("Microsoft.WindowsDesktop.App 8."))
+            stdout_str
+                .lines()
+                .any(|line| line.starts_with("Microsoft.WindowsDesktop.App 8."))
         }
         Err(_) => false,
     }
