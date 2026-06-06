@@ -98,6 +98,7 @@ export const ezppfarm = {
         stream: 'none',
       },
       headers: {
+        Accept: 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'EZPPLauncher',
       },
