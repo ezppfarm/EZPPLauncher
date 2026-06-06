@@ -2,7 +2,6 @@
   import DefaultThemePreview from '$assets/default_preview.png';
   import Logo from '$assets/logo.png';
   import { ezppfarm } from '$lib/api/ezpp';
-  import { osuapi } from '$lib/api/osuapi';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import * as Avatar from '$lib/components/ui/avatar';
   import Badge from '$lib/components/ui/badge/badge.svelte';
@@ -338,7 +337,7 @@
     }
 
     try {
-      const streamInfo = await osuapi.latestBuildVersion('stable40');
+      const streamInfo = await ezppfarm.latestBuildVersion('stable40');
       if (!streamInfo) {
         sileo.error({
           title: 'Hmmm...',

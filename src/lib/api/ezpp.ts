@@ -3,9 +3,11 @@ import type {
   EZPPUserInfoResponse,
   EZPPUserResponse,
   EZPPUSerStatusResponse,
+  StreamsResult,
 } from '$lib/types';
 import { betterFetch } from '@better-fetch/fetch';
 
+const VERSION_ENDPOINT = 'https://version.ez-pp.farm/';
 const BANCHO_ENDPOINT = 'https://c.ez-pp.farm/';
 const API_ENDPOINT = 'https://api.ez-pp.farm/';
 const ENDPOINT = 'https://ez-pp.farm/';
@@ -88,5 +90,31 @@ export const ezppfarm = {
       }
     );
     return request.error ? undefined : request.data;
+  },
+  latestBuildVersion: async (releaseStream: string): Promise<string | undefined> => {
+    const request = await betterFetch<StreamsResult>(`${VERSION_ENDPOINT}api/changelog`, {
+      timeout,
+      query: {
+        stream: 'none',
+      },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'EZPPLauncher',
+      },
+    });
+    if (request.error) {
+      return undefined;
+    }
+    const releaseData = request.data;
+    if (!releaseData || !releaseData.streams) {
+      return undefined;
+    }
+    if (releaseData.streams.length === 0) return undefined;
+    const selectedRelease = releaseData.streams.find(
+      (releaseBuild) =>
+        releaseBuild.name.toLowerCase() === releaseStream.replaceAll(' ', '').toLowerCase()
+    );
+    if (!selectedRelease) return undefined;
+    return selectedRelease.latest_build.display_version;
   },
 };
