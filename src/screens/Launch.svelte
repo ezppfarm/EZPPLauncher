@@ -150,6 +150,8 @@
 
   let downloadingUpdate = $state(false);
 
+  let updateCheckFailed = $state(false);
+
   let dragAndDrop = useDropZone({
     onDrop: async (file) => {
       const firstFile = file[0];
@@ -244,7 +246,7 @@
     }
   };
 
-  const launch = async () => {
+  const launch = async (skipUpdateCheck = false) => {
     if ($launching) return;
     launchInfo = 'Checking if osu! is already running...';
     launching.set(true);
@@ -301,107 +303,112 @@
       }
     }
 
-    try {
-      launchInfo = 'Looking for file updates...';
-      let launchStream = $launcherStream;
-      if ($platform !== 'windows') launchStream = 'stable'; //fallback to stable for non windows systems
-      const updateResult = await getEZPPLauncherUpdateFiles(osuPath, launchStream);
+    if (!skipUpdateCheck) {
+      try {
+        launchInfo = 'Looking for file updates...';
+        let launchStream = $launcherStream;
+        if ($platform !== 'windows') launchStream = 'stable'; //fallback to stable for non windows systems
+        const updateResult = await getEZPPLauncherUpdateFiles(osuPath, launchStream);
 
-      if (updateResult) {
-        if (updateResult.filesToDownload.length > 0) {
-          downloadingEZPPFiles = true;
-          launchInfo = 'Found file updates!';
-          await new Promise((res) => setTimeout(res, 1000));
-          await downloadEZPPLauncherUpdateFiles(
-            osuPath,
-            updateResult.filesToDownload,
-            updateResult.updateFiles,
-            (file) => {
-              progress = file.progress;
-              launchInfo = `${file.fileName}(${formatBytes(
-                file.downloaded
-              )}/${formatBytes(file.size)})...`;
-            }
-          );
-          progress = -1;
-          downloadingEZPPFiles = false;
-        } else {
-          launchInfo = 'EZPPLauncher Files are up to date!';
-          await new Promise((res) => setTimeout(res, 1500));
+        if (updateResult) {
+          if (updateResult.filesToDownload.length > 0) {
+            downloadingEZPPFiles = true;
+            launchInfo = 'Found file updates!';
+            await new Promise((res) => setTimeout(res, 1000));
+            await downloadEZPPLauncherUpdateFiles(
+              osuPath,
+              updateResult.filesToDownload,
+              updateResult.updateFiles,
+              (file) => {
+                progress = file.progress;
+                launchInfo = `${file.fileName}(${formatBytes(
+                  file.downloaded
+                )}/${formatBytes(file.size)})...`;
+              }
+            );
+            progress = -1;
+            downloadingEZPPFiles = false;
+          } else {
+            launchInfo = 'EZPPLauncher Files are up to date!';
+            await new Promise((res) => setTimeout(res, 1500));
+          }
         }
+      } catch (err) {
+        launchError = err as Error;
+        launching.set(false);
+        return;
       }
-    } catch (err) {
-      launchError = err as Error;
-      launching.set(false);
-      return;
     }
 
     try {
-      const streamInfo = await ezppfarm.latestBuildVersion('stable40');
-      if (!streamInfo) {
-        sileo.error({
-          title: 'Hmmm...',
-          description: 'Failed to check for updates, maybe osu! is down?',
-        });
-        launching.set(false);
-        return;
-      }
+      if (!skipUpdateCheck) {
+        const streamInfo = await ezppfarm.latestBuildVersion('stable40');
+        if (!streamInfo) {
+          sileo.error({
+            title: 'Hmmm...',
+            description: 'Failed to check for updates, maybe osu! is down?',
+          });
+          launching.set(false);
+          updateCheckFailed = true;
+          return;
+        }
 
-      const releaseStream = await getReleaseStream(osuPath);
+        const releaseStream = await getReleaseStream(osuPath);
 
-      if (releaseStream === undefined) {
-        sileo.error({
-          title: 'Hmmm...',
-          description: 'Failed to get osu! release stream.',
-        });
-        launching.set(false);
-        return;
-      }
+        if (releaseStream === undefined) {
+          sileo.error({
+            title: 'Hmmm...',
+            description: 'Failed to get osu! release stream.',
+          });
+          launching.set(false);
+          return;
+        }
 
-      // only stable osu! release streams are supported for now
-      if (!releaseStream.toLowerCase().includes('stable')) {
-        sileo.error({
-          title: 'Hmmm...',
-          description: 'You are not on the stable release stream, please switch to it.',
-        });
-        launching.set(false);
-        return;
-      }
+        // only stable osu! release streams are supported for now
+        if (!releaseStream.toLowerCase().includes('stable')) {
+          sileo.error({
+            title: 'Hmmm...',
+            description: 'You are not on the stable release stream, please switch to it.',
+          });
+          launching.set(false);
+          return;
+        }
 
-      const osuCorrupted = await isOsuCorrupted(osuPath);
-      let forceUpdate =
-        (releaseStream && releaseStream.toLowerCase() !== 'stable40') || osuCorrupted;
+        const osuCorrupted = await isOsuCorrupted(osuPath);
+        let forceUpdate =
+          (releaseStream && releaseStream.toLowerCase() !== 'stable40') || osuCorrupted;
 
-      const versions = compareBuildNumbers($osuBuild, streamInfo);
-      if (versions > 0 || forceUpdate) {
-        launchInfo = 'Update found!';
-        await new Promise((res) => setTimeout(res, 1500));
-        launchInfo = 'Running osu! updater...';
-        await setUserConfigValues(osuPath, [
-          {
-            key: 'LastVersion',
-            value: `b${streamInfo}`,
-          },
-        ]);
-        await setConfigValues(osuPath, [
-          {
-            key: '_ReleaseStream',
-            value: 'Stable40',
-          },
-        ]);
-        osuStream.set('Stable40');
-        osuBuild.set(`b${streamInfo}`);
-        await runUpdater(osuPath);
-        launchInfo = 'osu! is now up to date!';
-        if (forceUpdate)
-          await setConfigValues(osuPath, [
+        const versions = compareBuildNumbers($osuBuild, streamInfo);
+        if (versions > 0 || forceUpdate) {
+          launchInfo = 'Update found!';
+          await new Promise((res) => setTimeout(res, 1500));
+          launchInfo = 'Running osu! updater...';
+          await setUserConfigValues(osuPath, [
             {
-              key: '_UpdateFailCount',
-              value: '0',
+              key: 'LastVersion',
+              value: `b${streamInfo}`,
             },
           ]);
-      } else {
-        launchInfo = 'You are up to date!';
+          await setConfigValues(osuPath, [
+            {
+              key: '_ReleaseStream',
+              value: 'Stable40',
+            },
+          ]);
+          osuStream.set('Stable40');
+          osuBuild.set(`b${streamInfo}`);
+          await runUpdater(osuPath);
+          launchInfo = 'osu! is now up to date!';
+          if (forceUpdate)
+            await setConfigValues(osuPath, [
+              {
+                key: '_UpdateFailCount',
+                value: '0',
+              },
+            ]);
+        } else {
+          launchInfo = 'You are up to date!';
+        }
       }
       if ($currentUser) {
         const [username, password] = await Promise.all([
@@ -1023,6 +1030,47 @@
           askForTrackingPermission = false;
         }}>No, I do not consent</Button
       >
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root open={updateCheckFailed}>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0 max-w-2xl"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
+    <div
+      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+    >
+      <Import size={40} />
+      <span class="font-semibold text-xl">Update check failed</span>
+    </div>
+
+    <div
+      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+    >
+      <p class="mb-4">Failed to check for updates.</p>
+      <p>Do you want to launch anyway?</p>
+    </div>
+    <div class="flex items-center justify-center mb-3 gap-4 mt-4">
+      <Button
+        class="min-w-28"
+        onclick={async () => {
+          await launch(true);
+          updateCheckFailed = false;
+        }}
+      >
+        Launch anyways
+      </Button>
+      <Button
+        variant="outline"
+        onclick={async () => {
+          updateCheckFailed = false;
+        }}
+      >
+        Abort
+      </Button>
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>
