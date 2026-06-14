@@ -1401,7 +1401,7 @@
                   ? 'No connection...'
                   : undefined}
             disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
-            onClick={launch}
+            onClick={async () => await launch()}
           />
         </div>
         <div class="relative h-50">
