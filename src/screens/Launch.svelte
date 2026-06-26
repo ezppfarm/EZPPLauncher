@@ -1432,7 +1432,7 @@
                     {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
                   </div>
                 </Select.Trigger>
-                <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg">
+                <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg max-h-72">
                   {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
                     {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
                     <Select.Item value={gamemode.toFixed()}>
