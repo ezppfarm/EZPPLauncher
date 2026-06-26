@@ -9,6 +9,11 @@ export enum Gamemodes {
   RELAX_CATCH = 6,
 
   AUTOPILOT_OSU = 8,
+
+  SCOREV2_OSU = 12,
+  SCOREV2_TAIKO = 13,
+  SCOREV2_CATCH = 14,
+  SCOREV2_MANIA = 15,
 }
 
 export enum Mode {
@@ -22,12 +27,39 @@ export enum Type {
   VANILLA = 0,
   RELAX = 4,
   AUTOPILOT = 8,
+  SCOREV2 = 12,
 }
 
 export const validModes = [Mode.OSU, Mode.TAIKO, Mode.CATCH, Mode.MANIA];
-export const validTypes = [Type.VANILLA, Type.RELAX, Type.AUTOPILOT];
-export const validModeTypeCombinations = [0, 1, 2, 3, 4, 5, 6, 8];
-export const validModeTypeCombinationsSorted = [0, 4, 8, 1, 5, 2, 6, 3];
+export const validTypes = [Type.VANILLA, Type.RELAX, Type.AUTOPILOT, Type.SCOREV2];
+export const validModeTypeCombinations = [
+  Gamemodes.VANILLA_OSU,
+  Gamemodes.VANILLA_TAIKO,
+  Gamemodes.VANILLA_CATCH,
+  Gamemodes.VANILLA_MANIA,
+  Gamemodes.RELAX_OSU,
+  Gamemodes.RELAX_TAIKO,
+  Gamemodes.RELAX_CATCH,
+  Gamemodes.AUTOPILOT_OSU,
+  Gamemodes.SCOREV2_OSU,
+  Gamemodes.SCOREV2_TAIKO,
+  Gamemodes.SCOREV2_CATCH,
+  Gamemodes.SCOREV2_MANIA,
+];
+export const validModeTypeCombinationsSorted = [
+  Gamemodes.VANILLA_OSU,
+  Gamemodes.RELAX_OSU,
+  Gamemodes.AUTOPILOT_OSU,
+  Gamemodes.SCOREV2_OSU,
+  Gamemodes.VANILLA_TAIKO,
+  Gamemodes.RELAX_TAIKO,
+  Gamemodes.SCOREV2_TAIKO,
+  Gamemodes.VANILLA_CATCH,
+  Gamemodes.RELAX_CATCH,
+  Gamemodes.SCOREV2_CATCH,
+  Gamemodes.VANILLA_MANIA,
+  Gamemodes.SCOREV2_MANIA,
+];
 
 export const validMode = (modeStr: string) => modeStrToInt(modeStr) !== undefined;
 export const validType = (typeStr: string) => typeStrToInt(typeStr) !== undefined;
@@ -60,7 +92,7 @@ export const modeIntToStr = (modeInt: number) => {
   return undefined;
 };
 
-export const typeStrToInt = (typeStr: 'vanilla' | 'relax' | 'autopilot' | string) => {
+export const typeStrToInt = (typeStr: 'vanilla' | 'relax' | 'autopilot' | 'v2' | string) => {
   switch (typeStr) {
     case 'relax':
       return Type.RELAX;
@@ -68,6 +100,8 @@ export const typeStrToInt = (typeStr: 'vanilla' | 'relax' | 'autopilot' | string
       return Type.AUTOPILOT;
     case 'vanilla':
       return Type.VANILLA;
+    case 'scorev2':
+      return Type.SCOREV2;
   }
   return undefined;
 };
@@ -80,13 +114,15 @@ export const typeIntToStr = (typeInt: number) => {
       return 'autopilot';
     case Type.VANILLA:
       return 'vanilla';
+    case Type.SCOREV2:
+      return 'scorev2';
   }
   return undefined;
 };
 
 export const getGamemodeInt = (
   mode: 'osu' | 'taiko' | 'catch' | 'mania' | string | undefined,
-  type: 'vanilla' | 'relax' | 'autopilot' | string | undefined
+  type: 'vanilla' | 'relax' | 'autopilot' | 'scorev2' | string | undefined
 ) => {
   let modee = 0;
   switch (mode) {
@@ -108,6 +144,9 @@ export const getGamemodeInt = (
     case 'autopilot':
       modee += Type.AUTOPILOT;
       break;
+    case 'scorev2':
+      modee += Type.SCOREV2;
+      break;
   }
 
   return modee;
@@ -115,7 +154,7 @@ export const getGamemodeInt = (
 
 export const getGamemodeName = (
   mode: 'osu' | 'taiko' | 'catch' | 'mania' | string | undefined,
-  type: 'vanilla' | 'relax' | 'autopilot' | string | undefined
+  type: 'vanilla' | 'relax' | 'autopilot' | 'scorev2' | string | undefined
 ) => {
   let modeStr = '';
   switch (mode) {
@@ -139,6 +178,9 @@ export const getGamemodeName = (
       break;
     case 'autopilot':
       modeStr += 'ap';
+      break;
+    case 'scorev2':
+      modeStr += 'v2';
       break;
     default:
       modeStr += 'vn';
@@ -172,6 +214,9 @@ export const getModeAndTypeFromGamemode = (gamemode: number) => {
       break;
     case Type.AUTOPILOT:
       type = Type.AUTOPILOT;
+      break;
+    case Type.SCOREV2:
+      type = Type.SCOREV2;
       break;
   }
 
