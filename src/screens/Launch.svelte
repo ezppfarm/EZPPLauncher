@@ -617,7 +617,7 @@
         }, 1000 * 2);
       }
 
-      await runOsu(osuPath, true);
+      await runOsu(osuPath, $patch);
       if ($trackingEnabled) umami.track('app_exit_osu');
       cleanup = true;
       launchInfo = 'Cleaning up...';

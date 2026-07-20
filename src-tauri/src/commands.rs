@@ -500,7 +500,65 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
         }
     }
 
+    //TODO: maybe implement tosu?
+    /* let tosu_exe_path = PathBuf::from(&folder)
+        .join("EZPPLauncher")
+        .join("tosu")
+        .join("tosu.exe");
+
+    let mut _tosu_process: Option<_> = None;
+
+    if tosu_exe_path.exists() {
+        let mut sys = System::new_all();
+
+        loop {
+            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+            let mut found = false;
+
+            for (_pid, process) in sys.processes() {
+                if process.name() == "osu!.exe" {
+                    let pid = process.pid();
+                    let title = get_window_title_by_pid(pid);
+
+                    if !title.is_empty() && !title.contains("updater") {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if found {
+                break;
+            }
+
+            sleep(Duration::from_millis(500)).await;
+        }
+        #[cfg(windows)]
+        {
+            _tosu_process = Some(
+                Command::new(&tosu_exe_path)
+                    /* .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP) */
+                    .spawn()
+                    .map_err(|e| format!("Failed to run tosu: {e}"))?,
+            );
+        }
+        /* #[cfg(not(windows))]
+        {
+            let _ = Command::new("osu-wine")
+                .arg("--wine")
+                .arg(&tosu_exe_path)
+                .spawn()
+                .map_err(|e| format!("Failed to run tosu: {}", e))?;
+        } */
+    } */
+
     game_process.wait().await.map_err(|e| e.to_string())?;
+
+    /* if let Some(mut tosu_process) = _tosu_process {
+        tosu_process.kill().await.map_err(|e| e.to_string())?;
+    } */
+
     Ok(())
 }
 
