@@ -46,7 +46,6 @@
     presenceLoading,
     serverConnectionFails,
     serverPing,
-    skins,
     skinsCount,
     trackingEnabled,
   } from '$lib/global';
@@ -59,7 +58,7 @@
     getEZPPLauncherUpdateFiles,
     getReleaseStream,
     getSkin,
-    getSkins,
+    getSkinsCount,
     getVersion,
     hasNet8,
     hasOsuWinello,
@@ -70,7 +69,6 @@
     isOsuCorrupted,
     isOsuRunning,
     isValidOsuFolder,
-    replaceUIFiles,
     runOsu,
     runUpdater,
     setConfigValues,
@@ -230,10 +228,10 @@
       const beatmapSetCount = await getBeatmapSetsCount(selectedPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
-      const skins_list = await getSkins(selectedPath);
-      if (skins_list) {
-        skins.set(skins_list);
-        skinsCount.set(skins_list.length);
+      const skins_count = await getSkinsCount(selectedPath);
+      if (skins_count) {
+        /* skins.set(skins_list); */
+        skinsCount.set(skins_count);
       }
 
       const skin: string = await getSkin(selectedPath);
@@ -500,7 +498,7 @@
 
       fadeGlobalVolume($custom_theme_volume, 0, 2000, pauseGlobalMedia);
 
-      await replaceUIFiles(osuPath, false);
+      /* await replaceUIFiles(osuPath, false); */
       await new Promise((res) => setTimeout(res, 1000));
       await getCurrentWindow().hide();
 
@@ -648,7 +646,7 @@
         }
       }
       await new Promise((res) => setTimeout(res, 1000));
-      await replaceUIFiles(osuPath, true);
+      /* await replaceUIFiles(osuPath, true); */
 
       const osuReleaseStream = await getReleaseStream(osuPath);
       osuStream.set(osuReleaseStream);
@@ -658,10 +656,10 @@
       const beatmapSetCount = await getBeatmapSetsCount(osuPath);
       if (beatmapSetCount) beatmapSets.set(beatmapSetCount);
 
-      const skinsList = await getSkins(osuPath);
-      if (skinsList) {
-        skins.set(skinsList);
-        skinsCount.set(skinsList.length);
+      const skins_count = await getSkinsCount(osuPath);
+      if (skins_count) {
+        /* skins.set(skinsList); */
+        skinsCount.set(skins_count);
       }
 
       const skin = await getSkin(osuPath);

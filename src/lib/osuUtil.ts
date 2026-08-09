@@ -141,11 +141,8 @@ export const downloadUpdate = async (
   }
 };
 export const installUpdate = async () => await invoke('install_ezpp_launcher_update');
-export const getSkins = async (folder: string) =>
-  await invoke<{ name: string; author: string | undefined; modified: number }[] | undefined>(
-    'get_skins',
-    { folder }
-  );
+export const getSkinsCount = async (folder: string) =>
+  await invoke<number | undefined>('get_skins_count', { folder });
 export const startOpenTabletDriver = async (otdDaemonPath: string) =>
   await invoke('run_open_tablet_driver', { path: otdDaemonPath });
 export const stopOpenTabletDriver = async () => await invoke('stop_open_tablet_driver');

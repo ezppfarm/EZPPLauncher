@@ -14,7 +14,6 @@
     osuBuild,
     osuStream,
     presenceLoading,
-    skins,
     skinsCount,
   } from '$lib/global';
   import {
@@ -22,7 +21,7 @@
     getBeatmapSetsCount,
     getReleaseStream,
     getSkin,
-    getSkins,
+    getSkinsCount,
     getVersion,
     isValidOsuFolder,
   } from '$lib/osuUtil';
@@ -103,10 +102,10 @@
       beatmapSets.set(beatmapSetCount);
     }
 
-    const skins_list = await getSkins(osuInstallPath);
-    if (skins_list) {
-      skins.set(skins_list);
-      skinsCount.set(skins_list.length);
+    const skins_count = await getSkinsCount(osuInstallPath);
+    if (skins_count) {
+      /* skins.set(skins_count); */
+      skinsCount.set(skins_count);
     } else {
       skinsCount.set(0);
     }
