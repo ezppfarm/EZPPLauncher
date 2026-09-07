@@ -6,7 +6,6 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Stdio;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -23,8 +22,8 @@ use crate::presence;
 use crate::state::AppState;
 use crate::utils::{
     check_folder_completeness, encrypt_password, get_osu_config, get_osu_user_config,
-    get_window_title_by_pid, is_net8_installed, is_osuwinello_available, is_wmctrl_available,
-    set_osu_config_vals, set_osu_user_config_vals,
+    get_osuwinello_path, get_window_title_by_pid, is_net8_installed, is_osuwinello_available,
+    is_wmctrl_available, set_osu_config_vals, set_osu_user_config_vals,
 };
 
 #[tauri::command]
@@ -291,7 +290,8 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
 
         #[cfg(not(windows))]
         {
-            Command::new("osu-wine")
+            let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+            Command::new(&osu_wine_path)
                 .arg("-repair")
                 .spawn()
                 .map_err(|e| format!("Failed to spawn updater: {}", e))?
@@ -376,7 +376,8 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
 
         #[cfg(not(windows))]
         {
-            Command::new("osu-wine")
+            let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+            Command::new(&osu_wine_path)
                 .arg("--devserver")
                 .arg("ez-pp.farm")
                 .spawn()
@@ -425,7 +426,10 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
             }
             #[cfg(not(windows))]
             {
-                let _ = Command::new("osu-wine")
+                use crate::utils::get_osuwinello_path;
+
+                let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+                let _ = Command::new(&osu_wine_path)
                     .arg("--wine")
                     .arg(&patcher_exe_path)
                     .spawn()

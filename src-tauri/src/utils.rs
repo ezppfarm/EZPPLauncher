@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use sysinfo::Pid;
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
@@ -179,14 +179,38 @@ pub fn get_osu_config<P: AsRef<Path>>(
 }
 
 #[cfg(not(windows))]
+pub fn get_osuwinello_path() -> Option<PathBuf> {
+    let mut search_paths =
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect::<Vec<_>>();
+
+    for path in ["/usr/local/bin", "/usr/bin", "/bin"] {
+        let path = PathBuf::from(path);
+        if !search_paths.contains(&path) {
+            search_paths.push(path);
+        }
+    }
+
+    if let Some(home) = std::env::var_os("HOME") {
+        let path = Path::new(&home).join(".local/bin");
+        if !search_paths.contains(&path) {
+            search_paths.push(path);
+        }
+    }
+
+    search_paths
+        .into_iter()
+        .map(|path| path.join("osu-wine"))
+        .find(|path| path.is_file())
+}
+
+#[cfg(windows)]
+pub fn get_osuwinello_path() -> Option<PathBuf> {
+    None
+}
+
+#[cfg(not(windows))]
 pub fn is_osuwinello_available() -> bool {
-    use std::process::Command;
-    Command::new("osu-wine")
-        .arg("--info")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok()
+    get_osuwinello_path().is_some()
 }
 
 #[cfg(windows)]
