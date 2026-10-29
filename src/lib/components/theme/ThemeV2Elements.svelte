@@ -350,7 +350,10 @@
   onpointerdown={beginMarquee}
   oncontextmenu={(event) => {
     if (!interactive || event.target !== event.currentTarget) return;
-    event.preventDefault();
+    // The surrounding bits-ui ContextMenu.Trigger opens on the bubbling
+    // contextmenu event and prevents the native menu itself. Calling
+    // preventDefault() here makes the trigger treat the event as handled
+    // (it bails when defaultPrevented is set), leaving no menu at all.
     oncontext?.(undefined, event);
   }}
 >
@@ -363,7 +366,7 @@
       class:cursor-move={interactive && !element.locked}
       class:cursor-default={interactive && element.locked}
       style="left:{element.x}px;top:{element.y}px;width:{element.width}px;height:{element.height}px;transform:rotate({element.rotation ??
-        0}deg);opacity:{element.opacity ?? 1};touch-action:none;outline:{selected
+        0}deg);touch-action:none;outline:{selected
         ? `${selectedIds.length > 1 ? 1 : 2}px solid #ff006e`
         : 'none'};outline-offset:2px;"
       role={interactive ? 'button' : undefined}
@@ -372,7 +375,7 @@
       onpointerdown={(event) => beginDrag(event, element)}
       oncontextmenu={(event) => {
         if (!interactive) return;
-        event.preventDefault();
+        // Let the event bubble so the editor's ContextMenu.Trigger can open.
         oncontext?.(element.id, event);
       }}
       onkeydown={(event) => {
@@ -382,61 +385,64 @@
         }
       }}
     >
-      {#if element.type === 'text'}
-        <div
-          class="h-full w-full overflow-hidden"
-          style="display:flex;align-items:{element.verticalAlign === 'center'
-            ? 'center'
-            : element.verticalAlign === 'bottom'
-              ? 'flex-end'
-              : 'flex-start'};justify-content:{element.align === 'center'
-            ? 'center'
-            : element.align === 'right'
-              ? 'flex-end'
-              : 'flex-start'};text-align:{element.align ?? 'left'};"
-        >
-          <span
-            style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
-              28}px;font-weight:{element.fontWeight ?? 600};color:{element.color ??
-              '#ffffff'};line-height:{element.lineHeight ??
-              1.2};letter-spacing:{element.letterSpacing ??
-              0}px;white-space:pre-wrap;overflow-wrap:anywhere;"
+      <!-- Opacity lives on the content wrapper so selection chrome stays fully opaque. -->
+      <div class="h-full w-full" style="opacity:{element.opacity ?? 1};">
+        {#if element.type === 'text'}
+          <div
+            class="h-full w-full overflow-hidden"
+            style="display:flex;align-items:{element.verticalAlign === 'center'
+              ? 'center'
+              : element.verticalAlign === 'bottom'
+                ? 'flex-end'
+                : 'flex-start'};justify-content:{element.align === 'center'
+              ? 'center'
+              : element.align === 'right'
+                ? 'flex-end'
+                : 'flex-start'};text-align:{element.align ?? 'left'};"
           >
-            {element.text}
-          </span>
-        </div>
-      {:else if element.type === 'image'}
-        <img
-          class="pointer-events-none h-full w-full"
-          src={assetUrl(element.src)}
-          alt=""
-          draggable="false"
-          style="object-fit:{element.fit ?? 'cover'};border-radius:{element.radius ?? 0}px;"
-        />
-      {:else if element.type === 'video'}
-        <video
-          class="pointer-events-none h-full w-full"
-          use:themeMediaSource={assetUrl(element.src)}
-          use:themeVideoLifecycle
-          autoplay
-          loop
-          muted={element.muted !== false}
-          use:applyMuted={element.muted !== false}
-          playsinline
-          disablepictureinpicture
-          aria-hidden="true"
-          style="object-fit:{element.fit ?? 'cover'};border-radius:{element.radius ?? 0}px;"
-        ></video>
-      {:else}
-        <div
-          class="h-full w-full"
-          style="background:{element.fill ?? '#ff006e'};border-radius:{element.shape === 'ellipse'
-            ? '50%'
-            : `${element.radius ?? 16}px`};border:{element.borderWidth
-            ? `${element.borderWidth}px solid ${element.borderColor ?? '#ffffff'}`
-            : 'none'};"
-        ></div>
-      {/if}
+            <span
+              style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                28}px;font-weight:{element.fontWeight ?? 600};color:{element.color ??
+                '#ffffff'};line-height:{element.lineHeight ??
+                1.2};letter-spacing:{element.letterSpacing ??
+                0}px;white-space:pre-wrap;overflow-wrap:anywhere;"
+            >
+              {element.text}
+            </span>
+          </div>
+        {:else if element.type === 'image'}
+          <img
+            class="pointer-events-none h-full w-full"
+            src={assetUrl(element.src)}
+            alt=""
+            draggable="false"
+            style="object-fit:{element.fit ?? 'cover'};border-radius:{element.radius ?? 0}px;"
+          />
+        {:else if element.type === 'video'}
+          <video
+            class="pointer-events-none h-full w-full"
+            use:themeMediaSource={assetUrl(element.src)}
+            use:themeVideoLifecycle
+            autoplay
+            loop
+            muted={element.muted !== false}
+            use:applyMuted={element.muted !== false}
+            playsinline
+            disablepictureinpicture
+            aria-hidden="true"
+            style="object-fit:{element.fit ?? 'cover'};border-radius:{element.radius ?? 0}px;"
+          ></video>
+        {:else}
+          <div
+            class="h-full w-full"
+            style="background:{element.fill ?? '#ff006e'};border-radius:{element.shape === 'ellipse'
+              ? '50%'
+              : `${element.radius ?? 16}px`};border:{element.borderWidth
+              ? `${element.borderWidth}px solid ${element.borderColor ?? '#ffffff'}`
+              : 'none'};"
+          ></div>
+        {/if}
+      </div>
 
       {#if singleSelected && !element.locked}
         {#each resizeDirections as direction (direction)}
