@@ -30,7 +30,8 @@
   import { initLogging } from '$lib/logging';
   import { exit, getLauncherVersion, getPlatform, setLoggingEnabled } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
-  import { smoothThemeMedia } from '$lib/themeMedia';
+  import { smoothThemeMedia, themeMediaPreparing, themeMediaStatus } from '$lib/themeMedia';
+  import { isThemeTrusted } from '$lib/themeTrust';
   import { themeV2Css } from '$lib/themeV2';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
   import {
@@ -165,10 +166,20 @@
 
     const localThemes = await getThemes();
     const lastThemeName = await config_theme.get('Default');
+    const defaultTheme = localThemes.find((t) => t.name === 'Default') ?? localThemes[0];
     const last_theme = localThemes.find((t) => t.name === lastThemeName);
-    if (!last_theme) {
+    const canLoadLastTheme = Boolean(last_theme && isThemeTrusted(last_theme));
+
+    if (!last_theme || !canLoadLastTheme) {
       await config.value<string>('theme').set('Default');
-      loadTheme(localThemes[0], $custom_theme_container!, await config_theme_volume.get(0.15));
+      loadTheme(defaultTheme, $custom_theme_container!, await config_theme_volume.get(0.15));
+      if (last_theme && !canLoadLastTheme) {
+        sileo.error({
+          title: 'Theme needs approval',
+          description:
+            'The last theme runs executable code and has not been trusted on this device. The default theme was loaded instead.',
+        });
+      }
     } else {
       loadTheme(last_theme, $custom_theme_container!, await config_theme_volume.get(0.15));
     }
@@ -342,4 +353,12 @@
     {/if}
     {@render children()}
   </main>
+
+  {#if $themeMediaPreparing}
+    <div
+      class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/10 bg-black/75 px-4 py-2 text-xs font-medium text-white/80 shadow-xl backdrop-blur animate-pulse"
+    >
+      {$themeMediaStatus || 'Preparing theme video for smooth playback…'}
+    </div>
+  {/if}
 {/if}

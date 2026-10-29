@@ -566,8 +566,9 @@
                       <div class="min-w-0">
                         <Label class="text-[13px]" for="wizard-patch">Patching</Label>
                         <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Shows misses in Relax and Autopilot.{#if $platform === 'macos'}{' '}Requires
-                            .NET in your Wine prefix.{/if}
+                          Shows misses in Relax and Autopilot.{#if $platform === 'macos'}{' '}Stable
+                            patching needs no extra runtime; the experimental stream needs .NET 8 in
+                            your Wine prefix.{/if}
                         </p>
                       </div>
                       <Checkbox

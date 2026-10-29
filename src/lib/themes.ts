@@ -24,7 +24,17 @@ export type Theme = {
   status: 'installed' | 'downloading' | 'extracting' | 'deleting' | 'not-installed';
   progress: number;
   updateAvailable: boolean;
+  /** The version available in the repository when an update is pending. */
+  availableVersion?: string;
   definition?: ThemeV2Definition;
+  backups?: ThemeBackup[];
+};
+
+export type ThemeBackup = {
+  path: string;
+  label: string;
+  createdAt: number;
+  size: number;
 };
 
 export type ThemeInfo = {
@@ -239,11 +249,26 @@ export const getThemes = async (): Promise<Theme[]> => {
   if (await fs.exists(folderPath)) {
     const themeFolders = await fs.readDir(folderPath);
     for (const themeFolder of themeFolders) {
-      const theme = await themeFromFolder(
-        themeFolder.name,
-        await path.join(folderPath, themeFolder.name)
-      );
-      if (theme) themes.push(theme);
+      // Finder drops .DS_Store into this folder; never let a stray file or an
+      // unreadable package hide every other installed theme.
+      if (!themeFolder.isDirectory || themeFolder.name.startsWith('.')) continue;
+
+      const themeFolderPath = await path.join(folderPath, themeFolder.name);
+      try {
+        const theme = await themeFromFolder(themeFolder.name, themeFolderPath);
+        if (theme) {
+          try {
+            theme.backups = await invoke<ThemeBackup[]>('list_theme_backups', {
+              themeFolder: themeFolderPath,
+            });
+          } catch {
+            theme.backups = [];
+          }
+          themes.push(theme);
+        }
+      } catch (error) {
+        console.error(`Failed to load theme ${themeFolder.name}`, error);
+      }
     }
   }
   return themes;
@@ -254,6 +279,7 @@ export const downloadTheme = async (
   force = false
 ): Promise<{ success: boolean; error?: string }> => {
   if (theme.status !== 'not-installed' && !force) return { success: false };
+  const wasInstalled = theme.status === 'installed';
 
   patchTheme(theme.name, (current) => ({ ...current, status: 'downloading' }));
 
@@ -265,7 +291,10 @@ export const downloadTheme = async (
   );
 
   if (themeContents.error) {
-    patchTheme(theme.name, (current) => ({ ...current, status: 'not-installed' }));
+    patchTheme(theme.name, (current) => ({
+      ...current,
+      status: wasInstalled ? 'installed' : 'not-installed',
+    }));
     return {
       success: false,
       error: themeContents.error.message ?? 'An unknown error occurred',
@@ -285,6 +314,19 @@ export const downloadTheme = async (
     status: 'downloading',
     progress: 0,
   }));
+
+  let updateBackup: string | undefined;
+  const restoreUpdateBackup = async () => {
+    if (!updateBackup) return;
+    try {
+      await invoke('restore_theme_backup', {
+        themeFolder,
+        backupFolder: updateBackup,
+      });
+    } catch (error) {
+      console.error('Could not restore the theme backup after a failed update', error);
+    }
+  };
 
   let extractionStartedAt = 0;
   const beginExtraction = (progress: number) => {
@@ -318,6 +360,16 @@ export const downloadTheme = async (
   });
 
   try {
+    // Keep the currently installed files before an update overwrites them.
+    // The backup also covers a failed/partial download so the user can roll back.
+    if (theme.status === 'installed') {
+      try {
+        updateBackup = await invoke<string>('backup_theme_folder', { themeFolder });
+      } catch (error) {
+        console.warn('Could not back up the theme before updating it', error);
+      }
+    }
+
     await invoke('download_and_extract_theme', {
       downloadUrl,
       expectedSha: themeContents.data.file_contents.sha,
@@ -327,7 +379,11 @@ export const downloadTheme = async (
   } catch (err) {
     console.log(err);
     const erro = err as Error;
-    patchTheme(theme.name, (current) => ({ ...current, status: 'not-installed' }));
+    await restoreUpdateBackup();
+    patchTheme(theme.name, (current) => ({
+      ...current,
+      status: wasInstalled ? 'installed' : 'not-installed',
+    }));
     return { success: false, error: erro.message || 'Failed to download or extract theme.' };
   } finally {
     unlistenDownload();
@@ -349,7 +405,11 @@ export const downloadTheme = async (
 
   const installedTheme = await themeFromFolder(folderName, themeFolder);
   if (!installedTheme) {
-    patchTheme(theme.name, (current) => ({ ...current, status: 'not-installed' }));
+    await restoreUpdateBackup();
+    patchTheme(theme.name, (current) => ({
+      ...current,
+      status: wasInstalled ? 'installed' : 'not-installed',
+    }));
     return { success: false, error: 'The downloaded theme package is invalid.' };
   }
 
@@ -478,7 +538,9 @@ export const reloadThemes = async () => {
     if (installed) {
       try {
         if (new SemVer(downloadable.version).compare(new SemVer(installed.version)) > 0) {
-          combinedMap.get(downloadable.name)!.updateAvailable = true;
+          const installedTheme = combinedMap.get(downloadable.name)!;
+          installedTheme.updateAvailable = true;
+          installedTheme.availableVersion = downloadable.version;
         }
       } catch {
         // Ignore malformed versions instead of breaking the whole theme list.
@@ -513,7 +575,9 @@ export const reloadThemes = async () => {
         nsfw: theme.nsfw,
         definition: theme.definition,
         updateAvailable: theme.updateAvailable,
+        availableVersion: theme.availableVersion,
         cssStyle: theme.cssStyle,
+        backups: theme.backups ?? storeTheme.backups,
       };
     });
 
@@ -554,6 +618,12 @@ export const exportThemeFolder = async (folderName: string, destinationPath: str
   const themeFolder = await path.join(await themesDirectory(), folderName);
   await invoke('export_theme', { themeFolder, destinationPath });
 };
+
+export const listThemeBackups = async (themeFolder: string) =>
+  await invoke<ThemeBackup[]>('list_theme_backups', { themeFolder });
+
+export const restoreThemeBackup = async (themeFolder: string, backupFolder: string) =>
+  await invoke('restore_theme_backup', { themeFolder, backupFolder });
 
 export const exportTheme = async (theme: Theme, destinationPath: string) =>
   exportThemeFolder(theme.folder_name, destinationPath);

@@ -54,6 +54,35 @@ pub fn round_window(window: &tauri::WebviewWindow, radius: f64) -> Result<(), St
     Ok(())
 }
 
+/// Allow theme media to start without a click. WKWebView otherwise blocks
+/// autoplay for anything with an audio track, which makes a theme's background
+/// video sit frozen until the user interacts with the launcher.
+pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    window
+        .with_webview(|webview| unsafe {
+            let webview = webview.inner() as *mut AnyObject;
+            if webview.is_null() {
+                return;
+            }
+
+            let configuration: *mut AnyObject = msg_send![webview, configuration];
+            if configuration.is_null() {
+                return;
+            } // WKAudiovisualMediaTypesNone. This is a public WKWebView setting.
+            let _: () =
+                msg_send![configuration, setMediaTypesRequiringUserActionForPlayback: 0usize];
+            let current: usize = msg_send![configuration, mediaTypesRequiringUserActionForPlayback];
+            log::debug!(
+                target: "launcher",
+                "Theme media autoplay policy: {current}"
+            );
+        })
+        .map_err(|error| format!("Could not enable theme media autoplay: {error}"))
+}
+
 /// Show a native open panel that accepts `.app` bundles as well as folders.
 ///
 /// AppKit treats application bundles as packages (directories) by default, so a
@@ -131,6 +160,55 @@ pub struct WineRuntime {
     prefix: PathBuf,
     wine_bin: PathBuf,
     wine_root: Option<PathBuf>,
+}
+
+#[derive(Clone)]
+pub struct WineDiagnostics {
+    pub prefix: PathBuf,
+    pub wine_bin: PathBuf,
+    pub app_bundle: Option<PathBuf>,
+    pub net8_installed: bool,
+    pub wine_version: Option<String>,
+    pub prefix_arch: Option<String>,
+}
+
+impl WineDiagnostics {
+    /// Inspect the wrapper without starting it, for the launcher's diagnostics panel.
+    pub fn for_osu_folder(osu_folder: &Path) -> Result<Self, String> {
+        let runtime = WineRuntime::for_osu_folder(osu_folder)?;
+        let net8_installed = [
+            runtime
+                .prefix
+                .join("drive_c/Program Files/dotnet/shared/Microsoft.WindowsDesktop.App"),
+            runtime
+                .prefix
+                .join("drive_c/Program Files (x86)/dotnet/shared/Microsoft.WindowsDesktop.App"),
+        ]
+        .iter()
+        .any(|path| {
+            fs::read_dir(path)
+                .ok()
+                .map(|entries| {
+                    entries.filter_map(|entry| entry.ok()).any(|entry| {
+                        entry
+                            .file_name()
+                            .to_str()
+                            .map(|name| name.starts_with("8."))
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false)
+        });
+
+        Ok(Self {
+            prefix: runtime.prefix.clone(),
+            wine_bin: runtime.wine_bin.clone(),
+            app_bundle: app_bundle_for(&runtime.prefix),
+            net8_installed,
+            wine_version: wine_version_for(&runtime.wine_bin),
+            prefix_arch: prefix_architecture(&runtime.prefix),
+        })
+    }
 }
 
 impl WineRuntime {
@@ -766,6 +844,34 @@ fn has_wine_loader(bin: &Path) -> bool {
     ["wine32on64", "wine64", "wine"]
         .iter()
         .any(|loader| bin.join(loader).is_file())
+}
+
+fn wine_version_for(bin: &Path) -> Option<String> {
+    let loader = ["wine64", "wine", "wine32on64"]
+        .iter()
+        .map(|name| bin.join(name))
+        .find(|path| path.is_file())?;
+    let output = std::process::Command::new(loader)
+        .arg("--version")
+        .env("WINEDEBUG", "-all")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!version.is_empty()).then_some(version)
+}
+
+fn prefix_architecture(prefix: &Path) -> Option<String> {
+    if prefix.join("drive_c/windows/syswow64").is_dir() {
+        Some("win64".to_string())
+    } else if prefix.join("drive_c/windows/system32").is_dir() {
+        Some("win32".to_string())
+    } else {
+        None
+    }
 }
 
 fn find_in_path(binary: &str) -> Option<PathBuf> {

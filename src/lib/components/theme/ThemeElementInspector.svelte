@@ -39,6 +39,17 @@
     </div>
   </div>
 
+  <div class="space-y-1">
+    <Label for="element-name" class={label}>Layer name</Label>
+    <Input
+      id="element-name"
+      class={field}
+      value={element.name ?? ''}
+      placeholder="Optional label, for example Logo"
+      oninput={(event) => (element.name = (event.currentTarget as HTMLInputElement).value)}
+    />
+  </div>
+
   <div class="grid grid-cols-2 gap-2">
     <div class="space-y-1">
       <Label for="element-x" class={label}>X</Label>
@@ -95,6 +106,29 @@
         value={element.opacity ?? 1}
         onValueChange={(value) => (element.opacity = value)}
       />
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-2 border-t border-theme-800 pt-3">
+    <div class="flex items-center gap-2 rounded-md border border-theme-800 bg-black/20 px-2 py-1.5">
+      <Checkbox
+        id="element-hidden"
+        checked={element.hidden === true}
+        onCheckedChange={(checked) => (element.hidden = checked === true)}
+      />
+      <Label for="element-hidden" class="text-[10px] font-normal text-muted-foreground">
+        Hidden
+      </Label>
+    </div>
+    <div class="flex items-center gap-2 rounded-md border border-theme-800 bg-black/20 px-2 py-1.5">
+      <Checkbox
+        id="element-locked"
+        checked={element.locked === true}
+        onCheckedChange={(checked) => (element.locked = checked === true)}
+      />
+      <Label for="element-locked" class="text-[10px] font-normal text-muted-foreground">
+        Locked
+      </Label>
     </div>
   </div>
 

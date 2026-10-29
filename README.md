@@ -24,7 +24,9 @@ It enhances the osu! experience with quality-of-life features and integration sp
 - [x] Discord Rich Presence
 - [x] Performance Display Overlay (currently in experimental patcher release stream)
 - [x] Launcher Theming (API 1.0 bundles and API 2.0 declarative themes)
-- [x] Advanced theme editor in its own window with freeform text/image/video/shape layers, fonts, live launcher preview and export
+- [x] Advanced theme editor in its own window with freeform text/image/video/shape layers, multi-select and snapping, layer locks, draft recovery, validation and export
+- [x] Theme update backups with one-click rollback, plus a trust prompt before running executable API 1.0 themes
+- [x] In-app diagnostics for osu!, Wine, the patcher, and the experimental stream's .NET 8 runtime, plus a log-bundle viewer
 
 ---
 
@@ -37,8 +39,9 @@ It enhances the osu! experience with quality-of-life features and integration sp
 | Linux    | 🕧 Partially supported (via osu-winello)               |
 
 > **Windows** remains the fully supported platform. OpenTabletDriver is Windows-only. On macOS,
-> in-game patching runs the Windows patcher through the same Wine prefix as osu!, so that prefix
-> needs a .NET runtime installed.
+> in-game patching runs the Windows patcher through the same Wine prefix as osu!. The stable
+> patcher stream needs no extra runtime; the experimental stream needs the .NET 8 Desktop Runtime
+> installed in that prefix.
 
 ### macOS
 
@@ -50,6 +53,14 @@ The setup wizard automatically looks for Wineskins in `/Applications` and `~/App
 If detection fails, choose **Browse** and pick the `osu!.app` wrapper itself (or a Wine prefix
 folder); the launcher resolves the osu! installation inside it, so there is no need to open the
 bundle's package contents.
+
+Large VP8/VP9/AV1 theme videos are transcoded once to a cached 720p H.264/AAC file so WebKit
+can use the Mac's hardware decoder. The first large video triggers a one-time (~63 MB) download
+of a signed static FFmpeg 9.0.2 build from `ffmpeg.martin-riedl.de` into `~/.ezpplauncher/bin`;
+the launcher verifies its pinned SHA-256 and makes it executable. The managed build requires
+macOS 12 or newer. If the download fails, a system FFmpeg (Homebrew or MacPorts) is used; without
+either, themes still load but large WebM videos remain on WebKit's software decoder and may
+stutter. Theme authors can also ship an H.264/MP4 version alongside the WebM.
 
 ---
 
@@ -65,9 +76,14 @@ Launcher, osu! and patcher output is written to `.ezpplauncher/logs` in your hom
 
 A file is only created when that stream actually writes a line. On each new session, or when
 any file reaches 5 MiB, all three active files are bundled into a single
-`logs_<date>_<time>.zip`; the five most recent bundles are kept. You can turn file logging off
-or open the folder from **Settings → Logging**.
+`logs_<date>_<time>.zip`; the five most recent bundles are kept. You can turn file logging off,
+open the folder, or browse and filter a bundle in the built-in viewer from **Settings → Logging**.
 On Windows the folder is `%USERPROFILE%\.ezpplauncher\logs`.
+
+**Settings → Diagnostics** checks the selected osu! install and write access, the macOS Wine
+prefix/runtime/version and (for the experimental patcher stream) its .NET 8 runtime, the FFmpeg
+theme-video transcoder, osu-winello/wmctrl on Linux, and whether the patcher is present. It can
+copy a plain-text support report or reopen the setup wizard for a guided repair.
 
 ---
 

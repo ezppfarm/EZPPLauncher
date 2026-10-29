@@ -1,10 +1,10 @@
-//! Loopback HTTP server for theme assets on Linux.
+//! Loopback HTTP server for theme assets on Linux and macOS.
 //!
 //! WebKitGTK cannot play audio or video through Tauri's custom `asset:`
-//! protocol, and module scripts from that scheme are unreliable too. A real
-//! loopback HTTP server gives WebKit normal status codes, range responses and
-//! MIME types, so v1 and v2 theme assets load the same way they do in a
-//! browser.
+//! protocol, and WKWebView's range handling makes large media stall there.
+//! A real loopback HTTP server gives WebKit normal status codes, range
+//! responses and MIME types, so v1 and v2 theme assets load the same way they
+//! do in a browser without loading a whole video into a blob first.
 
 use http_body_util::Full;
 use http_range::HttpRange;
@@ -34,19 +34,22 @@ const MAX_RANGE_BYTES: u64 = 8 * 1024 * 1024;
 
 struct ThemeServer {
     port: u16,
+    root: PathBuf,
     previews: Arc<Mutex<HashMap<String, PathBuf>>>,
 }
 
 static SERVER: OnceLock<ThemeServer> = OnceLock::new();
 
 /// Bind the server on a random loopback port. The root is the themes folder.
-pub fn start(root: PathBuf) -> Result<u16, String> {
+pub fn start(root: PathBuf, media_root: PathBuf) -> Result<u16, String> {
     if let Some(server) = SERVER.get() {
         return Ok(server.port);
     }
 
     let root = std::fs::canonicalize(&root)
         .map_err(|error| format!("Could not resolve the themes folder: {error}"))?;
+    let media_root = std::fs::canonicalize(&media_root)
+        .map_err(|error| format!("Could not resolve the theme media cache: {error}"))?;
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0))
         .map_err(|error| format!("Could not start the theme asset server: {error}"))?;
     listener
@@ -60,11 +63,13 @@ pub fn start(root: PathBuf) -> Result<u16, String> {
     let previews = Arc::new(Mutex::new(HashMap::new()));
     let server = ThemeServer {
         port,
+        root: root.clone(),
         previews: previews.clone(),
     };
     let _ = SERVER.set(server);
 
     let root = Arc::new(root);
+    let media_root = Arc::new(media_root);
     tauri::async_runtime::spawn(async move {
         let listener = match TcpListener::from_std(listener) {
             Ok(listener) => listener,
@@ -89,10 +94,12 @@ pub fn start(root: PathBuf) -> Result<u16, String> {
             };
 
             let root = root.clone();
+            let media_root = media_root.clone();
             let previews = previews.clone();
             tokio::spawn(async move {
-                let service =
-                    service_fn(move |request| handle(request, root.clone(), previews.clone()));
+                let service = service_fn(move |request| {
+                    handle(request, root.clone(), media_root.clone(), previews.clone())
+                });
 
                 if let Err(error) = http1::Builder::new()
                     .serve_connection(TokioIo::new(stream), service)
@@ -111,6 +118,48 @@ pub fn base_url() -> Option<String> {
     SERVER
         .get()
         .map(|server| format!("http://127.0.0.1:{}/themes", server.port))
+}
+
+/// The cache folder for optimized theme media, next to the themes folder.
+pub fn media_root() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not locate the home directory".to_string())?;
+    let root = PathBuf::from(home)
+        .join(".ezpplauncher")
+        .join("media-cache");
+    std::fs::create_dir_all(&root)
+        .map_err(|error| format!("Failed to create the theme media cache: {error}"))?;
+    std::fs::canonicalize(&root)
+        .map_err(|error| format!("Failed to resolve the theme media cache: {error}"))
+}
+
+/// Map a loopback theme URL back to the file it serves. Only paths inside the
+/// configured themes folder are accepted.
+pub fn resolve_theme_url(value: &str) -> Option<PathBuf> {
+    let server = SERVER.get()?;
+    let url = url::Url::parse(value).ok()?;
+    if url.scheme() != "http"
+        || url.host_str() != Some("127.0.0.1")
+        || url.port() != Some(server.port)
+    {
+        return None;
+    }
+
+    let path = percent_encoding::percent_decode_str(url.path())
+        .decode_utf8_lossy()
+        .to_string();
+    let relative = path.strip_prefix("/themes/")?;
+    safe_path(&server.root, relative)
+}
+
+/// Public URL for a file in the optimized media cache.
+pub fn media_url(file_name: &str) -> Option<String> {
+    let server = SERVER.get()?;
+    Some(format!(
+        "http://127.0.0.1:{}/media/{}",
+        server.port, file_name
+    ))
 }
 
 /// Register a file picked in the theme editor so its preview can be served
@@ -149,6 +198,7 @@ pub fn preview_url(path: &Path) -> Result<String, String> {
 async fn handle(
     request: Request<Incoming>,
     root: Arc<PathBuf>,
+    media_root: Arc<PathBuf>,
     previews: Arc<Mutex<HashMap<String, PathBuf>>>,
 ) -> Result<Response<Body>, Infallible> {
     let origin = request
@@ -179,8 +229,15 @@ async fn handle(
         .decode_utf8_lossy()
         .to_string();
 
+    log::debug!(
+        target: "launcher",
+        "Theme asset request: {path} range={range:?}"
+    );
+
     let file = if let Some(relative) = path.strip_prefix("/themes/") {
-        safe_theme_path(&root, relative)
+        safe_path(&root, relative)
+    } else if let Some(relative) = path.strip_prefix("/media/") {
+        safe_path(&media_root, relative)
     } else if let Some(token) = path.strip_prefix("/preview/") {
         previews
             .lock()
@@ -211,7 +268,7 @@ async fn handle(
     }))
 }
 
-fn safe_theme_path(root: &Path, relative: &str) -> Option<PathBuf> {
+fn safe_path(root: &Path, relative: &str) -> Option<PathBuf> {
     let relative = relative.trim_start_matches('/');
     if relative.is_empty()
         || relative

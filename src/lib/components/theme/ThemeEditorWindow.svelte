@@ -6,6 +6,7 @@
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
   import { Checkbox } from '$lib/components/ui/checkbox';
+  import * as ContextMenu from '$lib/components/ui/context-menu';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
@@ -42,16 +43,23 @@
     themesDirectory,
     toSafeName,
   } from '$lib/themes';
+  import { formatBytes } from '$lib/utils';
   import {
+    AlertTriangle,
     Check,
+    CheckCircle2,
     ChevronDown,
     ChevronUp,
     Code2,
     Copy,
     Download,
+    Eye,
+    EyeOff,
+    GripVertical,
     Image as ImageIcon,
     Layers,
     LoaderCircle,
+    Lock,
     MousePointer2,
     Music,
     Palette,
@@ -61,11 +69,13 @@
     Save,
     Search,
     Shapes,
+    ShieldCheck,
     SlidersHorizontal,
     Sparkles,
     Trash2,
     Type,
     Undo2,
+    Unlock,
     Upload,
     Video,
     X,
@@ -86,6 +96,25 @@
     themeJson?: string | null;
   };
 
+  type ThemeEditorDraft = {
+    definition: ThemeV2Definition;
+    pickedAssets: ThemeV2Asset[];
+    savedFolder?: string;
+    savedAt: number;
+  };
+
+  type ThemeValidationIssue = {
+    level: 'error' | 'warning';
+    message: string;
+  };
+
+  type ThemeValidationReport = {
+    issues: ThemeValidationIssue[];
+    totalBytes: number;
+    fileCount: number;
+    checkedAt: number;
+  };
+
   type AssetKind = 'image' | 'video' | 'audio' | 'font';
 
   const labelClass = 'text-[10px] font-medium uppercase tracking-wide text-muted-foreground';
@@ -98,11 +127,25 @@
   let loading = $state(true);
   let saving = $state(false);
   let exporting = $state(false);
-  let selectedId = $state<string | undefined>(undefined);
+  let selectedIds = $state<string[]>([]);
   let leftTab = $state<'layers' | 'theme' | 'fonts'>('layers');
   let canvasHost = $state<HTMLDivElement | undefined>(undefined);
   let canvasScale = $state(0.8);
   let statusMessage = $state('Ready');
+  let renamingId = $state<string | undefined>(undefined);
+  let draggingLayerId = $state<string | undefined>(undefined);
+  let dropTarget = $state<{ id: string; position: 'above' | 'below' } | undefined>(undefined);
+  let lastSavedKey = $state('');
+  let draftSavedAt = $state<number | undefined>(undefined);
+  let recoverableDraft = $state<ThemeEditorDraft | undefined>(undefined);
+  let closeDialogOpen = $state(false);
+  let allowClose = false;
+  let validationReport = $state<ThemeValidationReport | undefined>(undefined);
+  let validationOpen = $state(false);
+  let exportAfterValidation = $state(false);
+
+  let contextMenuOpen = $state(false);
+  let contextMenuTargetId = $state<string | undefined>(undefined);
 
   let fontCatalog = $state<FontsourceFont[]>([]);
   let fontCatalogLoading = $state(false);
@@ -117,8 +160,20 @@
   let fontDownloading = $state(false);
 
   const elements = $derived(definition.elements ?? []);
-  const selectedIndex = $derived(elements.findIndex((element) => element.id === selectedId));
+  const selectedSet = $derived(new Set(selectedIds));
+  const selectedElements = $derived(elements.filter((element) => selectedSet.has(element.id)));
+  const movableSelectedElements = $derived(selectedElements.filter((element) => !element.locked));
+  const selectedIndex = $derived(
+    selectedIds.length === 1 ? elements.findIndex((element) => element.id === selectedIds[0]) : -1
+  );
   const selectedElement = $derived(selectedIndex >= 0 ? elements[selectedIndex] : undefined);
+  const contextMenuSelection = $derived(contextMenuTargetId ? selectedElements : []);
+  const contextMenuAllHidden = $derived(
+    contextMenuSelection.length > 0 && contextMenuSelection.every((element) => element.hidden)
+  );
+  const contextMenuAllLocked = $derived(
+    contextMenuSelection.length > 0 && contextMenuSelection.every((element) => element.locked)
+  );
   let previewAssetUrls = $state<Record<string, string>>({});
 
   // On Linux the custom asset protocol cannot serve theme media, so picked
@@ -324,6 +379,8 @@
 
   const HISTORY_LIMIT = 100;
   const HISTORY_DELAY = 450;
+  const DRAFT_KEY = 'ezpplauncher.theme-editor.draft.v1';
+  const DRAFT_DELAY = 800;
 
   let undoStack: EditorSnapshot[] = [];
   let redoStack: EditorSnapshot[] = [];
@@ -340,6 +397,79 @@
   });
 
   const snapshotKey = (snapshot: EditorSnapshot) => JSON.stringify(snapshot);
+  const dirty = $derived(
+    !loading && Boolean(lastSavedKey) && snapshotKey(captureSnapshot()) !== lastSavedKey
+  );
+
+  function readDraft(): ThemeEditorDraft | undefined {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw) as ThemeEditorDraft;
+      if (!parsed || typeof parsed !== 'object' || !parsed.definition) return undefined;
+      if (!Array.isArray(parsed.pickedAssets) || typeof parsed.savedAt !== 'number') {
+        return undefined;
+      }
+      return parsed;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // Storage can be unavailable in restricted webviews; autosave is optional.
+    }
+    draftSavedAt = undefined;
+  }
+
+  function restoreDraft() {
+    if (!recoverableDraft) return;
+    definition = ensureDefaults(normalizeThemeV2(recoverableDraft.definition));
+    pickedAssets = recoverableDraft.pickedAssets.map((asset) => ({ ...asset }));
+    selectedIds = [];
+    recoverableDraft = undefined;
+    resetHistory();
+    statusMessage = 'Draft restored';
+  }
+
+  function discardDraft() {
+    recoverableDraft = undefined;
+    clearDraft();
+    statusMessage = 'Draft discarded';
+  }
+
+  $effect(() => {
+    const current = captureSnapshot();
+    const key = snapshotKey(current);
+    if (loading || !lastSavedKey || !definition.name) return;
+
+    if (key === lastSavedKey) {
+      // Keep a draft that is waiting to be restored; only clear drafts that
+      // belong to the already-saved state.
+      if (!recoverableDraft) clearDraft();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      try {
+        const draft: ThemeEditorDraft = {
+          definition: current.definition,
+          pickedAssets: current.pickedAssets,
+          savedFolder,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        draftSavedAt = draft.savedAt;
+      } catch {
+        // Ignore quota errors; the explicit save button still works.
+      }
+    }, DRAFT_DELAY);
+
+    return () => window.clearTimeout(timer);
+  });
 
   function refreshHistoryButtons() {
     canUndo = historyDirty || undoStack.length > 0;
@@ -367,9 +497,199 @@
   function applySnapshot(snapshot: EditorSnapshot) {
     definition = snapshot.definition;
     pickedAssets = snapshot.pickedAssets.map((asset) => ({ ...asset }));
-    if (selectedId && !definition.elements?.some((element) => element.id === selectedId)) {
-      selectedId = undefined;
+    selectedIds = selectedIds.filter((id) =>
+      definition.elements?.some((element) => element.id === id)
+    );
+  }
+
+  function selectElement(id: string | undefined, additive = false) {
+    if (!id) {
+      selectedIds = [];
+      return;
     }
+
+    if (additive) {
+      selectedIds = selectedSet.has(id)
+        ? selectedIds.filter((selected) => selected !== id)
+        : [...selectedIds, id];
+      return;
+    }
+
+    selectedIds = [id];
+  }
+
+  function selectMany(ids: string[], additive = false) {
+    const valid = ids.filter((id) => elements.some((element) => element.id === id));
+    selectedIds = additive ? [...new Set([...selectedIds, ...valid])] : valid;
+  }
+
+  function closeContextMenu() {
+    contextMenuOpen = false;
+  }
+
+  function prepareContextMenu(targetId: string | undefined) {
+    if (loading) return;
+
+    if (targetId) {
+      if (!selectedSet.has(targetId)) selectElement(targetId);
+    } else {
+      selectedIds = [];
+    }
+    contextMenuTargetId = targetId;
+  }
+
+  function elementLabel(element: ThemeV2Element) {
+    if (element.name?.trim()) return element.name.trim();
+    if (element.type === 'text') return element.text.slice(0, 36) || 'Text layer';
+    if (element.type === 'shape') return element.shape;
+    return element.src.split('/').pop() || element.type;
+  }
+
+  function moveElements(updates: { id: string; x: number; y: number }[]) {
+    for (const update of updates) {
+      updateElement(update.id, { x: update.x, y: update.y });
+    }
+  }
+
+  function nudgeSelected(deltaX: number, deltaY: number) {
+    if (movableSelectedElements.length === 0) return;
+
+    const minX = Math.min(...movableSelectedElements.map((element) => element.x));
+    const minY = Math.min(...movableSelectedElements.map((element) => element.y));
+    const maxX = Math.max(...movableSelectedElements.map((element) => element.x + element.width));
+    const maxY = Math.max(...movableSelectedElements.map((element) => element.y + element.height));
+    const dx = Math.min(1000 - maxX, Math.max(-minX, deltaX));
+    const dy = Math.min(650 - maxY, Math.max(-minY, deltaY));
+
+    for (const element of movableSelectedElements) {
+      updateElement(element.id, { x: element.x + dx, y: element.y + dy });
+    }
+  }
+
+  function toggleElementFlag(element: ThemeV2Element, flag: 'hidden' | 'locked') {
+    updateElement(element.id, { [flag]: !element[flag] });
+  }
+
+  function toggleSelectedFlag(flag: 'hidden' | 'locked') {
+    const next = !selectedElements.every((element) => element[flag] === true);
+    for (const element of selectedElements) {
+      updateElement(element.id, { [flag]: next });
+    }
+  }
+
+  function alignSelected(edge: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') {
+    if (movableSelectedElements.length < 2) return;
+
+    const minX = Math.min(...movableSelectedElements.map((element) => element.x));
+    const minY = Math.min(...movableSelectedElements.map((element) => element.y));
+    const maxX = Math.max(...movableSelectedElements.map((element) => element.x + element.width));
+    const maxY = Math.max(...movableSelectedElements.map((element) => element.y + element.height));
+
+    for (const element of movableSelectedElements) {
+      if (edge === 'left') updateElement(element.id, { x: minX });
+      if (edge === 'center') {
+        updateElement(element.id, { x: Math.round((minX + maxX - element.width) / 2) });
+      }
+      if (edge === 'right') updateElement(element.id, { x: maxX - element.width });
+      if (edge === 'top') updateElement(element.id, { y: minY });
+      if (edge === 'middle') {
+        updateElement(element.id, { y: Math.round((minY + maxY - element.height) / 2) });
+      }
+      if (edge === 'bottom') updateElement(element.id, { y: maxY - element.height });
+    }
+  }
+
+  function distributeSelected(axis: 'horizontal' | 'vertical') {
+    if (movableSelectedElements.length < 3) return;
+
+    const sorted = [...movableSelectedElements].sort((a, b) =>
+      axis === 'horizontal' ? a.x - b.x : a.y - b.y
+    );
+    const start = axis === 'horizontal' ? sorted[0].x : sorted[0].y;
+    const end =
+      axis === 'horizontal'
+        ? Math.max(...sorted.map((element) => element.x + element.width))
+        : Math.max(...sorted.map((element) => element.y + element.height));
+    const totalSize = sorted.reduce(
+      (sum, element) => sum + (axis === 'horizontal' ? element.width : element.height),
+      0
+    );
+    const gap = Math.max(0, (end - start - totalSize) / (sorted.length - 1));
+    let cursor = start;
+
+    for (const element of sorted) {
+      if (axis === 'horizontal') {
+        updateElement(element.id, { x: Math.round(cursor) });
+        cursor += element.width + gap;
+      } else {
+        updateElement(element.id, { y: Math.round(cursor) });
+        cursor += element.height + gap;
+      }
+    }
+  }
+
+  function reorderLayer(sourceId: string, targetId: string, position: 'above' | 'below') {
+    if (sourceId === targetId) return;
+    const sourceIndex = elements.findIndex((element) => element.id === sourceId);
+    if (sourceIndex < 0) return;
+
+    const source = elements[sourceIndex];
+    const remaining = elements.filter((element) => element.id !== sourceId);
+    const targetIndex = remaining.findIndex((element) => element.id === targetId);
+    if (targetIndex < 0) return;
+
+    // The layer list is rendered top-to-bottom, while `elements` is ordered
+    // bottom-to-top. Inserting after the target in the array moves the layer
+    // above it in the list.
+    const insertAt = position === 'above' ? targetIndex + 1 : targetIndex;
+    remaining.splice(insertAt, 0, source);
+    definition.elements = remaining;
+  }
+
+  function startLayerDrag(event: DragEvent, id: string) {
+    draggingLayerId = id;
+    dropTarget = undefined;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', id);
+    }
+  }
+
+  function updateLayerDrop(event: DragEvent, id: string) {
+    if (!draggingLayerId || draggingLayerId === id) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    dropTarget = {
+      id,
+      position: event.clientY < rect.top + rect.height / 2 ? 'above' : 'below',
+    };
+  }
+
+  function dropLayer(event: DragEvent, id: string) {
+    event.preventDefault();
+    if (draggingLayerId && dropTarget) {
+      reorderLayer(draggingLayerId, id, dropTarget.position);
+    }
+    draggingLayerId = undefined;
+    dropTarget = undefined;
+  }
+
+  function endLayerDrag() {
+    draggingLayerId = undefined;
+    dropTarget = undefined;
+  }
+
+  function renameElement(id: string, value: string) {
+    updateElement(id, { name: value });
+  }
+
+  function focusInput(node: HTMLInputElement) {
+    requestAnimationFrame(() => {
+      node.focus();
+      node.select();
+    });
+    return {};
   }
 
   function commitPendingHistory() {
@@ -477,10 +797,15 @@
             ? convertFileSrc(await path.normalize(await path.join(context.folderPath, 'assets')))
             : '';
       pickedAssets = [];
-      selectedId = undefined;
+      selectedIds = [];
       selectedFontsourceId = undefined;
       fontDownloading = false;
+      renamingId = undefined;
       resetHistory();
+      lastSavedKey = snapshotKey(captureSnapshot());
+      const draft = readDraft();
+      recoverableDraft =
+        draft && (draft.savedFolder ?? '') === (context.folderName ?? '') ? draft : undefined;
       statusMessage = context.themeJson ? 'Theme loaded' : 'New theme';
       requestAnimationFrame(updateCanvasScale);
     } catch (error) {
@@ -489,9 +814,12 @@
       savedFolder = undefined;
       assetBase = '';
       pickedAssets = [];
+      selectedIds = [];
       selectedFontsourceId = undefined;
       fontDownloading = false;
       resetHistory();
+      lastSavedKey = snapshotKey(captureSnapshot());
+      recoverableDraft = undefined;
       notifyError(error instanceof Error ? error.message : String(error));
     } finally {
       loading = false;
@@ -503,12 +831,21 @@
     const observer = new ResizeObserver(updateCanvasScale);
     if (canvasHost) observer.observe(canvasHost);
     let unlisten: UnlistenFn | undefined;
+    let unlistenClose: UnlistenFn | undefined;
     listen('theme-editor-context', () => loadContext()).then((stop) => (unlisten = stop));
+    getCurrentWindow()
+      .onCloseRequested((event) => {
+        if (allowClose || !dirty) return;
+        event.preventDefault();
+        closeDialogOpen = true;
+      })
+      .then((stop) => (unlistenClose = stop));
     loadContext();
 
     return () => {
       observer.disconnect();
       unlisten?.();
+      unlistenClose?.();
       stopHistoryTimer();
     };
   });
@@ -686,7 +1023,7 @@
   function addText() {
     const element = createThemeV2Element('text', elements.length);
     definition.elements = [...elements, element];
-    selectedId = element.id;
+    selectedIds = [element.id];
     leftTab = 'layers';
   }
 
@@ -698,14 +1035,14 @@
       | ThemeV2VideoElement;
     element.src = asset.name;
     definition.elements = [...elements, element];
-    selectedId = element.id;
+    selectedIds = [element.id];
     leftTab = 'layers';
   }
 
   function addShape() {
     const element = createThemeV2Element('shape', elements.length);
     definition.elements = [...elements, element];
-    selectedId = element.id;
+    selectedIds = [element.id];
     leftTab = 'layers';
   }
 
@@ -730,21 +1067,22 @@
   }
 
   function duplicateSelected() {
-    if (!selectedElement) return;
-    const copy = {
-      ...selectedElement,
-      id: `element_${Date.now().toString(36)}_${elements.length}`,
-      x: Math.min(selectedElement.x + 24, 1000 - selectedElement.width),
-      y: Math.min(selectedElement.y + 24, 650 - selectedElement.height),
-    } as ThemeV2Element;
-    definition.elements = [...elements, copy];
-    selectedId = copy.id;
+    if (selectedElements.length === 0) return;
+    const stamp = Date.now().toString(36);
+    const copies = selectedElements.map((element, index) => ({
+      ...element,
+      id: `element_${stamp}_${elements.length + index}`,
+      x: Math.min(element.x + 24, 1000 - element.width),
+      y: Math.min(element.y + 24, 650 - element.height),
+    })) as ThemeV2Element[];
+    definition.elements = [...elements, ...copies];
+    selectedIds = copies.map((copy) => copy.id);
   }
 
   function deleteSelected() {
-    if (!selectedElement) return;
-    definition.elements = elements.filter((element) => element.id !== selectedElement.id);
-    selectedId = undefined;
+    if (selectedIds.length === 0) return;
+    definition.elements = elements.filter((element) => !selectedSet.has(element.id));
+    selectedIds = [];
   }
 
   function moveSelected(direction: -1 | 1) {
@@ -788,22 +1126,42 @@
       return;
     }
     if (event.key === 'Escape') {
-      selectedId = undefined;
+      if (contextMenuOpen) {
+        contextMenuOpen = false;
+        return;
+      }
+      if (validationOpen) {
+        validationOpen = false;
+        exportAfterValidation = false;
+        return;
+      }
+      if (closeDialogOpen) {
+        closeDialogOpen = false;
+        return;
+      }
+      selectedIds = [];
+      renamingId = undefined;
       return;
     }
-    if (typing || !selectedElement) return;
+    if (modifier && key === 'a') {
+      if (typing) return;
+      event.preventDefault();
+      selectedIds = elements.filter((element) => !element.hidden).map((element) => element.id);
+      return;
+    }
+    if (typing || selectedIds.length === 0) return;
 
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+    if (modifier && key === 'd') {
       event.preventDefault();
       duplicateSelected();
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowUp') {
+    if (modifier && event.key === 'ArrowUp') {
       event.preventDefault();
       moveSelected(1);
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowDown') {
+    if (modifier && event.key === 'ArrowDown') {
       event.preventDefault();
       moveSelected(-1);
       return;
@@ -823,10 +1181,7 @@
     const move = moves[event.key];
     if (move) {
       event.preventDefault();
-      updateElement(selectedElement.id, {
-        x: Math.min(1000 - selectedElement.width, Math.max(0, selectedElement.x + move[0])),
-        y: Math.min(650 - selectedElement.height, Math.max(0, selectedElement.y + move[1])),
-      });
+      nudgeSelected(move[0], move[1]);
     }
   }
 
@@ -883,6 +1238,9 @@
       themeToSave.preview = 'preview.png';
       await saveThemeProject(folderName, themeToSave, pickedAssets);
       savedFolder = folderName;
+      lastSavedKey = snapshotKey(captureSnapshot());
+      clearDraft();
+      recoverableDraft = undefined;
 
       let previewError: string | undefined;
       statusMessage = 'Creating preview...';
@@ -915,7 +1273,143 @@
     }
   }
 
-  async function exportCurrentTheme() {
+  function referencedAssets() {
+    const refs: string[] = [];
+    const add = (value: string | undefined) => {
+      if (!value) return;
+      if (/^(?:[a-z]+:)?\/\//i.test(value) || /^(?:data|blob|asset):/i.test(value)) return;
+      const relative = value.replace(/\\/g, '/').replace(/^\.?\//, '');
+      if (relative && !refs.includes(relative)) refs.push(relative);
+    };
+
+    const background = definition.background;
+    if (background.type === 'image' || background.type === 'video') add(background.src);
+    add(definition.audio?.src);
+    for (const element of elements) {
+      if (element.type === 'image' || element.type === 'video') add(element.src);
+    }
+    for (const font of definition.fonts ?? []) add(font.src);
+    return refs;
+  }
+
+  async function validateTheme(): Promise<ThemeValidationReport> {
+    const issues: ThemeValidationIssue[] = [];
+    const error = (message: string) => issues.push({ level: 'error', message });
+    const warning = (message: string) => issues.push({ level: 'warning', message });
+
+    if (!definition.name.trim()) error('The theme needs a name.');
+    if (!definition.author.trim()) error('The theme needs an author.');
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(definition.version.trim())) {
+      warning('The version should use semantic versioning, for example 1.0.0.');
+    }
+
+    const background = definition.background;
+    if ((background.type === 'image' || background.type === 'video') && !background.src.trim()) {
+      error(`Choose a ${background.type} for the background, or switch to a color/gradient.`);
+    }
+    if (definition.audio && !definition.audio.src.trim()) {
+      error('The theme has music enabled but no audio file.');
+    }
+
+    const seenIds: string[] = [];
+    for (const element of elements) {
+      if (seenIds.includes(element.id)) error(`Duplicate layer id: ${element.id}`);
+      seenIds.push(element.id);
+      if ((element.type === 'image' || element.type === 'video') && !element.src.trim()) {
+        error(`The ${element.type} layer ${elementLabel(element)} has no asset.`);
+      }
+    }
+
+    const refs = referencedAssets();
+    const themeFolder = savedFolder
+      ? await path.join(await themesDirectory(), savedFolder, 'assets')
+      : undefined;
+    let totalBytes = 0;
+    let fileCount = 0;
+
+    for (const ref of refs) {
+      const picked = pickedAssets.find((asset) => asset.name === ref);
+      let size: number | undefined;
+
+      if (picked) {
+        const pickedSize = await invoke<number | null>('file_size', { path: picked.source }).catch(
+          () => null
+        );
+        size = pickedSize ?? undefined;
+      } else if (themeFolder) {
+        const candidate = await path.join(themeFolder, ref);
+        try {
+          if (await fs.exists(candidate)) size = (await fs.stat(candidate)).size;
+        } catch {
+          // A missing or unreadable file is reported below.
+        }
+      }
+
+      if (size === undefined) {
+        error(`Missing asset: ${ref}. Re-import it before exporting.`);
+        continue;
+      }
+
+      totalBytes += size;
+      fileCount += 1;
+
+      if (/\.(?:webm|mp4|m4v|mov)$/i.test(ref) && size > 20 * 1024 * 1024) {
+        warning(`${ref} is ${formatBytes(size)}. Consider compressing videos to WebM.`);
+      } else if (/\.(?:png|jpe?g|webp|gif|avif)$/i.test(ref) && size > 8 * 1024 * 1024) {
+        warning(`${ref} is ${formatBytes(size)}. Large images make theme downloads slower.`);
+      }
+    }
+
+    const unused = pickedAssets.filter((asset) => !refs.includes(asset.name));
+    if (unused.length > 0) {
+      warning(
+        `${unused.length} imported asset${unused.length === 1 ? '' : 's'} will not be exported because no layer uses ${unused.length === 1 ? 'it' : 'them'}.`
+      );
+    }
+
+    if (elements.length === 0) {
+      warning(
+        'This theme has no custom layers. It will only change the launcher background and colors.'
+      );
+    }
+
+    return {
+      issues,
+      totalBytes,
+      fileCount,
+      checkedAt: Date.now(),
+    };
+  }
+
+  async function checkTheme() {
+    statusMessage = 'Checking theme...';
+    validationReport = await validateTheme();
+    validationOpen = true;
+    const errors = validationReport.issues.filter((issue) => issue.level === 'error').length;
+    exportAfterValidation = errors === 0;
+    statusMessage =
+      errors === 0
+        ? 'Theme check passed'
+        : `Theme check found ${errors} error${errors === 1 ? '' : 's'}`;
+  }
+
+  async function exportCurrentTheme(skipValidation = false) {
+    if (exporting || saving) return;
+
+    if (!skipValidation) {
+      const report = await validateTheme();
+      validationReport = report;
+      const errors = report.issues.some((issue) => issue.level === 'error');
+      const warnings = report.issues.some((issue) => issue.level === 'warning');
+      if (errors || warnings) {
+        validationOpen = true;
+        exportAfterValidation = !errors;
+        return;
+      }
+    }
+
+    validationOpen = false;
+    exportAfterValidation = false;
     const alreadySaved = Boolean(savedFolder);
     const saved = await saveTheme({ notify: false, emitSaved: !alreadySaved });
     if (!saved || !savedFolder) return;
@@ -926,14 +1420,26 @@
     if (typeof destination !== 'string') return;
 
     exporting = true;
+    statusMessage = 'Exporting...';
     try {
       await exportThemeFolder(savedFolder, destination);
+      let size = 0;
+      try {
+        size = (await invoke<number | null>('file_size', { path: destination })) ?? 0;
+      } catch {
+        // The export succeeded; only the size read failed.
+      }
+      statusMessage = size > 0 ? `Exported ${formatBytes(size)}` : 'Exported';
       sileo.success({
         title: 'Theme exported',
-        description: 'The .ezpplauncher-theme file is ready to share.',
+        description:
+          size > 0
+            ? `The ${formatBytes(size)} .ezpplauncher-theme file is ready to share.`
+            : 'The .ezpplauncher-theme file is ready to share.',
       });
     } catch (error) {
       console.error(error);
+      statusMessage = 'Export failed';
       sileo.error({
         title: 'Export failed',
         description: error instanceof Error ? error.message : String(error),
@@ -943,10 +1449,34 @@
     }
   }
 
-  const closeEditor = () => getCurrentWindow().close();
+  async function closeEditor() {
+    if (saving) return;
+    if (dirty) {
+      closeDialogOpen = true;
+      return;
+    }
+    allowClose = true;
+    await getCurrentWindow().close();
+  }
+
+  async function saveAndClose() {
+    const saved = await saveTheme({ notify: false });
+    if (!saved) return;
+    clearDraft();
+    allowClose = true;
+    closeDialogOpen = false;
+    await getCurrentWindow().close();
+  }
+
+  async function discardAndClose() {
+    clearDraft();
+    allowClose = true;
+    closeDialogOpen = false;
+    await getCurrentWindow().close();
+  }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} onresize={closeContextMenu} onblur={closeContextMenu} />
 
 {#if selectedFontPreviewCss}
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -1006,9 +1536,20 @@
         <Redo2 class="size-4" />
       </Button>
       <Button
+        variant="ghost"
+        size="icon"
+        class="size-8"
+        title="Check theme before export"
+        aria-label="Check theme"
+        onclick={checkTheme}
+        disabled={loading || saving || exporting}
+      >
+        <ShieldCheck class="size-4" />
+      </Button>
+      <Button
         variant="secondary"
         size="sm"
-        onclick={exportCurrentTheme}
+        onclick={() => exportCurrentTheme()}
         disabled={exporting || saving}
       >
         {#if exporting}
@@ -1032,17 +1573,37 @@
     </div>
   </header>
 
+  {#if recoverableDraft}
+    <div
+      class="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/25 bg-amber-500/10 px-4 py-2 text-[11px] text-amber-100"
+    >
+      <AlertTriangle class="size-4 shrink-0 text-amber-300" />
+      <span class="min-w-0 flex-1">
+        An unsaved draft from {new Date(recoverableDraft.savedAt).toLocaleString()} is available.
+      </span>
+      <Button size="sm" class="h-7 text-[10px]" onclick={restoreDraft}>Restore draft</Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="h-7 text-[10px] text-amber-100 hover:bg-amber-500/10"
+        onclick={discardDraft}
+      >
+        Discard
+      </Button>
+    </div>
+  {/if}
+
   <div class="grid min-h-0 flex-1 grid-cols-[64px_282px_minmax(0,1fr)_324px] overflow-hidden">
     <aside class="flex flex-col items-center gap-1.5 border-r border-theme-800 bg-black/25 p-2">
       <Button
         variant="ghost"
         size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg {selectedId === undefined
+        class="size-11 flex-col gap-0.5 rounded-lg {selectedIds.length === 0
           ? 'bg-primary/20 text-primary hover:bg-primary/25'
           : ''}"
         title="Select and move layers"
-        aria-pressed={selectedId === undefined}
-        onclick={() => (selectedId = undefined)}
+        aria-pressed={selectedIds.length === 0}
+        onclick={() => (selectedIds = [])}
       >
         <MousePointer2 class="size-4" />
       </Button>
@@ -1172,47 +1733,153 @@
               </p>
             </div>
           {:else}
-            <div class="space-y-1">
+            <div class="space-y-1" role="list">
               {#each [...elements].reverse() as element (element.id)}
-                <Button
-                  variant="ghost"
-                  class="h-auto w-full justify-start gap-2 whitespace-normal rounded-md border px-2 py-2 text-left font-normal {selectedId ===
-                  element.id
-                    ? 'border-primary/50 bg-primary/10 hover:bg-primary/15'
-                    : 'border-transparent hover:border-theme-800'}"
-                  aria-pressed={selectedId === element.id}
-                  onclick={() => {
-                    selectedId = element.id;
-                    leftTab = 'layers';
+                {@const selected = selectedSet.has(element.id)}
+                <div
+                  role="listitem"
+                  class="group relative flex items-center gap-1 rounded-md border px-1 py-1 {selected
+                    ? 'border-primary/50 bg-primary/10'
+                    : 'border-transparent hover:border-theme-800'} {element.hidden
+                    ? 'opacity-60'
+                    : ''}"
+                  ondragover={(event) => updateLayerDrop(event, element.id)}
+                  ondrop={(event) => dropLayer(event, element.id)}
+                  ondragleave={() => {
+                    if (dropTarget?.id === element.id) dropTarget = undefined;
                   }}
                 >
-                  <span
-                    class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
-                  >
-                    {#if element.type === 'text'}
-                      <Type class="size-3.5" />
-                    {:else if element.type === 'image'}
-                      <ImageIcon class="size-3.5" />
-                    {:else if element.type === 'video'}
-                      <Video class="size-3.5" />
-                    {:else}
-                      <Shapes class="size-3.5" />
-                    {/if}
-                  </span>
-                  <span class="min-w-0 flex-1">
-                    <span class="block truncate text-[11px] font-medium text-theme-100">
-                      {element.type === 'text'
-                        ? element.text.slice(0, 36) || 'Text layer'
-                        : element.type === 'shape'
-                          ? element.shape
-                          : element.src.split('/').pop() || element.type}
-                    </span>
-                    <span class="block font-mono text-[9px] text-muted-foreground">
-                      {Math.round(element.width)}×{Math.round(element.height)}
-                    </span>
-                  </span>
-                  <span class="text-[9px] uppercase text-muted-foreground">{element.type}</span>
-                </Button>
+                  {#if dropTarget?.id === element.id}
+                    <span
+                      class="pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded bg-primary {dropTarget.position ===
+                      'above'
+                        ? '-top-px'
+                        : '-bottom-px'}"
+                    ></span>
+                  {/if}
+
+                  {#if renamingId === element.id}
+                    <div class="flex min-w-0 flex-1 items-center gap-1.5 px-1">
+                      <span
+                        class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                      >
+                        {#if element.type === 'text'}
+                          <Type class="size-3.5" />
+                        {:else if element.type === 'image'}
+                          <ImageIcon class="size-3.5" />
+                        {:else if element.type === 'video'}
+                          <Video class="size-3.5" />
+                        {:else}
+                          <Shapes class="size-3.5" />
+                        {/if}
+                      </span>
+                      <input
+                        class="h-6 min-w-0 flex-1 rounded border border-primary/50 bg-theme-950 px-1.5 text-[11px] text-theme-50 outline-none"
+                        value={element.name ?? ''}
+                        placeholder={elementLabel(element)}
+                        use:focusInput
+                        oninput={(event) =>
+                          renameElement(
+                            element.id,
+                            (event.currentTarget as HTMLInputElement).value
+                          )}
+                        onblur={() => (renamingId = undefined)}
+                        onkeydown={(event) => {
+                          if (event.key === 'Enter' || event.key === 'Escape') {
+                            event.preventDefault();
+                            renamingId = undefined;
+                          }
+                        }}
+                      />
+                    </div>
+                  {:else}
+                    <button
+                      type="button"
+                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left"
+                      aria-pressed={selected}
+                      onclick={(event) => {
+                        selectElement(element.id, event.shiftKey || event.metaKey || event.ctrlKey);
+                        leftTab = 'layers';
+                      }}
+                    >
+                      <span
+                        class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                      >
+                        {#if element.type === 'text'}
+                          <Type class="size-3.5" />
+                        {:else if element.type === 'image'}
+                          <ImageIcon class="size-3.5" />
+                        {:else if element.type === 'video'}
+                          <Video class="size-3.5" />
+                        {:else}
+                          <Shapes class="size-3.5" />
+                        {/if}
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <span
+                          class="block truncate text-[11px] font-medium text-theme-100"
+                          title="Double-click to rename"
+                          role="presentation"
+                          ondblclick={(event) => {
+                            event.stopPropagation();
+                            renamingId = element.id;
+                          }}
+                        >
+                          {elementLabel(element)}
+                        </span>
+                        <span class="block font-mono text-[9px] text-muted-foreground">
+                          {Math.round(element.width)}×{Math.round(element.height)} · {element.type}
+                        </span>
+                      </span>
+                    </button>
+                  {/if}
+
+                  <div class="flex shrink-0 items-center gap-0.5">
+                    <button
+                      type="button"
+                      class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                      title={element.hidden ? 'Show layer' : 'Hide layer'}
+                      aria-label={element.hidden ? 'Show layer' : 'Hide layer'}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        toggleElementFlag(element, 'hidden');
+                      }}
+                    >
+                      {#if element.hidden}
+                        <EyeOff class="size-3.5" />
+                      {:else}
+                        <Eye class="size-3.5" />
+                      {/if}
+                    </button>
+                    <button
+                      type="button"
+                      class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                      title={element.locked ? 'Unlock layer' : 'Lock layer'}
+                      aria-label={element.locked ? 'Unlock layer' : 'Lock layer'}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        toggleElementFlag(element, 'locked');
+                      }}
+                    >
+                      {#if element.locked}
+                        <Lock class="size-3.5" />
+                      {:else}
+                        <Unlock class="size-3.5" />
+                      {/if}
+                    </button>
+                    <button
+                      type="button"
+                      draggable="true"
+                      class="flex size-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100 active:cursor-grabbing"
+                      title="Drag to reorder layer"
+                      aria-label="Drag to reorder layer"
+                      ondragstart={(event) => startLayerDrag(event, element.id)}
+                      ondragend={endLayerDrag}
+                    >
+                      <GripVertical class="size-3.5" />
+                    </button>
+                  </div>
+                </div>
               {/each}
             </div>
           {/if}
@@ -2044,37 +2711,269 @@
             <span class="text-xs">Opening theme…</span>
           </div>
         {:else}
-          <div
-            class="relative overflow-hidden rounded-xl border border-theme-700 shadow-2xl"
-            style="width:{1000 * canvasScale}px;height:{650 * canvasScale}px;"
-          >
-            <div
-              style="width:1000px;height:650px;transform:scale({canvasScale});transform-origin:top left;"
+          <ContextMenu.Root bind:open={contextMenuOpen}>
+            <ContextMenu.Trigger
+              class="relative overflow-hidden rounded-xl border border-theme-700 shadow-2xl"
+              style="width:{1000 * canvasScale}px;height:{650 * canvasScale}px;"
             >
-              <ThemeStage
-                {definition}
-                assets={assetBase}
-                assetOverrides={previewAssets}
-                {selectedId}
-                interactive
-                scale={canvasScale}
-                onselect={(id) => (selectedId = id)}
-                onpatch={(id, patch) => patchElement(id, patch)}
-              />
-            </div>
-          </div>
+              <div
+                style="width:1000px;height:650px;transform:scale({canvasScale});transform-origin:top left;"
+              >
+                <ThemeStage
+                  {definition}
+                  assets={assetBase}
+                  assetOverrides={previewAssets}
+                  {selectedIds}
+                  interactive
+                  scale={canvasScale}
+                  onselect={(id, additive) => selectElement(id, additive)}
+                  onselectmany={(ids, additive) => selectMany(ids, additive)}
+                  onmove={moveElements}
+                  onpatch={(id, patch) => patchElement(id, patch)}
+                  oncontext={(id) => prepareContextMenu(id)}
+                />
+              </div>
+            </ContextMenu.Trigger>
+
+            <ContextMenu.Content class="w-56 border-theme-700 bg-theme-950">
+              <ContextMenu.Label
+                class="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
+                {#if contextMenuTargetId}
+                  {contextMenuSelection.length > 1
+                    ? `${contextMenuSelection.length} layers selected`
+                    : contextMenuSelection[0]
+                      ? elementLabel(contextMenuSelection[0])
+                      : 'Layer'}
+                {:else}
+                  Canvas
+                {/if}
+              </ContextMenu.Label>
+
+              {#if contextMenuTargetId}
+                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={duplicateSelected}>
+                  <Copy />
+                  Duplicate
+                </ContextMenu.Item>
+                {#if contextMenuSelection.length === 1}
+                  <ContextMenu.Item
+                    class="gap-2 py-1.5 text-[11px]"
+                    disabled={selectedIndex >= elements.length - 1}
+                    onclick={() => moveSelected(1)}
+                  >
+                    <ChevronUp />
+                    Bring forward
+                  </ContextMenu.Item>
+                  <ContextMenu.Item
+                    class="gap-2 py-1.5 text-[11px]"
+                    disabled={selectedIndex <= 0}
+                    onclick={() => moveSelected(-1)}
+                  >
+                    <ChevronDown />
+                    Send backward
+                  </ContextMenu.Item>
+                {/if}
+                <ContextMenu.Separator class="my-1 bg-theme-800" />
+                <ContextMenu.Item
+                  class="gap-2 py-1.5 text-[11px]"
+                  onclick={() => toggleSelectedFlag('hidden')}
+                >
+                  {#if contextMenuAllHidden}
+                    <Eye />
+                    Show {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+                  {:else}
+                    <EyeOff />
+                    Hide {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+                  {/if}
+                </ContextMenu.Item>
+                <ContextMenu.Item
+                  class="gap-2 py-1.5 text-[11px]"
+                  onclick={() => toggleSelectedFlag('locked')}
+                >
+                  {#if contextMenuAllLocked}
+                    <Unlock />
+                    Unlock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+                  {:else}
+                    <Lock />
+                    Lock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+                  {/if}
+                </ContextMenu.Item>
+                <ContextMenu.Separator class="my-1 bg-theme-800" />
+                <ContextMenu.Item
+                  variant="destructive"
+                  class="gap-2 py-1.5 text-[11px]"
+                  onclick={deleteSelected}
+                >
+                  <Trash2 />
+                  Delete {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+                </ContextMenu.Item>
+              {:else}
+                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addText}>
+                  <Type />
+                  Add text
+                </ContextMenu.Item>
+                <ContextMenu.Item
+                  class="gap-2 py-1.5 text-[11px]"
+                  onclick={() => addMedia('image')}
+                >
+                  <ImageIcon />
+                  Add image
+                </ContextMenu.Item>
+                <ContextMenu.Item
+                  class="gap-2 py-1.5 text-[11px]"
+                  onclick={() => addMedia('video')}
+                >
+                  <Video />
+                  Add video
+                </ContextMenu.Item>
+                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addShape}>
+                  <Shapes />
+                  Add shape
+                </ContextMenu.Item>
+                <ContextMenu.Separator class="my-1 bg-theme-800" />
+                <ContextMenu.Item
+                  class="gap-2 py-1.5 text-[11px]"
+                  disabled={elements.length === 0}
+                  onclick={() => {
+                    selectedIds = elements
+                      .filter((element) => !element.hidden)
+                      .map((element) => element.id);
+                  }}
+                >
+                  <MousePointer2 />
+                  Select all layers
+                </ContextMenu.Item>
+              {/if}
+            </ContextMenu.Content>
+          </ContextMenu.Root>
         {/if}
       </div>
       <div
         class="flex h-8 shrink-0 items-center justify-between border-t border-theme-800 px-4 text-[9px] text-muted-foreground"
       >
-        <span>Drag layers on the canvas. Corner handles resize. Shift+arrows nudges 10px.</span>
+        <span>
+          Drag to move · shift/cmd-click or drag empty space to multi-select · Alt skips snapping
+        </span>
         <span class="font-mono">{elements.length} elements</span>
       </div>
     </main>
 
     <aside class="flex min-h-0 flex-col border-l border-theme-800 bg-theme-900/35">
-      {#if selectedElement}
+      {#if selectedIds.length > 1}
+        <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
+          <span class="flex-1 text-[10px] font-semibold text-theme-100">
+            {selectedIds.length} layers selected
+          </span>
+          <Button
+            variant="secondary"
+            size="icon"
+            class="size-8"
+            title="Duplicate selected layers"
+            onclick={duplicateSelected}
+          >
+            <Copy class="size-3.5" />
+          </Button>
+          <Button
+            variant="destructive"
+            size="icon"
+            class="size-8"
+            title="Delete selected layers"
+            onclick={deleteSelected}
+          >
+            <Trash2 class="size-3.5" />
+          </Button>
+        </div>
+        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+          <section class="space-y-2">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Align
+            </p>
+            <div class="grid grid-cols-3 gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('left')}>Left</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('center')}>Center</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('right')}>Right</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('top')}>Top</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('middle')}>Middle</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => alignSelected('bottom')}>Bottom</Button
+              >
+            </div>
+          </section>
+          <section class="space-y-2 border-t border-theme-800 pt-3">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Distribute
+            </p>
+            <div class="grid grid-cols-2 gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => distributeSelected('horizontal')}>Horizontal</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => distributeSelected('vertical')}>Vertical</Button
+              >
+            </div>
+            <p class="text-[10px] leading-relaxed text-muted-foreground">
+              Distribute needs at least three selected layers.
+            </p>
+          </section>
+          <section class="space-y-2 border-t border-theme-800 pt-3">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Layers
+            </p>
+            <div class="grid grid-cols-2 gap-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => toggleSelectedFlag('hidden')}>Hide / show</Button
+              >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 text-[10px]"
+                onclick={() => toggleSelectedFlag('locked')}>Lock / unlock</Button
+              >
+            </div>
+            <p class="text-[10px] leading-relaxed text-muted-foreground">
+              Use the alignment buttons to arrange a multi-layer selection. Press Escape to clear
+              it.
+            </p>
+          </section>
+        </div>
+      {:else if selectedElement}
         <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
           <Button
             variant="secondary"
@@ -2204,8 +3103,10 @@
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+Shift+Z</span> redo</p>
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+S</span> save theme</p>
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+D</span> duplicate layer</p>
-            <p><span class="font-mono text-theme-100">Arrows</span> nudge selected layer</p>
-            <p><span class="font-mono text-theme-100">Delete</span> remove selected layer</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl+A</span> select all layers</p>
+            <p><span class="font-mono text-theme-100">Shift/Cmd+click</span> add to selection</p>
+            <p><span class="font-mono text-theme-100">Arrows</span> nudge selected layers</p>
+            <p><span class="font-mono text-theme-100">Delete</span> remove selected layers</p>
           </div>
 
           <Button class="mt-4 w-full" onclick={() => saveTheme()} disabled={saving || loading}>
@@ -2226,8 +3127,154 @@
   >
     <span class="flex items-center gap-1.5">
       <span class="size-1.5 rounded-full bg-primary"></span>
-      Changes are local until you save. WebM is recommended for video backgrounds and layers.
+      {#if draftSavedAt}
+        Draft autosaved at {new Date(draftSavedAt).toLocaleTimeString()} · changes are local until you
+        save
+      {:else}
+        Changes are local until you save. WebM is recommended for video backgrounds and layers.
+      {/if}
     </span>
     <span>API 2.0 · advanced editor</span>
   </footer>
+
+  {#if validationOpen && validationReport}
+    {@const errors = validationReport.issues.filter((issue) => issue.level === 'error')}
+    {@const warnings = validationReport.issues.filter((issue) => issue.level === 'warning')}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="presentation"
+    >
+      <div
+        class="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-theme-700 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="validation-title"
+      >
+        <div class="flex items-start gap-3 border-b border-theme-800 p-4">
+          <div
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg {errors.length
+              ? 'bg-destructive/15 text-destructive'
+              : 'bg-emerald-500/15 text-emerald-400'}"
+          >
+            {#if errors.length}
+              <AlertTriangle class="size-4" />
+            {:else}
+              <CheckCircle2 class="size-4" />
+            {/if}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h2 id="validation-title" class="text-sm font-semibold">Theme check</h2>
+            <p class="mt-0.5 text-[10px] text-muted-foreground">
+              {validationReport.fileCount} referenced asset{validationReport.fileCount === 1
+                ? ''
+                : 's'} · {formatBytes(validationReport.totalBytes)} estimated
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7"
+            title="Close check"
+            onclick={() => {
+              validationOpen = false;
+              exportAfterValidation = false;
+            }}
+          >
+            <X class="size-3.5" />
+          </Button>
+        </div>
+
+        <div class="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+          {#if validationReport.issues.length === 0}
+            <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs">
+              Everything looks good. The theme is ready to export.
+            </div>
+          {:else}
+            {#each [...errors, ...warnings] as issue (issue.level + issue.message)}
+              <div
+                class="flex gap-2 rounded-md border px-2.5 py-2 text-[11px] leading-relaxed {issue.level ===
+                'error'
+                  ? 'border-destructive/25 bg-destructive/10 text-destructive'
+                  : 'border-amber-500/20 bg-amber-500/10 text-amber-100'}"
+              >
+                {#if issue.level === 'error'}
+                  <AlertTriangle class="mt-0.5 size-3.5 shrink-0" />
+                {:else}
+                  <ShieldCheck class="mt-0.5 size-3.5 shrink-0" />
+                {/if}
+                <span>{issue.message}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800 p-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onclick={() => {
+              validationOpen = false;
+              exportAfterValidation = false;
+            }}
+          >
+            Close
+          </Button>
+          {#if errors.length === 0 && exportAfterValidation}
+            <Button
+              size="sm"
+              onclick={() => exportCurrentTheme(true)}
+              disabled={exporting || saving}
+            >
+              {#if exporting}
+                <LoaderCircle class="animate-spin" />
+              {:else}
+                <Download />
+              {/if}
+              Export anyway
+            </Button>
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if closeDialogOpen}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="presentation"
+    >
+      <div
+        class="w-full max-w-md rounded-xl border border-theme-700 bg-theme-950 p-5 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="close-title"
+      >
+        <h2 id="close-title" class="text-sm font-semibold">Save before closing?</h2>
+        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+          This theme has unsaved changes. Save them, discard them, or keep editing.
+        </p>
+        <div class="mt-5 flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => (closeDialogOpen = false)}
+            disabled={saving}
+          >
+            Keep editing
+          </Button>
+          <Button variant="destructive" size="sm" onclick={discardAndClose} disabled={saving}>
+            Discard
+          </Button>
+          <Button size="sm" onclick={saveAndClose} disabled={saving}>
+            {#if saving}
+              <LoaderCircle class="animate-spin" />
+            {:else}
+              <Save />
+            {/if}
+            Save and close
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>

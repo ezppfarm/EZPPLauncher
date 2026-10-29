@@ -15,12 +15,13 @@
 //! logging can be disabled from Settings → Logging; stdout output is unchanged.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use log::Level;
+use serde::Serialize;
 use tauri::Runtime;
 use tauri::plugin::TauriPlugin;
 use tauri_plugin_log::{Target, TargetKind, TimezoneStrategy};
@@ -374,6 +375,105 @@ pub fn plugin<R: Runtime>() -> TauriPlugin<R> {
         })
         .timezone_strategy(TimezoneStrategy::UseLocal)
         .build()
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LogBundleInfo {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub modified: u64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LogBundleEntry {
+    pub name: String,
+    pub content: String,
+}
+
+/// List the rotating ZIP bundles, newest first, for the in-app log viewer.
+#[tauri::command]
+pub fn list_log_bundles() -> Result<Vec<LogBundleInfo>, String> {
+    let dir = logs_directory();
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut bundles = fs::read_dir(&dir)
+        .map_err(|error| format!("Could not read the logs folder: {error}"))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_str()?.to_string();
+            if !name.starts_with("logs_") || !name.ends_with(".zip") {
+                return None;
+            }
+            let metadata = entry.metadata().ok()?;
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis() as u64)
+                .unwrap_or(0);
+            Some(LogBundleInfo {
+                path: path.to_string_lossy().into_owned(),
+                name,
+                size: metadata.len(),
+                modified,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    bundles.sort_by(|a, b| b.modified.cmp(&a.modified));
+    Ok(bundles)
+}
+
+/// Read the launcher/osu/patcher logs out of one bundle.
+#[tauri::command]
+pub fn read_log_bundle(path: String) -> Result<Vec<LogBundleEntry>, String> {
+    let dir = logs_directory();
+    let requested = fs::canonicalize(&path)
+        .map_err(|error| format!("Could not open the log bundle: {error}"))?;
+    let root = fs::canonicalize(&dir)
+        .map_err(|error| format!("Could not resolve the logs folder: {error}"))?;
+    if !requested.starts_with(&root) {
+        return Err("The log bundle is outside the logs folder".to_string());
+    }
+
+    let file = File::open(&requested)
+        .map_err(|error| format!("Could not read the log bundle: {error}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|error| format!("Invalid log bundle: {error}"))?;
+    let mut entries = Vec::new();
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| format!("Could not read a log entry: {error}"))?;
+        if !entry.name().ends_with(".log") {
+            continue;
+        }
+
+        let mut bytes = Vec::new();
+        entry
+            .by_ref()
+            .take(2 * 1024 * 1024)
+            .read_to_end(&mut bytes)
+            .map_err(|error| format!("Could not read a log entry: {error}"))?;
+        let mut content = String::from_utf8_lossy(&bytes).into_owned();
+        if entry.size() > bytes.len() as u64 {
+            content.push_str("\n… log truncated in the viewer …\n");
+        }
+        entries.push(LogBundleEntry {
+            name: entry.name().to_string(),
+            content,
+        });
+    }
+
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(entries)
 }
 
 /// Start reading a child's stdout/stderr and write every line to `target`.

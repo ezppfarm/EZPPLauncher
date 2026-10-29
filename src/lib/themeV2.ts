@@ -81,6 +81,8 @@ export type ThemeV2ElementVerticalAlign = 'top' | 'center' | 'bottom';
 
 export type ThemeV2ElementBase = {
   id: string;
+  /** Optional editor-facing name; does not affect rendering. */
+  name?: string;
   /** Stage coordinates: the launcher canvas is 1000 x 650. */
   x: number;
   y: number;
@@ -88,6 +90,10 @@ export type ThemeV2ElementBase = {
   height: number;
   rotation?: number;
   opacity?: number;
+  /** Hidden layers stay in the package but are not rendered. */
+  hidden?: boolean;
+  /** Locked layers can be selected in the layer list but not dragged on canvas. */
+  locked?: boolean;
 };
 
 export type ThemeV2TextElement = ThemeV2ElementBase & {
@@ -222,12 +228,15 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
   const type = oneOf(source.type, ['text', 'image', 'video', 'shape'] as const, 'text');
   const base = {
     id: text(source.id, `element_${index + 1}`).slice(0, 64),
+    name: typeof source.name === 'string' ? source.name.slice(0, 80) : undefined,
     x: clamp(source.x, 0, 0, 1000),
     y: clamp(source.y, 0, 0, 650),
     width: clamp(source.width, 320, 24, 1000),
     height: clamp(source.height, 120, 24, 650),
     rotation: clamp(source.rotation, 0, -360, 360),
     opacity: clamp(source.opacity, 1, 0, 1),
+    hidden: source.hidden === true,
+    locked: source.locked === true,
   };
 
   if (type === 'text') {

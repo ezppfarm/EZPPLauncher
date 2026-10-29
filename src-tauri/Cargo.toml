@@ -60,7 +60,7 @@ tauri-plugin-log = "2"
 log = "0.4"
 time = { version = "0.3", features = ["local-offset"] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 http-body-util = "0.1.3"
 http-range = "0.1.5"
 hyper = { version = "1.8.1", features = ["server", "http1"] }

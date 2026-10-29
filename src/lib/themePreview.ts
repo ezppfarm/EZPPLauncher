@@ -1124,6 +1124,7 @@ export const renderThemePreview = async ({
     drawStatsCard(context);
     drawFooter(context);
     for (const element of definition.elements ?? []) {
+      if (element.hidden) continue;
       await drawElement(context, element);
     }
 

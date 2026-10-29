@@ -10,20 +10,26 @@
     definition,
     assets = '',
     assetOverrides = {},
-    selectedId = undefined,
+    selectedIds = [],
     interactive = false,
     scale = 1,
     onselect,
+    onselectmany,
+    onmove,
     onpatch,
+    oncontext,
   }: {
     definition: ThemeV2Definition;
     assets?: string;
     assetOverrides?: Record<string, string>;
-    selectedId?: string;
+    selectedIds?: string[];
     interactive?: boolean;
     scale?: number;
-    onselect?: (id: string | undefined) => void;
+    onselect?: (id: string | undefined, additive?: boolean) => void;
+    onselectmany?: (ids: string[], additive?: boolean) => void;
+    onmove?: (updates: { id: string; x: number; y: number }[]) => void;
     onpatch?: (id: string, patch: Record<string, unknown>) => void;
+    oncontext?: (id: string | undefined, event: MouseEvent) => void;
   } = $props();
 
   const bodyFont = $derived(definition.typography?.body);
@@ -53,9 +59,6 @@
   class="theme-stage relative h-[650px] w-[1000px] overflow-hidden bg-theme-950 text-theme-50"
   style={stageStyle}
   role="presentation"
-  onpointerdown={() => {
-    if (interactive) onselect?.(undefined);
-  }}
 >
   <ThemeV2Background {definition} {assets} {assetOverrides} preview />
 
@@ -185,9 +188,12 @@
     {assets}
     {assetOverrides}
     {interactive}
-    {selectedId}
+    {selectedIds}
     {scale}
     {onselect}
+    {onselectmany}
+    {onmove}
     {onpatch}
+    {oncontext}
   />
 </div>

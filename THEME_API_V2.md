@@ -245,15 +245,18 @@ top. Themes can contain up to 100 layers.
 
 Every layer supports:
 
-| Field      | Type   | Notes                               |
-| ---------- | ------ | ----------------------------------- |
-| `id`       | string | Unique within the theme             |
-| `type`     | string | `text`, `image`, `video` or `shape` |
-| `x`, `y`   | number | Position in the 1000 × 650 stage    |
-| `width`    | number | 24–1000                             |
-| `height`   | number | 24–650                              |
-| `rotation` | number | Degrees, `-360`–`360`               |
-| `opacity`  | number | `0`–`1`                             |
+| Field      | Type    | Notes                                            |
+| ---------- | ------- | ------------------------------------------------ |
+| `id`       | string  | Unique within the theme                          |
+| `name`     | string? | Optional editor label; does not affect rendering |
+| `type`     | string  | `text`, `image`, `video` or `shape`              |
+| `x`, `y`   | number  | Position in the 1000 × 650 stage                 |
+| `width`    | number  | 24–1000                                          |
+| `height`   | number  | 24–650                                           |
+| `rotation` | number  | Degrees, `-360`–`360`                            |
+| `opacity`  | number  | `0`–`1`                                          |
+| `hidden`   | boolean | Keep the layer in the file but do not render it  |
+| `locked`   | boolean | Prevent moving/resizing the layer in the editor  |
 
 #### Text
 
@@ -357,27 +360,40 @@ small tweaks, but it is not required. Example:
    full launcher home canvas at 1000 × 650.
 4. Use the left toolbar to add text, image, video and shape layers. Drag layers on
    the canvas, resize with the corner handles, or edit exact values in the right
-   inspector.
-5. Use the **Theme** tab for metadata, background, effects, typography and custom
+   inspector. Shift/Cmd-click a layer or drag a marquee over empty canvas to
+   select several layers. Multi-selections can be dragged together and aligned
+   or distributed from the right panel. Layers snap to canvas edges, the canvas
+   center, and other layers while dragging; hold Alt to disable snapping.
+   Right-click a layer for quick duplicate, ordering, hide/lock and delete
+   actions, or right-click empty canvas to add a new layer.
+5. The layer list supports double-click rename, hide/show, lock/unlock and
+   drag-to-reorder. Hidden layers remain in the package, while locked layers
+   cannot be moved or resized on the canvas.
+6. Use the **Theme** tab for metadata, background, effects, typography and custom
    CSS. Open the **Fonts** tab to search and download from every Fontsource
    family, or import WOFF2, WOFF, TTF and OTF files. Downloaded fonts are copied
    into the theme's `assets/` folder when you save.
-6. Select **Save theme** to write `theme.json` and copy new assets into
+7. Select **Save theme** to write `theme.json` and copy new assets into
    `~/.ezpplauncher/themes`. A fresh `assets/preview.png` thumbnail is rendered
-   from the theme and the launcher applies the saved theme immediately.
-7. Select **Export** to create a shareable `.ezpplauncher-theme` package. Export
-   saves and refreshes the preview first, so the package always includes the
-   current thumbnail.
+   from the theme and the launcher applies the saved theme immediately. Unsaved
+   edits are autosaved as a local draft and offered for recovery after a crash.
+8. Select **Export** to create a shareable `.ezpplauncher-theme` package. A theme
+   check runs first and reports missing assets, oversized media, missing fonts
+   and unused imports. Export saves and refreshes the preview, then reports the
+   final package size.
 
 Keyboard shortcuts:
 
 - `Cmd/Ctrl+Z` undoes the last change.
 - `Cmd/Ctrl+Shift+Z` or `Ctrl+Y` redoes it.
 - `Cmd/Ctrl+S` saves.
-- `Cmd/Ctrl+D` duplicates the selected layer.
-- Arrow keys nudge the selected layer by 1 px; hold Shift for 10 px.
-- `Delete` removes the selected layer.
-- `Esc` deselects the layer.
+- `Cmd/Ctrl+D` duplicates the selected layer or multi-selection.
+- `Cmd/Ctrl+A` selects every visible layer.
+- Shift/Cmd-click toggles a layer in the current selection.
+- Arrow keys nudge the selected layer(s) by 1 px; hold Shift for 10 px.
+- `Delete` removes the selected layer(s).
+- Hold Alt while dragging to skip snapping.
+- `Esc` clears the selection or closes an open editor dialog.
 
 ---
 

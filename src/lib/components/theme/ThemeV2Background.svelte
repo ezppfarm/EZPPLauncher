@@ -1,6 +1,6 @@
 <script lang="ts">
   import { custom_theme_volume } from '$lib/global';
-  import { themeMediaSource } from '$lib/themeMedia';
+  import { themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
   import type { ThemeV2Definition } from '$lib/themeV2';
   import { themeAssetUrl } from '$lib/themeV2';
   import { reduceAnimations } from '$lib/userSettings';
@@ -116,6 +116,7 @@
       <video
         class="absolute inset-0 h-full w-full object-cover"
         use:themeMediaSource={assetUrl(background.src)}
+        use:themeVideoLifecycle
         autoplay
         loop
         muted={background.muted !== false}

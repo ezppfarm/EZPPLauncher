@@ -77,6 +77,14 @@ pub fn open_logs_folder() -> Result<(), String> {
     open::that(&dir).map_err(|error| format!("Failed to open the logs folder: {error}"))
 }
 
+/// Return the byte size of a regular file. Used by the theme editor to
+/// validate and size picked assets without granting the webview broad fs reads.
+#[tauri::command]
+pub fn file_size(path: String) -> Option<u64> {
+    let metadata = std::fs::metadata(path).ok()?;
+    metadata.is_file().then_some(metadata.len())
+}
+
 #[tauri::command]
 pub fn get_hwid() -> String {
     get_id()
@@ -133,6 +141,135 @@ fn normalized_osu_folder(folder: &str) -> Option<PathBuf> {
 fn normalized_osu_folder(folder: &str) -> Option<PathBuf> {
     let path = PathBuf::from(folder);
     is_valid_osu_folder(&path).then_some(path)
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallationDiagnostics {
+    pub platform: String,
+    pub os_version: Option<String>,
+    pub os_arch: String,
+    pub launcher_version: String,
+    pub osu_folder: String,
+    pub resolved_folder: Option<String>,
+    pub osu_writable: Option<bool>,
+    pub patcher_path: Option<String>,
+    pub patcher_installed: bool,
+    pub patcher_file_count: usize,
+    pub patcher_total_size: u64,
+    pub host_net8: bool,
+    pub osuwinello: bool,
+    pub wmctrl: bool,
+    pub wine_prefix: Option<String>,
+    pub wine_binary: Option<String>,
+    pub wine_app_bundle: Option<String>,
+    pub wine_version: Option<String>,
+    pub wine_prefix_arch: Option<String>,
+    pub wine_net8: Option<bool>,
+    pub wine_error: Option<String>,
+    pub ffmpeg_status: Option<String>,
+    pub logs_directory: String,
+}
+
+fn directory_is_writable(path: &Path) -> bool {
+    let probe = path.join(format!(".ezpplauncher-write-test-{}", std::process::id()));
+    let _ = std::fs::remove_file(&probe);
+    let writable = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+        .is_ok();
+    let _ = std::fs::remove_file(&probe);
+    writable
+}
+
+fn osu_install_writable(osu_folder: &Path) -> bool {
+    if !directory_is_writable(osu_folder) {
+        return false;
+    }
+
+    let support_folder = osu_folder.join("EZPPLauncher");
+    !support_folder.is_dir() || directory_is_writable(&support_folder)
+}
+
+fn patcher_file_stats(osu_folder: &Path) -> (usize, u64) {
+    let Ok(entries) = std::fs::read_dir(osu_folder.join("EZPPLauncher/patcher")) else {
+        return (0, 0);
+    };
+
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let metadata = entry.metadata().ok()?;
+            metadata.is_file().then_some(metadata.len())
+        })
+        .fold((0, 0), |(count, total), size| (count + 1, total + size))
+}
+
+/// Collect the installation details shown in Settings → Diagnostics.
+#[tauri::command]
+pub async fn installation_diagnostics(app: AppHandle, folder: String) -> InstallationDiagnostics {
+    let resolved = normalized_osu_folder(&folder);
+    let resolved_folder = resolved
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
+    let patcher_path = resolved
+        .as_ref()
+        .map(|path| path.join("EZPPLauncher/patcher/osu!.patcher.exe"));
+    let (patcher_file_count, patcher_total_size) = resolved
+        .as_deref()
+        .map(patcher_file_stats)
+        .unwrap_or_default();
+
+    let mut diagnostics = InstallationDiagnostics {
+        platform: std::env::consts::OS.to_string(),
+        os_version: System::long_os_version(),
+        os_arch: std::env::consts::ARCH.to_string(),
+        launcher_version: app.package_info().version.to_string(),
+        osu_folder: folder,
+        resolved_folder,
+        osu_writable: resolved.as_deref().map(osu_install_writable),
+        patcher_installed: patcher_path
+            .as_ref()
+            .map(|path| path.is_file())
+            .unwrap_or(false),
+        patcher_file_count,
+        patcher_total_size,
+        patcher_path: patcher_path.map(|path| path.to_string_lossy().into_owned()),
+        host_net8: is_net8_installed().await,
+        osuwinello: is_osuwinello_available(),
+        wmctrl: is_wmctrl_available(),
+        wine_prefix: None,
+        wine_binary: None,
+        wine_app_bundle: None,
+        wine_version: None,
+        wine_prefix_arch: None,
+        wine_net8: None,
+        wine_error: None,
+        ffmpeg_status: None,
+        logs_directory: logging::logs_directory().to_string_lossy().into_owned(),
+    };
+
+    #[cfg(target_os = "macos")]
+    if let Some(path) = resolved {
+        match crate::macos::WineDiagnostics::for_osu_folder(&path) {
+            Ok(wine) => {
+                diagnostics.wine_prefix = Some(wine.prefix.to_string_lossy().into_owned());
+                diagnostics.wine_binary = Some(wine.wine_bin.to_string_lossy().into_owned());
+                diagnostics.wine_app_bundle = wine
+                    .app_bundle
+                    .map(|bundle| bundle.to_string_lossy().into_owned());
+                diagnostics.wine_version = wine.wine_version;
+                diagnostics.wine_prefix_arch = wine.prefix_arch;
+                diagnostics.wine_net8 = Some(wine.net8_installed);
+            }
+            Err(error) => diagnostics.wine_error = Some(error),
+        }
+
+        diagnostics.ffmpeg_status = theme_ffmpeg_status();
+    }
+
+    diagnostics
 }
 
 #[tauri::command]
@@ -1415,12 +1552,19 @@ pub(crate) fn theme_root() -> Result<PathBuf, String> {
     std::fs::canonicalize(&root).map_err(|e| format!("Failed to resolve the themes directory: {e}"))
 }
 
-#[cfg(target_os = "linux")]
-fn linux_theme_asset_base() -> String {
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn loopback_theme_asset_base() -> String {
     if crate::theme_server::base_url().is_none() {
         if let Ok(root) = theme_root() {
-            if let Err(error) = crate::theme_server::start(root) {
-                log::warn!(target: "launcher", "Could not start the theme asset server: {error}");
+            match crate::theme_server::media_root() {
+                Ok(media) => {
+                    if let Err(error) = crate::theme_server::start(root, media) {
+                        log::warn!(target: "launcher", "Could not start the theme asset server: {error}");
+                    }
+                }
+                Err(error) => {
+                    log::warn!(target: "launcher", "Could not prepare the media cache: {error}");
+                }
             }
         }
     }
@@ -1429,12 +1573,12 @@ fn linux_theme_asset_base() -> String {
 
 #[tauri::command]
 pub fn theme_asset_base() -> String {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        return linux_theme_asset_base();
+        return loopback_theme_asset_base();
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         String::new()
     }
@@ -1442,17 +1586,543 @@ pub fn theme_asset_base() -> String {
 
 #[tauri::command]
 pub fn theme_preview_url(path: String) -> Result<String, String> {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        let _ = linux_theme_asset_base();
+        let _ = loopback_theme_asset_base();
         return crate::theme_server::preview_url(Path::new(&path));
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         let _ = path;
         Ok(String::new())
     }
+}
+
+/// Return a hardware-decodable copy of a large VP9/AV1 theme video.
+///
+/// WebKit on macOS decodes VP9 in software. A 1080p 10 Mbps WebM can use
+/// enough CPU to starve the audio decoder, while H.264 is decoded by the
+/// media engine. The first playback of a large theme video is transcoded to a
+/// cached 720p H.264/AAC file; later loads return the cached URL directly.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeMediaProgress {
+    pub stage: String,
+    pub progress: f64,
+}
+
+#[cfg(target_os = "macos")]
+const FFMPEG_VERSION: &str = "9.0.2";
+
+#[cfg(target_os = "macos")]
+struct FfmpegBuild {
+    url: &'static str,
+    sha256: &'static str,
+}
+
+#[cfg(target_os = "macos")]
+fn ffmpeg_build() -> Result<FfmpegBuild, String> {
+    match std::env::consts::ARCH {
+        "aarch64" => Ok(FfmpegBuild {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
+            sha256: "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924",
+        }),
+        "x86_64" => Ok(FfmpegBuild {
+            url: "https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2/ffmpeg.zip",
+            sha256: "7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4",
+        }),
+        arch => Err(format!(
+            "No FFmpeg build is available for the macOS architecture {arch}"
+        )),
+    }
+}
+
+#[tauri::command]
+pub async fn optimize_theme_media(app: AppHandle, source_url: String) -> Result<String, String> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        return Ok(source_url);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let Some(source) = crate::theme_server::resolve_theme_url(&source_url) else {
+            return Ok(source_url);
+        };
+
+        let metadata = match tokio::fs::metadata(&source).await {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                log::warn!(target: "launcher", "Could not inspect theme media: {error}");
+                return Ok(source_url);
+            }
+        };
+        if metadata.len() < 20 * 1024 * 1024 {
+            return Ok(source_url);
+        }
+
+        let (cache_name, destination) = match theme_media_cache_path(&source, &metadata) {
+            Ok(cache) => cache,
+            Err(error) => {
+                log::warn!(target: "launcher", "Could not prepare the media cache: {error}");
+                return Ok(source_url);
+            }
+        };
+
+        if destination
+            .metadata()
+            .map(|meta| meta.is_file() && meta.len() > 1024)
+            .unwrap_or(false)
+        {
+            return Ok(crate::theme_server::media_url(&cache_name)
+                .unwrap_or_else(|| source_url.to_string()));
+        }
+
+        let ffmpeg = match ensure_theme_ffmpeg(&app).await {
+            Ok(path) => path,
+            Err(error) => {
+                log::warn!(target: "launcher", "Theme video optimization is unavailable: {error}");
+                return Ok(source_url);
+            }
+        };
+
+        let _ = app.emit(
+            "theme-media-progress",
+            ThemeMediaProgress {
+                stage: "optimize".to_string(),
+                progress: 0.0,
+            },
+        );
+
+        let original = source_url.clone();
+        tokio::task::spawn_blocking(move || {
+            optimize_theme_media_blocking(&ffmpeg, &source, &original, &cache_name, &destination)
+        })
+        .await
+        .map_err(|error| format!("Theme media optimizer thread failed: {error}"))?
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn theme_media_cache_path(
+    source: &Path,
+    metadata: &std::fs::Metadata,
+) -> Result<(String, PathBuf), String> {
+    use sha2::{Digest, Sha256};
+
+    let cache_root = crate::theme_server::media_root()?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let mut hasher = Sha256::new();
+    hasher.update(source.to_string_lossy().as_bytes());
+    hasher.update(metadata.len().to_le_bytes());
+    hasher.update(modified.to_le_bytes());
+    hasher.update(b"h264-720-v1");
+    let cache_name = format!("{}.mp4", hex::encode(&hasher.finalize()[..16]));
+    let destination = cache_root.join(&cache_name);
+    Ok((cache_name, destination))
+}
+
+#[cfg(target_os = "macos")]
+fn theme_tools_dir() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not locate the home directory".to_string())?;
+    let directory = PathBuf::from(home).join(".ezpplauncher").join("bin");
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("Failed to create the theme media tools folder: {error}"))?;
+    std::fs::canonicalize(&directory)
+        .map_err(|error| format!("Failed to resolve the theme media tools folder: {error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn verify_ffmpeg(path: &Path) -> bool {
+    std::process::Command::new(path)
+        .arg("-version")
+        .output()
+        .map(|output| {
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout).starts_with("ffmpeg version")
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "macos")]
+fn theme_ffmpeg_status() -> Option<String> {
+    let home = std::env::var_os("HOME")?;
+    let managed = PathBuf::from(home).join(".ezpplauncher/bin/ffmpeg");
+    if managed.is_file() && verify_ffmpeg(&managed) {
+        return Some(format!(
+            "Managed FFmpeg {FFMPEG_VERSION} at {}",
+            managed.display()
+        ));
+    }
+
+    find_media_binary("ffmpeg")
+        .filter(|path| verify_ffmpeg(path))
+        .map(|path| format!("System FFmpeg at {}", path.display()))
+}
+
+#[cfg(target_os = "macos")]
+static FFMPEG_DOWNLOAD_LOCK: std::sync::OnceLock<tokio::sync::Mutex<()>> =
+    std::sync::OnceLock::new();
+
+#[cfg(target_os = "macos")]
+async fn ensure_theme_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
+    let managed = theme_tools_dir()?.join("ffmpeg");
+    if managed.is_file() && verify_ffmpeg(&managed) {
+        return Ok(managed);
+    }
+    if managed.exists() {
+        let _ = std::fs::remove_file(&managed);
+    }
+
+    match download_ffmpeg(app).await {
+        Ok(path) => Ok(path),
+        Err(download_error) => {
+            log::warn!(target: "launcher", "Could not download ffmpeg: {download_error}");
+            find_media_binary("ffmpeg")
+                .filter(|path| verify_ffmpeg(path))
+                .ok_or_else(|| {
+                    format!("ffmpeg is not installed and the download failed: {download_error}")
+                })
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn download_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
+    use futures_util::StreamExt;
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncWriteExt;
+
+    let build = ffmpeg_build()?;
+    let directory = theme_tools_dir()?;
+    let target = directory.join("ffmpeg");
+
+    let lock = FFMPEG_DOWNLOAD_LOCK.get_or_init(|| tokio::sync::Mutex::new(()));
+    let _guard = lock.lock().await;
+
+    if target.is_file() && verify_ffmpeg(&target) {
+        return Ok(target);
+    }
+
+    let zip_path = directory.join("ffmpeg.zip.part");
+    let binary_path = directory.join("ffmpeg.part");
+    let _ = std::fs::remove_file(&zip_path);
+    let _ = std::fs::remove_file(&binary_path);
+
+    log::info!(
+        target: "launcher",
+        "Downloading FFmpeg {FFMPEG_VERSION} for theme video optimization"
+    );
+    let _ = app.emit(
+        "theme-media-progress",
+        ThemeMediaProgress {
+            stage: "download".to_string(),
+            progress: 0.0,
+        },
+    );
+
+    let client = Client::builder()
+        .user_agent(concat!("EZPPLauncher/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|error| format!("Could not create the FFmpeg download client: {error}"))?;
+    let response = client
+        .get(build.url)
+        .send()
+        .await
+        .map_err(|error| format!("Could not download FFmpeg: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("FFmpeg download failed: {error}"))?;
+    let total = response.content_length().unwrap_or(0);
+    let mut file = tokio::fs::File::create(&zip_path)
+        .await
+        .map_err(|error| format!("Could not create the FFmpeg archive: {error}"))?;
+    let mut hasher = Sha256::new();
+    let mut received = 0_u64;
+    let mut last_percent = u8::MAX;
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk =
+            chunk.map_err(|error| format!("Could not read the FFmpeg download: {error}"))?;
+        received += chunk.len() as u64;
+        hasher.update(&chunk);
+        file.write_all(&chunk)
+            .await
+            .map_err(|error| format!("Could not write the FFmpeg archive: {error}"))?;
+
+        if total > 0 {
+            let percent = ((received.min(total) * 100) / total) as u8;
+            if percent != last_percent {
+                last_percent = percent;
+                let _ = app.emit(
+                    "theme-media-progress",
+                    ThemeMediaProgress {
+                        stage: "download".to_string(),
+                        progress: percent as f64 / 100.0,
+                    },
+                );
+            }
+        }
+    }
+
+    file.flush()
+        .await
+        .map_err(|error| format!("Could not finish the FFmpeg archive: {error}"))?;
+    drop(file);
+
+    let digest = hex::encode(hasher.finalize());
+    if digest != build.sha256 {
+        let _ = std::fs::remove_file(&zip_path);
+        return Err("The downloaded FFmpeg archive failed its SHA-256 check".to_string());
+    }
+
+    let _ = app.emit(
+        "theme-media-progress",
+        ThemeMediaProgress {
+            stage: "extract".to_string(),
+            progress: 0.0,
+        },
+    );
+
+    let zip_for_task = zip_path.clone();
+    let binary_for_task = binary_path.clone();
+    let target_for_task = target.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let file = std::fs::File::open(&zip_for_task)
+            .map_err(|error| format!("Could not open the FFmpeg archive: {error}"))?;
+        let mut archive = zip::ZipArchive::new(file)
+            .map_err(|error| format!("Could not read the FFmpeg archive: {error}"))?;
+        let mut entry = archive
+            .by_name("ffmpeg")
+            .map_err(|error| format!("The FFmpeg archive does not contain the binary: {error}"))?;
+        let mut output = std::fs::File::create(&binary_for_task)
+            .map_err(|error| format!("Could not create the FFmpeg binary: {error}"))?;
+        std::io::copy(&mut entry, &mut output)
+            .map_err(|error| format!("Could not extract the FFmpeg binary: {error}"))?;
+        drop(output);
+        std::fs::set_permissions(&binary_for_task, std::fs::Permissions::from_mode(0o755))
+            .map_err(|error| format!("Could not make FFmpeg executable: {error}"))?;
+        std::fs::rename(&binary_for_task, &target_for_task)
+            .map_err(|error| format!("Could not install FFmpeg: {error}"))?;
+        let _ = std::fs::remove_file(&zip_for_task);
+        Ok(())
+    })
+    .await
+    .map_err(|error| format!("FFmpeg extraction thread failed: {error}"))??;
+
+    if !verify_ffmpeg(&target) {
+        let _ = std::fs::remove_file(&target);
+        return Err("The downloaded FFmpeg binary could not be executed".to_string());
+    }
+
+    log::info!(
+        target: "launcher",
+        "FFmpeg {FFMPEG_VERSION} installed at {}",
+        target.display()
+    );
+    Ok(target)
+}
+
+#[cfg(target_os = "macos")]
+fn find_media_binary(name: &str) -> Option<PathBuf> {
+    let variable = format!("EZPP_{}", name.to_ascii_uppercase());
+    if let Some(value) = std::env::var_os(variable) {
+        let path = PathBuf::from(value);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
+    let mut candidates = Vec::new();
+    if let Some(path) = std::env::var_os("PATH") {
+        candidates.extend(std::env::split_paths(&path).map(|directory| directory.join(name)));
+    }
+    for directory in [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/opt/local/bin",
+        "/usr/bin",
+    ] {
+        candidates.push(PathBuf::from(directory).join(name));
+    }
+
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+#[cfg(target_os = "macos")]
+fn optimize_theme_media_blocking(
+    ffmpeg: &Path,
+    source: &Path,
+    source_url: &str,
+    cache_name: &str,
+    destination: &Path,
+) -> Result<String, String> {
+    use std::process::Command;
+
+    let probe = Command::new(ffmpeg)
+        .args(["-hide_banner", "-i"])
+        .arg(source)
+        .output()
+        .map_err(|error| format!("Could not probe theme media: {error}"))?;
+    let probe_text = String::from_utf8_lossy(&probe.stderr);
+    let codec = probe_text.lines().find_map(|line| {
+        let index = line.find("Video: ")?;
+        line[index + 7..]
+            .split(|character: char| character == ',' || character == ' ')
+            .next()
+            .map(str::to_ascii_lowercase)
+    });
+
+    let Some(codec) = codec else {
+        return Ok(source_url.to_string());
+    };
+    if codec == "h264" || codec == "hevc" {
+        return Ok(source_url.to_string());
+    }
+
+    let temporary = destination.with_extension("mp4.tmp");
+    let _ = std::fs::remove_file(&temporary);
+
+    log::info!(
+        target: "launcher",
+        "Optimizing theme video for hardware playback ({} -> 720p H.264)",
+        source.display()
+    );
+    let started = std::time::Instant::now();
+
+    let mut command = Command::new(ffmpeg);
+    command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i"]);
+    command.arg(source);
+    command.args([
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-vf",
+        "scale=-2:720",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:v",
+        "h264_videotoolbox",
+        "-b:v",
+        "3500k",
+        "-maxrate",
+        "4500k",
+        "-bufsize",
+        "7000k",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        "-map_metadata",
+        "-1",
+        "-f",
+        "mp4",
+    ]);
+    command.arg(&temporary);
+    let first = command.output();
+
+    let success = match first {
+        Ok(output) if output.status.success() => true,
+        Ok(output) => {
+            log::warn!(
+                target: "launcher",
+                "Hardware theme video encode failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+                    .chars()
+                    .take(500)
+                    .collect::<String>()
+            );
+            false
+        }
+        Err(error) => {
+            log::warn!(target: "launcher", "Could not run ffmpeg: {error}");
+            false
+        }
+    };
+
+    let success = if success {
+        true
+    } else {
+        let _ = std::fs::remove_file(&temporary);
+        let mut fallback = Command::new(ffmpeg);
+        fallback.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i"]);
+        fallback.arg(source);
+        fallback.args([
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
+            "-vf",
+            "scale=-2:720",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "22",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            "-map_metadata",
+            "-1",
+            "-f",
+            "mp4",
+        ]);
+        fallback.arg(&temporary);
+        match fallback.output() {
+            Ok(output) if output.status.success() => true,
+            Ok(output) => {
+                log::warn!(
+                    target: "launcher",
+                    "Software theme video encode failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                        .chars()
+                        .take(500)
+                        .collect::<String>()
+                );
+                false
+            }
+            Err(error) => {
+                log::warn!(target: "launcher", "Could not run the fallback ffmpeg encode: {error}");
+                false
+            }
+        }
+    };
+
+    if !success {
+        let _ = std::fs::remove_file(&temporary);
+        return Ok(source_url.to_string());
+    }
+
+    std::fs::rename(&temporary, destination)
+        .map_err(|error| format!("Could not store the optimized theme video: {error}"))?;
+    log::info!(
+        target: "launcher",
+        "Optimized theme video in {:.1}s: {}",
+        started.elapsed().as_secs_f64(),
+        destination.display()
+    );
+
+    Ok(crate::theme_server::media_url(cache_name).unwrap_or_else(|| source_url.to_string()))
 }
 
 #[derive(Serialize, Clone)]
@@ -1529,6 +2199,185 @@ pub fn theme_editor_context(app: AppHandle) -> Result<ThemeEditorContext, String
         folder_path: Some(folder),
         theme_json,
     })
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeBackupInfo {
+    pub path: String,
+    pub label: String,
+    pub created_at: u64,
+    pub size: u64,
+}
+
+fn theme_backups_root() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not locate the home directory".to_string())?;
+    let root = PathBuf::from(home)
+        .join(".ezpplauncher")
+        .join("theme-backups");
+    std::fs::create_dir_all(&root)
+        .map_err(|error| format!("Failed to create the theme backup directory: {error}"))?;
+    std::fs::canonicalize(&root)
+        .map_err(|error| format!("Failed to resolve the theme backup directory: {error}"))
+}
+
+fn directory_size(path: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+
+    entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| {
+            let path = entry.path();
+            match entry.file_type() {
+                Ok(kind) if kind.is_dir() => directory_size(&path),
+                Ok(kind) if kind.is_file() => entry.metadata().map(|meta| meta.len()).unwrap_or(0),
+                _ => 0,
+            }
+        })
+        .sum()
+}
+
+fn copy_theme_tree(source: &Path, destination: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(destination)
+        .map_err(|error| format!("Failed to create {}: {error}", destination.display()))?;
+
+    for entry in std::fs::read_dir(source)
+        .map_err(|error| format!("Failed to read {}: {error}", source.display()))?
+    {
+        let entry = entry.map_err(|error| format!("Failed to read theme entry: {error}"))?;
+        let kind = entry
+            .file_type()
+            .map_err(|error| format!("Failed to inspect theme entry: {error}"))?;
+        if kind.is_symlink() {
+            continue;
+        }
+
+        let target = destination.join(entry.file_name());
+        if kind.is_dir() {
+            copy_theme_tree(&entry.path(), &target)?;
+        } else if kind.is_file() {
+            std::fs::copy(entry.path(), &target)
+                .map_err(|error| format!("Failed to copy theme file: {error}"))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn theme_backup_dir(theme_folder: &Path) -> Result<PathBuf, String> {
+    let name = theme_folder
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "The theme folder has no name".to_string())?;
+    Ok(theme_backups_root()?.join(name))
+}
+
+fn prune_theme_backups(directory: &Path) -> Result<(), String> {
+    let mut entries = std::fs::read_dir(directory)
+        .map_err(|error| format!("Failed to read theme backups: {error}"))?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .collect::<Vec<_>>();
+
+    entries.sort_by_key(|entry| entry.file_name());
+
+    while entries.len() > 5 {
+        let oldest = entries.remove(0);
+        let _ = std::fs::remove_dir_all(oldest.path());
+    }
+
+    Ok(())
+}
+
+/// Copy a theme aside before overwriting it during an update.
+#[tauri::command]
+pub async fn backup_theme_folder(theme_folder: String) -> Result<String, String> {
+    let folder = checked_theme_folder(&theme_folder)?;
+    if !folder.is_dir() {
+        return Err("The theme folder does not exist".to_string());
+    }
+
+    tokio::task::spawn_blocking(move || {
+        let backup_root = theme_backup_dir(&folder)?;
+        std::fs::create_dir_all(&backup_root)
+            .map_err(|error| format!("Failed to create the theme backup directory: {error}"))?;
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0);
+        let destination = backup_root.join(format!("backup_{stamp}"));
+        copy_theme_tree(&folder, &destination)?;
+        prune_theme_backups(&backup_root)?;
+        Ok(destination.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|error| format!("Thread error: {error}"))?
+}
+
+#[tauri::command]
+pub async fn list_theme_backups(theme_folder: String) -> Result<Vec<ThemeBackupInfo>, String> {
+    let folder = checked_theme_folder(&theme_folder)?;
+    tokio::task::spawn_blocking(move || {
+        let backup_root = theme_backup_dir(&folder)?;
+        if !backup_root.is_dir() {
+            return Ok(Vec::new());
+        }
+
+        let mut backups = std::fs::read_dir(&backup_root)
+            .map_err(|error| format!("Failed to read theme backups: {error}"))?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+            .filter_map(|entry| {
+                let path = entry.path();
+                let created_at = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|meta| meta.modified().ok())
+                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|duration| duration.as_millis() as u64)
+                    .unwrap_or(0);
+                Some(ThemeBackupInfo {
+                    label: entry.file_name().to_string_lossy().into_owned(),
+                    path: path.to_string_lossy().into_owned(),
+                    created_at,
+                    size: directory_size(&path),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(backups)
+    })
+    .await
+    .map_err(|error| format!("Thread error: {error}"))?
+}
+
+#[tauri::command]
+pub async fn restore_theme_backup(
+    theme_folder: String,
+    backup_folder: String,
+) -> Result<(), String> {
+    let folder = checked_theme_folder(&theme_folder)?;
+    tokio::task::spawn_blocking(move || {
+        let allowed_root = theme_backup_dir(&folder)?;
+        let backup = std::fs::canonicalize(&backup_folder)
+            .map_err(|error| format!("Failed to resolve the theme backup: {error}"))?;
+        if !backup.starts_with(&allowed_root) || !backup.is_dir() {
+            return Err("The backup is outside this theme's backup folder".to_string());
+        }
+
+        if folder.exists() {
+            std::fs::remove_dir_all(&folder)
+                .map_err(|error| format!("Failed to replace the theme folder: {error}"))?;
+        }
+        copy_theme_tree(&backup, &folder)
+    })
+    .await
+    .map_err(|error| format!("Thread error: {error}"))?
 }
 
 /// Only allow writing inside `~/.ezpplauncher/themes`.
