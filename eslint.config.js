@@ -11,6 +11,10 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 export default ts.config(
   includeIgnoreFile(gitignorePath),
+  {
+    // Tauri build output is ignored by src-tauri/.gitignore, not the root file.
+    ignores: ['src-tauri/target/**', 'src-tauri/gen/**'],
+  },
   js.configs.recommended,
   ...ts.configs.recommended,
   ...svelte.configs.recommended,

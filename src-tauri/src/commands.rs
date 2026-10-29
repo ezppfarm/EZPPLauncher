@@ -5,26 +5,36 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "macos"))]
+use std::process::Stdio;
 use sysinfo::System;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::State;
+use tauri::WebviewUrl;
+use tauri::WebviewWindowBuilder;
 use tauri_plugin_fs::FsExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+#[cfg(not(target_os = "macos"))]
 use tokio::process::Command;
+#[cfg(not(target_os = "macos"))]
 use tokio::time::{Duration, sleep};
 
+use crate::logging;
 use crate::osudb::parse_osudb;
 use crate::presence;
 use crate::state::AppState;
+#[cfg(all(not(windows), not(target_os = "macos")))]
+use crate::utils::get_osuwinello_path;
 use crate::utils::{
-    check_folder_completeness, encrypt_password, get_osu_config, get_osu_user_config,
-    get_osuwinello_path, get_window_title_by_pid, is_net8_installed, is_osuwinello_available,
-    is_wmctrl_available, set_osu_config_vals, set_osu_user_config_vals,
+    encrypt_password, get_osu_config, get_osu_user_config, is_net8_installed, is_osu_process,
+    is_osuwinello_available, is_wmctrl_available, set_osu_config_vals, set_osu_user_config_vals,
 };
+#[cfg(not(target_os = "macos"))]
+use crate::utils::{get_window_title_by_pid, is_osu_game_process, is_valid_osu_folder};
 
 #[tauri::command]
 pub fn opened_urls(app: tauri::AppHandle) -> Vec<PathBuf> {
@@ -39,6 +49,34 @@ pub fn get_launcher_version(app: tauri::AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// Forward a webview console message to the launcher log file.
+#[tauri::command]
+pub fn log_frontend(level: String, message: String) {
+    let message: String = message.chars().take(16_000).collect();
+
+    match level.as_str() {
+        "error" => log::error!(target: "launcher", "[webview] {message}"),
+        "warn" => log::warn!(target: "launcher", "[webview] {message}"),
+        "debug" => log::debug!(target: "launcher", "[webview] {message}"),
+        "trace" => log::trace!(target: "launcher", "[webview] {message}"),
+        _ => log::info!(target: "launcher", "[webview] {message}"),
+    }
+}
+
+#[tauri::command]
+pub fn set_logging_enabled(enabled: bool) {
+    logging::set_logging_enabled(enabled);
+}
+
+#[tauri::command]
+pub fn open_logs_folder() -> Result<(), String> {
+    let dir = logging::logs_directory();
+    std::fs::create_dir_all(&dir)
+        .map_err(|error| format!("Failed to create the logs folder: {error}"))?;
+
+    open::that(&dir).map_err(|error| format!("Failed to open the logs folder: {error}"))
+}
+
 #[tauri::command]
 pub fn get_hwid() -> String {
     get_id()
@@ -46,124 +84,125 @@ pub fn get_hwid() -> String {
         .into()
 }
 
+/// Show the native macOS picker, which can select `osu!.app` bundles as files.
+/// The regular Tauri dialog opens app bundles as folders on macOS.
+#[tauri::command]
+pub async fn pick_osu_installation(app: AppHandle) -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let (tx, rx) = std::sync::mpsc::channel();
+        app.run_on_main_thread(move || {
+            let _ = tx.send(crate::macos::pick_osu_installation());
+        })
+        .map_err(|error| format!("Could not open the osu! picker: {error}"))?;
+
+        let picked = tauri::async_runtime::spawn_blocking(move || rx.recv())
+            .await
+            .map_err(|error| format!("Could not open the osu! picker: {error}"))?;
+
+        picked
+            .map_err(|_| "The osu! picker closed unexpectedly".to_string())?
+            .map(|path| path.map(|path| path.to_string_lossy().into_owned()))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(None)
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub fn valid_osu_folder(folder: String) -> bool {
-    let osu_folder_files = [
-        "avcodec-51.dll",
-        "avformat-52.dll",
-        "avutil-49.dll",
-        "bass.dll",
-        "bass_fx.dll",
-        "collection.db",
-        "d3dcompiler_47.dll",
-        "libEGL.dll",
-        "libGLESv2.dll",
-        "Microsoft.Ink.dll",
-        "OpenTK.dll",
-        "osu!.cfg",
-        "osu!.db",
-        "osu!.exe",
-        "osu!auth.dll",
-        "osu!gameplay.dll",
-        "osu!seasonal.dll",
-        "osu!ui.dll",
-        "presence.db",
-        "pthreadGC2.dll",
-        "scores.db",
-    ];
+    normalized_osu_folder(&folder).is_some()
+}
 
+/// Resolve a selected path (osu! folder, `.app` wrapper, Wine prefix or drive_c)
+/// to the actual osu! installation folder. Returns `None` if it is not valid.
+#[tauri::command(rename_all = "snake_case")]
+pub fn resolve_osu_folder(folder: String) -> Option<String> {
+    normalized_osu_folder(&folder).map(|path| path.to_string_lossy().into_owned())
+}
+
+#[cfg(target_os = "macos")]
+fn normalized_osu_folder(folder: &str) -> Option<PathBuf> {
+    crate::macos::resolve_osu_folder(Path::new(folder))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn normalized_osu_folder(folder: &str) -> Option<PathBuf> {
     let path = PathBuf::from(folder);
-    if !path.join("osu!.exe").exists() {
-        return false;
-    }
-    check_folder_completeness(path, &osu_folder_files) >= 70.0
+    is_valid_osu_folder(&path).then_some(path)
 }
 
 #[tauri::command]
 pub fn find_osu_installation() -> Option<String> {
-    #[cfg(windows)]
-    {
-        use winreg::RegKey;
-        use winreg::enums::*;
+    find_osu_installation_impl()
+}
 
-        let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
+#[cfg(windows)]
+fn find_osu_installation_impl() -> Option<String> {
+    use winreg::RegKey;
+    use winreg::enums::*;
 
-        let hkcu_registry_paths = [
-            "Software\\Classes\\osustable.File.osk\\DefaultIcon",
-            "Software\\Classes\\osustable.File.osr\\DefaultIcon",
-            "Software\\Classes\\osustable.File.osz\\DefaultIcon",
-        ];
+    let hklm_registry_paths = ["SOFTWARE\\Classes\\osu\\DefaultIcon"];
 
-        let osu_folder_files = [
-            "avcodec-51.dll",
-            "avformat-52.dll",
-            "avutil-49.dll",
-            "bass.dll",
-            "bass_fx.dll",
-            "collection.db",
-            "d3dcompiler_47.dll",
-            "libEGL.dll",
-            "libGLESv2.dll",
-            "Microsoft.Ink.dll",
-            "OpenTK.dll",
-            "osu!.cfg",
-            "osu!.db",
-            "osu!.exe",
-            "osu!auth.dll",
-            "osu!gameplay.dll",
-            "osu!seasonal.dll",
-            "osu!ui.dll",
-            "presence.db",
-            "pthreadGC2.dll",
-            "scores.db",
-        ];
+    let hkcu_registry_paths = [
+        "Software\\Classes\\osustable.File.osk\\DefaultIcon",
+        "Software\\Classes\\osustable.File.osr\\DefaultIcon",
+        "Software\\Classes\\osustable.File.osz\\DefaultIcon",
+    ];
 
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
 
-        for reg_path in &hklm_registry_paths {
-            if let Ok(subkey) = hklm.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
-                let value_names = [""];
-                for value_name in &value_names {
-                    if let Ok(value) = subkey.get_value::<String, _>(value_name) {
-                        let trimmed = value.trim_matches('"');
-                        let stripped = trimmed.strip_suffix(",0").unwrap_or(trimmed);
-                        let path = PathBuf::from(stripped.trim());
-                        if let Some(parent) = path.parent() {
-                            let match_percentage =
-                                check_folder_completeness(parent, &osu_folder_files);
-
-                            if match_percentage >= 70.0 {
-                                return Some(parent.to_string_lossy().into());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-
-        for reg_path in &hkcu_registry_paths {
-            if let Ok(subkey) = hkcu.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
-                let value_names = [""];
-                for value_name in &value_names {
-                    if let Ok(value) = subkey.get_value::<String, _>(value_name) {
-                        let trimmed = value.trim_matches('"');
-                        let stripped = trimmed.strip_suffix(",1").unwrap_or(trimmed);
-                        let path = PathBuf::from(stripped.trim());
-                        if let Some(parent) = path.parent() {
-                            let match_percentage =
-                                check_folder_completeness(parent, &osu_folder_files);
-
-                            if match_percentage >= 70.0 {
-                                return Some(parent.to_string_lossy().into());
-                            }
+    for reg_path in &hklm_registry_paths {
+        if let Ok(subkey) = hklm.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
+            let value_names = [""];
+            for value_name in &value_names {
+                if let Ok(value) = subkey.get_value::<String, _>(value_name) {
+                    let trimmed = value.trim_matches('"');
+                    let stripped = trimmed.strip_suffix(",0").unwrap_or(trimmed);
+                    let path = PathBuf::from(stripped.trim());
+                    if let Some(parent) = path.parent() {
+                        if is_valid_osu_folder(parent) {
+                            return Some(parent.to_string_lossy().into());
                         }
                     }
                 }
             }
         }
     }
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+    for reg_path in &hkcu_registry_paths {
+        if let Ok(subkey) = hkcu.open_subkey_with_flags(reg_path, KEY_READ | KEY_WOW64_32KEY) {
+            let value_names = [""];
+            for value_name in &value_names {
+                if let Ok(value) = subkey.get_value::<String, _>(value_name) {
+                    let trimmed = value.trim_matches('"');
+                    let stripped = trimmed.strip_suffix(",1").unwrap_or(trimmed);
+                    let path = PathBuf::from(stripped.trim());
+                    if let Some(parent) = path.parent() {
+                        if is_valid_osu_folder(parent) {
+                            return Some(parent.to_string_lossy().into());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn find_osu_installation_impl() -> Option<String> {
+    crate::macos::find_osu_installation()
+}
+
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn find_osu_installation_impl() -> Option<String> {
     None
 }
 
@@ -275,59 +314,87 @@ pub fn set_osu_config_values(
 
 #[tauri::command]
 pub async fn run_osu_updater(folder: String) -> Result<(), String> {
-    let mut updater_process = {
-        #[cfg(windows)]
-        {
-            const DETACHED_PROCESS: u32 = 0x00000008;
-            const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-            let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
-            Command::new(&osu_exe_path)
-                .arg("-repair")
-                .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                .spawn()
-                .map_err(|e| format!("Failed to spawn updater: {}", e))?
-        }
+    log::info!(target: "osu", "Starting the osu! updater for {folder}");
 
-        #[cfg(not(windows))]
-        {
-            let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
-            Command::new(&osu_wine_path)
-                .arg("-repair")
-                .spawn()
-                .map_err(|e| format!("Failed to spawn updater: {}", e))?
-        }
-    };
+    #[cfg(target_os = "macos")]
+    crate::macos::run_osu_updater(&folder).await?;
 
-    sleep(Duration::from_millis(500)).await;
-
-    let mut sys = System::new_all();
-
-    loop {
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-        let mut found = false;
-
-        for (_pid, process) in sys.processes() {
-            if process.name() == "osu!.exe" {
-                let pid = process.pid();
-                let title = get_window_title_by_pid(pid);
-
-                if !title.is_empty() && !title.contains("updater") {
-                    let _ = process.kill_and_wait();
-                    found = true;
-                    break;
-                }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut updater_process = {
+            #[cfg(windows)]
+            {
+                const DETACHED_PROCESS: u32 = 0x00000008;
+                const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+                let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
+                Command::new(&osu_exe_path)
+                    .arg("-repair")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                    .spawn()
+                    .map_err(|e| {
+                        log::error!(target: "osu", "Failed to spawn the osu! updater: {e}");
+                        format!("Failed to spawn updater: {}", e)
+                    })?
             }
-        }
 
-        if found {
-            break;
+            #[cfg(not(windows))]
+            {
+                let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+                Command::new(&osu_wine_path)
+                    .arg("-repair")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .map_err(|e| {
+                        log::error!(target: "osu", "Failed to spawn the osu! updater: {e}");
+                        format!("Failed to spawn updater: {}", e)
+                    })?
+            }
+        };
+
+        if let Some(pid) = updater_process.id() {
+            log::info!(target: "osu", "osu! updater started (pid {pid})");
         }
+        crate::logging::capture_osu_output(&mut updater_process);
 
         sleep(Duration::from_millis(500)).await;
-    }
 
-    let _ = updater_process.wait().await;
+        let mut sys = System::new_all();
+
+        loop {
+            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+            let mut found = false;
+
+            for (_pid, process) in sys.processes() {
+                if is_osu_game_process(process) {
+                    let pid = process.pid();
+                    let title = get_window_title_by_pid(pid);
+
+                    if !title.is_empty() && !title.contains("updater") {
+                        let _ = process.kill_and_wait();
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if found {
+                break;
+            }
+
+            sleep(Duration::from_millis(500)).await;
+        }
+
+        match updater_process.wait().await {
+            Ok(status) => log::info!(target: "osu", "osu! updater exited with {status}"),
+            Err(error) => log::warn!(target: "osu", "Could not wait for the osu! updater: {error}"),
+        }
+    }
 
     let force_update_files = [".require_update", "help.txt", "_pending"];
     for update_file_name in &force_update_files {
@@ -342,11 +409,11 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
                     };
 
                     if let Err(e) = res {
-                        eprintln!("Failed to remove {:?}: {}", path, e);
+                        log::warn!(target: "osu", "Failed to remove {:?}: {}", path, e);
                     }
                 }
                 Err(e) => {
-                    eprintln!("Could not stat {:?}: {}", path, e);
+                    log::warn!(target: "osu", "Could not stat {:?}: {}", path, e);
                 }
             }
         }
@@ -357,147 +424,147 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
-    #[cfg(windows)]
-    const DETACHED_PROCESS: u32 = 0x00000008;
-    #[cfg(windows)]
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+    log::info!(target: "osu", "Launching osu! from {folder} (patch={patch})");
 
-    let mut game_process = {
-        #[cfg(windows)]
-        {
-            let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
-            Command::new(&osu_exe_path)
-                .arg("-devserver")
-                .arg("ez-pp.farm")
-                .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                .spawn()
-                .map_err(|e| format!("Failed to spawn osu: {}", e))?
-        }
-
-        #[cfg(not(windows))]
-        {
-            let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
-            Command::new(&osu_wine_path)
-                .arg("--devserver")
-                .arg("ez-pp.farm")
-                .spawn()
-                .map_err(|e| format!("Failed to spawn osu: {}", e))?
-        }
-    };
-
-    if patch {
-        let patcher_exe_path = PathBuf::from(&folder)
-            .join("EZPPLauncher")
-            .join("patcher")
-            .join("osu!.patcher.exe");
-
-        if patcher_exe_path.exists() {
-            let mut sys = System::new_all();
-
-            loop {
-                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-                let mut found = false;
-
-                for (_pid, process) in sys.processes() {
-                    if process.name() == "osu!.exe" {
-                        let pid = process.pid();
-                        let title = get_window_title_by_pid(pid);
-
-                        if !title.is_empty() && !title.contains("updater") {
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-
-                if found {
-                    break;
-                }
-
-                sleep(Duration::from_millis(500)).await;
-            }
-            #[cfg(windows)]
-            {
-                let _ = Command::new(&patcher_exe_path)
-                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-                    .spawn()
-                    .map_err(|e| format!("Failed to run patcher: {e}"))?;
-            }
-            #[cfg(not(windows))]
-            {
-                use crate::utils::get_osuwinello_path;
-
-                let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
-                let _ = Command::new(&osu_wine_path)
-                    .arg("--wine")
-                    .arg(&patcher_exe_path)
-                    .spawn()
-                    .map_err(|e| format!("Failed to run patcher: {}", e))?;
-            }
-        }
+    #[cfg(target_os = "macos")]
+    {
+        return crate::macos::run_osu(&folder, patch).await;
     }
 
-    //TODO: maybe implement tosu?
-    /* let tosu_exe_path = PathBuf::from(&folder)
-        .join("EZPPLauncher")
-        .join("tosu")
-        .join("tosu.exe");
+    #[cfg(not(target_os = "macos"))]
+    {
+        #[cfg(windows)]
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        #[cfg(windows)]
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
 
-    let mut _tosu_process: Option<_> = None;
+        let mut game_process = {
+            #[cfg(windows)]
+            {
+                let osu_exe_path = PathBuf::from(&folder).join("osu!.exe");
+                Command::new(&osu_exe_path)
+                    .arg("-devserver")
+                    .arg("ez-pp.farm")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+                    .spawn()
+                    .map_err(|e| {
+                        log::error!(target: "osu", "Failed to spawn osu!: {e}");
+                        format!("Failed to spawn osu: {}", e)
+                    })?
+            }
 
-    if tosu_exe_path.exists() {
-        let mut sys = System::new_all();
+            #[cfg(not(windows))]
+            {
+                let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+                Command::new(&osu_wine_path)
+                    .arg("--devserver")
+                    .arg("ez-pp.farm")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .map_err(|e| {
+                        log::error!(target: "osu", "Failed to spawn osu!: {e}");
+                        format!("Failed to spawn osu: {}", e)
+                    })?
+            }
+        };
 
-        loop {
-            sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        if let Some(pid) = game_process.id() {
+            log::info!(target: "osu", "osu! started (pid {pid})");
+        }
+        crate::logging::capture_osu_output(&mut game_process);
 
-            let mut found = false;
+        if patch {
+            let patcher_exe_path = PathBuf::from(&folder)
+                .join("EZPPLauncher")
+                .join("patcher")
+                .join("osu!.patcher.exe");
 
-            for (_pid, process) in sys.processes() {
-                if process.name() == "osu!.exe" {
-                    let pid = process.pid();
-                    let title = get_window_title_by_pid(pid);
+            if patcher_exe_path.exists() {
+                let mut sys = System::new_all();
 
-                    if !title.is_empty() && !title.contains("updater") {
-                        found = true;
+                loop {
+                    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+
+                    let mut found = false;
+
+                    for (_pid, process) in sys.processes() {
+                        if process.name() == "osu!.exe" {
+                            let pid = process.pid();
+                            let title = get_window_title_by_pid(pid);
+
+                            if !title.is_empty() && !title.contains("updater") {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if found {
                         break;
                     }
+
+                    sleep(Duration::from_millis(500)).await;
                 }
-            }
+                log::info!(target: "patcher", "Starting the patcher from {}", patcher_exe_path.display());
 
-            if found {
-                break;
-            }
-
-            sleep(Duration::from_millis(500)).await;
-        }
-        #[cfg(windows)]
-        {
-            _tosu_process = Some(
-                Command::new(&tosu_exe_path)
-                    /* .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP) */
+                #[cfg(windows)]
+                let mut patcher_process = Command::new(&patcher_exe_path)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
                     .spawn()
-                    .map_err(|e| format!("Failed to run tosu: {e}"))?,
-            );
+                    .map_err(|e| {
+                        log::error!(target: "patcher", "Failed to start the patcher: {e}");
+                        format!("Failed to run patcher: {e}")
+                    })?;
+
+                #[cfg(not(windows))]
+                let mut patcher_process = {
+                    use crate::utils::get_osuwinello_path;
+
+                    let osu_wine_path = get_osuwinello_path().expect("osu-wine was not found");
+                    Command::new(&osu_wine_path)
+                        .arg("--wine")
+                        .arg(&patcher_exe_path)
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .spawn()
+                        .map_err(|e| {
+                            log::error!(target: "patcher", "Failed to start the patcher: {e}");
+                            format!("Failed to run patcher: {}", e)
+                        })?
+                };
+
+                if let Some(pid) = patcher_process.id() {
+                    log::info!(target: "patcher", "Patcher started (pid {pid})");
+                }
+                crate::logging::capture_patcher_output(&mut patcher_process);
+            } else {
+                log::warn!(
+                    target: "patcher",
+                    "Patcher was requested but {} does not exist",
+                    patcher_exe_path.display()
+                );
+            }
         }
-        /* #[cfg(not(windows))]
-        {
-            let _ = Command::new("osu-wine")
-                .arg("--wine")
-                .arg(&tosu_exe_path)
-                .spawn()
-                .map_err(|e| format!("Failed to run tosu: {}", e))?;
-        } */
-    } */
 
-    game_process.wait().await.map_err(|e| e.to_string())?;
+        match game_process.wait().await {
+            Ok(status) => log::info!(target: "osu", "osu! exited with {status}"),
+            Err(error) => {
+                log::warn!(target: "osu", "Could not wait for osu!: {error}");
+                return Err(error.to_string());
+            }
+        }
 
-    /* if let Some(mut tosu_process) = _tosu_process {
-        tosu_process.kill().await.map_err(|e| e.to_string())?;
-    } */
-
-    Ok(())
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -813,7 +880,7 @@ pub fn is_osu_running() -> bool {
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
     for process in sys.processes().values() {
-        if process.name().eq_ignore_ascii_case("osu!.exe") {
+        if is_osu_process(process) {
             return true;
         }
     }
@@ -960,6 +1027,9 @@ pub async fn download_ezpp_launcher_update(app: AppHandle, url: String) -> Resul
 
 #[tauri::command]
 pub async fn install_ezpp_launcher_update(app: AppHandle) -> Result<(), String> {
+    #[cfg(not(windows))]
+    let _ = app;
+
     #[cfg(windows)]
     {
         let temp_dir = app.path().temp_dir().expect("Failed to get temp directory");
@@ -1049,6 +1119,9 @@ pub fn is_open_tablet_driver_running() -> bool {
 
 #[tauri::command]
 pub async fn is_open_tablet_driver_path_valid(app: AppHandle, path: String) -> bool {
+    #[cfg(not(windows))]
+    let _ = (&app, &path);
+
     #[cfg(windows)]
     {
         app.fs_scope().allow_file(&path).ok();
@@ -1285,10 +1358,24 @@ pub async fn extract_theme(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct ThemeInfo {
     pub name: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(rename = "apiVersion", default)]
+    pub api_version: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub nsfw: bool,
+    #[serde(default)]
     pub entry: String,
+    #[serde(default)]
+    pub style: String,
+    #[serde(default)]
     pub preview: String,
 }
 
@@ -1316,6 +1403,404 @@ pub async fn read_theme_info(app: AppHandle, file_path: String) -> Result<ThemeI
     })
     .await
     .map_err(|e| format!("Thread error: {}", e))?
+}
+
+pub(crate) fn theme_root() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not locate the home directory".to_string())?;
+    let root = PathBuf::from(home).join(".ezpplauncher").join("themes");
+    std::fs::create_dir_all(&root)
+        .map_err(|e| format!("Failed to create the themes directory: {e}"))?;
+    std::fs::canonicalize(&root).map_err(|e| format!("Failed to resolve the themes directory: {e}"))
+}
+
+#[cfg(target_os = "linux")]
+fn linux_theme_asset_base() -> String {
+    if crate::theme_server::base_url().is_none() {
+        if let Ok(root) = theme_root() {
+            if let Err(error) = crate::theme_server::start(root) {
+                log::warn!(target: "launcher", "Could not start the theme asset server: {error}");
+            }
+        }
+    }
+    crate::theme_server::base_url().unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn theme_asset_base() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        return linux_theme_asset_base();
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        String::new()
+    }
+}
+
+#[tauri::command]
+pub fn theme_preview_url(path: String) -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = linux_theme_asset_base();
+        return crate::theme_server::preview_url(Path::new(&path));
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = path;
+        Ok(String::new())
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeEditorContext {
+    pub folder_name: Option<String>,
+    pub folder_path: Option<String>,
+    pub theme_json: Option<String>,
+}
+
+/// Open (or focus) the advanced theme editor in its own native window.
+#[tauri::command]
+pub async fn open_theme_editor(app: AppHandle, theme_folder: Option<String>) -> Result<(), String> {
+    let folder = match theme_folder.filter(|value| !value.trim().is_empty()) {
+        Some(folder) => {
+            let checked = checked_theme_folder(&folder)?;
+            if !checked.join("theme.json").is_file() {
+                return Err("That theme does not contain a theme.json".to_string());
+            }
+            Some(checked.to_string_lossy().into_owned())
+        }
+        None => None,
+    };
+
+    *app.state::<AppState>().editor_theme_folder.lock().unwrap() = folder;
+
+    if let Some(window) = app.get_webview_window("theme-editor") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        app.emit_to("theme-editor", "theme-editor-context", ())
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(&app, "theme-editor", WebviewUrl::App("index.html".into()))
+        .title("EZPPLauncher Theme Editor")
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(1100.0, 720.0)
+        .resizable(true)
+        .center()
+        .build()
+        .map_err(|error| format!("Could not open the theme editor: {error}"))?;
+
+    Ok(())
+}
+
+/// Theme data requested by the advanced editor window when it starts or switches themes.
+#[tauri::command]
+pub fn theme_editor_context(app: AppHandle) -> Result<ThemeEditorContext, String> {
+    let folder = app
+        .state::<AppState>()
+        .editor_theme_folder
+        .lock()
+        .unwrap()
+        .clone();
+    let Some(folder) = folder else {
+        return Ok(ThemeEditorContext {
+            folder_name: None,
+            folder_path: None,
+            theme_json: None,
+        });
+    };
+
+    let path = PathBuf::from(&folder);
+    let folder_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(ToOwned::to_owned);
+    let theme_json = std::fs::read_to_string(path.join("theme.json")).ok();
+
+    Ok(ThemeEditorContext {
+        folder_name,
+        folder_path: Some(folder),
+        theme_json,
+    })
+}
+
+/// Only allow writing inside `~/.ezpplauncher/themes`.
+fn checked_theme_folder(theme_folder: &str) -> Result<PathBuf, String> {
+    let root = theme_root()?;
+    let requested = PathBuf::from(theme_folder);
+    if !requested.is_absolute() {
+        return Err("The theme folder must be an absolute path".to_string());
+    }
+
+    let folder = if requested.exists() {
+        std::fs::canonicalize(&requested)
+            .map_err(|e| format!("Failed to resolve the theme folder: {e}"))?
+    } else {
+        let parent = requested
+            .parent()
+            .ok_or_else(|| "The theme folder has no parent directory".to_string())?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create the theme directory: {e}"))?;
+        let parent = std::fs::canonicalize(parent)
+            .map_err(|e| format!("Failed to resolve the theme directory: {e}"))?;
+        let name = requested
+            .file_name()
+            .ok_or_else(|| "The theme folder has no name".to_string())?;
+        parent.join(name)
+    };
+
+    if folder == root || !folder.starts_with(&root) {
+        return Err("The theme folder is outside the themes directory".to_string());
+    }
+
+    Ok(folder)
+}
+
+#[derive(Deserialize)]
+pub struct ThemeAssetInput {
+    pub name: String,
+    pub source: String,
+}
+
+/// Write a theme created or edited by the in-app theme editor.
+#[tauri::command]
+pub async fn save_theme_project(
+    theme_folder: String,
+    config: String,
+    assets: Vec<ThemeAssetInput>,
+) -> Result<(), String> {
+    let folder = checked_theme_folder(&theme_folder)?;
+
+    let parsed: Value = serde_json::from_str(&config)
+        .map_err(|e| format!("The theme config is not valid JSON: {e}"))?;
+    if parsed.get("apiVersion").and_then(Value::as_str) != Some("2.0") {
+        return Err("The theme editor can only save API 2.0 themes".to_string());
+    }
+    if parsed
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .is_none()
+    {
+        return Err("The theme needs a name".to_string());
+    }
+
+    let assets_folder = folder.join("assets");
+    tokio::fs::create_dir_all(&assets_folder)
+        .await
+        .map_err(|e| format!("Failed to create the assets folder: {e}"))?;
+
+    for asset in assets {
+        let name = asset.name.trim();
+        if name.is_empty()
+            || name == "."
+            || name == ".."
+            || name.contains('/')
+            || name.contains('\\')
+        {
+            return Err(format!("Invalid theme asset name: {name}"));
+        }
+
+        let source = PathBuf::from(&asset.source);
+        if !source.is_file() {
+            return Err(format!("Theme asset not found: {}", source.display()));
+        }
+
+        let destination = assets_folder.join(name);
+        if source.canonicalize().ok() == destination.canonicalize().ok() {
+            continue;
+        }
+
+        tokio::fs::copy(&source, &destination)
+            .await
+            .map_err(|e| format!("Failed to copy theme asset {name}: {e}"))?;
+    }
+
+    tokio::fs::write(folder.join("theme.json"), config)
+        .await
+        .map_err(|e| format!("Failed to write theme.json: {e}"))?;
+
+    Ok(())
+}
+
+/// Resolve a `theme.json` asset reference to a path relative to `assets/`.
+/// Remote URLs, data URLs and paths that could escape the assets folder are
+/// ignored.
+fn theme_asset_reference(src: &str) -> Option<String> {
+    let value = src.trim();
+    if value.is_empty()
+        || value.contains("://")
+        || value.starts_with('/')
+        || value.starts_with("data:")
+        || value.starts_with("blob:")
+        || value.starts_with("asset:")
+    {
+        return None;
+    }
+
+    let normalized = value.replace('\\', "/");
+    let normalized = normalized.trim_start_matches("./");
+    if normalized.is_empty()
+        || normalized
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return None;
+    }
+
+    Some(normalized.to_string())
+}
+
+fn collect_theme_asset_refs(value: &Value, assets: &mut HashSet<String>) {
+    match value {
+        Value::Object(object) => {
+            for (key, value) in object {
+                if key == "src" || key == "preview" {
+                    if let Some(src) = value.as_str() {
+                        if let Some(path) = theme_asset_reference(src) {
+                            assets.insert(path);
+                        }
+                    }
+                }
+                collect_theme_asset_refs(value, assets);
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                collect_theme_asset_refs(value, assets);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// For API 2.0 packages, return the assets referenced by `theme.json` so an
+/// export can omit orphaned files left behind by older edits. API 1.0 themes
+/// can load assets dynamically from their bundle, so they are exported whole.
+fn referenced_theme_assets(theme_json: &Path) -> Option<HashSet<String>> {
+    let text = std::fs::read_to_string(theme_json).ok()?;
+    let parsed: Value = serde_json::from_str(&text).ok()?;
+    let api_version = parsed.get("apiVersion")?.as_str()?;
+    if api_version.split('.').next() != Some("2") {
+        return None;
+    }
+
+    let mut assets = HashSet::new();
+    // The launcher falls back to this filename for theme thumbnails even when
+    // `preview` is omitted from theme.json.
+    assets.insert("preview.png".to_string());
+    collect_theme_asset_refs(&parsed, &mut assets);
+    Some(assets)
+}
+
+fn add_theme_folder_to_zip(
+    zip: &mut zip::ZipWriter<std::fs::File>,
+    root: &Path,
+    directory: &Path,
+    asset_filter: Option<&HashSet<String>>,
+    options: zip::write::SimpleFileOptions,
+) -> Result<(), String> {
+    let entries = std::fs::read_dir(directory)
+        .map_err(|e| format!("Failed to read {}: {e}", directory.display()))?;
+    let assets_root = root.join("assets");
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read theme entry: {e}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("Failed to inspect theme entry: {e}"))?;
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        let entry_path = entry.path();
+        if file_type.is_dir() {
+            add_theme_folder_to_zip(zip, root, &entry_path, asset_filter, options)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+
+        if let Some(filter) = asset_filter {
+            if let Ok(asset_path) = entry_path.strip_prefix(&assets_root) {
+                let key = asset_path.to_string_lossy().replace('\\', "/");
+                if !filter.contains(&key) {
+                    continue;
+                }
+            }
+        }
+
+        let relative = entry_path
+            .strip_prefix(root)
+            .map_err(|e| format!("Failed to build archive path: {e}"))?
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        zip.start_file(relative, options)
+            .map_err(|e| format!("Failed to add a file to the theme archive: {e}"))?;
+        let mut file = std::fs::File::open(&entry_path)
+            .map_err(|e| format!("Failed to open {}: {e}", entry_path.display()))?;
+        std::io::copy(&mut file, zip)
+            .map_err(|e| format!("Failed to write the theme archive: {e}"))?;
+    }
+
+    Ok(())
+}
+
+/// Package a theme folder as a shareable `.ezpplauncher-theme` file.
+#[tauri::command]
+pub async fn export_theme(theme_folder: String, destination_path: String) -> Result<(), String> {
+    let folder = checked_theme_folder(&theme_folder)?;
+    if !folder.is_dir() {
+        return Err("The theme folder does not exist".to_string());
+    }
+
+    let destination = PathBuf::from(destination_path);
+    if !destination.is_absolute() {
+        return Err("The export path must be absolute".to_string());
+    }
+    if destination.starts_with(&folder) {
+        return Err("Choose a destination outside the theme folder".to_string());
+    }
+
+    tokio::task::spawn_blocking(move || {
+        let asset_filter = referenced_theme_assets(&folder.join("theme.json"));
+        let file = std::fs::File::create(&destination)
+            .map_err(|e| format!("Failed to create the theme archive: {e}"))?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        add_theme_folder_to_zip(&mut zip, &folder, &folder, asset_filter.as_ref(), options)?;
+        zip.finish()
+            .map_err(|e| format!("Failed to finish the theme archive: {e}"))?;
+        Ok::<_, String>(())
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))??;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_theme_folder(theme_folder: String) -> Result<(), String> {
+    let root = theme_root()?;
+    let requested = std::fs::canonicalize(&theme_folder).unwrap_or_else(|_| root.clone());
+    if requested != root && !requested.starts_with(&root) {
+        return Err("The theme folder is outside the themes directory".to_string());
+    }
+
+    open::that(&requested).map_err(|e| format!("Failed to open the themes folder: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]

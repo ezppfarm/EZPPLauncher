@@ -28,24 +28,27 @@
     "security": {
       "csp": {
         "default-src": "'self' tauri: customprotocol: asset:",
-        "script-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost https://analytics.ez-pp.farm",
-        "style-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost",
-        "img-src": "'self' asset: http://asset.localhost https://asset.localhost blob: data: https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct",
-        "connect-src": "'self' ipc: http://ipc.localhost https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct https://osu.ppy.sh",
-        "media-src": "'self' asset: http://asset.localhost https://asset.localhost blob:",
+        "script-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost http://127.0.0.1:* https://analytics.ez-pp.farm",
+        "style-src": "'self' 'unsafe-inline' asset: http://asset.localhost https://asset.localhost http://127.0.0.1:*",
+        "img-src": "'self' asset: http://asset.localhost https://asset.localhost blob: data: http://127.0.0.1:* https://assets.ppy.sh https://a.ez-pp.farm https://git.ez-pp.farm https://osu.direct",
+        "connect-src": "'self' ipc: http://ipc.localhost asset: http://asset.localhost https://asset.localhost http://127.0.0.1:* https://ez-pp.farm https://api.ez-pp.farm https://c.ez-pp.farm https://analytics.ez-pp.farm https://git.ez-pp.farm https://osu.direct https://osu.ppy.sh https://api.fontsource.org https://cdn.jsdelivr.net",
+        "media-src": "'self' asset: http://asset.localhost https://asset.localhost http://127.0.0.1:* blob:",
         "font-src": [
           "'self'",
           "asset:",
           "blob:",
           "data:",
           "http://asset.localhost",
-          "https://asset.localhost"
+          "https://asset.localhost",
+          "http://127.0.0.1:*",
+          "https://cdn.jsdelivr.net"
         ]
       },
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$HOME/.ezpplauncher/themes/**"
+          "$HOME/.ezpplauncher/themes/**",
+          "$HOME/.ezpplauncher/font-cache/**"
         ]
       }
     }

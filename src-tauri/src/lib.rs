@@ -7,36 +7,38 @@ use tauri_plugin_fs::FsExt;
 
 pub mod commands;
 pub mod config;
+pub mod logging;
+#[cfg(target_os = "macos")]
+pub mod macos;
 pub mod osudb;
 pub mod presence;
 pub mod state;
+#[cfg(target_os = "linux")]
+pub mod theme_server;
 pub mod utils;
 use crate::{
     commands::{
         check_for_corruption, config_all, config_clear, config_delete, config_exists, config_get,
         config_set, download_and_extract_theme, download_ezpp_launcher_update,
-        download_ezpp_launcher_update_files, encrypt_string, exit, extract_theme,
+        download_ezpp_launcher_update_files, encrypt_string, exit, export_theme, extract_theme,
         find_osu_installation, get_beatmapsets_count, get_ezpp_launcher_update_files, get_hwid,
         get_launcher_version, get_osu_release_stream, get_osu_skin, get_osu_version, get_platform,
         get_skins_count, has_net8, has_osuwinello, has_wmctrl, install_ezpp_launcher_update,
         is_open_tablet_driver_path_valid, is_open_tablet_driver_running, is_osu_running,
-        open_url_in_browser, opened_urls, presence_connect, presence_disconnect,
+        log_frontend, open_logs_folder, open_theme_editor, open_theme_folder, open_url_in_browser,
+        opened_urls, pick_osu_installation, presence_connect, presence_disconnect,
         presence_is_connected, presence_update_button, presence_update_status,
-        presence_update_user, read_theme_info, replace_ui_files, run_open_tablet_driver, run_osu,
-        run_osu_updater, set_osu_config_values, set_osu_user_config_values,
-        stop_open_tablet_driver, valid_osu_folder,
+        presence_update_user, read_theme_info, replace_ui_files, resolve_osu_folder,
+        run_open_tablet_driver, run_osu, run_osu_updater, save_theme_project, set_logging_enabled,
+        set_osu_config_values, set_osu_user_config_values, stop_open_tablet_driver,
+        theme_asset_base, theme_editor_context, theme_preview_url, valid_osu_folder,
     },
     state::AppState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(target_os = "linux")]
-    unsafe {
-        // std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
-
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(logging::plugin());
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -67,6 +69,15 @@ pub fn run() {
 
     let app = builder
         .setup(|app| {
+            log::info!(
+                target: "launcher",
+                "EZPPLauncher {} starting on {} ({}) — logs: {}",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                logging::logs_directory().display()
+            );
+
             // ── Config ────────────────────────────────────────────────────────
             let home = std::env::var("HOME")
                 .or_else(|_| std::env::var("USERPROFILE"))
@@ -97,7 +108,26 @@ pub fn run() {
             app.manage(AppState {
                 config: Mutex::new(cfg),
                 opened_files: Mutex::new(opened_files),
+                editor_theme_folder: Mutex::new(None),
             });
+
+            // WebKitGTK cannot play theme media through the custom asset
+            // protocol, so Linux gets a real loopback HTTP server instead.
+            #[cfg(target_os = "linux")]
+            match commands::theme_root().and_then(theme_server::start) {
+                Ok(_) => {}
+                Err(error) => log::warn!(
+                    target: "launcher",
+                    "Could not start the theme asset server: {error}"
+                ),
+            }
+
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = macos::round_window(&window, 12.0) {
+                    log::warn!(target: "launcher", "Could not round the launcher window: {error}");
+                }
+            }
 
             Ok(())
         })
@@ -105,6 +135,8 @@ pub fn run() {
             opened_urls,
             get_hwid,
             find_osu_installation,
+            pick_osu_installation,
+            resolve_osu_folder,
             valid_osu_folder,
             get_beatmapsets_count,
             get_skins_count,
@@ -139,6 +171,13 @@ pub fn run() {
             read_theme_info,
             extract_theme,
             download_and_extract_theme,
+            save_theme_project,
+            export_theme,
+            open_theme_folder,
+            open_theme_editor,
+            theme_editor_context,
+            theme_asset_base,
+            theme_preview_url,
             config_get,
             config_set,
             config_exists,
@@ -148,7 +187,10 @@ pub fn run() {
             run_open_tablet_driver,
             stop_open_tablet_driver,
             is_open_tablet_driver_running,
-            is_open_tablet_driver_path_valid
+            is_open_tablet_driver_path_valid,
+            log_frontend,
+            set_logging_enabled,
+            open_logs_folder
         ])
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -158,6 +200,17 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|app, event| {
+        // The content view can be replaced again while the webview is being
+        // built, so re-apply the corner mask once the app is ready.
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Ready = &event {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = macos::round_window(&window, 12.0) {
+                    log::warn!(target: "launcher", "Could not round the launcher window: {error}");
+                }
+            }
+        }
+
         presence::handle_run_event(app, &event);
     });
 }

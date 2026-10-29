@@ -5,6 +5,7 @@ export const cursorSmoothening = writable<boolean>(false);
 export const cursorSmoothness = writable<number>(180);
 export const reduceAnimations = writable<boolean>(false);
 export const patch = writable<boolean>(true);
+export const loggingEnabled = writable<boolean>(true);
 
 export const osuInstallationPath = writable<string>('');
 

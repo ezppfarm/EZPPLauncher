@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import Logo from '$assets/logo.png';
+  import ThemeEditorWindow from '$lib/components/theme/ThemeEditorWindow.svelte';
+  import ThemeV2Background from '$lib/components/theme/ThemeV2Background.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import AnimatedBg from '$lib/components/ui/animated-bg/AnimatedBg.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -24,12 +27,22 @@
     setupValues,
     trackingEnabled,
   } from '$lib/global';
-  import { exit, getLauncherVersion, getPlatform } from '$lib/osuUtil';
+  import { initLogging } from '$lib/logging';
+  import { exit, getLauncherVersion, getPlatform, setLoggingEnabled } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
+  import { smoothThemeMedia } from '$lib/themeMedia';
+  import { themeV2Css } from '$lib/themeV2';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
-  import { cursorSmoothening, customCursor, patch, reduceAnimations } from '$lib/userSettings';
+  import {
+    cursorSmoothening,
+    customCursor,
+    loggingEnabled,
+    patch,
+    reduceAnimations,
+  } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import '../app.css';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import { Buffer } from 'buffer';
   import { SemVer } from 'semver';
   import { sileo } from 'sileo';
@@ -37,6 +50,17 @@
   import { fade } from 'svelte/transition';
 
   let { children } = $props();
+
+  if (browser) initLogging();
+
+  const editorWindow = (() => {
+    if (!browser) return false;
+    try {
+      return getCurrentWindow().label === 'theme-editor';
+    } catch {
+      return false;
+    }
+  })();
 
   let unsupported_platform = $state<boolean>(false);
 
@@ -83,11 +107,17 @@
   }
 
   onMount(async () => {
+    if (editorWindow) return;
+
     window.Buffer = Buffer;
 
     disableReload();
     setupValues();
     launcherVersion.set(await getLauncherVersion());
+
+    const currentPlatform = await getPlatform();
+    platform.set(currentPlatform);
+    if (!['windows', 'linux', 'macos'].includes(currentPlatform)) unsupported_platform = true;
 
     const oldUserConfig = new Config('user_settings', false);
     const oldUserConfigExists = await oldUserConfig.init();
@@ -127,6 +157,7 @@
     const config_custom_cursor = config.value<boolean>('custom_cursor');
     const config_cursor_smoothening = config.value<boolean>('cursor_smoothening');
     const config_reduce_animations = config.value<boolean>('reduce_animations');
+    const config_logging_enabled = config.value<boolean>('logging_enabled');
     const config_discord_presence = config.value<boolean>('discord_presence');
     const config_tracking_enabled = config.value<boolean>('tracking_consent');
     const config_otd_enabled = config.value<boolean>('otd_enabled');
@@ -135,7 +166,7 @@
     const localThemes = await getThemes();
     const lastThemeName = await config_theme.get('Default');
     const last_theme = localThemes.find((t) => t.name === lastThemeName);
-    if (!last_theme || $platform === 'linux') {
+    if (!last_theme) {
       await config.value<string>('theme').set('Default');
       loadTheme(localThemes[0], $custom_theme_container!, await config_theme_volume.get(0.15));
     } else {
@@ -147,6 +178,7 @@
     customCursor.set(await config_custom_cursor.get(true));
     cursorSmoothening.set(await config_cursor_smoothening.get(true));
     reduceAnimations.set(await config_reduce_animations.get(false));
+    loggingEnabled.set(await config_logging_enabled.get(true));
     discordPresence.set(await config_discord_presence.get(true));
     openTabletDriverEnabled.set(await config_otd_enabled.get(false));
     openTabletDriverPath.set(await config_otd_path.get(''));
@@ -158,6 +190,10 @@
     customCursor.subscribe(async (val) => await config_custom_cursor.set(val));
     cursorSmoothening.subscribe(async (val) => await config_cursor_smoothening.set(val));
     reduceAnimations.subscribe(async (val) => await config_reduce_animations.set(val));
+    loggingEnabled.subscribe(async (val) => {
+      await config_logging_enabled.set(val);
+      await setLoggingEnabled(val);
+    });
     openTabletDriverEnabled.subscribe(async (val) => config_otd_enabled.set(val));
 
     discordPresence.subscribe(async (val) => {
@@ -221,20 +257,20 @@
         description: 'Failed to load themes',
       });
     }
-
-    platform.set(await getPlatform());
-    if ($platform !== 'windows' && $platform !== 'linux') unsupported_platform = true;
   });
 </script>
 
 <svelte:head>
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html `<style>${$active_custom_theme?.cssStyle || ''}</style>`}
+  {#if $active_custom_theme?.definition}
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+    {@html `<style>${themeV2Css(
+      $active_custom_theme.definition,
+      $active_custom_theme.assets
+    )}</style>`}
+  {/if}
 </svelte:head>
-
-{#if $customCursor}
-  <OsuCursor smoothCursor={$cursorSmoothening} />
-{/if}
 
 <SileoToast
   position="top-center"
@@ -246,45 +282,64 @@
   }}
 />
 
-<Titlebar />
+{#if editorWindow}
+  <ThemeEditorWindow />
+{:else}
+  {#if $customCursor}
+    <OsuCursor smoothCursor={$cursorSmoothening} />
+  {/if}
 
-<AlertDialog.Root open={unsupported_platform}>
-  <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
-    <div
-      class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
-    >
-      <img class="h-20 w-20" src={Logo} alt="logo" />
-      <span class="font-semibold text-xl">Unsupported Platform!</span>
-    </div>
-    <div
-      class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
-    >
-      This Platform is not supported by EZPPLauncher.
-    </div>
-    <div class="flex items-center justify-center mb-3">
-      <Button
-        onclick={async () => {
-          await exit();
-        }}>Close</Button
-      >
-    </div>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+  <Titlebar />
 
-<main>
-  <div class="opacity-30">
-    <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+  <AlertDialog.Root open={unsupported_platform}>
+    <AlertDialog.Content class="bg-theme-950 border-theme-800 p-0">
       <div
-        class={$active_custom_theme && $active_custom_theme.name === 'Default'
-          ? 'hidden'
-          : 'absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video'}
-        bind:this={$custom_theme_container}
-        use:trackMediaContainer
-      ></div>
-      {#if ($active_custom_theme && $active_custom_theme.name === 'Default') || !$active_custom_theme}
-        <AnimatedBg />
-      {/if}
+        class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
+      >
+        <img class="h-20 w-20" src={Logo} alt="logo" />
+        <span class="font-semibold text-xl">Unsupported Platform!</span>
+      </div>
+      <div
+        class="flex flex-col items-center text-sm text-center bg-theme-900 border border-theme-800 rounded-lg mx-3 p-3"
+      >
+        This Platform is not supported by EZPPLauncher.
+      </div>
+      <div class="flex items-center justify-center mb-3">
+        <Button
+          onclick={async () => {
+            await exit();
+          }}>Close</Button
+        >
+      </div>
+    </AlertDialog.Content>
+  </AlertDialog.Root>
+
+  <main>
+    <div class:hidden={!!$active_custom_theme?.definition}>
+      <div class="opacity-30">
+        <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
+          <div
+            class={$active_custom_theme && $active_custom_theme.name === 'Default'
+              ? 'hidden'
+              : 'absolute z-0 top-0 left-0 w-full h-full object-cover object-center aspect-video'}
+            bind:this={$custom_theme_container}
+            use:trackMediaContainer
+            use:smoothThemeMedia
+          ></div>
+          {#if ($active_custom_theme && $active_custom_theme.name === 'Default') || !$active_custom_theme}
+            <AnimatedBg />
+          {/if}
+        </div>
+      </div>
     </div>
-  </div>
-  {@render children()}
-</main>
+    {#if $active_custom_theme?.definition}
+      <div class="absolute inset-0 z-0">
+        <ThemeV2Background
+          definition={$active_custom_theme.definition}
+          assets={$active_custom_theme.assets}
+        />
+      </div>
+    {/if}
+    {@render children()}
+  </main>
+{/if}

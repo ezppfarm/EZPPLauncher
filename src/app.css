@@ -6,6 +6,10 @@
 
 @import "@fontsource-variable/sora";
 @import "@fontsource/space-mono";
+@import "@fontsource/bebas-neue";
+@import "@fontsource-variable/montserrat";
+@import "@fontsource-variable/playfair-display";
+@import "@fontsource-variable/jetbrains-mono";
 
 :root {
   --radius: 0.625rem;

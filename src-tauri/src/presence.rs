@@ -104,12 +104,12 @@ impl PresenceActor {
                     self.reconnecting = false;
                     match result {
                         ReconnectResult::Connected(client) => {
-                            println!("Presence: reconnect succeeded.");
+                            log::info!(target: "launcher", "Presence: reconnect succeeded");
                             self.client = Some(client);
                             self.push_presence().await;
                         }
                         ReconnectResult::Failed => {
-                            eprintln!("Presence: all reconnect attempts exhausted.");
+                            log::warn!(target: "launcher", "Presence: all reconnect attempts exhausted");
                         }
                     }
                 }
@@ -135,7 +135,10 @@ impl PresenceActor {
                 let _ = resp.send(true);
             }
             None => {
-                eprintln!("Presence: initial connect failed; spawning reconnect task.");
+                log::warn!(
+                    target: "launcher",
+                    "Presence: initial connect failed; spawning reconnect task"
+                );
                 let _ = resp.send(false);
                 self.spawn_reconnect_task();
             }
@@ -145,7 +148,7 @@ impl PresenceActor {
     async fn cmd_disconnect(&mut self, resp: oneshot::Sender<()>) {
         if let Some(mut client) = self.client.take() {
             let _ = client.clear_activity().await;
-            println!("Presence: disconnected.");
+            log::info!(target: "launcher", "Presence: disconnected");
         }
         let _ = resp.send(());
     }
@@ -182,9 +185,12 @@ impl PresenceActor {
 
         let activity = builder.build();
 
-        /* println!("Presence: updating activity: {:?}", activity); */
         if let Err(e) = client.set_activity(&activity).await {
-            eprintln!("Presence: set_activity failed ({:?}); will reconnect.", e);
+            log::warn!(
+                target: "launcher",
+                "Presence: set_activity failed ({:?}); will reconnect",
+                e
+            );
             self.client = None;
             self.spawn_reconnect_task();
         }
@@ -201,9 +207,12 @@ impl PresenceActor {
             const MAX_ATTEMPTS: u32 = 5;
             for attempt in 1..=MAX_ATTEMPTS {
                 let delay = Duration::from_secs(5 * attempt as u64);
-                println!(
+                log::info!(
+                    target: "launcher",
                     "Presence: reconnect attempt {}/{} in {:?}…",
-                    attempt, MAX_ATTEMPTS, delay
+                    attempt,
+                    MAX_ATTEMPTS,
+                    delay
                 );
                 tokio::time::sleep(delay).await;
 
@@ -221,16 +230,16 @@ async fn try_connect_once() -> Option<AsyncDiscordIpcClient> {
     match AsyncDiscordIpcClient::new("1032772293220384808").await {
         Ok(mut client) => match client.connect().await {
             Ok(_) => {
-                println!("Presence: IPC connected.");
+                log::info!(target: "launcher", "Presence: IPC connected");
                 Some(client)
             }
             Err(e) => {
-                eprintln!("Presence: IPC connect error: {:?}", e);
+                log::warn!(target: "launcher", "Presence: IPC connect error: {:?}", e);
                 None
             }
         },
         Err(e) => {
-            eprintln!("Presence: failed to create client: {:?}", e);
+            log::warn!(target: "launcher", "Presence: failed to create client: {:?}", e);
             None
         }
     }
@@ -256,7 +265,11 @@ pub async fn connect() -> bool {
 
 pub async fn disconnect() {
     let (tx, rx) = oneshot::channel();
-    if PRESENCE_TX.send(PresenceCommand::Disconnect(tx)).await.is_ok() {
+    if PRESENCE_TX
+        .send(PresenceCommand::Disconnect(tx))
+        .await
+        .is_ok()
+    {
         let _ = tokio::time::timeout(Duration::from_secs(2), rx).await;
     }
 }

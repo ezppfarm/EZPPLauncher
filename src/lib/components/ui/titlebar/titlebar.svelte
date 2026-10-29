@@ -1,6 +1,6 @@
 <script lang="ts">
   import { config } from '$lib/config';
-  import { custom_theme_audio_playing, custom_theme_volume } from '$lib/global';
+  import { custom_theme_audio_playing, custom_theme_volume, platform } from '$lib/global';
   import { reduceAnimations } from '$lib/userSettings';
   import { Volume, Volume1, VolumeOff } from '@lucide/svelte';
   import Minimize from '@lucide/svelte/icons/minus';
@@ -19,7 +19,7 @@
   });
 </script>
 
-<div data-tauri-drag-region class="titlebar z-[100]">
+<div data-tauri-drag-region class="titlebar z-[100]" class:macos-window={$platform === 'macos'}>
   {#if $custom_theme_audio_playing}
     {#if $custom_theme_audio_playing}
       <div class="relative flex items-center justify-center group">
@@ -113,6 +113,11 @@
     margin-bottom: 10px;
     padding-right: 5px;
     pointer-events: auto;
+  }
+
+  /* Keep the window controls clear of the rounded top-right corner. */
+  .titlebar.macos-window {
+    padding-right: 12px;
   }
 
   .volume-slider {

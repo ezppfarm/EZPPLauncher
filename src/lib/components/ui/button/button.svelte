@@ -53,6 +53,8 @@
 </script>
 
 {#if href}
+  <!-- href is a pass-through prop and may point to an external URL -->
+  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
   <a bind:this={ref} class={cn(buttonVariants({ variant, size }), className)} {href} {...restProps}>
     {@render children?.()}
   </a>

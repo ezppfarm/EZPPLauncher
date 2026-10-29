@@ -2,6 +2,7 @@ import type { UpdateFile, UpdateStatus } from './types';
 import { betterFetch } from '@better-fetch/fetch';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const updateUrl = 'https://ez-pp.farm/api/ezpplauncher';
 
@@ -23,8 +24,31 @@ export const getHWID = async (): Promise<string | undefined> =>
 export const isValidOsuFolder = async (folder: string): Promise<boolean | undefined> =>
   await invoke<boolean | undefined>('valid_osu_folder', { folder });
 
+export const resolveOsuFolder = async (folder: string): Promise<string | undefined> =>
+  (await invoke<string | null>('resolve_osu_folder', { folder })) ?? undefined;
+
 export const autoDetectOsuInstallFolder = async () =>
   await invoke<string | undefined>('find_osu_installation');
+
+/**
+ * Pick an osu! installation. On macOS the app runs inside a Wineskin `.app`
+ * bundle, and the standard dialog would descend into the bundle instead of
+ * letting it be selected, so a native panel is used there.
+ */
+export const pickOsuInstallation = async (platform: string): Promise<string | undefined> => {
+  if (platform === 'macos') {
+    return (await invoke<string | null>('pick_osu_installation')) ?? undefined;
+  }
+
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: 'Select osu! Installation Folder',
+    canCreateDirectories: false,
+  });
+
+  return typeof selected === 'string' ? selected : undefined;
+};
 
 export const setUserConfigValues = async (
   osuFolderPath: string,
@@ -120,6 +144,9 @@ export const isOsuRunning = async (): Promise<boolean> => await invoke<boolean>(
 export const getLauncherVersion = async () => await invoke<string>('get_launcher_version');
 export const exit = async () => await invoke('exit');
 export const getPlatform = async (): Promise<string> => await invoke<string>('get_platform');
+export const setLoggingEnabled = async (enabled: boolean) =>
+  await invoke('set_logging_enabled', { enabled });
+export const openLogsFolder = async () => await invoke('open_logs_folder');
 export const isOsuCorrupted = async (folder: string): Promise<boolean> =>
   await invoke<boolean>('check_for_corruption', { folder });
 export const hasWMCTRL = async (): Promise<boolean> => await invoke<boolean>('has_wmctrl');

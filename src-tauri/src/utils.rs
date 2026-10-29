@@ -1,6 +1,111 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use sysinfo::Pid;
+
+pub const OSU_FOLDER_FILES: &[&str] = &[
+    "avcodec-51.dll",
+    "avformat-52.dll",
+    "avutil-49.dll",
+    "bass.dll",
+    "bass_fx.dll",
+    "collection.db",
+    "d3dcompiler_47.dll",
+    "libEGL.dll",
+    "libGLESv2.dll",
+    "Microsoft.Ink.dll",
+    "OpenTK.dll",
+    "osu!.cfg",
+    "osu!.db",
+    "osu!.exe",
+    "osu!auth.dll",
+    "osu!gameplay.dll",
+    "osu!seasonal.dll",
+    "osu!ui.dll",
+    "presence.db",
+    "pthreadGC2.dll",
+    "scores.db",
+];
+
+pub fn is_valid_osu_folder<P: AsRef<Path>>(folder_path: P) -> bool {
+    let folder_path = folder_path.as_ref();
+    folder_path.join("osu!.exe").is_file()
+        && check_folder_completeness(folder_path, OSU_FOLDER_FILES) >= 70.0
+}
+
+/// True if the process is osu! (either running natively or through Wine/Proton).
+pub fn is_osu_process(process: &sysinfo::Process) -> bool {
+    let name = process.name().to_string_lossy().to_ascii_lowercase();
+    if name.ends_with("osu!.exe") {
+        return true;
+    }
+
+    if let Some(exe) = process.exe() {
+        if exe
+            .file_name()
+            .map(|file_name| file_name.to_string_lossy().to_ascii_lowercase() == "osu!.exe")
+            .unwrap_or(false)
+        {
+            return true;
+        }
+    }
+
+    process.cmd().iter().any(|arg| {
+        arg.to_string_lossy()
+            .to_ascii_lowercase()
+            .contains("osu!.exe")
+    })
+}
+
+/// Like [`is_osu_process`], but excludes the osu! updater started with `-repair`.
+pub fn is_osu_game_process(process: &sysinfo::Process) -> bool {
+    is_osu_process(process)
+        && !process.cmd().iter().any(|arg| {
+            arg.to_string_lossy()
+                .to_ascii_lowercase()
+                .contains("-repair")
+        })
+}
+
+fn find_osu_user_config_path<P: AsRef<Path>>(folder_path: P) -> Option<PathBuf> {
+    let folder_path = folder_path.as_ref();
+    if !folder_path.is_dir() {
+        return None;
+    }
+
+    if let Ok(current_user) = std::env::var("USERNAME").or_else(|_| std::env::var("USER")) {
+        let config_path = folder_path.join(format!("osu!.{}.cfg", current_user));
+        if config_path.is_file() {
+            return Some(config_path);
+        }
+    }
+
+    // The Windows username inside a Wine prefix does not always match the host
+    // username (especially on macOS), so fall back to the most recent osu!.*.cfg.
+    let mut candidates = fs::read_dir(folder_path)
+        .ok()?
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = path.file_name()?.to_string_lossy().to_ascii_lowercase();
+            if !file_name.starts_with("osu!.") || !file_name.ends_with(".cfg") {
+                return None;
+            }
+            if file_name == "osu!.cfg" {
+                return None;
+            }
+
+            let modified = entry
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            Some((modified, path))
+        })
+        .collect::<Vec<_>>();
+
+    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    candidates.into_iter().next().map(|(_, path)| path)
+}
 
 pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files: &[&str]) -> f32 {
     let mut found = 0;
@@ -20,20 +125,7 @@ pub fn check_folder_completeness<P: AsRef<Path>>(folder_path: P, required_files:
 pub fn get_osu_user_config<P: AsRef<Path>>(
     osu_folder_path: P,
 ) -> Option<std::collections::HashMap<String, String>> {
-    if !osu_folder_path.as_ref().exists() {
-        return None;
-    }
-
-    let current_user = std::env::var("USERNAME")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_else(|_| "Admin".to_string());
-    let osu_config_path = osu_folder_path
-        .as_ref()
-        .join(format!("osu!.{}.cfg", current_user));
-    println!("Looking for user config at: {:?}", osu_config_path);
-    if !osu_config_path.exists() {
-        return None;
-    }
+    let osu_config_path = find_osu_user_config_path(osu_folder_path)?;
 
     let mut config_map = std::collections::HashMap::new();
     if let Ok(contents) = std::fs::read_to_string(osu_config_path) {
@@ -44,21 +136,15 @@ pub fn get_osu_user_config<P: AsRef<Path>>(
         }
     }
 
-    return Some(config_map);
+    Some(config_map)
 }
 
 pub fn set_osu_user_config_vals(
     osu_folder_path: &str,
     key_values: &[(&str, Option<&str>)],
 ) -> Result<bool, String> {
-    let current_user = std::env::var("USERNAME")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_else(|_| "Admin".to_string());
-    let osu_config_path = Path::new(osu_folder_path).join(format!("osu!.{}.cfg", current_user));
-
-    if !osu_config_path.exists() {
-        return Err("osu! user config file does not exist".to_string());
-    }
+    let osu_config_path = find_osu_user_config_path(osu_folder_path)
+        .ok_or_else(|| "osu! user config file does not exist".to_string())?;
 
     let mut lines = fs::read_to_string(&osu_config_path)
         .map_err(|e| e.to_string())?
@@ -178,7 +264,7 @@ pub fn get_osu_config<P: AsRef<Path>>(
     return Some(config_map);
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub fn get_osuwinello_path() -> Option<PathBuf> {
     let mut search_paths =
         std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).collect::<Vec<_>>();
@@ -203,22 +289,22 @@ pub fn get_osuwinello_path() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn get_osuwinello_path() -> Option<PathBuf> {
     None
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub fn is_osuwinello_available() -> bool {
     get_osuwinello_path().is_some()
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn is_osuwinello_available() -> bool {
     false
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub fn is_wmctrl_available() -> bool {
     use std::process::Command;
     Command::new("wmctrl")
@@ -229,12 +315,12 @@ pub fn is_wmctrl_available() -> bool {
         .is_ok()
 }
 
-#[cfg(windows)]
+#[cfg(not(target_os = "linux"))]
 pub fn is_wmctrl_available() -> bool {
     false
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 pub fn get_window_title_by_pid(target_pid: Pid) -> String {
     use std::process::Command;
     let find_title = || -> Option<String> {
@@ -264,6 +350,11 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
     };
 
     find_title().unwrap_or_default()
+}
+
+#[cfg(target_os = "macos")]
+pub fn get_window_title_by_pid(_pid: Pid) -> String {
+    String::new()
 }
 
 #[cfg(windows)]
@@ -330,11 +421,16 @@ pub async fn is_net8_installed() -> bool {
     match output_result {
         Ok(output) => {
             if !output.status.success() {
-                eprintln!(
-                    "Error: `dotnet --list-runtimes` failed with status: {}",
+                log::warn!(
+                    target: "launcher",
+                    "`dotnet --list-runtimes` failed with status: {}",
                     output.status
                 );
-                eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+                log::warn!(
+                    target: "launcher",
+                    "dotnet stderr: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
                 return false;
             }
 

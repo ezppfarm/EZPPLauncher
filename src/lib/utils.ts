@@ -163,7 +163,9 @@ export function trackMediaContainer(node: HTMLElement) {
   const media = new Set<HTMLMediaElement>();
 
   function update() {
-    custom_theme_audio_playing.set(Array.from(media).some((el) => !el.paused));
+    custom_theme_audio_playing.set(
+      Array.from(media).some((el) => !el.paused && !(el instanceof HTMLVideoElement && el.muted))
+    );
   }
 
   function register(el: HTMLMediaElement) {
