@@ -25,12 +25,19 @@
     platform,
     presenceLoading,
     setupValues,
+    theme_reload_token,
     trackingEnabled,
   } from '$lib/global';
   import { initLogging } from '$lib/logging';
   import { exit, getLauncherVersion, getPlatform, setLoggingEnabled } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
-  import { smoothThemeMedia, themeMediaPreparing, themeMediaStatus } from '$lib/themeMedia';
+  import {
+    smoothThemeMedia,
+    themeMediaPreparing,
+    themeMediaStatus,
+    themeMediaSuspended,
+    themeMediaSuspension,
+  } from '$lib/themeMedia';
   import { isThemeTrusted } from '$lib/themeTrust';
   import { themeV2Css } from '$lib/themeV2';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
@@ -43,14 +50,19 @@
   } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import '../app.css';
+  import { listen } from '@tauri-apps/api/event';
+  import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { Buffer } from 'buffer';
   import { SemVer } from 'semver';
   import { sileo } from 'sileo';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { fade } from 'svelte/transition';
 
   let { children } = $props();
+
+  let unlistenEditorState: (() => void) | undefined;
+  onDestroy(() => unlistenEditorState?.());
 
   if (browser) initLogging();
 
@@ -109,6 +121,19 @@
 
   onMount(async () => {
     if (editorWindow) return;
+
+    // The editor is a separate WebView, so the launcher cannot observe its
+    // focus directly. Native code emits this state when the window is created
+    // or destroyed, and the launcher pauses its own theme media while it is
+    // open so both previews cannot play over each other.
+    try {
+      unlistenEditorState = await listen<boolean>('theme-editor-state', (event) => {
+        themeMediaSuspended.set(event.payload === true);
+      });
+      if (await WebviewWindow.getByLabel('theme-editor')) themeMediaSuspended.set(true);
+    } catch (error) {
+      console.warn('Could not sync the theme editor media state', error);
+    }
 
     window.Buffer = Buffer;
 
@@ -325,7 +350,7 @@
     </AlertDialog.Content>
   </AlertDialog.Root>
 
-  <main>
+  <main use:themeMediaSuspension>
     <div class:hidden={!!$active_custom_theme?.definition}>
       <div class="opacity-30">
         <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>
@@ -345,10 +370,12 @@
     </div>
     {#if $active_custom_theme?.definition}
       <div class="absolute inset-0 z-0">
-        <ThemeV2Background
-          definition={$active_custom_theme.definition}
-          assets={$active_custom_theme.assets}
-        />
+        {#key $theme_reload_token}
+          <ThemeV2Background
+            definition={$active_custom_theme.definition}
+            assets={$active_custom_theme.assets}
+          />
+        {/key}
       </div>
     {/if}
     {@render children()}

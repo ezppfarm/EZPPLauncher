@@ -24,8 +24,8 @@ It enhances the osu! experience with quality-of-life features and integration sp
 - [x] Discord Rich Presence
 - [x] Performance Display Overlay (currently in experimental patcher release stream)
 - [x] Launcher Theming (API 1.0 bundles and API 2.0 declarative themes)
-- [x] Advanced theme editor in its own window with freeform text/image/video/shape layers, multi-select and snapping, layer locks, draft recovery, validation and export
-- [x] Theme update backups with one-click rollback, plus a trust prompt before running executable API 1.0 themes
+- [x] Advanced theme editor in its own window with freeform text/image/video/shape layers, custom Svelte 5 component layers with Monaco editing and inline compiler diagnostics, gradient/outline/shadow text effects, multi-select and snapping, a drag-and-drop layer tree with moves into and out of nested groups, layer/group transforms with independent X/Y scale and skew, hover group breadcrumbs, on-canvas layer/group rotate handles plus group move and scale handles, layer/group-linked WHEN/IF/THEN logic with quick navigation, safe advanced rule scripts with expressions, branches and loops, draft recovery, validation and export
+- [x] Theme update backups with one-click rollback, plus a trust prompt before running executable API 1.0 themes or API 2.0 themes with custom Svelte layers
 - [x] In-app diagnostics for osu!, Wine, the patcher, and the experimental stream's .NET 8 runtime, plus a log-bundle viewer
 
 ---
@@ -141,8 +141,23 @@ in two ways:
 
 - Use the built-in **advanced editor** on the Themes screen. It opens in its own
   resizable window with a full launcher home canvas, freeform text/image/video/shape
-  layers, WebM support, `@fontsource` fonts and custom font imports. It creates API 2.0
-  themes and can export them as shareable `.ezpplauncher-theme` files.
+  layers, custom Svelte 5 components with a Monaco editor, rich text effects
+  (gradient fills, outlines, shadows, decoration and case), WebM support,
+  `@fontsource` fonts and custom font imports. Themes can switch the launcher
+  chrome between the bundled Lucide, Phosphor and Tabler icon families. Hover a
+  layer and click a crumb in its group path (or double-click it), then use the
+  on-canvas frame or the inspector to move, rotate, scale or skew the group.
+  Logic rules can be linked to layers or groups and edited from their inspectors.
+  Any rule can switch from the visual builder to a sandboxed JavaScript script
+  with variables, expressions, `if/else`, `for`/`while`, visibility actions and
+  navigation; scripts open in a Monaco editor with syntax highlighting,
+  completion, hover docs and inline errors, and can expand to fullscreen. Text
+  layers can display live variables with `{name}` placeholders and theme-defined
+  starting values, plus read-only clock values such as `{time}` and `{hour}` that
+  refresh every second. Scripts are compiled into a safe instruction set and run by
+  the launcher without `eval`.
+  It creates API 2.0 themes and can export them as shareable
+  `.ezpplauncher-theme` files.
 - Use the [create-ezpplauncher-theme](https://git.ez-pp.farm/EZPPFarm/create-ezpplauncher-theme)
   CLI. It supports both API 1.0 Svelte themes and API 2.0 declarative themes.
 

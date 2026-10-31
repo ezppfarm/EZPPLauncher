@@ -30,6 +30,8 @@ export const launching = writable<boolean>(false);
 export const custom_themes = writable<Theme[]>([]);
 export const custom_theme_container = writable<HTMLElement | undefined>(undefined);
 export const active_custom_theme = writable<Theme | undefined>(undefined);
+/** Incremented to remount theme media after reloading the active theme from disk. */
+export const theme_reload_token = writable(0);
 export const custom_theme_audio_playing = writable<boolean>(false);
 export const custom_theme_volume = writable<number>(0.15);
 custom_theme_volume.subscribe((val) => {

@@ -15,6 +15,7 @@ use tauri::Manager;
 use tauri::State;
 use tauri::WebviewUrl;
 use tauri::WebviewWindowBuilder;
+use tauri::WindowEvent;
 use tauri_plugin_fs::FsExt;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -1599,12 +1600,14 @@ pub fn theme_preview_url(path: String) -> Result<String, String> {
     }
 }
 
-/// Return a hardware-decodable copy of a large VP9/AV1 theme video.
+/// Return a hardware-decodable copy of a VP9/AV1 theme video.
 ///
-/// WebKit on macOS decodes VP9 in software. A 1080p 10 Mbps WebM can use
-/// enough CPU to starve the audio decoder, while H.264 is decoded by the
-/// media engine. The first playback of a large theme video is transcoded to a
-/// cached 720p H.264/AAC file; later loads return the cached URL directly.
+/// WebKit on macOS decodes VP9/AV1 in software. A 1080p WebM can use enough
+/// CPU to starve the audio decoder, while H.264 is decoded by the media
+/// engine. The first playback of an installed theme video or a video picked
+/// in the editor is transcoded to a cached 720p H.264/AAC file; later loads
+/// return the cached URL directly. Videos already encoded as H.264/HEVC, and
+/// very small clips, are left untouched.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeMediaProgress {
@@ -1614,6 +1617,12 @@ pub struct ThemeMediaProgress {
 
 #[cfg(target_os = "macos")]
 const FFMPEG_VERSION: &str = "9.0.2";
+
+/// Small clips are usually short stickers; transcoding them would cost more
+/// time and disk than it saves. Anything larger may be a 1080p VP9 stream that
+/// WebKit cannot decode smoothly in software.
+#[cfg(target_os = "macos")]
+const THEME_VIDEO_OPTIMIZE_MIN_BYTES: u64 = 2 * 1024 * 1024;
 
 #[cfg(target_os = "macos")]
 struct FfmpegBuild {
@@ -1659,7 +1668,13 @@ pub async fn optimize_theme_media(app: AppHandle, source_url: String) -> Result<
                 return Ok(source_url);
             }
         };
-        if metadata.len() < 20 * 1024 * 1024 {
+        if metadata.len() < THEME_VIDEO_OPTIMIZE_MIN_BYTES {
+            log::debug!(
+                target: "launcher",
+                "Skipping theme video optimization for {} ({} bytes)",
+                source.display(),
+                metadata.len()
+            );
             return Ok(source_url);
         }
 
@@ -2155,17 +2170,34 @@ pub async fn open_theme_editor(app: AppHandle, theme_folder: Option<String>) -> 
         let _ = window.set_focus();
         app.emit_to("theme-editor", "theme-editor-context", ())
             .map_err(|error| error.to_string())?;
+        let _ = app.emit_to("main", "theme-editor-state", true);
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(&app, "theme-editor", WebviewUrl::App("index.html".into()))
-        .title("EZPPLauncher Theme Editor")
-        .inner_size(1440.0, 900.0)
-        .min_inner_size(1100.0, 720.0)
-        .resizable(true)
-        .center()
-        .build()
-        .map_err(|error| format!("Could not open the theme editor: {error}"))?;
+    let window =
+        WebviewWindowBuilder::new(&app, "theme-editor", WebviewUrl::App("index.html".into()))
+            .title("EZPPLauncher Theme Editor")
+            .inner_size(1440.0, 900.0)
+            .min_inner_size(1100.0, 720.0)
+            .resizable(true)
+            // Tauri's native file-drop handler intercepts HTML5 drag events on
+            // macOS/WebKit. The editor only needs HTML5 drag and drop for its layer
+            // tree, while the main launcher keeps native theme-file dropping.
+            .disable_drag_drop_handler()
+            .center()
+            .build()
+            .map_err(|error| format!("Could not open the theme editor: {error}"))?;
+
+    // Pause the launcher's own theme media while the editor window exists. The
+    // editor is a separate WebView, so the launcher needs an explicit signal
+    // rather than relying on focus/blur events.
+    let main_window = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, WindowEvent::Destroyed) {
+            let _ = main_window.emit_to("main", "theme-editor-state", false);
+        }
+    });
+    let _ = app.emit_to("main", "theme-editor-state", true);
 
     Ok(())
 }
@@ -2531,6 +2563,49 @@ fn collect_theme_asset_refs(value: &Value, assets: &mut HashSet<String>) {
     }
 }
 
+fn collect_svelte_sources(value: &Value, sources: &mut Vec<String>) {
+    let Some(elements) = value.get("elements").and_then(Value::as_array) else {
+        return;
+    };
+    for element in elements {
+        if element.get("type").and_then(Value::as_str) != Some("svelte") {
+            continue;
+        }
+        if let Some(source) = element.get("source").and_then(Value::as_str) {
+            sources.push(source.to_string());
+        }
+    }
+}
+
+/// Custom Svelte layers load assets through `asset("path")`, which is not a
+/// `src` field in theme.json. Keep any asset whose relative path appears in a
+/// component source so exports do not drop files used by custom layers.
+fn collect_svelte_asset_refs(assets_root: &Path, sources: &[String], assets: &mut HashSet<String>) {
+    if sources.is_empty() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(assets_root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_svelte_asset_refs(&path, sources, assets);
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(relative) = path.strip_prefix(assets_root) else {
+            continue;
+        };
+        let key = relative.to_string_lossy().replace('\\', "/");
+        if sources.iter().any(|source| source.contains(&key)) {
+            assets.insert(key);
+        }
+    }
+}
+
 /// For API 2.0 packages, return the assets referenced by `theme.json` so an
 /// export can omit orphaned files left behind by older edits. API 1.0 themes
 /// can load assets dynamically from their bundle, so they are exported whole.
@@ -2547,6 +2622,13 @@ fn referenced_theme_assets(theme_json: &Path) -> Option<HashSet<String>> {
     // `preview` is omitted from theme.json.
     assets.insert("preview.png".to_string());
     collect_theme_asset_refs(&parsed, &mut assets);
+
+    if let Some(folder) = theme_json.parent() {
+        let assets_root = folder.join("assets");
+        let mut sources = Vec::new();
+        collect_svelte_sources(&parsed, &mut sources);
+        collect_svelte_asset_refs(&assets_root, &sources, &mut assets);
+    }
     Some(assets)
 }
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Ellipsis from '@lucide/svelte/icons/ellipsis';
-  import Play from '@lucide/svelte/icons/play';
+  import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
 
   const prop: {
     downloading: boolean;
@@ -8,6 +8,7 @@
     text: string;
     subtext?: string;
     disabled?: boolean;
+    iconSet?: ThemeIconSet;
     onClick?: () => void;
   } = $props();
 
@@ -66,14 +67,22 @@
     <div class="size-9 rounded-full bg-black/30 flex items-center justify-center relative z-10">
       {#if prop.downloading}
         {#if prop.progress === -1}
-          <Ellipsis class="size-4 text-primary-foreground fill-current animate-pulse" />
+          <ThemeIcon
+            name="ellipsis"
+            set={prop.iconSet ?? DEFAULT_THEME_ICON_SET}
+            class="size-4 text-primary-foreground fill-current animate-pulse"
+          />
         {:else}
           <span class="text-[10px] font-bold text-primary-foreground">
             {prop.progress.toFixed()}
           </span>
         {/if}
       {:else}
-        <Play class="size-4 text-primary-foreground fill-current ml-0.5" />
+        <ThemeIcon
+          name="launch"
+          set={prop.iconSet ?? DEFAULT_THEME_ICON_SET}
+          class="size-4 text-primary-foreground fill-current ml-0.5"
+        />
       {/if}
     </div>
   </div>

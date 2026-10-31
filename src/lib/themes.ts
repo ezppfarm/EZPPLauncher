@@ -457,18 +457,18 @@ export const deleteTheme = async (themeToUninstall: Theme) => {
     return false;
   }
   patchTheme(themeToUninstall.name, (current) => ({ ...current, status: 'deleting' }));
-  await fs.remove(themeFolder, { recursive: true });
+  try {
+    await fs.remove(themeFolder, { recursive: true });
+  } catch (error) {
+    patchTheme(themeToUninstall.name, (current) => ({ ...current, status: 'installed' }));
+    throw error;
+  }
 
-  patchTheme(themeToUninstall.name, (current) => ({
-    ...current,
-    scriptUrl: '',
-    cssStyle: '',
-    assets: '',
-    definition: undefined,
-    preview: `${THEME_REPOSITORY}/raw/branch/main/previews/${toSafeName(themeToUninstall.name)}.png`,
-    status: 'not-installed',
-    updateAvailable: false,
-  }));
+  // Remove the local card entirely, then let reloadThemes add it back as a
+  // downloadable theme only when the repository actually offers it. Marking
+  // local-only themes as "not-installed" left them stuck in the gallery with
+  // an unusable Download Theme button.
+  custom_themes.update((themes) => themes.filter((theme) => theme.name !== themeToUninstall.name));
 
   await reloadThemes();
   return true;

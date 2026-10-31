@@ -1,41 +1,61 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
+  import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeV2Background from '$lib/components/theme/ThemeV2Background.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
-  import { fontStack } from '$lib/themeFonts';
-  import { readableTextColor, themeFontFaceCss, type ThemeV2Definition } from '$lib/themeV2';
-  import { Brush, House, Music, Paintbrush, Play, Settings, User, Wifi } from '@lucide/svelte';
+  import { scopeThemeCss } from '$lib/themeCssScope';
+  import { fontStack, monoFontStack } from '$lib/themeFonts';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
+  import {
+    readableTextColor,
+    themeFontFaceCss,
+    type ThemeV2Definition,
+    type ThemeV2Group,
+    type ThemeV2ScriptValue,
+  } from '$lib/themeV2';
 
   let {
     definition,
     assets = '',
     assetOverrides = {},
     selectedIds = [],
+    selectedGroupId,
     interactive = false,
     scale = 1,
+    variables = {},
     onselect,
     onselectmany,
+    onselectgroup,
     onmove,
     onpatch,
+    onpatchgroup,
     oncontext,
+    oncontextgroup,
   }: {
     definition: ThemeV2Definition;
     assets?: string;
     assetOverrides?: Record<string, string>;
     selectedIds?: string[];
+    selectedGroupId?: string;
     interactive?: boolean;
     scale?: number;
+    variables?: Record<string, ThemeV2ScriptValue>;
     onselect?: (id: string | undefined, additive?: boolean) => void;
     onselectmany?: (ids: string[], additive?: boolean) => void;
+    onselectgroup?: (id: string) => void;
     onmove?: (updates: { id: string; x: number; y: number }[]) => void;
     onpatch?: (id: string, patch: Record<string, unknown>) => void;
+    onpatchgroup?: (id: string, patch: Partial<ThemeV2Group>) => void;
     oncontext?: (id: string | undefined, event: MouseEvent) => void;
+    oncontextgroup?: (id: string, event: MouseEvent) => void;
   } = $props();
 
   const bodyFont = $derived(definition.typography?.body);
   const headingFont = $derived(definition.typography?.heading);
+  const monoFont = $derived(definition.typography?.mono);
   const accent = $derived(definition.accentColor?.trim() || '#ff006e');
   const accentText = $derived(readableTextColor(accent));
+  const iconSet = $derived(definition.iconSet ?? DEFAULT_THEME_ICON_SET);
   const stageStyle = $derived(
     [
       `font-family:${fontStack(bodyFont)}`,
@@ -46,17 +66,19 @@
       `--color-primary-foreground:${accentText}`,
       `--color-primary-500:${accent}`,
       `--color-ring:${accent}`,
+      `--font-mono:${monoFontStack(monoFont)}`,
     ].join(';')
   );
   const fontFaces = $derived(themeFontFaceCss(definition, assets, assetOverrides));
+  const customCss = $derived(scopeThemeCss(definition.css, '.theme-stage'));
   const elements = $derived(definition.elements ?? []);
 </script>
 
 <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-{@html `<style>${fontFaces}</style>`}
+{@html `<style>${fontFaces}\n${customCss}</style>`}
 
 <div
-  class="theme-stage relative h-[650px] w-[1000px] overflow-hidden bg-theme-950 text-theme-50"
+  class="theme-stage dark relative h-[650px] w-[1000px] overflow-hidden bg-theme-950 text-theme-50"
   style={stageStyle}
   role="presentation"
 >
@@ -75,24 +97,24 @@
         3.2.7
       </span>
       <div
-        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] bg-primary/50 p-3 ring-1 ring-inset ring-white/15"
+        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] bg-primary p-3 text-primary-foreground ring-1 ring-inset ring-white/15"
       >
-        <House class="size-5 text-theme-200" />
+        <ThemeIcon name="home" set={iconSet} class="size-5" />
       </div>
       <div
-        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] border border-black/20 bg-black/20 p-3 ring-1 ring-inset ring-white/15"
+        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] border border-black/20 bg-black/20 p-3 text-theme-200 ring-1 ring-inset ring-white/15"
       >
-        <Paintbrush class="size-5 text-theme-200" />
+        <ThemeIcon name="themes" set={iconSet} class="size-5" />
       </div>
       <div
-        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] border border-black/20 bg-black/20 p-3 ring-1 ring-inset ring-white/15"
+        class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] border border-black/20 bg-black/20 p-3 text-theme-200 ring-1 ring-inset ring-white/15"
       >
-        <Settings class="size-5 text-theme-200" />
+        <ThemeIcon name="settings" set={iconSet} class="size-5" />
       </div>
       <div
         class="mt-auto flex size-10 items-center justify-center overflow-hidden rounded-full bg-theme-900"
       >
-        <User class="size-5 text-muted-foreground" />
+        <ThemeIcon name="user" set={iconSet} class="size-5 text-muted-foreground" />
       </div>
     </aside>
 
@@ -139,15 +161,15 @@
       >
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
-            <Music class="size-3.5 text-blue-400" />
+            <ThemeIcon name="music" set={iconSet} class="size-3.5 text-blue-400" />
             <span class="text-[11px] font-medium text-white/70">1.2k</span>
           </div>
           <div class="flex items-center gap-2">
-            <Brush class="size-3.5 text-amber-400" />
+            <ThemeIcon name="brush" set={iconSet} class="size-3.5 text-amber-400" />
             <span class="text-[11px] font-medium text-white/70">42</span>
           </div>
           <div class="flex items-center gap-2">
-            <Wifi class="size-3.5 text-emerald-400" />
+            <ThemeIcon name="wifi" set={iconSet} class="size-3.5 text-emerald-400" />
             <span class="text-[11px] font-medium text-white/70">19ms</span>
           </div>
           <div class="h-4 w-px bg-white/10"></div>
@@ -172,7 +194,11 @@
             <div
               class="relative z-10 flex size-9 items-center justify-center rounded-full bg-black/30"
             >
-              <Play class="ml-0.5 size-4 fill-current text-primary-foreground" />
+              <ThemeIcon
+                name="launch"
+                set={iconSet}
+                class="ml-0.5 size-4 fill-current text-primary-foreground"
+              />
             </div>
           </div>
           <div class="w-52 pl-1 pr-6 text-center">
@@ -185,15 +211,26 @@
 
   <ThemeV2Elements
     {elements}
+    groups={definition.groups}
     {assets}
     {assetOverrides}
+    themeName={definition.name}
+    themeAuthor={definition.author}
+    themeVersion={definition.version}
+    accentColor={definition.accentColor}
+    {iconSet}
     {interactive}
     {selectedIds}
+    {selectedGroupId}
     {scale}
+    {variables}
     {onselect}
     {onselectmany}
+    {onselectgroup}
     {onmove}
     {onpatch}
+    {onpatchgroup}
     {oncontext}
+    {oncontextgroup}
   />
 </div>

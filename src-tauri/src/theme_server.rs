@@ -134,8 +134,9 @@ pub fn media_root() -> Result<PathBuf, String> {
         .map_err(|error| format!("Failed to resolve the theme media cache: {error}"))
 }
 
-/// Map a loopback theme URL back to the file it serves. Only paths inside the
-/// configured themes folder are accepted.
+/// Map a loopback theme URL back to the file it serves. Installed theme files
+/// are restricted to the themes folder; editor preview URLs must match a token
+/// registered through `preview_url`.
 pub fn resolve_theme_url(value: &str) -> Option<PathBuf> {
     let server = SERVER.get()?;
     let url = url::Url::parse(value).ok()?;
@@ -149,8 +150,16 @@ pub fn resolve_theme_url(value: &str) -> Option<PathBuf> {
     let path = percent_encoding::percent_decode_str(url.path())
         .decode_utf8_lossy()
         .to_string();
-    let relative = path.strip_prefix("/themes/")?;
-    safe_path(&server.root, relative)
+    if let Some(relative) = path.strip_prefix("/themes/") {
+        return safe_path(&server.root, relative);
+    }
+
+    let token = path.strip_prefix("/preview/")?;
+    server
+        .previews
+        .lock()
+        .ok()
+        .and_then(|previews| previews.get(token).cloned())
 }
 
 /// Public URL for a file in the optimized media cache.

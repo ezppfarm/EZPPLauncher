@@ -4,6 +4,7 @@
   import { ezppfarm } from '$lib/api/ezpp';
   import DiagnosticsPanel from '$lib/components/diagnostics/DiagnosticsPanel.svelte';
   import LogViewer from '$lib/components/logs/LogViewer.svelte';
+  import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import * as Avatar from '$lib/components/ui/avatar';
@@ -51,6 +52,7 @@
     serverConnectionFails,
     serverPing,
     skinsCount,
+    theme_reload_token,
     trackingEnabled,
   } from '$lib/global';
   import {
@@ -84,8 +86,24 @@
     stopOpenTabletDriver,
   } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
-  import { isThemeTrusted, trustTheme } from '$lib/themeTrust';
-  import { themeAssetUrl, themeV2ThumbnailStyle } from '$lib/themeV2';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
+  import { themeMediaSuspended } from '$lib/themeMedia';
+  import {
+    loadThemeScript,
+    setThemeScriptHandlers,
+    setThemeScriptScreen,
+    stopThemeScript,
+    themeScriptState,
+    triggerThemeScriptElement,
+  } from '$lib/themeScript';
+  import { isThemeTrusted, themeCodeKind, trustTheme } from '$lib/themeTrust';
+  import {
+    themeAssetUrl,
+    themeV2ThumbnailStyle,
+    type ThemeV2ButtonAction,
+    type ThemeV2Definition,
+    type ThemeV2ScriptScreen,
+  } from '$lib/themeV2';
   import {
     checkThemeFromFile,
     deleteTheme,
@@ -124,44 +142,6 @@
     setCurrentTimeGlobalMedia,
     urlIsValidImage,
   } from '$lib/utils';
-  import {
-    AlertTriangle,
-    Eye,
-    EyeOff,
-    History,
-    Info,
-    LoaderCircle,
-    Music,
-    Wifi,
-    WifiOff,
-    Drum,
-    Cherry,
-    Piano,
-    Circle,
-    LogOut,
-    LogIn,
-    Brush,
-    ArrowRight,
-    Settings,
-    House,
-    LayoutGrid,
-    Paintbrush,
-    Trash,
-    CloudDownload,
-    Import,
-    Plus,
-    Pencil,
-    RefreshCw,
-    FolderOpen,
-    Search,
-    Gamepad2,
-    HardDrive,
-    Palette,
-    Plug,
-    ScrollText,
-    ShieldCheck,
-    Wrench,
-  } from '@lucide/svelte';
   import NumberFlow from '@number-flow/svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -176,59 +156,67 @@
   import { TextMorph } from 'torph/svelte';
 
   let selectedView = $state<LaunchView>('HOME');
+  let pendingExternalUrl = $state<string | undefined>(undefined);
+  const iconSet = $derived($active_custom_theme?.definition?.iconSet ?? DEFAULT_THEME_ICON_SET);
 
   const settingsTabs = [
     {
       id: 'gameplay',
       label: 'Gameplay',
       description: 'Patching behavior and the patcher release stream.',
-      icon: Gamepad2,
+      icon: 'gameplay',
     },
     {
       id: 'appearance',
       label: 'Appearance',
       description: 'Cursor, motion and animation preferences.',
-      icon: Palette,
+      icon: 'themes',
     },
     {
       id: 'integrations',
       label: 'Integrations',
       description: 'Discord presence and anonymous usage tracking.',
-      icon: Plug,
+      icon: 'integrations',
     },
     {
       id: 'installation',
       label: 'Installation',
       description: 'osu! location and platform-specific tools.',
-      icon: HardDrive,
+      icon: 'installation',
     },
     {
       id: 'diagnostics',
       label: 'Diagnostics',
       description: 'Installation health, Wine, FFmpeg and dependencies.',
-      icon: ShieldCheck,
+      icon: 'diagnostics',
     },
     {
       id: 'logging',
       label: 'Logging',
       description: 'Log capture, rotation and support bundles.',
-      icon: ScrollText,
+      icon: 'logs',
     },
   ] as const;
   type SettingsTab = (typeof settingsTabs)[number]['id'];
 
   let activeSettingsTab = $state<SettingsTab>('gameplay');
 
+  const sidebarButtonClass = (view: LaunchView) =>
+    `flex size-12 items-center gap-2 rounded-[0.85rem] p-3 mt-3 ring-1 ring-inset ring-white/15 transition-colors ${
+      selectedView === view
+        ? 'bg-primary text-primary-foreground'
+        : 'border-black/20 bg-black/20 text-theme-200 hover:bg-primary/20 hover:text-theme-50'
+    }`;
+
   const settingsTabClass = (id: SettingsTab) =>
-    `group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+    `flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[11px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
       activeSettingsTab === id
-        ? 'bg-theme-800/70 text-theme-50'
-        : 'text-muted-foreground hover:bg-theme-900/50 hover:text-theme-100'
+        ? 'bg-theme-800/80 text-theme-50'
+        : 'text-muted-foreground hover:bg-theme-900/60 hover:text-theme-100'
     }`;
   const activeSettings = $derived(
     settingsTabs.find((tab) => tab.id === activeSettingsTab) ?? settingsTabs[0]
   );
-  const ActiveSettingsIcon = $derived(activeSettings.icon);
 
   let progress = $state(-1);
   let launchInfo = $state('');
@@ -276,41 +264,39 @@
   let themeSearch = $state('');
   let themeSavedUnlisten: (() => void) | undefined;
   let refreshingThemes = $state(false);
+  let reloadingActiveTheme = $state(false);
   let revealedNsfw = $state<string[]>([]);
   let trustDialogTheme = $state<Theme | undefined>(undefined);
+  let trustDialogEditor = $state(false);
+  const trustDialogCode = $derived(trustDialogTheme ? themeCodeKind(trustDialogTheme) : 'none');
+  const requestThemeTrust = (theme: Theme, forEditor = false) => {
+    trustDialogEditor = forEditor;
+    trustDialogTheme = theme;
+  };
+  const dismissThemeTrust = () => {
+    trustDialogTheme = undefined;
+    trustDialogEditor = false;
+  };
   let restoreCandidate = $state<{ theme: Theme; backup: ThemeBackup } | undefined>(undefined);
   let restoringTheme = $state(false);
   let logViewerOpen = $state(false);
 
   const themeFilterOptions = [
-    { id: 'all', label: 'All themes', icon: LayoutGrid },
-    { id: 'installed', label: 'Installed', icon: HardDrive },
-    { id: 'available', label: 'Available', icon: CloudDownload },
-    { id: 'updates', label: 'Updates', icon: RefreshCw },
+    { id: 'all', label: 'All themes', icon: 'all-themes' },
+    { id: 'installed', label: 'Installed', icon: 'installed' },
+    { id: 'available', label: 'Available', icon: 'available' },
+    { id: 'updates', label: 'Updates', icon: 'updates' },
   ] as const;
   type ThemeFilter = (typeof themeFilterOptions)[number]['id'];
 
   let themeFilter = $state<ThemeFilter>('all');
 
   const themeFilterClass = (id: ThemeFilter) =>
-    `group relative flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+    `flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
       themeFilter === id
-        ? 'bg-theme-800/70 text-theme-50'
-        : 'text-muted-foreground hover:bg-theme-900/50 hover:text-theme-100'
+        ? 'bg-theme-800/80 text-theme-50'
+        : 'text-muted-foreground hover:bg-theme-900/60 hover:text-theme-100'
     }`;
-
-  const activeThemeFilter = $derived(
-    themeFilterOptions.find((option) => option.id === themeFilter) ?? themeFilterOptions[0]
-  );
-
-  const themeFilterDescription = $derived(
-    {
-      all: 'Everything installed or ready to download.',
-      installed: 'The themes saved on this device.',
-      available: 'Gallery themes you have not installed yet.',
-      updates: 'Installed themes with a newer release waiting.',
-    }[themeFilter]
-  );
 
   /** A theme is local while installed, being removed, or updating in place. */
   const themeIsInstalled = (theme: Theme) =>
@@ -372,12 +358,23 @@
   };
 
   const openThemeEditor = async (theme?: Theme) => {
+    // Opening the editor mounts the theme's layers, so an untrusted theme
+    // must pass the same approval gate as activating it.
+    if (theme && !isThemeTrusted(theme)) {
+      requestThemeTrust(theme, true);
+      return;
+    }
+
+    // Pause immediately instead of waiting for the native window event, so
+    // the launcher track cannot bleed into the editor while its window opens.
+    themeMediaSuspended.set(true);
     try {
       const themeFolder = theme
         ? await path.join(await themesDirectory(), theme.folder_name)
         : null;
       await invoke('open_theme_editor', { themeFolder });
     } catch (error) {
+      themeMediaSuspended.set(false);
       console.error(error);
       sileo.error({
         title: 'Could not open the theme editor',
@@ -414,7 +411,7 @@
       const updatedTheme = get(custom_themes).find((candidate) => candidate.name === theme.name);
       if (updatedTheme) {
         if (!isThemeTrusted(updatedTheme)) {
-          trustDialogTheme = updatedTheme;
+          requestThemeTrust(updatedTheme);
         } else {
           await applyInstalledTheme(updatedTheme);
         }
@@ -448,7 +445,7 @@
     }
 
     if (!isThemeTrusted(theme)) {
-      trustDialogTheme = theme;
+      requestThemeTrust(theme);
       return;
     }
 
@@ -458,22 +455,95 @@
   const confirmThemeTrust = async () => {
     const theme = trustDialogTheme;
     if (!theme) return;
+    const openEditorAfterTrust = trustDialogEditor;
     trustTheme(theme);
-    trustDialogTheme = undefined;
+    dismissThemeTrust();
+    if (openEditorAfterTrust) {
+      await openThemeEditor(theme);
+      return;
+    }
     await applyInstalledTheme(theme);
   };
 
   const applySavedTheme = async (folderName: string) => {
+    // Saving an edit must not activate the theme. Only refresh the launcher's
+    // copy when the saved theme was already the active one.
+    const wasActive = $active_custom_theme?.folder_name === folderName;
     await reloadThemes();
+    if (!wasActive) return;
+
     const savedTheme = get(custom_themes).find((theme) => theme.folder_name === folderName);
     if (!savedTheme) return;
 
-    if (!isThemeTrusted(savedTheme)) {
-      trustDialogTheme = savedTheme;
-      return;
-    }
+    const reloadVersion = Date.now();
+    const themeToApply = savedTheme.definition
+      ? {
+          ...savedTheme,
+          assets: savedTheme.assets
+            ? `${savedTheme.assets}${savedTheme.assets.includes('?') ? '&' : '?'}v=${reloadVersion}`
+            : savedTheme.assets,
+        }
+      : savedTheme;
 
-    await applyInstalledTheme(savedTheme);
+    await applyInstalledTheme(themeToApply);
+    theme_reload_token.update((value) => value + 1);
+  };
+
+  const reloadActiveTheme = async () => {
+    if (reloadingActiveTheme) return;
+    const active = $active_custom_theme;
+    if (!active) return;
+
+    reloadingActiveTheme = true;
+    try {
+      await reloadThemes();
+      // The user may have switched themes while the theme list was reloading.
+      if ($active_custom_theme?.folder_name !== active.folder_name) return;
+
+      const refreshed = get(custom_themes).find(
+        (theme) => theme.folder_name === active.folder_name
+      );
+      if (!refreshed) {
+        sileo.error({
+          title: 'Theme not found',
+          description: `"${active.name}" is no longer installed.`,
+        });
+        return;
+      }
+
+      if (!isThemeTrusted(refreshed)) {
+        requestThemeTrust(refreshed);
+        return;
+      }
+
+      // Re-request v2 theme assets under a fresh URL so the WebView cannot
+      // keep serving a file that changed on disk. API 1.0 bundles use their
+      // own container and must not receive a query string in the assets path.
+      const reloadVersion = Date.now();
+      const themeToApply = refreshed.definition
+        ? {
+            ...refreshed,
+            assets: refreshed.assets
+              ? `${refreshed.assets}${refreshed.assets.includes('?') ? '&' : '?'}v=${reloadVersion}`
+              : refreshed.assets,
+          }
+        : refreshed;
+
+      await applyInstalledTheme(themeToApply);
+      theme_reload_token.update((value) => value + 1);
+      sileo.success({
+        title: 'Theme reloaded',
+        description: `"${refreshed.name}" was reloaded from disk.`,
+      });
+    } catch (error) {
+      console.error(error);
+      sileo.error({
+        title: 'Could not reload the theme',
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      reloadingActiveTheme = false;
+    }
   };
 
   const requestThemeRestore = (theme: Theme, backup: ThemeBackup) => {
@@ -494,7 +564,7 @@
       const restoredTheme = get(custom_themes).find((candidate) => candidate.name === theme.name);
       if (wasActive && restoredTheme) {
         if (!isThemeTrusted(restoredTheme)) {
-          trustDialogTheme = restoredTheme;
+          requestThemeTrust(restoredTheme);
         } else {
           await applyInstalledTheme(restoredTheme);
         }
@@ -1050,6 +1120,74 @@
     }
   };
 
+  setThemeScriptHandlers({
+    navigate: (screen) => {
+      selectedView = screen.toUpperCase() as LaunchView;
+    },
+    launch: () => {
+      void launch();
+    },
+    openUrl: (url) => {
+      if (pendingExternalUrl) return;
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          pendingExternalUrl = parsed.toString();
+        }
+      } catch {
+        // The rule normalizer already drops malformed and non-web URLs.
+      }
+    },
+  });
+
+  const handleThemeButtonAction = (action: ThemeV2ButtonAction) => {
+    if (action.type === 'navigate') {
+      selectedView = action.screen.toUpperCase() as LaunchView;
+      return;
+    }
+    if (action.type === 'launch') {
+      void launch();
+      return;
+    }
+    if (pendingExternalUrl) return;
+    try {
+      const parsed = new URL(action.url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        pendingExternalUrl = parsed.toString();
+      }
+    } catch {
+      // Theme actions are normalized to http(s) when the theme loads.
+    }
+  };
+
+  let scriptDefinition: ThemeV2Definition | undefined;
+
+  $effect(() => {
+    const next = $active_custom_theme?.definition;
+    if (next === scriptDefinition) return;
+    scriptDefinition = next;
+    pendingExternalUrl = undefined;
+    loadThemeScript(next);
+  });
+
+  $effect(() => {
+    setThemeScriptScreen(selectedView.toLowerCase() as ThemeV2ScriptScreen);
+  });
+
+  async function confirmExternalUrl() {
+    const url = pendingExternalUrl;
+    pendingExternalUrl = undefined;
+    if (!url) return;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+      await openURL(parsed.toString());
+    } catch (error) {
+      console.error(error);
+      sileo.error({ title: 'Could not open the website' });
+    }
+  }
+
   let username = $state('');
   let password = $state('');
   let loginIsLoading = $state(false);
@@ -1239,6 +1377,7 @@
     return () => {
       window.clearInterval(animateInterval);
       themeSavedUnlisten?.();
+      stopThemeScript();
     };
   });
 </script>
@@ -1294,7 +1433,7 @@
         <span>{$launcherVersion}</span>
       </div>
       <div class="flex items-center justify-center">
-        <ArrowRight />
+        <ThemeIcon name="arrow-right" set={iconSet} />
       </div>
       <div class="flex flex-col items-center justify-center">
         <span class="text-sm text-muted-foreground">New Version</span>
@@ -1404,7 +1543,7 @@
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
-      <Import size={40} />
+      <ThemeIcon name="import" set={iconSet} size={40} />
       <span class="font-semibold text-xl">Update check failed</span>
     </div>
 
@@ -1445,7 +1584,7 @@
     <div
       class="flex flex-col items-center justify-center border-b border-theme-800 bg-black/40 rounded-t-lg p-3"
     >
-      <Import size={40} />
+      <ThemeIcon name="import" set={iconSet} size={40} />
       <span class="font-semibold text-xl">Import Theme</span>
     </div>
 
@@ -1517,7 +1656,7 @@
         disabled={themeInstalling}
       >
         {#if themeInstalling}
-          <LoaderCircle class="animate-spin" size={18} />
+          <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={18} />
         {:else}
           Yes, import
         {/if}
@@ -1545,23 +1684,38 @@
     <div
       class="flex flex-col items-center justify-center gap-2 border-b border-theme-800 bg-amber-500/10 rounded-t-lg p-4"
     >
-      <AlertTriangle class="size-7 text-amber-300" />
-      <span class="font-semibold text-lg">Run this theme's code?</span>
+      <ThemeIcon name="warning" set={iconSet} class="size-7 text-amber-300" />
+      <span class="font-semibold text-lg">
+        {trustDialogEditor ? 'Edit this theme?' : "Run this theme's code?"}
+      </span>
     </div>
     <div
       class="mx-3 mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100"
     >
-      <strong>{trustDialogTheme?.name}</strong> is an API 1.0 theme, so the launcher will execute
-      its bundled JavaScript. Only continue if you trust <strong>{trustDialogTheme?.author}</strong> and
-      got the theme from a source you trust. API 2.0 themes are data-only and do not need this prompt.
+      {#if trustDialogCode === 'v2-svelte'}
+        <strong>{trustDialogTheme?.name}</strong> contains a custom Svelte layer, so the launcher
+        will execute JavaScript authored by the theme. Only continue if you trust
+        <strong>{trustDialogTheme?.author}</strong>
+        and got the theme from a source you trust. Other API 2.0 themes are data-only and do not need
+        this prompt.
+      {:else}
+        <strong>{trustDialogTheme?.name}</strong> is an API 1.0 theme, so the launcher will execute
+        its bundled JavaScript. Only continue if you trust
+        <strong>{trustDialogTheme?.author}</strong>
+        and got the theme from a source you trust.
+      {/if}
+      {#if trustDialogEditor}
+        <p class="mt-2">
+          The editor renders custom layers immediately, so this code starts running as soon as the
+          editor opens.
+        </p>
+      {/if}
     </div>
     <div class="flex items-center justify-center gap-3 p-4">
-      <Button variant="outline" class="min-w-28" onclick={() => (trustDialogTheme = undefined)}>
-        Cancel
-      </Button>
+      <Button variant="outline" class="min-w-28" onclick={dismissThemeTrust}>Cancel</Button>
       <Button class="min-w-28" onclick={confirmThemeTrust}>
-        <ShieldCheck class="size-4" />
-        Trust and use
+        <ThemeIcon name="diagnostics" set={iconSet} class="size-4" />
+        {trustDialogEditor ? 'Trust and edit' : 'Trust and use'}
       </Button>
     </div>
   </AlertDialog.Content>
@@ -1576,7 +1730,7 @@
     <div
       class="flex flex-col items-center justify-center gap-2 border-b border-theme-800 bg-black/40 rounded-t-lg p-4"
     >
-      <History class="size-7" />
+      <ThemeIcon name="history" set={iconSet} class="size-7" />
       <span class="font-semibold text-lg">Restore previous version?</span>
     </div>
     <div
@@ -1605,11 +1759,53 @@
       </Button>
       <Button class="min-w-28" disabled={restoringTheme} onclick={confirmThemeRestore}>
         {#if restoringTheme}
-          <LoaderCircle class="animate-spin" />
+          <ThemeIcon name="loader" set={iconSet} class="animate-spin" />
         {:else}
-          <History class="size-4" />
+          <ThemeIcon name="history" set={iconSet} class="size-4" />
         {/if}
         Restore
+      </Button>
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root open={pendingExternalUrl !== undefined}>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0 max-w-xl"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
+    <div
+      class="flex flex-col items-center justify-center gap-2 border-b border-theme-800 bg-black/40 rounded-t-lg p-4"
+    >
+      <ThemeIcon name="warning" set={iconSet} class="size-7 text-amber-300" />
+      <span class="font-semibold text-lg">Open external website?</span>
+    </div>
+    <div class="mx-3 mt-3 space-y-3">
+      <p class="text-xs leading-relaxed text-muted-foreground">
+        <strong class="text-theme-100">{$active_custom_theme?.name ?? 'The active theme'}</strong>
+        wants to open a website in your browser. Check the full address before continuing.
+      </p>
+      <div class="rounded-lg border border-theme-800 bg-black/40 p-3">
+        <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Full URL
+        </p>
+        <p class="max-h-32 overflow-auto break-all font-mono text-[11px] text-theme-100">
+          {pendingExternalUrl}
+        </p>
+      </div>
+      <p class="text-[10px] leading-relaxed text-amber-100/80">
+        Only continue if you recognize this address. Theme links never open without this
+        confirmation.
+      </p>
+    </div>
+    <div class="flex items-center justify-center gap-3 p-4">
+      <Button variant="outline" class="min-w-28" onclick={() => (pendingExternalUrl = undefined)}>
+        Cancel
+      </Button>
+      <Button class="min-w-28" onclick={confirmExternalUrl}>
+        <ThemeIcon name="arrow-right" set={iconSet} class="size-4" />
+        Open website
       </Button>
     </div>
   </AlertDialog.Content>
@@ -1625,7 +1821,7 @@
         class="w-[90vw] h-[90vh] flex flex-col items-center justify-center bg-theme-900 border border-theme-800 rounded-lg"
         transition:scale={{ start: 0.7, duration: 300 }}
       >
-        <Import size={64} />
+        <ThemeIcon name="import" set={iconSet} size={64} />
         <p>Drag and Drop a .ezpplauncher-theme file here to import</p>
       </div>
     </div>
@@ -1638,40 +1834,31 @@
     </div>
     <Badge class="text-[0.5rem] py-0 px-2">{$launcherVersion || 'dev'}</Badge>
     <Button
-      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15 {selectedView ===
-      'HOME'
-        ? 'bg-primary/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
+      class={sidebarButtonClass('HOME')}
       disabled={$launching}
       onclick={() => {
         if (!$launching) selectedView = 'HOME';
       }}
     >
-      <House class="text-theme-200 size-5!" />
+      <ThemeIcon name="home" set={iconSet} class="size-5!" />
     </Button>
     <Button
-      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
-      'THEMES'
-        ? 'bg-primary/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
+      class={sidebarButtonClass('THEMES')}
       disabled={$launching}
       onclick={() => {
         if (!$launching) selectedView = 'THEMES';
       }}
     >
-      <Paintbrush class="text-theme-200 size-5!" />
+      <ThemeIcon name="themes" set={iconSet} class="size-5!" />
     </Button>
     <Button
-      class="flex size-12 items-center gap-2 ring-1 ring-inset ring-white/15  {selectedView ===
-      'SETTINGS'
-        ? 'bg-primary/50'
-        : 'bg-black/20 border-black/20'} hover:bg-primary/50 rounded-[0.85rem] p-3 mt-3"
+      class={sidebarButtonClass('SETTINGS')}
       disabled={$launching}
       onclick={() => {
         if (!$launching) selectedView = 'SETTINGS';
       }}
     >
-      <Settings class="text-theme-200 size-5!" />
+      <ThemeIcon name="settings" set={iconSet} class="size-5!" />
     </Button>
     <div class="mt-auto">
       <DropdownMenu.Root>
@@ -1679,7 +1866,7 @@
           <Avatar.Root class="size-10">
             <Avatar.Image src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}" />
             <Avatar.Fallback class="bg-theme-900">
-              <LoaderCircle class="animate-spin" size={32} />
+              <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={32} />
             </Avatar.Fallback>
           </Avatar.Root>
         </DropdownMenu.Trigger>
@@ -1702,12 +1889,12 @@
                 selectedView = 'HOME';
               }}
             >
-              <LogOut class="size-3.5 mr-2" />
+              <ThemeIcon name="logout" set={iconSet} class="size-3.5 mr-2" />
               Logout
             </DropdownMenu.Item>
           {:else}
             <DropdownMenu.Item class="text-xs" onclick={() => (selectedView = 'LOGIN')}>
-              <LogIn class="size-3.5 mr-2" />
+              <ThemeIcon name="login" set={iconSet} class="size-3.5 mr-2" />
               Login
             </DropdownMenu.Item>
           {/if}
@@ -1733,20 +1920,20 @@
           <div class="flex items-center gap-4">
             {#if $osuInstallationPath !== ''}
               <div class="flex items-center gap-2">
-                <Music class="size-3.5 text-blue-400" />
+                <ThemeIcon name="music" set={iconSet} class="size-3.5 text-blue-400" />
                 <span class="text-[11px] text-white/70 font-medium">
                   {#if !$beatmapSets && $beatmapSets !== 0}
-                    <LoaderCircle class="animate-spin" size={12} />
+                    <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
                   {:else}
                     {numberHumanReadable($beatmapSets ?? 0)}
                   {/if}
                 </span>
               </div>
               <div class="flex items-center gap-2">
-                <Brush class="size-3.5 text-amber-400" />
+                <ThemeIcon name="brush" set={iconSet} class="size-3.5 text-amber-400" />
                 <span class="text-[11px] text-white/70 font-medium">
                   {#if !$skinsCount && $skinsCount !== 0}
-                    <LoaderCircle class="animate-spin" size={12} />
+                    <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
                   {:else}
                     {numberHumanReadable($skinsCount ?? 0)}
                   {/if}
@@ -1755,9 +1942,9 @@
             {/if}
             <div class="flex items-center gap-2">
               {#if $serverConnectionFails > 1}
-                <WifiOff class="size-3.5 text-red-400" />
+                <ThemeIcon name="wifi-off" set={iconSet} class="size-3.5 text-red-400" />
               {:else}
-                <Wifi class="size-3.5 text-emerald-400" />
+                <ThemeIcon name="wifi" set={iconSet} class="size-3.5 text-emerald-400" />
               {/if}
               <span class="relative text-[11px] text-white/70 font-medium">
                 <div
@@ -1766,7 +1953,7 @@
                     ? 'opacity-100'
                     : 'opacity-0'} transition-opacity duration-1000"
                 >
-                  <LoaderCircle class="size-3.5 animate-spin" />
+                  <ThemeIcon name="loader" set={iconSet} class="size-3.5 animate-spin" />
                 </div>
                 <div
                   class="{!$serverPing || $serverConnectionFails > 1
@@ -1791,7 +1978,7 @@
                 {#if $osuStream}
                   {releaseStreamToReadable($osuStream)}
                 {:else}
-                  <LoaderCircle class="animate-spin" size={10} />
+                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
                 {/if}
               </span>
               <span
@@ -1800,7 +1987,7 @@
                 {#if $osuBuild}
                   {$osuBuild}
                 {:else}
-                  <LoaderCircle class="animate-spin" size={10} />
+                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
                 {/if}
               </span>
               <span
@@ -1813,7 +2000,7 @@
                     {$currentSkin}
                   {/if}
                 {:else}
-                  <LoaderCircle class="animate-spin" size={10} />
+                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
                 {/if}
               </span>
             {/if}
@@ -1841,6 +2028,7 @@
                   ? 'No connection...'
                   : undefined}
             disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
+            {iconSet}
             onClick={async () => await launch()}
           />
         </div>
@@ -1861,13 +2049,18 @@
                 >
                   <div class="flex flex-row items-center gap-2">
                     {#if selectedMode === 0}
-                      <Circle size={16} class="text-theme-200" />
+                      <ThemeIcon
+                        name="osu-standard"
+                        set={iconSet}
+                        size={16}
+                        class="text-theme-200"
+                      />
                     {:else if selectedMode === 1}
-                      <Drum size={16} class="text-theme-200" />
+                      <ThemeIcon name="osu-taiko" set={iconSet} size={16} class="text-theme-200" />
                     {:else if selectedMode === 2}
-                      <Cherry size={16} class="text-theme-200" />
+                      <ThemeIcon name="osu-catch" set={iconSet} size={16} class="text-theme-200" />
                     {:else if selectedMode === 3}
-                      <Piano size={16} class="text-theme-200" />
+                      <ThemeIcon name="osu-mania" set={iconSet} size={16} class="text-theme-200" />
                     {/if}
                     {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
                   </div>
@@ -1878,13 +2071,13 @@
                     <Select.Item value={gamemode.toFixed()}>
                       <div class="flex flex-row gap-2 items-center">
                         {#if gamemod.mode === 0}
-                          <Circle size={16} />
+                          <ThemeIcon name="osu-standard" set={iconSet} size={16} />
                         {:else if gamemod.mode === 1}
-                          <Drum size={16} />
+                          <ThemeIcon name="osu-taiko" set={iconSet} size={16} />
                         {:else if gamemod.mode === 2}
-                          <Cherry size={16} />
+                          <ThemeIcon name="osu-catch" set={iconSet} size={16} />
                         {:else if gamemod.mode === 3}
-                          <Piano size={16} />
+                          <ThemeIcon name="osu-mania" set={iconSet} size={16} />
                         {/if}
                         {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
                       </div>
@@ -1914,7 +2107,7 @@
                       </div>
                     {:else}
                       <div in:fade>
-                        <LoaderCircle class="animate-spin" size={21} />
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
                       </div>
                     {/if}
                   </div>
@@ -1940,7 +2133,7 @@
                       </div>
                     {:else}
                       <div in:fade>
-                        <LoaderCircle class="animate-spin" size={21} />
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
                       </div>
                     {/if}
                   </div>
@@ -1964,7 +2157,7 @@
                       </div>
                     {:else}
                       <div in:fade>
-                        <LoaderCircle class="animate-spin" size={21} />
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
                       </div>
                     {/if}
                   </div>
@@ -1989,7 +2182,7 @@
                       </div>
                     {:else}
                       <div in:fade>
-                        <LoaderCircle class="animate-spin" size={21} />
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
                       </div>
                     {/if}
                   </div>
@@ -2046,583 +2239,535 @@
       >
         <div class="flex h-screen w-full items-center justify-center px-6 pt-10 pb-8">
           <div
-            class="flex h-full max-h-[560px] w-full max-w-4xl overflow-hidden rounded-2xl border border-theme-800/60 bg-theme-950/75 shadow-2xl backdrop-blur-xl"
+            class="flex h-full max-h-[560px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-theme-800/60 bg-theme-950/75 shadow-2xl backdrop-blur-xl"
             in:scale={{ duration: $reduceAnimations ? 0 : 260, start: 0.98, opacity: 0 }}
           >
-            <aside class="flex w-44 shrink-0 flex-col border-r border-theme-800/50 bg-black/20 p-4">
-              <header>
-                <h1 class="text-xl font-bold tracking-tight">Settings</h1>
-                <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Manage gameplay, appearance, integrations and diagnostics.
-                </p>
-                <p class="mt-3 text-[10px] text-muted-foreground/60">
-                  Changes are saved automatically.
-                </p>
-              </header>
+            <header class="shrink-0 border-b border-theme-800/50 px-5 pt-4 pb-3">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <h1 class="text-lg font-semibold tracking-tight">Settings</h1>
+                    {#if activeSettingsTab === 'logging'}
+                      <Badge variant={$loggingEnabled ? 'secondary' : 'outline'} class="text-[9px]">
+                        {$loggingEnabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    {/if}
+                  </div>
+                  <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {activeSettings.description}
+                  </p>
+                </div>
+                <div
+                  class="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 text-[10px] font-medium text-emerald-300"
+                  title="Changes are saved automatically"
+                >
+                  <ThemeIcon name="check" set={iconSet} class="size-3" />
+                  Saved automatically
+                </div>
+              </div>
 
-              <nav class="mt-5 flex flex-col gap-0.5" aria-label="Settings sections">
+              <nav class="mt-3 flex min-w-0 items-center gap-0.5" aria-label="Settings sections">
                 {#each settingsTabs as tab (tab.id)}
-                  {@const Icon = tab.icon}
                   <button
                     type="button"
                     class={settingsTabClass(tab.id)}
                     aria-current={activeSettingsTab === tab.id ? 'page' : undefined}
                     onclick={() => (activeSettingsTab = tab.id)}
                   >
-                    <span
-                      class="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-all duration-200 {activeSettingsTab ===
-                      tab.id
-                        ? 'scale-y-100 opacity-100'
-                        : 'scale-y-50 opacity-0'}"
-                    ></span>
-                    <Icon class="size-4 shrink-0" />
+                    <ThemeIcon name={tab.icon} set={iconSet} class="size-3.5 shrink-0" />
                     <span>{tab.label}</span>
                   </button>
                 {/each}
               </nav>
-            </aside>
+            </header>
 
-            <div class="flex min-h-0 min-w-0 flex-1 flex-col p-5">
-              <header class="mb-3 border-b border-theme-800/50 pb-3">
-                {#key activeSettingsTab}
-                  <div
-                    class="flex items-center gap-2"
-                    in:fly={{ duration: $reduceAnimations ? 0 : 220, y: 4, opacity: 0 }}
-                  >
-                    <span
-                      class="flex size-7 items-center justify-center rounded-md bg-theme-800/60"
-                    >
-                      <ActiveSettingsIcon class="size-4" />
-                    </span>
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <h2 class="text-base font-semibold">{activeSettings.label}</h2>
-                        {#if activeSettingsTab === 'logging'}
-                          <Badge
-                            variant={$loggingEnabled ? 'secondary' : 'outline'}
-                            class="text-[10px]"
-                          >
-                            {$loggingEnabled ? 'Enabled' : 'Disabled'}
-                          </Badge>
-                        {/if}
-                      </div>
-                      <p class="mt-0.5 text-xs text-muted-foreground">
-                        {activeSettings.description}
-                      </p>
-                    </div>
-                  </div>
-                {/key}
-              </header>
+            <div class="min-h-0 flex-1 px-5 pt-4 pb-1">
+              {#key activeSettingsTab}
+                <div
+                  class="h-full"
+                  in:fly={{ duration: $reduceAnimations ? 0 : 240, y: 8, opacity: 0 }}
+                >
+                  <ScrollContainer class="pr-2">
+                    <div class="pb-4">
+                      <div
+                        class="grid items-start gap-4 {activeSettingsTab === 'diagnostics'
+                          ? ''
+                          : 'md:grid-cols-[minmax(0,1fr)_190px]'}"
+                      >
+                        <div class="min-w-0">
+                          {#if activeSettingsTab === 'gameplay'}
+                            <section>
+                              <div
+                                class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
+                              >
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-patch">Patching</Label>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Shows misses in Relax and Autopilot.
+                                      {#if $platform === 'macos'}
+                                        Runs through your osu! Wine prefix. Only the experimental
+                                        patcher stream needs .NET 8 installed there.
+                                      {/if}
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-patch"
+                                    checked={$patch}
+                                    onCheckedChange={async (e) => {
+                                      patch.set(e);
+                                    }}
+                                    class="mt-0.5"
+                                  />
+                                </div>
 
-              <div class="min-h-0 flex-1">
-                {#key activeSettingsTab}
-                  <div
-                    class="h-full"
-                    in:fly={{ duration: $reduceAnimations ? 0 : 240, y: 8, opacity: 0 }}
-                  >
-                    <ScrollContainer class="pr-4">
-                      <div class="pb-4">
-                        <div
-                          class="grid items-start gap-4 {activeSettingsTab === 'diagnostics'
-                            ? ''
-                            : 'md:grid-cols-[minmax(0,1fr)_190px]'}"
-                        >
-                          <div class="min-w-0">
-                            {#if activeSettingsTab === 'gameplay'}
-                              <section>
-                                <div
-                                  class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
-                                >
-                                  <div class="flex items-start justify-between gap-8 py-3">
+                                {#if $platform === 'windows'}
+                                  <div class="py-3">
+                                    <Label class="text-sm">Patcher release stream</Label>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Test different versions of the patcher. The experimental
+                                      stream requires the .NET 8 Desktop Runtime; stable does not.
+                                    </p>
+                                    <Select.Root
+                                      type="single"
+                                      bind:value={$launcherStream}
+                                      onValueChange={async (newStream) => {
+                                        // Only the experimental patcher build targets .NET 8.
+                                        if (newStream === 'experimental') {
+                                          const isNet8Installed = await hasNet8();
+                                          if (!isNet8Installed) {
+                                            launcherStream.set('stable');
+                                            sileo.error({
+                                              title: 'Hmm...',
+                                              description:
+                                                '.NET 8.0 Desktop Runtime is required for the experimental patcher stream.',
+                                              button: {
+                                                title: 'Download .NET 8.0',
+                                                onClick: async () =>
+                                                  await openURL(
+                                                    'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
+                                                  ),
+                                              },
+                                            });
+                                            return;
+                                          }
+                                        }
+                                        await config.value<string>('patcherStream').set(newStream);
+                                        launcherStream.set(newStream);
+                                      }}
+                                    >
+                                      <Select.Trigger class="mt-2.5 border-theme-800 bg-theme-950">
+                                        <div
+                                          class="flex flex-row items-center gap-2 font-normal text-foreground"
+                                        >
+                                          {$launcherStream}
+                                        </div>
+                                      </Select.Trigger>
+                                      <Select.Content
+                                        class="rounded-lg border border-theme-950 bg-theme-950"
+                                      >
+                                        {#each $launcherStreams as stream (stream)}
+                                          <Select.Item value={stream}>
+                                            <div class="flex flex-row items-center gap-2">
+                                              {stream}
+                                            </div>
+                                          </Select.Item>
+                                        {/each}
+                                      </Select.Content>
+                                    </Select.Root>
+                                  </div>
+                                {/if}
+
+                                {#if $platform !== 'windows'}
+                                  <div class="flex items-start justify-between gap-6 py-3">
                                     <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-patch">Patching</Label>
+                                      <Label class="text-sm">Patcher stream</Label>
                                       <p
                                         class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
                                       >
-                                        Shows misses in Relax and Autopilot.
-                                        {#if $platform === 'macos'}
-                                          Runs through your osu! Wine prefix. Only the experimental
-                                          patcher stream needs .NET 8 installed there.
-                                        {/if}
+                                        The experimental stream is Windows-only, so
+                                        {$platform === 'macos' ? 'macOS' : 'Linux'} uses stable.
                                       </p>
                                     </div>
+                                    <Badge variant="outline">stable</Badge>
+                                  </div>
+                                {/if}
+                              </div>
+                            </section>
+                          {:else if activeSettingsTab === 'appearance'}
+                            <section>
+                              <div
+                                class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
+                              >
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-custom-cursor"
+                                      >Lazer-style cursor</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Enable a custom cursor in the launcher, like the lazer build
+                                      of osu!.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-custom-cursor"
+                                    checked={$customCursor}
+                                    onCheckedChange={async (e) => {
+                                      if (!e) {
+                                        cursorSmoothening.set(false);
+                                      }
+                                      customCursor.set(e);
+                                    }}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-cursor-smoothening"
+                                      >Cursor smoothening</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Makes the custom cursor movement smoother.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-cursor-smoothening"
+                                    checked={$cursorSmoothening}
+                                    onCheckedChange={async (e) => {
+                                      if (!$customCursor) return;
+                                      cursorSmoothening.set(e);
+                                    }}
+                                    disabled={!$customCursor}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-reduce-animations"
+                                      >Reduce animations</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Disables some launcher animations to improve performance on
+                                      low-end devices.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-reduce-animations"
+                                    checked={$reduceAnimations}
+                                    onCheckedChange={async (e) => {
+                                      reduceAnimations.set(e);
+                                    }}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+                              </div>
+                            </section>
+                          {:else if activeSettingsTab === 'integrations'}
+                            <section>
+                              <div
+                                class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
+                              >
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-rich-presence"
+                                      >Discord Rich Presence</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Let other Discord users see what you are doing right now 👀
+                                    </p>
+                                  </div>
+                                  <div class="mt-0.5 flex items-center gap-3">
+                                    {#if $presenceLoading}
+                                      <ThemeIcon
+                                        name="loader"
+                                        set={iconSet}
+                                        class="size-4 animate-spin text-muted-foreground"
+                                      />
+                                    {/if}
                                     <Checkbox
-                                      id="setting-patch"
-                                      checked={$patch}
-                                      onCheckedChange={async (e) => {
-                                        patch.set(e);
-                                      }}
-                                      class="mt-0.5"
+                                      id="setting-rich-presence"
+                                      bind:checked={$discordPresence}
+                                      disabled={$presenceLoading}
                                     />
                                   </div>
+                                </div>
 
-                                  {#if $platform === 'windows'}
-                                    <div class="py-3">
-                                      <Label class="text-sm">Patcher release stream</Label>
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Test different versions of the patcher. The experimental
-                                        stream requires the .NET 8 Desktop Runtime; stable does not.
-                                      </p>
-                                      <Select.Root
-                                        type="single"
-                                        bind:value={$launcherStream}
-                                        onValueChange={async (newStream) => {
-                                          // Only the experimental patcher build targets .NET 8.
-                                          if (newStream === 'experimental') {
-                                            const isNet8Installed = await hasNet8();
-                                            if (!isNet8Installed) {
-                                              launcherStream.set('stable');
-                                              sileo.error({
-                                                title: 'Hmm...',
-                                                description:
-                                                  '.NET 8.0 Desktop Runtime is required for the experimental patcher stream.',
-                                                button: {
-                                                  title: 'Download .NET 8.0',
-                                                  onClick: async () =>
-                                                    await openURL(
-                                                      'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-8.0.22-windows-x64-installer'
-                                                    ),
-                                                },
-                                              });
-                                              return;
-                                            }
-                                          }
-                                          await config
-                                            .value<string>('patcherStream')
-                                            .set(newStream);
-                                          launcherStream.set(newStream);
-                                        }}
-                                      >
-                                        <Select.Trigger
-                                          class="mt-2.5 border-theme-800 bg-theme-950"
-                                        >
-                                          <div
-                                            class="flex flex-row items-center gap-2 font-normal text-foreground"
-                                          >
-                                            {$launcherStream}
-                                          </div>
-                                        </Select.Trigger>
-                                        <Select.Content
-                                          class="rounded-lg border border-theme-950 bg-theme-950"
-                                        >
-                                          {#each $launcherStreams as stream (stream)}
-                                            <Select.Item value={stream}>
-                                              <div class="flex flex-row items-center gap-2">
-                                                {stream}
-                                              </div>
-                                            </Select.Item>
-                                          {/each}
-                                        </Select.Content>
-                                      </Select.Root>
-                                    </div>
-                                  {/if}
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-tracking"
+                                      >App tracking</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Allow anonymous usage data to be collected to help improve the
+                                      application.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-tracking"
+                                    checked={$trackingEnabled}
+                                    onCheckedChange={async (e) => {
+                                      trackingEnabled.set(e);
+                                      await config.value<boolean>('tracking_consent').set(e);
+                                    }}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+                              </div>
+                            </section>
+                          {:else if activeSettingsTab === 'installation'}
+                            <section>
+                              <div
+                                class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
+                              >
+                                <div class="py-3">
+                                  <Label class="text-sm" for="setting-osu-path"
+                                    >osu! installation path</Label
+                                  >
+                                  <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                    The path to your osu! installation.
+                                    {#if $platform === 'macos'}
+                                      Select your <code>osu!.app</code> bundle directly. The launcher
+                                      will locate osu! inside the Wineskin wrapper for you.
+                                    {/if}
+                                  </p>
+                                  <div class="mt-2.5 flex gap-2">
+                                    <Input
+                                      id="setting-osu-path"
+                                      class="flex-1 border-theme-800 bg-theme-950"
+                                      type="text"
+                                      value={$osuInstallationPath}
+                                      placeholder="Path to osu! installation"
+                                      readonly
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      class="shrink-0 border-theme-800 bg-theme-950"
+                                      onclick={browse_osu_installation}
+                                    >
+                                      <ThemeIcon name="folder" set={iconSet} class="size-4" />
+                                      Browse
+                                    </Button>
+                                  </div>
+                                </div>
 
-                                  {#if $platform !== 'windows'}
-                                    <div class="flex items-start justify-between gap-6 py-3">
+                                {#if $platform === 'windows'}
+                                  <div class="py-3">
+                                    <div class="flex items-start justify-between gap-8">
                                       <div class="min-w-0">
-                                        <Label class="text-sm">Patcher stream</Label>
+                                        <Label class="text-sm" for="setting-otd"
+                                          >OpenTabletDriver</Label
+                                        >
                                         <p
                                           class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
                                         >
-                                          The experimental stream is Windows-only, so
-                                          {$platform === 'macos' ? 'macOS' : 'Linux'} uses stable.
+                                          Automatically start OpenTabletDriver when launching osu!.
                                         </p>
                                       </div>
-                                      <Badge variant="outline">stable</Badge>
-                                    </div>
-                                  {/if}
-                                </div>
-                              </section>
-                            {:else if activeSettingsTab === 'appearance'}
-                              <section>
-                                <div
-                                  class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
-                                >
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-custom-cursor"
-                                        >Lazer-style cursor</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Enable a custom cursor in the launcher, like the lazer build
-                                        of osu!.
-                                      </p>
-                                    </div>
-                                    <Checkbox
-                                      id="setting-custom-cursor"
-                                      checked={$customCursor}
-                                      onCheckedChange={async (e) => {
-                                        if (!e) {
-                                          cursorSmoothening.set(false);
-                                        }
-                                        customCursor.set(e);
-                                      }}
-                                      class="mt-0.5"
-                                    />
-                                  </div>
-
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-cursor-smoothening"
-                                        >Cursor smoothening</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Makes the custom cursor movement smoother.
-                                      </p>
-                                    </div>
-                                    <Checkbox
-                                      id="setting-cursor-smoothening"
-                                      checked={$cursorSmoothening}
-                                      onCheckedChange={async (e) => {
-                                        if (!$customCursor) return;
-                                        cursorSmoothening.set(e);
-                                      }}
-                                      disabled={!$customCursor}
-                                      class="mt-0.5"
-                                    />
-                                  </div>
-
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-reduce-animations"
-                                        >Reduce animations</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Disables some launcher animations to improve performance on
-                                        low-end devices.
-                                      </p>
-                                    </div>
-                                    <Checkbox
-                                      id="setting-reduce-animations"
-                                      checked={$reduceAnimations}
-                                      onCheckedChange={async (e) => {
-                                        reduceAnimations.set(e);
-                                      }}
-                                      class="mt-0.5"
-                                    />
-                                  </div>
-                                </div>
-                              </section>
-                            {:else if activeSettingsTab === 'integrations'}
-                              <section>
-                                <div
-                                  class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
-                                >
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-rich-presence"
-                                        >Discord Rich Presence</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Let other Discord users see what you are doing right now 👀
-                                      </p>
-                                    </div>
-                                    <div class="mt-0.5 flex items-center gap-3">
-                                      {#if $presenceLoading}
-                                        <LoaderCircle
-                                          class="size-4 animate-spin text-muted-foreground"
-                                        />
-                                      {/if}
                                       <Checkbox
-                                        id="setting-rich-presence"
-                                        bind:checked={$discordPresence}
-                                        disabled={$presenceLoading}
+                                        id="setting-otd"
+                                        bind:checked={$openTabletDriverEnabled}
+                                        class="mt-0.5"
                                       />
                                     </div>
-                                  </div>
-
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-tracking"
-                                        >App tracking</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Allow anonymous usage data to be collected to help improve
-                                        the application.
-                                      </p>
-                                    </div>
-                                    <Checkbox
-                                      id="setting-tracking"
-                                      checked={$trackingEnabled}
-                                      onCheckedChange={async (e) => {
-                                        trackingEnabled.set(e);
-                                        await config.value<boolean>('tracking_consent').set(e);
-                                      }}
-                                      class="mt-0.5"
-                                    />
-                                  </div>
-                                </div>
-                              </section>
-                            {:else if activeSettingsTab === 'installation'}
-                              <section>
-                                <div
-                                  class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
-                                >
-                                  <div class="py-3">
-                                    <Label class="text-sm" for="setting-osu-path"
-                                      >osu! installation path</Label
-                                    >
-                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                                      The path to your osu! installation.
-                                      {#if $platform === 'macos'}
-                                        Select your <code>osu!.app</code> bundle directly. The launcher
-                                        will locate osu! inside the Wineskin wrapper for you.
-                                      {/if}
-                                    </p>
                                     <div class="mt-2.5 flex gap-2">
                                       <Input
-                                        id="setting-osu-path"
                                         class="flex-1 border-theme-800 bg-theme-950"
                                         type="text"
-                                        value={$osuInstallationPath}
-                                        placeholder="Path to osu! installation"
+                                        value={$openTabletDriverPath}
+                                        placeholder="Path to OpenTabletDriver.Daemon.exe"
                                         readonly
+                                        disabled={!$openTabletDriverEnabled}
                                       />
                                       <Button
                                         variant="outline"
                                         class="shrink-0 border-theme-800 bg-theme-950"
-                                        onclick={browse_osu_installation}
+                                        disabled={!$openTabletDriverEnabled}
+                                        onclick={browse_otd}
                                       >
-                                        <FolderOpen class="size-4" />
+                                        <ThemeIcon name="folder" set={iconSet} class="size-4" />
                                         Browse
                                       </Button>
                                     </div>
                                   </div>
-
-                                  {#if $platform === 'windows'}
-                                    <div class="py-3">
-                                      <div class="flex items-start justify-between gap-8">
-                                        <div class="min-w-0">
-                                          <Label class="text-sm" for="setting-otd"
-                                            >OpenTabletDriver</Label
-                                          >
-                                          <p
-                                            class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                          >
-                                            Automatically start OpenTabletDriver when launching
-                                            osu!.
-                                          </p>
-                                        </div>
-                                        <Checkbox
-                                          id="setting-otd"
-                                          bind:checked={$openTabletDriverEnabled}
-                                          class="mt-0.5"
-                                        />
-                                      </div>
-                                      <div class="mt-2.5 flex gap-2">
-                                        <Input
-                                          class="flex-1 border-theme-800 bg-theme-950"
-                                          type="text"
-                                          value={$openTabletDriverPath}
-                                          placeholder="Path to OpenTabletDriver.Daemon.exe"
-                                          readonly
-                                          disabled={!$openTabletDriverEnabled}
-                                        />
-                                        <Button
-                                          variant="outline"
-                                          class="shrink-0 border-theme-800 bg-theme-950"
-                                          disabled={!$openTabletDriverEnabled}
-                                          onclick={browse_otd}
-                                        >
-                                          <FolderOpen class="size-4" />
-                                          Browse
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  {/if}
-                                </div>
-                              </section>
-                            {:else if activeSettingsTab === 'diagnostics'}
-                              <section>
-                                <DiagnosticsPanel onRepair={openSetupWizard} />
-                              </section>
-                            {:else if activeSettingsTab === 'logging'}
-                              <section>
-                                <div
-                                  class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
-                                >
-                                  <div class="flex items-start justify-between gap-8 py-3">
-                                    <div class="min-w-0">
-                                      <Label class="text-sm" for="setting-logging"
-                                        >Save logs to disk</Label
-                                      >
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Capture launcher, osu! and patcher output. Rotated logs are
-                                        bundled into one ZIP per session, and the last five bundles
-                                        are kept.
-                                      </p>
-                                    </div>
-                                    <Checkbox
-                                      id="setting-logging"
-                                      checked={$loggingEnabled}
-                                      onCheckedChange={(enabled) => loggingEnabled.set(enabled)}
-                                      class="mt-0.5"
-                                    />
-                                  </div>
-
-                                  <div
-                                    class="flex flex-wrap items-center justify-between gap-4 py-3"
-                                  >
-                                    <div class="min-w-0">
-                                      <Label class="text-sm">Log bundles</Label>
-                                      <p
-                                        class="mt-0.5 text-xs leading-relaxed text-muted-foreground"
-                                      >
-                                        Stored in
-                                        <span class="font-mono text-[11px] text-theme-300"
-                                          >{$platform === 'windows'
-                                            ? '%USERPROFILE%\\.ezpplauncher\\logs'
-                                            : '~/.ezpplauncher/logs'}</span
-                                        >.
-                                      </p>
-                                    </div>
-                                    <div class="flex shrink-0 flex-wrap gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        class="border-theme-800 bg-theme-950"
-                                        onclick={() => (logViewerOpen = true)}
-                                      >
-                                        <ScrollText class="size-4" />
-                                        View logs
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        class="border-theme-800 bg-theme-950"
-                                        onclick={async () => {
-                                          try {
-                                            await openLogsFolder();
-                                          } catch (error) {
-                                            console.error(error);
-                                            sileo.error({
-                                              title: 'Could not open the logs folder',
-                                            });
-                                          }
-                                        }}
-                                      >
-                                        <FolderOpen class="size-4" />
-                                        Open folder
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </section>
-                            {/if}
-                          </div>
-
-                          {#if activeSettingsTab !== 'diagnostics'}
-                            <aside class="space-y-3">
-                              <div
-                                class="rounded-xl border border-theme-800/60 bg-theme-900/25 p-3.5"
-                                in:fly={{
-                                  duration: $reduceAnimations ? 0 : 240,
-                                  delay: $reduceAnimations ? 0 : 60,
-                                  y: 8,
-                                  opacity: 0,
-                                }}
-                              >
-                                <p
-                                  class="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
-                                >
-                                  <Info class="size-3.5" /> Status
-                                </p>
-                                <dl class="mt-3 space-y-2 text-[11px]">
-                                  <div class="flex items-center justify-between gap-2">
-                                    <dt class="text-muted-foreground">Launcher</dt>
-                                    <dd class="font-medium">{$launcherVersion || 'dev'}</dd>
-                                  </div>
-                                  <div class="flex items-center justify-between gap-2">
-                                    <dt class="text-muted-foreground">osu!</dt>
-                                    <dd class="truncate font-medium">
-                                      {$osuBuild || 'Not detected'}
-                                    </dd>
-                                  </div>
-                                  <div class="flex items-center justify-between gap-2">
-                                    <dt class="text-muted-foreground">Stream</dt>
-                                    <dd class="font-medium">
-                                      {$osuStream ? releaseStreamToReadable($osuStream) : '—'}
-                                    </dd>
-                                  </div>
-                                  <div class="flex items-center justify-between gap-2">
-                                    <dt class="text-muted-foreground">Patching</dt>
-                                    <dd class="font-medium {$patch ? 'text-emerald-400' : ''}">
-                                      {$patch ? 'On' : 'Off'}
-                                    </dd>
-                                  </div>
-                                </dl>
+                                {/if}
                               </div>
-
+                            </section>
+                          {:else if activeSettingsTab === 'diagnostics'}
+                            <section>
+                              <DiagnosticsPanel onRepair={openSetupWizard} />
+                            </section>
+                          {:else if activeSettingsTab === 'logging'}
+                            <section>
                               <div
-                                class="rounded-xl border border-theme-800/60 bg-theme-900/25 p-3.5"
-                                in:fly={{
-                                  duration: $reduceAnimations ? 0 : 240,
-                                  delay: $reduceAnimations ? 0 : 120,
-                                  y: 8,
-                                  opacity: 0,
-                                }}
+                                class="divide-y divide-theme-800/50 overflow-hidden rounded-xl border border-theme-800/60 bg-theme-900/25 px-4"
                               >
-                                <p
-                                  class="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
-                                >
-                                  <Wrench class="size-3.5" /> Quick actions
-                                </p>
-                                <div class="mt-2 flex flex-col gap-0.5">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
-                                    onclick={openSetupWizard}
-                                  >
-                                    <Wrench class="size-3.5" /> Repair setup
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
-                                    onclick={() => (activeSettingsTab = 'diagnostics')}
-                                  >
-                                    <ShieldCheck class="size-3.5" /> Open diagnostics
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
-                                    onclick={async () => {
-                                      try {
-                                        await openLogsFolder();
-                                      } catch (error) {
-                                        console.error(error);
-                                        sileo.error({ title: 'Could not open the logs folder' });
-                                      }
-                                    }}
-                                  >
-                                    <FolderOpen class="size-3.5" /> Open logs folder
-                                  </Button>
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-logging"
+                                      >Save logs to disk</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Capture launcher, osu! and patcher output. Rotated logs are
+                                      bundled into one ZIP per session, and the last five bundles
+                                      are kept.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-logging"
+                                    checked={$loggingEnabled}
+                                    onCheckedChange={(enabled) => loggingEnabled.set(enabled)}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-4 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm">Log bundles</Label>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Stored in
+                                      <span class="font-mono text-[11px] text-theme-300"
+                                        >{$platform === 'windows'
+                                          ? '%USERPROFILE%\\.ezpplauncher\\logs'
+                                          : '~/.ezpplauncher/logs'}</span
+                                      >.
+                                    </p>
+                                  </div>
+                                  <div class="flex shrink-0 flex-wrap gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      class="border-theme-800 bg-theme-950"
+                                      onclick={() => (logViewerOpen = true)}
+                                    >
+                                      <ThemeIcon name="logs" set={iconSet} class="size-4" />
+                                      View logs
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      class="border-theme-800 bg-theme-950"
+                                      onclick={async () => {
+                                        try {
+                                          await openLogsFolder();
+                                        } catch (error) {
+                                          console.error(error);
+                                          sileo.error({
+                                            title: 'Could not open the logs folder',
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <ThemeIcon name="folder" set={iconSet} class="size-4" />
+                                      Open folder
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
-                            </aside>
+                            </section>
                           {/if}
                         </div>
+
+                        {#if activeSettingsTab !== 'diagnostics'}
+                          <aside class="space-y-3">
+                            <div
+                              class="rounded-xl border border-theme-800/60 bg-theme-900/25 p-3.5"
+                              in:fly={{
+                                duration: $reduceAnimations ? 0 : 240,
+                                delay: $reduceAnimations ? 0 : 60,
+                                y: 8,
+                                opacity: 0,
+                              }}
+                            >
+                              <p
+                                class="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
+                              >
+                                <ThemeIcon name="info" set={iconSet} class="size-3.5" /> Status
+                              </p>
+                              <dl class="mt-3 space-y-2 text-[11px]">
+                                <div class="flex items-center justify-between gap-2">
+                                  <dt class="text-muted-foreground">Launcher</dt>
+                                  <dd class="font-medium">{$launcherVersion || 'dev'}</dd>
+                                </div>
+                                <div class="flex items-center justify-between gap-2">
+                                  <dt class="text-muted-foreground">osu!</dt>
+                                  <dd class="truncate font-medium">
+                                    {$osuBuild || 'Not detected'}
+                                  </dd>
+                                </div>
+                                <div class="flex items-center justify-between gap-2">
+                                  <dt class="text-muted-foreground">Stream</dt>
+                                  <dd class="font-medium">
+                                    {$osuStream ? releaseStreamToReadable($osuStream) : '—'}
+                                  </dd>
+                                </div>
+                                <div class="flex items-center justify-between gap-2">
+                                  <dt class="text-muted-foreground">Patching</dt>
+                                  <dd class="font-medium {$patch ? 'text-emerald-400' : ''}">
+                                    {$patch ? 'On' : 'Off'}
+                                  </dd>
+                                </div>
+                              </dl>
+                            </div>
+
+                            <div
+                              class="rounded-xl border border-theme-800/60 bg-theme-900/25 p-3.5"
+                              in:fly={{
+                                duration: $reduceAnimations ? 0 : 240,
+                                delay: $reduceAnimations ? 0 : 120,
+                                y: 8,
+                                opacity: 0,
+                              }}
+                            >
+                              <p
+                                class="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground uppercase"
+                              >
+                                <ThemeIcon name="wrench" set={iconSet} class="size-3.5" /> Quick actions
+                              </p>
+                              <div class="mt-2 flex flex-col gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
+                                  onclick={openSetupWizard}
+                                >
+                                  <ThemeIcon name="wrench" set={iconSet} class="size-3.5" /> Repair setup
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
+                                  onclick={() => (activeSettingsTab = 'diagnostics')}
+                                >
+                                  <ThemeIcon name="diagnostics" set={iconSet} class="size-3.5" /> Open
+                                  diagnostics
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  class="justify-start px-2 text-xs text-muted-foreground hover:text-theme-50"
+                                  onclick={async () => {
+                                    try {
+                                      await openLogsFolder();
+                                    } catch (error) {
+                                      console.error(error);
+                                      sileo.error({ title: 'Could not open the logs folder' });
+                                    }
+                                  }}
+                                >
+                                  <ThemeIcon name="folder" set={iconSet} class="size-3.5" /> Open logs
+                                  folder
+                                </Button>
+                              </div>
+                            </div>
+                          </aside>
+                        {/if}
                       </div>
-                    </ScrollContainer>
-                  </div>
-                {/key}
-              </div>
+                    </div>
+                  </ScrollContainer>
+                </div>
+              {/key}
             </div>
           </div>
         </div>
@@ -2671,7 +2816,7 @@
           </div>
           <Button class="w-full" type="submit" disabled={loginIsLoading}>
             {#if loginIsLoading}
-              <LoaderCircle class="animate-spin" />
+              <ThemeIcon name="loader" set={iconSet} class="animate-spin" />
             {:else}
               Login
             {/if}
@@ -2691,83 +2836,62 @@
       >
         <div class="flex h-screen w-full items-center justify-center px-6 pt-10 pb-8">
           <div
-            class="flex h-full max-h-[560px] w-full max-w-4xl overflow-hidden rounded-2xl border border-theme-800/60 bg-theme-950/75 shadow-2xl backdrop-blur-xl"
+            class="flex h-full max-h-[560px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-theme-800/60 bg-theme-950/75 shadow-2xl backdrop-blur-xl"
             in:scale={{ duration: $reduceAnimations ? 0 : 260, start: 0.98, opacity: 0 }}
           >
-            <aside
-              class="flex w-40 shrink-0 flex-col border-r border-theme-800/50 bg-black/20 p-3.5"
-            >
-              <header>
-                <h1 class="text-lg font-bold tracking-tight">Themes</h1>
-                <p class="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  Make it feel like yours.
-                </p>
-                <p class="mt-2.5 text-[10px] text-muted-foreground/60">
-                  {$custom_themes.length} theme{$custom_themes.length === 1 ? '' : 's'} in your library.
-                </p>
-              </header>
-
-              <nav class="mt-4 flex flex-col gap-0.5" aria-label="Theme filters">
-                {#each themeFilterOptions as option (option.id)}
-                  {@const Icon = option.icon}
-                  <button
-                    type="button"
-                    class={themeFilterClass(option.id)}
-                    aria-current={themeFilter === option.id ? 'page' : undefined}
-                    onclick={() => (themeFilter = option.id)}
-                  >
+            <header class="shrink-0 border-b border-theme-800/50 px-5 pt-4 pb-3">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex items-baseline gap-2">
+                    <h1 class="text-lg font-semibold tracking-tight">Themes</h1>
                     <span
-                      class="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-all duration-200 {themeFilter ===
-                      option.id
-                        ? 'scale-y-100 opacity-100'
-                        : 'scale-y-50 opacity-0'}"
-                    ></span>
-                    <Icon class="size-3.5 shrink-0" />
-                    <span class="flex-1">{option.label}</span>
-                    <span class="text-[9px] tabular-nums text-muted-foreground/70">
-                      {themeCounts[option.id]}
-                    </span>
-                  </button>
-                {/each}
-              </nav>
-
-              <div class="mt-auto flex flex-col gap-1.5 pt-3">
-                {#if $active_custom_theme}
-                  <div class="rounded-lg border border-theme-800/60 bg-theme-900/40 p-2">
-                    <p
-                      class="text-[8px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70"
+                      class="rounded-full bg-theme-900/70 px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground/70"
+                      title="Themes in your library"
                     >
-                      Current theme
-                    </p>
-                    <div class="mt-1 flex items-center gap-1.5">
-                      <span class="size-1 shrink-0 rounded-full bg-emerald-400"></span>
-                      <span class="truncate text-[11px] font-medium">
-                        {$active_custom_theme.name}
-                      </span>
-                    </div>
+                      {$custom_themes.length}
+                    </span>
                   </div>
-                {/if}
-                <Button class="h-8 w-full text-xs" size="sm" onclick={() => openThemeEditor()}>
-                  <Plus class="size-3.5" />
-                  Create theme
-                </Button>
-                <div class="flex gap-1.5">
+                  <p class="mt-0.5 text-[11px] text-muted-foreground">Make it feel like yours.</p>
+                </div>
+                <div class="flex shrink-0 items-center gap-1.5">
                   <Button
-                    class="h-8 min-w-0 flex-1 text-xs"
-                    variant="secondary"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    class="size-8 text-muted-foreground hover:text-theme-100"
                     title="Refresh themes"
+                    aria-label="Refresh themes"
                     onclick={refreshThemes}
                     disabled={refreshingThemes}
                   >
-                    <RefreshCw class="size-3.5 {refreshingThemes ? 'animate-spin' : ''}" />
-                    Refresh
+                    <ThemeIcon
+                      name="refresh"
+                      set={iconSet}
+                      class="size-3.5 {refreshingThemes ? 'animate-spin' : ''}"
+                    />
                   </Button>
+                  {#if $active_custom_theme}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="size-8 text-muted-foreground hover:text-theme-100"
+                      title="Reload active theme"
+                      aria-label="Reload active theme"
+                      onclick={reloadActiveTheme}
+                      disabled={reloadingActiveTheme}
+                    >
+                      <ThemeIcon
+                        name="rotate"
+                        set={iconSet}
+                        class="size-3.5 {reloadingActiveTheme ? 'animate-spin' : ''}"
+                      />
+                    </Button>
+                  {/if}
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="icon"
-                    class="size-7"
+                    class="size-8 text-muted-foreground hover:text-theme-100"
                     title="Open themes folder"
+                    aria-label="Open themes folder"
                     onclick={async () => {
                       try {
                         await openThemesFolder();
@@ -2777,357 +2901,359 @@
                       }
                     }}
                   >
-                    <FolderOpen class="size-3.5" />
+                    <ThemeIcon name="folder" set={iconSet} class="size-3.5" />
+                  </Button>
+                  <Button class="h-8 gap-1.5 text-xs" size="sm" onclick={() => openThemeEditor()}>
+                    <ThemeIcon name="plus" set={iconSet} class="size-3.5" />
+                    New theme
                   </Button>
                 </div>
               </div>
-            </aside>
 
-            <div class="flex min-h-0 min-w-0 flex-1 flex-col p-4">
-              <header class="mb-2.5 shrink-0 border-b border-theme-800/50 pb-2.5">
-                <div class="flex items-end justify-between gap-3">
-                  {#key themeFilter}
-                    <div
-                      class="min-w-0"
-                      in:fly={{ duration: $reduceAnimations ? 0 : 220, y: 4, opacity: 0 }}
+              <div class="mt-3 flex items-center justify-between gap-3">
+                <nav class="flex min-w-0 items-center gap-0.5" aria-label="Theme filters">
+                  {#each themeFilterOptions as option (option.id)}
+                    <button
+                      type="button"
+                      class={themeFilterClass(option.id)}
+                      aria-current={themeFilter === option.id ? 'page' : undefined}
+                      onclick={() => (themeFilter = option.id)}
                     >
-                      <div class="flex items-center gap-2">
-                        <h2 class="truncate text-sm font-semibold">
-                          {activeThemeFilter.label}
-                        </h2>
-                        <Badge variant="secondary" class="text-[9px]">
-                          {filteredThemes.length}
-                        </Badge>
-                      </div>
-                      <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        {themeFilterDescription}
-                      </p>
-                    </div>
-                  {/key}
-                  <div class="relative w-40 shrink-0">
-                    <Search
-                      class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                      class="h-7 border-theme-800 bg-theme-950/80 pl-7 text-[11px]"
-                      placeholder="Search themes..."
-                      bind:value={themeSearch}
-                    />
-                  </div>
+                      <ThemeIcon name={option.icon} set={iconSet} class="size-3.5 shrink-0" />
+                      <span>{option.label}</span>
+                      <span class="text-[8px] tabular-nums text-muted-foreground/60">
+                        {themeCounts[option.id]}
+                      </span>
+                    </button>
+                  {/each}
+                </nav>
+                <div class="relative w-44 shrink-0">
+                  <ThemeIcon
+                    name="search"
+                    set={iconSet}
+                    class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    class="h-8 border-theme-800 bg-theme-950/80 pl-7 text-[11px]"
+                    placeholder="Search themes..."
+                    bind:value={themeSearch}
+                  />
                 </div>
-              </header>
+              </div>
+            </header>
 
-              <div class="min-h-0 flex-1">
-                <ScrollContainer class="pr-4">
-                  {#if filteredThemes.length > 0}
-                    {#key themeFilter}
-                      <div class="grid grid-cols-3 gap-2.5 pb-3 pr-1">
-                        {#each filteredThemes as theme, index (theme.folder_name)}
-                          {@const isActive =
-                            $active_custom_theme?.folder_name === theme.folder_name}
+            <div class="min-h-0 flex-1 px-5 pt-4 pb-1">
+              <ScrollContainer class="pr-2">
+                {#if filteredThemes.length > 0}
+                  {#key themeFilter}
+                    <div class="grid grid-cols-3 gap-3 pb-4 pr-1">
+                      {#each filteredThemes as theme, index (theme.folder_name)}
+                        {@const isActive = $active_custom_theme?.folder_name === theme.folder_name}
+                        <div
+                          class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
+                            ? 'border-primary/60 ring-1 ring-primary/15'
+                            : 'border-theme-800/60'} {$reduceAnimations
+                            ? ''
+                            : 'transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/25'}"
+                          in:fly={{
+                            duration: $reduceAnimations ? 0 : 260,
+                            delay: $reduceAnimations ? 0 : Math.min(index * 35, 210),
+                            y: 8,
+                            opacity: 0,
+                          }}
+                        >
                           <div
-                            class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
-                              ? 'border-primary/60 ring-1 ring-primary/15'
-                              : 'border-theme-800/60'} {$reduceAnimations
-                              ? ''
-                              : 'transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/25'}"
-                            in:fly={{
-                              duration: $reduceAnimations ? 0 : 260,
-                              delay: $reduceAnimations ? 0 : Math.min(index * 35, 210),
-                              y: 8,
-                              opacity: 0,
-                            }}
+                            class="relative h-36 w-full shrink-0 overflow-hidden bg-theme-950/60"
                           >
                             <div
-                              class="relative h-36 w-full shrink-0 overflow-hidden bg-theme-950/60"
+                              class="h-full w-full {$reduceAnimations
+                                ? ''
+                                : 'transition-transform duration-500 ease-out group-hover:scale-[1.03]'} {theme.nsfw &&
+                              !revealedNsfw.includes(theme.name)
+                                ? 'scale-105 blur-2xl'
+                                : ''}"
                             >
-                              <div
-                                class="h-full w-full {$reduceAnimations
-                                  ? ''
-                                  : 'transition-transform duration-500 ease-out group-hover:scale-[1.03]'} {theme.nsfw &&
-                                !revealedNsfw.includes(theme.name)
-                                  ? 'scale-105 blur-2xl'
-                                  : ''}"
-                              >
-                                {#if theme.preview}
-                                  <img
-                                    src={theme.preview}
-                                    alt="Preview of {theme.name}"
-                                    class="pointer-events-none h-full w-full object-contain object-center select-none"
-                                  />
-                                {:else if themeBackgroundVideo(theme)}
-                                  <video
-                                    src={themeBackgroundVideo(theme)}
-                                    class="pointer-events-none h-full w-full object-cover object-center"
-                                    autoplay
-                                    loop
-                                    muted
-                                    playsinline
-                                  ></video>
-                                {:else if theme.definition}
-                                  <div
-                                    class="h-full w-full"
-                                    style={themeV2ThumbnailStyle(theme.definition, theme.assets)}
-                                  ></div>
-                                {:else}
-                                  <img
-                                    src={DefaultThemePreview}
-                                    alt="Preview of {theme.name}"
-                                    class="pointer-events-none h-full w-full object-contain object-center select-none"
-                                  />
-                                {/if}
-                              </div>
-                              <div
-                                class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/75 via-transparent to-transparent"
-                              ></div>
-                              {#if isActive}
-                                <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
-                              {/if}
-                              <Badge
-                                variant="secondary"
-                                class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
-                              >
-                                API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
-                              </Badge>
-                              {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
-                                <button
-                                  type="button"
-                                  class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/20 text-white transition hover:bg-black/30"
-                                  onclick={() => toggleNsfwPreview(theme.name)}
-                                >
-                                  <Eye class="size-5" />
-                                  <span class="text-[9px] font-semibold uppercase tracking-wide">
-                                    Adult preview
-                                  </span>
-                                  <span class="text-[8px] text-white/70">Click to reveal</span>
-                                </button>
-                              {:else if theme.nsfw}
-                                <button
-                                  type="button"
-                                  class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
-                                  onclick={() => toggleNsfwPreview(theme.name)}
-                                >
-                                  <EyeOff class="size-3" />
-                                  Hide preview
-                                </button>
-                              {/if}
-                              {#if theme.nsfw}
-                                <Badge
-                                  variant="destructive"
-                                  class="absolute right-1.5 bottom-1.5 px-1.5 py-0 text-[9px]"
-                                  title="Adult content"
-                                >
-                                  18+
-                                </Badge>
+                              {#if theme.preview}
+                                <img
+                                  src={theme.preview}
+                                  alt="Preview of {theme.name}"
+                                  class="pointer-events-none h-full w-full object-cover object-center select-none"
+                                />
+                              {:else if themeBackgroundVideo(theme)}
+                                <video
+                                  src={themeBackgroundVideo(theme)}
+                                  class="pointer-events-none h-full w-full object-cover object-center"
+                                  autoplay
+                                  loop
+                                  muted
+                                  playsinline
+                                ></video>
+                              {:else if theme.definition}
+                                <div
+                                  class="h-full w-full"
+                                  style={themeV2ThumbnailStyle(theme.definition, theme.assets)}
+                                ></div>
+                              {:else}
+                                <img
+                                  src={DefaultThemePreview}
+                                  alt="Preview of {theme.name}"
+                                  class="pointer-events-none h-full w-full object-cover object-center select-none"
+                                />
                               {/if}
                             </div>
-                            <div class="flex flex-1 flex-col gap-1.5 p-2.5">
-                              <div class="flex items-start justify-between gap-1.5">
-                                <div class="min-w-0">
-                                  <span
-                                    class="block truncate text-[13px] leading-tight font-semibold"
-                                  >
-                                    {theme.name}
-                                  </span>
-                                  <span
-                                    class="mt-0.5 block truncate text-[10px] text-muted-foreground"
-                                  >
-                                    by {theme.author}
-                                  </span>
-                                </div>
+                            <div
+                              class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/75 via-transparent to-transparent"
+                            ></div>
+                            {#if isActive}
+                              <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
+                            {/if}
+                            <Badge
+                              variant="secondary"
+                              class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
+                            >
+                              API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
+                            </Badge>
+                            {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
+                              <button
+                                type="button"
+                                class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/20 text-white transition hover:bg-black/30"
+                                onclick={() => toggleNsfwPreview(theme.name)}
+                              >
+                                <ThemeIcon name="eye" set={iconSet} class="size-5" />
+                                <span class="text-[9px] font-semibold uppercase tracking-wide">
+                                  Adult preview
+                                </span>
+                                <span class="text-[8px] text-white/70">Click to reveal</span>
+                              </button>
+                            {:else if theme.nsfw}
+                              <button
+                                type="button"
+                                class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
+                                onclick={() => toggleNsfwPreview(theme.name)}
+                              >
+                                <ThemeIcon name="eye-off" set={iconSet} class="size-3" />
+                                Hide preview
+                              </button>
+                            {/if}
+                            {#if theme.nsfw}
+                              <Badge
+                                variant="destructive"
+                                class="absolute right-1.5 bottom-1.5 px-1.5 py-0 text-[9px]"
+                                title="Adult content"
+                              >
+                                18+
+                              </Badge>
+                            {/if}
+                          </div>
+                          <div class="flex flex-1 flex-col gap-1.5 p-2.5">
+                            <div class="flex items-start justify-between gap-1.5">
+                              <div class="min-w-0">
                                 <span
-                                  class="shrink-0 rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] whitespace-nowrap tabular-nums text-muted-foreground"
+                                  class="block truncate text-[13px] leading-tight font-semibold"
                                 >
-                                  {#if theme.updateAvailable && theme.availableVersion}
-                                    v{theme.version} <span class="text-primary">→</span>
-                                    v{theme.availableVersion}
-                                  {:else}
-                                    v{theme.version}
-                                  {/if}
+                                  {theme.name}
+                                </span>
+                                <span
+                                  class="mt-0.5 block truncate text-[10px] text-muted-foreground"
+                                >
+                                  by {theme.author}
                                 </span>
                               </div>
-                              {#if theme.description}
-                                <p
-                                  class="line-clamp-2 text-[10px] leading-snug text-muted-foreground"
-                                >
-                                  {theme.description}
-                                </p>
-                              {/if}
-                              <div class="mt-auto flex items-center gap-1 pt-0.5">
-                                <Button
-                                  class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
-                                    'downloading' || theme.status === 'extracting'
-                                    ? 'disabled:bg-primary disabled:opacity-100'
-                                    : ''}"
-                                  size="sm"
-                                  aria-busy={theme.status === 'downloading' ||
-                                    theme.status === 'extracting'}
-                                  disabled={isActive ||
-                                    theme.status === 'downloading' ||
-                                    theme.status === 'extracting' ||
-                                    theme.status === 'deleting'}
-                                  onclick={() => requestThemeApply(theme)}
-                                >
-                                  {#if theme.status === 'downloading' || theme.status === 'extracting'}
-                                    <span
-                                      class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
-                                      style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
-                                    ></span>
-                                    {#if !$reduceAnimations}
-                                      <span
-                                        class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
-                                      ></span>
-                                    {/if}
-                                  {/if}
+                              <span
+                                class="shrink-0 rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] whitespace-nowrap tabular-nums text-muted-foreground"
+                              >
+                                {#if theme.updateAvailable && theme.availableVersion}
+                                  v{theme.version} <span class="text-primary">→</span>
+                                  v{theme.availableVersion}
+                                {:else}
+                                  v{theme.version}
+                                {/if}
+                              </span>
+                            </div>
+                            {#if theme.description}
+                              <p
+                                class="line-clamp-2 text-[10px] leading-snug text-muted-foreground"
+                              >
+                                {theme.description}
+                              </p>
+                            {/if}
+                            <div class="mt-auto flex items-center gap-1 pt-0.5">
+                              <Button
+                                class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
+                                  'downloading' || theme.status === 'extracting'
+                                  ? 'disabled:bg-primary disabled:opacity-100'
+                                  : ''}"
+                                size="sm"
+                                aria-busy={theme.status === 'downloading' ||
+                                  theme.status === 'extracting'}
+                                disabled={isActive ||
+                                  theme.status === 'downloading' ||
+                                  theme.status === 'extracting' ||
+                                  theme.status === 'deleting'}
+                                onclick={() => requestThemeApply(theme)}
+                              >
+                                {#if theme.status === 'downloading' || theme.status === 'extracting'}
                                   <span
-                                    class="relative z-10 flex items-center justify-center gap-2"
-                                  >
-                                    {#if theme.status === 'extracting'}
-                                      <LoaderCircle
-                                        class="size-4 animate-spin"
-                                        aria-hidden="true"
-                                      />
-                                    {/if}
-                                    <TextMorph
-                                      text={themeButtonLabel(
-                                        theme,
-                                        $active_custom_theme?.folder_name
-                                      )}
-                                      duration={260}
-                                      ease="cubic-bezier(0.19, 1, 0.22, 1)"
-                                      disabled={$reduceAnimations}
-                                      class="whitespace-nowrap"
+                                    class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
+                                    style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
+                                  ></span>
+                                  {#if !$reduceAnimations}
+                                    <span
+                                      class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                                    ></span>
+                                  {/if}
+                                {/if}
+                                <span class="relative z-10 flex items-center justify-center gap-2">
+                                  {#if theme.status === 'extracting'}
+                                    <ThemeIcon
+                                      name="loader"
+                                      set={iconSet}
+                                      class="size-4 animate-spin"
                                     />
-                                  </span>
+                                  {/if}
+                                  <TextMorph
+                                    text={themeButtonLabel(
+                                      theme,
+                                      $active_custom_theme?.folder_name
+                                    )}
+                                    duration={260}
+                                    ease="cubic-bezier(0.19, 1, 0.22, 1)"
+                                    disabled={$reduceAnimations}
+                                    class="whitespace-nowrap"
+                                  />
+                                </span>
+                              </Button>
+                              {#if theme.status === 'installed' && theme.definition}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  class="size-7 shrink-0"
+                                  title="Edit theme"
+                                  onclick={() => openThemeEditor(theme)}
+                                >
+                                  <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
                                 </Button>
-                                {#if theme.status === 'installed' && theme.definition}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Edit theme"
-                                    onclick={() => openThemeEditor(theme)}
-                                  >
-                                    <Pencil class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Restore previous version ({new Date(
-                                      theme.backups![0].createdAt
-                                    ).toLocaleDateString()})"
-                                    onclick={() => requestThemeRestore(theme, theme.backups![0])}
-                                  >
-                                    <History class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if theme.status === 'installed' && theme.updateAvailable}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title={`Update theme${theme.availableVersion ? ` to v${theme.availableVersion}` : ''}`}
-                                    onclick={() => updateInstalledTheme(theme)}
-                                  >
-                                    <CloudDownload class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if (theme.status === 'installed' || theme.status === 'deleting') && !isActive && theme.name !== 'Default'}
-                                  <Button
-                                    variant="destructive"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Uninstall theme"
-                                    disabled={theme.status !== 'installed'}
-                                    onclick={async () => {
-                                      try {
-                                        const deleteResult = await deleteTheme(theme);
-                                        if (deleteResult) {
-                                          sileo.success({
-                                            title: 'Yaay!',
-                                            description: 'Theme uninstalled successfully!',
-                                          });
-                                        } else {
-                                          sileo.error({
-                                            title: 'Uhhm..',
-                                            description: 'Failed to uninstall theme.',
-                                          });
-                                        }
-                                      } catch (err) {
-                                        console.log(err);
+                              {/if}
+                              {#if theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  class="size-7 shrink-0"
+                                  title="Restore previous version ({new Date(
+                                    theme.backups![0].createdAt
+                                  ).toLocaleDateString()})"
+                                  onclick={() => requestThemeRestore(theme, theme.backups![0])}
+                                >
+                                  <ThemeIcon name="history" set={iconSet} class="size-3.5" />
+                                </Button>
+                              {/if}
+                              {#if theme.status === 'installed' && theme.updateAvailable}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  class="size-7 shrink-0"
+                                  title={`Update theme${theme.availableVersion ? ` to v${theme.availableVersion}` : ''}`}
+                                  onclick={() => updateInstalledTheme(theme)}
+                                >
+                                  <ThemeIcon name="download" set={iconSet} class="size-3.5" />
+                                </Button>
+                              {/if}
+                              {#if (theme.status === 'installed' || theme.status === 'deleting') && !isActive && theme.name !== 'Default'}
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  class="size-7 shrink-0"
+                                  title="Uninstall theme"
+                                  disabled={theme.status !== 'installed'}
+                                  onclick={async () => {
+                                    try {
+                                      const deleteResult = await deleteTheme(theme);
+                                      if (deleteResult) {
+                                        sileo.success({
+                                          title: 'Yaay!',
+                                          description: 'Theme uninstalled successfully!',
+                                        });
+                                      } else {
                                         sileo.error({
                                           title: 'Uhhm..',
                                           description: 'Failed to uninstall theme.',
                                         });
                                       }
-                                    }}
-                                  >
-                                    {#if theme.status === 'deleting'}
-                                      <LoaderCircle class="size-3.5 animate-spin" />
-                                    {:else}
-                                      <Trash class="size-3.5" />
-                                    {/if}
-                                  </Button>
-                                {/if}
-                              </div>
+                                    } catch (err) {
+                                      console.log(err);
+                                      sileo.error({
+                                        title: 'Uhhm..',
+                                        description: 'Failed to uninstall theme.',
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {#if theme.status === 'deleting'}
+                                    <ThemeIcon
+                                      name="loader"
+                                      set={iconSet}
+                                      class="size-3.5 animate-spin"
+                                    />
+                                  {:else}
+                                    <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
+                                  {/if}
+                                </Button>
+                              {/if}
                             </div>
                           </div>
-                        {/each}
-                      </div>
-                    {/key}
-                  {:else}
-                    <div
-                      class="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground"
-                    >
-                      <div class="rounded-full bg-theme-900/60 p-3">
-                        <Search class="size-5 opacity-60" />
-                      </div>
-                      <p class="text-sm font-semibold text-theme-100">
-                        {#if themeSearch}
-                          No themes match "{themeSearch}"
-                        {:else if themeFilter === 'updates'}
-                          Everything is up to date
-                        {:else if themeFilter === 'available'}
-                          No themes left to install
-                        {:else if themeFilter === 'installed'}
-                          No installed themes yet
-                        {:else}
-                          No themes found
-                        {/if}
-                      </p>
-                      <p class="max-w-xs text-xs leading-relaxed">
-                        {#if themeSearch}
-                          Try a different name, author or API version.
-                        {:else if themeFilter === 'updates'}
-                          You are running the latest version of every installed theme.
-                        {:else if themeFilter === 'available'}
-                          Every gallery theme is already installed.
-                        {:else if themeFilter === 'installed'}
-                          Download a theme from the gallery to get started.
-                        {:else}
-                          Try refreshing the gallery, or create a new API 2.0 theme.
-                        {/if}
-                      </p>
-                      {#if themeSearch || themeFilter !== 'all'}
-                        <Button
-                          class="mt-1"
-                          variant="secondary"
-                          size="sm"
-                          onclick={() => {
-                            themeSearch = '';
-                            themeFilter = 'all';
-                          }}
-                        >
-                          Clear filters
-                        </Button>
-                      {/if}
+                        </div>
+                      {/each}
                     </div>
-                  {/if}
-                </ScrollContainer>
-              </div>
+                  {/key}
+                {:else}
+                  <div
+                    class="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground"
+                  >
+                    <div class="rounded-full bg-theme-900/60 p-3">
+                      <ThemeIcon name="search" set={iconSet} class="size-5 opacity-60" />
+                    </div>
+                    <p class="text-sm font-semibold text-theme-100">
+                      {#if themeSearch}
+                        No themes match "{themeSearch}"
+                      {:else if themeFilter === 'updates'}
+                        Everything is up to date
+                      {:else if themeFilter === 'available'}
+                        No themes left to install
+                      {:else if themeFilter === 'installed'}
+                        No installed themes yet
+                      {:else}
+                        No themes found
+                      {/if}
+                    </p>
+                    <p class="max-w-xs text-xs leading-relaxed">
+                      {#if themeSearch}
+                        Try a different name, author or API version.
+                      {:else if themeFilter === 'updates'}
+                        You are running the latest version of every installed theme.
+                      {:else if themeFilter === 'available'}
+                        Every gallery theme is already installed.
+                      {:else if themeFilter === 'installed'}
+                        Download a theme from the gallery to get started.
+                      {:else}
+                        Try refreshing the gallery, or create a new API 2.0 theme.
+                      {/if}
+                    </p>
+                    {#if themeSearch || themeFilter !== 'all'}
+                      <Button
+                        class="mt-1"
+                        variant="secondary"
+                        size="sm"
+                        onclick={() => {
+                          themeSearch = '';
+                          themeFilter = 'all';
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    {/if}
+                  </div>
+                {/if}
+              </ScrollContainer>
             </div>
           </div>
         </div>
@@ -3136,11 +3262,34 @@
   </div>
 
   {#if selectedView === 'HOME' && $active_custom_theme?.definition?.elements?.length}
-    <div class="pointer-events-none absolute inset-0 z-20">
-      <ThemeV2Elements
-        elements={$active_custom_theme.definition.elements}
-        assets={$active_custom_theme.assets}
-      />
+    <div
+      class="pointer-events-none absolute inset-0 z-20"
+      in:fly={{
+        duration: $reduceAnimations ? 0 : 400,
+        delay: $reduceAnimations ? 0 : 400,
+        y: 5,
+        opacity: 0,
+      }}
+      out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
+    >
+      {#key $theme_reload_token}
+        <ThemeV2Elements
+          elements={$active_custom_theme.definition.elements}
+          groups={$active_custom_theme.definition.groups}
+          assets={$active_custom_theme.assets}
+          themeName={$active_custom_theme.definition.name}
+          themeAuthor={$active_custom_theme.definition.author}
+          themeVersion={$active_custom_theme.definition.version}
+          accentColor={$active_custom_theme.definition.accentColor}
+          {iconSet}
+          screen={selectedView.toLowerCase()}
+          visibility={$themeScriptState.visibility}
+          groupVisibility={$themeScriptState.groupVisibility}
+          variables={$themeScriptState.variables}
+          oninteraction={triggerThemeScriptElement}
+          onbuttonaction={handleThemeButtonAction}
+        />
+      {/key}
     </div>
   {/if}
 

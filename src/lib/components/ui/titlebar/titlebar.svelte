@@ -1,13 +1,20 @@
 <script lang="ts">
+  import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import { config } from '$lib/config';
-  import { custom_theme_audio_playing, custom_theme_volume, platform } from '$lib/global';
+  import {
+    active_custom_theme,
+    custom_theme_audio_playing,
+    custom_theme_volume,
+    platform,
+  } from '$lib/global';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
   import { reduceAnimations } from '$lib/userSettings';
-  import { Volume, Volume1, VolumeOff } from '@lucide/svelte';
   import Minimize from '@lucide/svelte/icons/minus';
-  import Volume2 from '@lucide/svelte/icons/volume-2';
   import Close from '@lucide/svelte/icons/x';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
+
+  const iconSet = $derived($active_custom_theme?.definition?.iconSet ?? DEFAULT_THEME_ICON_SET);
 
   onMount(() => {
     const appWindow = getCurrentWindow();
@@ -33,13 +40,13 @@
           ></div>
 
           {#if $custom_theme_volume > 0.7}
-            <Volume2 class="z-10 pointer-events-none" size={14} />
+            <ThemeIcon name="volume" set={iconSet} class="z-10 pointer-events-none" size={14} />
           {:else if $custom_theme_volume >= 0.15}
-            <Volume1 class="z-10 pointer-events-none" size={14} />
+            <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
           {:else if $custom_theme_volume > 0}
-            <Volume class="z-10 pointer-events-none" size={14} />
+            <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
           {:else}
-            <VolumeOff class="z-10 pointer-events-none" size={14} />
+            <ThemeIcon name="volume-off" set={iconSet} class="z-10 pointer-events-none" size={14} />
           {/if}
         </div>
 
@@ -62,7 +69,7 @@
               max="1"
               step="0.01"
               bind:value={$custom_theme_volume}
-              on:input={() => {
+              oninput={() => {
                 config.value<number>('volume').set($custom_theme_volume);
               }}
               class="volume-slider"

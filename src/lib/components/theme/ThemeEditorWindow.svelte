@@ -1,16 +1,22 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
   import FontPreview from '$lib/components/theme/FontPreview.svelte';
+  import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import ThemeElementInspector from '$lib/components/theme/ThemeElementInspector.svelte';
+  import ThemeGroupInspector from '$lib/components/theme/ThemeGroupInspector.svelte';
+  import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
+  import ThemeLogicBadge from '$lib/components/theme/ThemeLogicBadge.svelte';
+  import ThemeSection from '$lib/components/theme/ThemeSection.svelte';
   import ThemeStage from '$lib/components/theme/ThemeStage.svelte';
+  import ThemeVariableDefaults from '$lib/components/theme/ThemeVariableDefaults.svelte';
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import * as ContextMenu from '$lib/components/ui/context-menu';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
-  import Separator from '$lib/components/ui/separator/separator.svelte';
   import Slider from '$lib/components/ui/slider/slider.svelte';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
   import {
@@ -22,18 +28,49 @@
     themeFontKey,
     type FontsourceFont,
   } from '$lib/fontsource';
-  import { BUNDLED_THEME_FONTS, type ThemeFontChoice } from '$lib/themeFonts';
+  import {
+    THEME_CLOCK_VARIABLE_NAMES,
+    isThemeClockVariable,
+    themeClockValues,
+  } from '$lib/themeClock';
+  import {
+    BUNDLED_THEME_FONTS,
+    bundledThemeFontFamily,
+    fontStack,
+    type ThemeFontChoice,
+  } from '$lib/themeFonts';
+  import { THEME_ICON_PREVIEW_NAMES, THEME_ICON_SETS } from '$lib/themeIcons';
+  import {
+    themeBehaviorSummary,
+    themeBehaviorTargetLabel,
+    themeElementLabel,
+    themeGroupContainsElement,
+    themeGroupInteractiveCount,
+  } from '$lib/themeLogic';
   import { renderThemePreview } from '$lib/themePreview';
+  import { themeScriptInitialVariables, themeScriptVariableNames } from '$lib/themeScript';
+  import {
+    formatThemeScriptError,
+    parseThemeScript,
+    themeScriptProgramCanLeaveLauncher,
+    themeScriptProgramReferences,
+  } from '$lib/themeScriptLang';
+  import { analyzeThemeSvelteSource } from '$lib/themeSvelte';
   import {
     createDefaultThemeV2,
+    createThemeV2Behavior,
     createThemeV2Element,
     normalizeThemeV2,
     themeAssetName,
     type ThemeV2Asset,
+    type ThemeV2BehaviorTarget,
     type ThemeV2Definition,
     type ThemeV2Element,
     type ThemeV2Font,
+    type ThemeV2Group,
     type ThemeV2ImageElement,
+    type ThemeV2LottieElement,
+    type ThemeV2ScriptValue,
     type ThemeV2VideoElement,
   } from '$lib/themeV2';
   import {
@@ -46,39 +83,60 @@
   import { formatBytes } from '$lib/utils';
   import {
     AlertTriangle,
+    Boxes,
     Check,
     CheckCircle2,
     ChevronDown,
+    ChevronRight,
     ChevronUp,
+    ChevronsDown,
+    ChevronsUp,
+    ClipboardPaste,
+    Clock,
     Code2,
+    Component,
     Copy,
+    CopyPlus,
     Download,
     Eye,
     EyeOff,
+    Film,
+    Gauge,
     GripVertical,
+    Hand,
     Image as ImageIcon,
+    Keyboard,
     Layers,
     LoaderCircle,
     Lock,
+    Maximize2,
+    Megaphone,
+    Minus,
     MousePointer2,
+    MousePointerClick,
     Music,
-    Palette,
     Plus,
     Redo2,
     RefreshCw,
+    Repeat,
     Save,
+    Scissors,
     Search,
     Shapes,
     ShieldCheck,
     SlidersHorizontal,
     Sparkles,
+    Spline,
+    Timer,
     Trash2,
     Type,
     Undo2,
+    Ungroup,
     Unlock,
     Upload,
     Video,
     X,
+    Zap,
   } from '@lucide/svelte';
   import { convertFileSrc, invoke } from '@tauri-apps/api/core';
   import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -87,8 +145,8 @@
   import { open, save as saveDialog } from '@tauri-apps/plugin-dialog';
   import * as fs from '@tauri-apps/plugin-fs';
   import { sileo } from 'sileo';
-  import { onMount } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { onMount, tick } from 'svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   type ThemeEditorContext = {
     folderName?: string | null;
@@ -115,26 +173,81 @@
     checkedAt: number;
   };
 
-  type AssetKind = 'image' | 'video' | 'audio' | 'font';
+  type AssetKind = 'image' | 'video' | 'audio' | 'font' | 'lottie';
+
+  type LayerClipboard = {
+    groups: ThemeV2Group[];
+    elements: ThemeV2Element[];
+  };
+
+  type LayerRow =
+    | { kind: 'group'; group: ThemeV2Group; depth: number }
+    | { kind: 'element'; element: ThemeV2Element; depth: number };
+
+  type LayerDragItem = { kind: 'element' | 'group'; id: string };
+
+  type LayerDropTarget =
+    | { mode: 'inside'; groupId: string }
+    | { mode: 'between'; elementId: string; position: 'above' | 'below' }
+    | { mode: 'root' };
 
   const labelClass = 'text-[10px] font-medium uppercase tracking-wide text-muted-foreground';
   const fieldClass = 'h-9 border-theme-800 bg-theme-950 text-xs text-theme-50';
+  const shortcutRows: { label: string; keys: string[] }[] = [
+    { label: 'Save theme', keys: ['Cmd/Ctrl', 'S'] },
+    { label: 'Undo', keys: ['Cmd/Ctrl', 'Z'] },
+    { label: 'Redo', keys: ['Cmd/Ctrl', 'Shift', 'Z'] },
+    { label: 'Find layers and groups', keys: ['Cmd/Ctrl', 'F'] },
+    { label: 'Zoom canvas in / out', keys: ['Cmd/Ctrl', '+ / -'] },
+    { label: 'Fit canvas to window', keys: ['Cmd/Ctrl', '0'] },
+    { label: 'Copy / cut / paste', keys: ['Cmd/Ctrl', 'C / X / V'] },
+    { label: 'Duplicate layer or group', keys: ['Cmd/Ctrl', 'D'] },
+    { label: 'Select all layers', keys: ['Cmd/Ctrl', 'A'] },
+    { label: 'Group or ungroup selection', keys: ['Cmd/Ctrl', 'G'] },
+    { label: 'Add to selection', keys: ['Shift/Cmd', 'Click'] },
+    { label: 'Nudge selected layers', keys: ['Arrows'] },
+    { label: 'Nudge by 10px', keys: ['Shift', 'Arrows'] },
+    { label: 'Reorder selected layer', keys: ['Cmd/Ctrl', '↑ / ↓'] },
+    { label: 'Jump to linked logic', keys: ['Alt/Option', '↑ / ↓'] },
+    { label: 'Delete selection', keys: ['Delete'] },
+    { label: 'Clear selection / close dialog', keys: ['Escape'] },
+    { label: 'Show this shortcut list', keys: ['?'] },
+  ];
 
   let definition = $state<ThemeV2Definition>(createDefaultThemeV2());
   let pickedAssets = $state<ThemeV2Asset[]>([]);
   let assetBase = $state('');
   let savedFolder = $state<string | undefined>(undefined);
+  let editorFolderPath = $state<string | undefined>(undefined);
   let loading = $state(true);
   let saving = $state(false);
   let exporting = $state(false);
   let selectedIds = $state<string[]>([]);
-  let leftTab = $state<'layers' | 'theme' | 'fonts'>('layers');
+  let selectedGroupId = $state<string | undefined>(undefined);
+  let selectedBehaviorId = $state<string | undefined>(undefined);
+  let logicQuery = $state('');
+  let layerClipboard = $state<LayerClipboard | undefined>(undefined);
+  let pasteSerial = 0;
+  let leftTab = $state<'layers' | 'theme' | 'fonts' | 'logic'>('layers');
+  let layerQuery = $state('');
+  let layerSearchInput = $state<HTMLInputElement | null>(null);
+  let layerListHost = $state<HTMLDivElement | null>(null);
+  let shortcutsOpen = $state(false);
+  let logicFocusKey = $state('');
+  let logicFocusToken = $state(0);
   let canvasHost = $state<HTMLDivElement | undefined>(undefined);
-  let canvasScale = $state(0.8);
+  let canvasFitScale = $state(0.8);
+  let canvasZoom = $state(1);
+  let canvasPanX = $state(0);
+  let canvasPanY = $state(0);
+  let panMode = $state(false);
+  let panning = $state(false);
+  let panStart = { x: 0, y: 0, panX: 0, panY: 0 };
+  const canvasScale = $derived(canvasFitScale * canvasZoom);
   let statusMessage = $state('Ready');
   let renamingId = $state<string | undefined>(undefined);
-  let draggingLayerId = $state<string | undefined>(undefined);
-  let dropTarget = $state<{ id: string; position: 'above' | 'below' } | undefined>(undefined);
+  let draggingLayer = $state<LayerDragItem | undefined>(undefined);
+  let dropTarget = $state<LayerDropTarget | undefined>(undefined);
   let lastSavedKey = $state('');
   let draftSavedAt = $state<number | undefined>(undefined);
   let recoverableDraft = $state<ThemeEditorDraft | undefined>(undefined);
@@ -145,7 +258,10 @@
   let exportAfterValidation = $state(false);
 
   let contextMenuOpen = $state(false);
+  let layerContextMenuOpen = $state(false);
   let contextMenuTargetId = $state<string | undefined>(undefined);
+  let contextMenuGroupId = $state<string | undefined>(undefined);
+  let deleteGroupId = $state<string | undefined>(undefined);
 
   let fontCatalog = $state<FontsourceFont[]>([]);
   let fontCatalogLoading = $state(false);
@@ -160,14 +276,230 @@
   let fontDownloading = $state(false);
 
   const elements = $derived(definition.elements ?? []);
-  const selectedSet = $derived(new Set(selectedIds));
+  const groups = $derived(definition.groups ?? []);
+  const behaviors = $derived(definition.behaviors ?? []);
+  const logicBadges = $derived.by(() => {
+    const badges = new SvelteMap<string, { count: number; warning: boolean }>();
+
+    for (const behavior of behaviors) {
+      const target = behavior.target;
+      if (!target) continue;
+
+      const key = `${target.type}:${target.id}`;
+      const badge = badges.get(key) ?? { count: 0, warning: false };
+      badge.count += 1;
+
+      const pointerTrigger =
+        behavior.trigger.type === 'click' ||
+        behavior.trigger.type === 'hover' ||
+        behavior.trigger.type === 'leave';
+      if (pointerTrigger) {
+        const interactive =
+          target.type === 'element'
+            ? elements.some((element) => element.id === target.id && element.interactive === true)
+            : themeGroupInteractiveCount(groups, elements, target.id) > 0;
+        if (!interactive) badge.warning = true;
+      }
+
+      badges.set(key, badge);
+    }
+
+    return badges;
+  });
+  const filteredBehaviors = $derived.by(() => {
+    const query = logicQuery.trim().toLowerCase();
+    if (!query) return behaviors;
+    return behaviors.filter((behavior) => {
+      const haystack = [
+        behavior.name ?? '',
+        themeBehaviorTargetLabel(behavior.target, elements, groups),
+        themeBehaviorSummary(behavior, elements, groups),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  });
+  const scriptVariables = $derived([
+    ...new Set<string>([...THEME_CLOCK_VARIABLE_NAMES, ...themeScriptVariableNames(definition)]),
+  ]);
+  const editableScriptVariables = $derived(
+    scriptVariables.filter((name) => !isThemeClockVariable(name))
+  );
+  let previewClock = $state(Date.now());
+  $effect(() => {
+    const handle = setInterval(() => (previewClock = Date.now()), 1000);
+    return () => clearInterval(handle);
+  });
+  const previewScriptVariables = $derived({
+    ...themeScriptInitialVariables(definition),
+    ...themeClockValues(new Date(previewClock)),
+  });
+  const selectedGroup = $derived(
+    selectedGroupId ? groups.find((group) => group.id === selectedGroupId) : undefined
+  );
+  const selectedBehavior = $derived(
+    selectedBehaviorId
+      ? behaviors.find((behavior) => behavior.id === selectedBehaviorId)
+      : undefined
+  );
+  function buildLayerRows(includeCollapsed: boolean): LayerRow[] {
+    const groupIds = new SvelteSet(groups.map((group) => group.id));
+    const elementOrder = new SvelteMap(elements.map((element, index) => [element.id, index]));
+    const parentElement = (element: ThemeV2Element) =>
+      element.groupId && groupIds.has(element.groupId) ? element.groupId : undefined;
+    const parentGroup = (group: ThemeV2Group) =>
+      group.parentId && groupIds.has(group.parentId) ? group.parentId : undefined;
+
+    const groupZ = (groupId: string, stack = new SvelteSet<string>()): number => {
+      if (stack.has(groupId)) return -1;
+      stack.add(groupId);
+      let top = -1;
+      for (const element of elements) {
+        if (parentElement(element) === groupId) {
+          top = Math.max(top, elementOrder.get(element.id) ?? -1);
+        }
+      }
+      for (const group of groups) {
+        if (parentGroup(group) === groupId) top = Math.max(top, groupZ(group.id, stack));
+      }
+      return top;
+    };
+
+    const entriesFor = (parentId: string | undefined) => {
+      const groupEntries = groups
+        .filter((group) => parentGroup(group) === parentId)
+        .map((group) => ({ kind: 'group' as const, group }));
+      const elementEntries = elements
+        .filter((element) => parentElement(element) === parentId)
+        .map((element) => ({ kind: 'element' as const, element }));
+
+      return [...groupEntries, ...elementEntries].sort((a, b) => {
+        const aZ = a.kind === 'group' ? groupZ(a.group.id) : (elementOrder.get(a.element.id) ?? -1);
+        const bZ = b.kind === 'group' ? groupZ(b.group.id) : (elementOrder.get(b.element.id) ?? -1);
+        return bZ - aZ;
+      });
+    };
+
+    const rows: LayerRow[] = [];
+    const addEntries = (parentId: string | undefined, depth: number) => {
+      for (const entry of entriesFor(parentId)) {
+        if (entry.kind === 'group') {
+          rows.push({ kind: 'group', group: entry.group, depth });
+          if (includeCollapsed || !entry.group.collapsed) addEntries(entry.group.id, depth + 1);
+        } else {
+          rows.push({ kind: 'element', element: entry.element, depth });
+        }
+      }
+    };
+    addEntries(undefined, 0);
+    return rows;
+  }
+
+  const layerRows = $derived.by(() => buildLayerRows(false));
+  const layerRowKey = (row: LayerRow) =>
+    row.kind === 'group' ? `g:${row.group.id}` : `e:${row.element.id}`;
+  const layerRowMatches = (row: LayerRow, query: string) => {
+    const haystack =
+      row.kind === 'group'
+        ? groupLabel(row.group)
+        : `${elementLabel(row.element)} ${row.element.name ?? ''} ${row.element.type}`;
+    return haystack.toLowerCase().includes(query);
+  };
+  const layerSearchQuery = $derived(layerQuery.trim().toLowerCase());
+  const layerSearchActive = $derived(layerSearchQuery.length > 0);
+  const layerSearchMatchCount = $derived.by(() => {
+    if (!layerSearchActive) return 0;
+    return buildLayerRows(true).filter((row) => layerRowMatches(row, layerSearchQuery)).length;
+  });
+  const visibleLayerRows = $derived.by(() => {
+    if (!layerSearchActive) return layerRows;
+
+    const allRows = buildLayerRows(true);
+    const byKey = new SvelteMap(allRows.map((row) => [layerRowKey(row), row]));
+    const matches = new SvelteSet(
+      allRows.filter((row) => layerRowMatches(row, layerSearchQuery)).map((row) => layerRowKey(row))
+    );
+    const visible = new SvelteSet(matches);
+
+    // A matching group is shown with its full contents, so the expanded chevron is accurate.
+    for (const row of allRows) {
+      let parentId = row.kind === 'group' ? row.group.parentId : row.element.groupId;
+      const seen = new SvelteSet<string>();
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+        if (matches.has(`g:${parentId}`)) {
+          visible.add(layerRowKey(row));
+          break;
+        }
+        const parent = byKey.get(`g:${parentId}`);
+        parentId = parent?.kind === 'group' ? parent.group.parentId : undefined;
+      }
+    }
+
+    // Keep the ancestors of each match visible so the list still shows hierarchy.
+    for (const key of [...visible]) {
+      const row = byKey.get(key);
+      let parentId = row?.kind === 'group' ? row.group.parentId : row?.element.groupId;
+      const seen = new SvelteSet<string>();
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+        const parentKey = `g:${parentId}`;
+        if (visible.has(parentKey)) break;
+        visible.add(parentKey);
+        const parent = byKey.get(parentKey);
+        parentId = parent?.kind === 'group' ? parent.group.parentId : undefined;
+      }
+    }
+
+    return allRows.filter((row) => visible.has(layerRowKey(row)));
+  });
+  const anyGroupExpanded = $derived(groups.some((group) => !group.collapsed));
+  const logicTargets = $derived.by(() =>
+    buildLayerRows(true)
+      .map((row) =>
+        row.kind === 'group'
+          ? { type: 'group' as const, id: row.group.id }
+          : { type: 'element' as const, id: row.element.id }
+      )
+      .filter((target) => (logicBadges.get(`${target.type}:${target.id}`)?.count ?? 0) > 0)
+  );
+  const currentLogicTargetIndex = $derived(
+    logicTargets.findIndex((target) =>
+      target.type === 'group'
+        ? target.id === selectedGroupId
+        : selectedIds.length === 1 && target.id === selectedIds[0]
+    )
+  );
+  const selectedSet = $derived(new SvelteSet(selectedIds));
   const selectedElements = $derived(elements.filter((element) => selectedSet.has(element.id)));
-  const movableSelectedElements = $derived(selectedElements.filter((element) => !element.locked));
+  const movableSelectedElements = $derived(
+    selectedElements.filter((element) => !element.locked && !isElementLockedByGroups(element))
+  );
   const selectedIndex = $derived(
     selectedIds.length === 1 ? elements.findIndex((element) => element.id === selectedIds[0]) : -1
   );
   const selectedElement = $derived(selectedIndex >= 0 ? elements[selectedIndex] : undefined);
   const contextMenuSelection = $derived(contextMenuTargetId ? selectedElements : []);
+  const contextMenuGroup = $derived(
+    contextMenuGroupId ? groups.find((group) => group.id === contextMenuGroupId) : undefined
+  );
+  const deleteGroupTarget = $derived(
+    deleteGroupId ? groups.find((group) => group.id === deleteGroupId) : undefined
+  );
+  const deleteGroupIds = $derived(
+    deleteGroupTarget ? collectGroupIds(deleteGroupTarget.id) : new SvelteSet<string>()
+  );
+  const deleteGroupLayerCount = $derived(
+    elements.filter((element) => element.groupId && deleteGroupIds.has(element.groupId)).length
+  );
+  const deleteGroupNestedCount = $derived(Math.max(0, deleteGroupIds.size - 1));
+  const deleteGroupLayerLabel = $derived(
+    `${deleteGroupLayerCount} layer${deleteGroupLayerCount === 1 ? '' : 's'}`
+  );
+  const deleteGroupNestedLabel = $derived(
+    `${deleteGroupNestedCount} nested group${deleteGroupNestedCount === 1 ? '' : 's'}`
+  );
   const contextMenuAllHidden = $derived(
     contextMenuSelection.length > 0 && contextMenuSelection.every((element) => element.hidden)
   );
@@ -233,13 +565,19 @@
   const FONT_PREVIEW_FAMILY = 'EZPPFontPreview';
 
   const selectedFontsource = $derived(fontCatalog.find((font) => font.id === selectedFontsourceId));
+  const selectedFontBundledFamily = $derived(
+    selectedFontsource ? bundledThemeFontFamily(selectedFontsource.family) : undefined
+  );
+  const selectedFontIsBundled = $derived(selectedFontBundledFamily !== undefined);
   const selectedFontsourceOptions = $derived({
     weight: Number(fontWeight),
     style: fontStyle,
     subset: fontSubset,
   });
   const selectedFontPreviewUrl = $derived(
-    selectedFontsource ? fontsourceFontUrl(selectedFontsource, selectedFontsourceOptions) : ''
+    selectedFontsource && !selectedFontIsBundled
+      ? fontsourceFontUrl(selectedFontsource, selectedFontsourceOptions)
+      : ''
   );
   const selectedFontPreviewCss = $derived.by(() => {
     if (!selectedFontsource || !selectedFontPreviewUrl) return '';
@@ -318,7 +656,8 @@
   }
 
   async function addSelectedFontsource() {
-    if (!selectedFontsource || fontDownloading || selectedFontIsAdded) return;
+    if (!selectedFontsource || fontDownloading || selectedFontIsAdded || selectedFontIsBundled)
+      return;
     fontDownloading = true;
     statusMessage = `Downloading ${selectedFontsource.family}...`;
     try {
@@ -356,20 +695,111 @@
     }
   }
 
+  const CANVAS_WIDTH = 1000;
+  const CANVAS_HEIGHT = 650;
+  const CANVAS_MIN_SCALE = 0.1;
+  const CANVAS_MAX_SCALE = 5;
+  const CANVAS_ZOOM_STEP = 1.2;
+
   const updateCanvasScale = () => {
     if (!canvasHost) return;
     const rect = canvasHost.getBoundingClientRect();
-    canvasScale = Math.max(0.25, Math.min((rect.width - 56) / 1000, (rect.height - 56) / 650));
+    canvasFitScale = Math.max(
+      0.25,
+      Math.min((rect.width - 56) / CANVAS_WIDTH, (rect.height - 56) / CANVAS_HEIGHT)
+    );
   };
+
+  function zoomCanvasAt(focusX: number, focusY: number, nextScale: number) {
+    if (!canvasHost) return;
+    const rect = canvasHost.getBoundingClientRect();
+    const currentScale = canvasScale;
+    const clampedScale = Math.max(CANVAS_MIN_SCALE, Math.min(CANVAS_MAX_SCALE, nextScale));
+    if (Math.abs(clampedScale - currentScale) < 0.0001) return;
+
+    // Keep the canvas point under the cursor fixed while the scale changes.
+    const canvasX =
+      (focusX - rect.width / 2 - canvasPanX + (CANVAS_WIDTH * currentScale) / 2) / currentScale;
+    const canvasY =
+      (focusY - rect.height / 2 - canvasPanY + (CANVAS_HEIGHT * currentScale) / 2) / currentScale;
+    canvasPanX =
+      focusX - rect.width / 2 - canvasX * clampedScale + (CANVAS_WIDTH * clampedScale) / 2;
+    canvasPanY =
+      focusY - rect.height / 2 - canvasY * clampedScale + (CANVAS_HEIGHT * clampedScale) / 2;
+    canvasZoom = clampedScale / canvasFitScale;
+  }
+
+  function zoomCanvasBy(factor: number) {
+    if (!canvasHost) {
+      canvasZoom = Math.max(
+        CANVAS_MIN_SCALE / canvasFitScale,
+        Math.min(CANVAS_MAX_SCALE / canvasFitScale, canvasZoom * factor)
+      );
+      return;
+    }
+    const rect = canvasHost.getBoundingClientRect();
+    zoomCanvasAt(rect.width / 2, rect.height / 2, canvasScale * factor);
+  }
+
+  function resetCanvasViewState() {
+    canvasZoom = 1;
+    canvasPanX = 0;
+    canvasPanY = 0;
+    panMode = false;
+    panning = false;
+  }
+
+  function resetCanvasView() {
+    resetCanvasViewState();
+    updateCanvasScale();
+    statusMessage = 'Canvas fit to window';
+  }
+
+  function handleCanvasWheel(event: WheelEvent) {
+    if (!canvasHost) return;
+    event.preventDefault();
+    const rect = canvasHost.getBoundingClientRect();
+    if (event.ctrlKey || event.metaKey) {
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      zoomCanvasAt(event.clientX - rect.left, event.clientY - rect.top, canvasScale * factor);
+      return;
+    }
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1;
+    canvasPanX -= event.deltaX * unit;
+    canvasPanY -= event.deltaY * unit;
+  }
+
+  function startCanvasPan(event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    panning = true;
+    panStart = { x: event.clientX, y: event.clientY, panX: canvasPanX, panY: canvasPanY };
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  }
+
+  function moveCanvasPan(event: PointerEvent) {
+    if (!panning) return;
+    canvasPanX = panStart.panX + (event.clientX - panStart.x);
+    canvasPanY = panStart.panY + (event.clientY - panStart.y);
+  }
+
+  function endCanvasPan(event: PointerEvent) {
+    if (!panning) return;
+    panning = false;
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId);
+  }
 
   const ensureDefaults = (theme: ThemeV2Definition): ThemeV2Definition => ({
     ...theme,
     typography: {
       body: theme.typography?.body ?? 'Sora Variable',
       heading: theme.typography?.heading ?? theme.typography?.body ?? 'Sora Variable',
+      ...(theme.typography?.mono ? { mono: theme.typography.mono } : {}),
     },
     fonts: theme.fonts ?? [],
     elements: theme.elements ?? [],
+    groups: theme.groups ?? [],
   });
 
   type EditorSnapshot = {
@@ -401,6 +831,23 @@
     !loading && Boolean(lastSavedKey) && snapshotKey(captureSnapshot()) !== lastSavedKey
   );
 
+  $effect(() => {
+    const searching = layerSearchActive;
+    if (searching || leftTab !== 'layers') return;
+    const key = selectedGroupId
+      ? `g:${selectedGroupId}`
+      : selectedIds[0]
+        ? `e:${selectedIds[0]}`
+        : '';
+    if (!key || !layerListHost) return;
+    const host = layerListHost;
+    requestAnimationFrame(() => {
+      host
+        .querySelector<HTMLElement>(`[data-layer-key="${key}"]`)
+        ?.scrollIntoView({ block: 'nearest' });
+    });
+  });
+
   function readDraft(): ThemeEditorDraft | undefined {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -430,6 +877,7 @@
     definition = ensureDefaults(normalizeThemeV2(recoverableDraft.definition));
     pickedAssets = recoverableDraft.pickedAssets.map((asset) => ({ ...asset }));
     selectedIds = [];
+    selectedGroupId = undefined;
     recoverableDraft = undefined;
     resetHistory();
     statusMessage = 'Draft restored';
@@ -500,9 +948,20 @@
     selectedIds = selectedIds.filter((id) =>
       definition.elements?.some((element) => element.id === id)
     );
+    selectedGroupId = definition.groups?.some((group) => group.id === selectedGroupId)
+      ? selectedGroupId
+      : undefined;
+    selectedBehaviorId = definition.behaviors?.some(
+      (behavior) => behavior.id === selectedBehaviorId
+    )
+      ? selectedBehaviorId
+      : undefined;
   }
 
   function selectElement(id: string | undefined, additive = false) {
+    selectedGroupId = undefined;
+    selectedBehaviorId = undefined;
+    if (leftTab === 'logic') leftTab = 'layers';
     if (!id) {
       selectedIds = [];
       return;
@@ -519,30 +978,447 @@
   }
 
   function selectMany(ids: string[], additive = false) {
+    selectedGroupId = undefined;
+    selectedBehaviorId = undefined;
+    if (leftTab === 'logic') leftTab = 'layers';
     const valid = ids.filter((id) => elements.some((element) => element.id === id));
-    selectedIds = additive ? [...new Set([...selectedIds, ...valid])] : valid;
+    selectedIds = additive ? [...new SvelteSet([...selectedIds, ...valid])] : valid;
+  }
+
+  function selectGroup(id: string | undefined) {
+    selectedIds = [];
+    selectedBehaviorId = undefined;
+    selectedGroupId = id;
+    leftTab = 'layers';
+  }
+
+  function expandGroupPath(groupId: string | undefined) {
+    const seen = new SvelteSet<string>();
+    let current = groupId ? groups.find((group) => group.id === groupId) : undefined;
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      current.collapsed = false;
+      current = current.parentId
+        ? groups.find((group) => group.id === current?.parentId)
+        : undefined;
+    }
+  }
+
+  function openLinkedLogic(type: 'element' | 'group', id: string) {
+    const groupId =
+      type === 'group'
+        ? groups.find((group) => group.id === id)?.parentId
+        : elements.find((element) => element.id === id)?.groupId;
+    expandGroupPath(groupId);
+    if (type === 'group') selectGroup(id);
+    else selectElement(id);
+    leftTab = 'layers';
+    logicFocusKey = `${type}:${id}`;
+    logicFocusToken += 1;
+  }
+
+  function jumpLogicTarget(direction: 1 | -1) {
+    if (logicTargets.length === 0) return;
+    const index =
+      currentLogicTargetIndex === -1
+        ? direction > 0
+          ? 0
+          : logicTargets.length - 1
+        : (currentLogicTargetIndex + direction + logicTargets.length) % logicTargets.length;
+    const target = logicTargets[index];
+    openLinkedLogic(target.type, target.id);
+  }
+
+  function openLogicTab() {
+    selectedIds = [];
+    selectedGroupId = undefined;
+    leftTab = 'logic';
+    if (!selectedBehaviorId) selectedBehaviorId = behaviors[0]?.id;
+  }
+
+  function groupLabel(group: ThemeV2Group) {
+    return group.name?.trim() || 'Group';
+  }
+
+  function isElementLockedByGroups(element: ThemeV2Element) {
+    let group = element.groupId
+      ? groups.find((candidate) => candidate.id === element.groupId)
+      : undefined;
+    const seen = new SvelteSet<string>();
+    while (group && !seen.has(group.id)) {
+      if (group.locked) return true;
+      seen.add(group.id);
+      group = group.parentId
+        ? groups.find((candidate) => candidate.id === group?.parentId)
+        : undefined;
+    }
+    return false;
+  }
+
+  function selectBehavior(id: string | undefined) {
+    selectedBehaviorId = id;
+    selectedIds = [];
+    selectedGroupId = undefined;
+    leftTab = 'logic';
+  }
+
+  function createBehavior(target?: ThemeV2BehaviorTarget) {
+    if (behaviors.length >= 100) {
+      notifyError('A theme can contain at most 100 logic rules.');
+      return undefined;
+    }
+    const behavior = createThemeV2Behavior(behaviors.length, target);
+    definition.behaviors = [...behaviors, behavior];
+    if (target?.type === 'element') {
+      const element = elements.find((candidate) => candidate.id === target.id);
+      if (element) element.interactive = true;
+    }
+    return behavior;
+  }
+
+  function addBehavior() {
+    const behavior = createBehavior();
+    if (behavior) selectBehavior(behavior.id);
+  }
+
+  function deleteBehavior(id = selectedBehaviorId) {
+    if (!id) return;
+    definition.behaviors = behaviors.filter((behavior) => behavior.id !== id);
+    if (selectedBehaviorId === id) selectBehavior(undefined);
+  }
+
+  function collectGroupIds(rootId: string) {
+    const ids = new SvelteSet<string>();
+    const visit = (groupId: string) => {
+      if (ids.has(groupId)) return;
+      ids.add(groupId);
+      for (const child of groups.filter((group) => group.parentId === groupId)) {
+        visit(child.id);
+      }
+    };
+    visit(rootId);
+    return ids;
+  }
+
+  function pruneBehaviorsAfterRemoval({
+    groups: removedGroups,
+    elements: removedElements,
+  }: {
+    groups?: ReadonlySet<string>;
+    elements?: ReadonlySet<string>;
+  } = {}) {
+    const groupIds = removedGroups ?? new SvelteSet<string>();
+    const elementIds = removedElements ?? new SvelteSet<string>();
+    const current = definition.behaviors ?? [];
+
+    const remaining = current.filter((behavior) => {
+      if (behavior.target?.type === 'element' && elementIds.has(behavior.target.id)) return false;
+      if (behavior.target?.type === 'group' && groupIds.has(behavior.target.id)) return false;
+
+      const trigger = behavior.trigger;
+      if (
+        (trigger.type === 'click' || trigger.type === 'hover' || trigger.type === 'leave') &&
+        trigger.elementId &&
+        elementIds.has(trigger.elementId)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    let changed = remaining.length !== current.length;
+    const cleaned = remaining.map((behavior) => {
+      let behaviorChanged = false;
+      const conditions = (behavior.conditions ?? []).filter((condition) => {
+        if (condition.type === 'visible' && elementIds.has(condition.elementId)) {
+          behaviorChanged = true;
+          return false;
+        }
+        if (condition.type === 'groupVisible' && groupIds.has(condition.groupId)) {
+          behaviorChanged = true;
+          return false;
+        }
+        return true;
+      });
+      const actions = behavior.actions.filter((action) => {
+        if (
+          (action.type === 'showElement' ||
+            action.type === 'hideElement' ||
+            action.type === 'toggleElement') &&
+          elementIds.has(action.elementId)
+        ) {
+          behaviorChanged = true;
+          return false;
+        }
+        if (
+          (action.type === 'showGroup' ||
+            action.type === 'hideGroup' ||
+            action.type === 'toggleGroup') &&
+          groupIds.has(action.groupId)
+        ) {
+          behaviorChanged = true;
+          return false;
+        }
+        return true;
+      });
+
+      if (!behaviorChanged) return behavior;
+      changed = true;
+      return { ...behavior, conditions, actions };
+    });
+
+    if (!changed) return 0;
+
+    definition.behaviors = cleaned;
+    if (selectedBehaviorId && !cleaned.some((behavior) => behavior.id === selectedBehaviorId)) {
+      selectedBehaviorId = undefined;
+    }
+    return current.length - remaining.length;
+  }
+
+  function removeGroupTree(rootId: string) {
+    const ids = collectGroupIds(rootId);
+    const removedElements = new SvelteSet(
+      elements
+        .filter((element) => element.groupId && ids.has(element.groupId))
+        .map((element) => element.id)
+    );
+    definition.groups = groups.filter((group) => !ids.has(group.id));
+    definition.elements = elements.filter((element) => !removedElements.has(element.id));
+    pruneBehaviorsAfterRemoval({ groups: ids, elements: removedElements });
+    if (selectedGroupId && ids.has(selectedGroupId)) selectedGroupId = undefined;
+    selectedIds = selectedIds.filter((id) => !removedElements.has(id));
+  }
+
+  function requestGroupDelete(id = selectedGroupId) {
+    if (!id || !groups.some((group) => group.id === id)) return;
+    deleteGroupId = id;
+  }
+
+  function confirmGroupDelete() {
+    const id = deleteGroupId;
+    if (!id) return;
+
+    const group = groups.find((candidate) => candidate.id === id);
+    const ids = collectGroupIds(id);
+    const layerCount = elements.filter(
+      (element) => element.groupId && ids.has(element.groupId)
+    ).length;
+    const label = group ? groupLabel(group) : 'Group';
+
+    deleteGroupId = undefined;
+    removeGroupTree(id);
+    statusMessage =
+      layerCount > 0
+        ? `Deleted ${label} and ${layerCount} layer${layerCount === 1 ? '' : 's'}`
+        : `Deleted ${label}`;
+  }
+
+  function addGroup(name?: string) {
+    let id = `group_${Date.now().toString(36)}`;
+    let suffix = 2;
+    while (groups.some((group) => group.id === id))
+      id = `group_${Date.now().toString(36)}_${suffix++}`;
+    const group: ThemeV2Group = {
+      id,
+      name: name ?? `Group ${groups.length + 1}`,
+      collapsed: false,
+    };
+    definition.groups = [...groups, group];
+    selectedIds = [];
+    selectedGroupId = id;
+    leftTab = 'layers';
+    return group;
+  }
+
+  function groupSelection() {
+    if (selectedElements.length === 0) return;
+    const targets = [...selectedElements];
+    const parents = new SvelteSet(targets.map((element) => element.groupId));
+    const parentId = parents.size === 1 ? [...parents][0] : undefined;
+    const group = addGroup();
+    if (parentId) {
+      group.parentId = parentId;
+      const parent = groups.find((candidate) => candidate.id === parentId);
+      if (parent) parent.collapsed = false;
+    }
+    const targetSet = new SvelteSet(targets.map((element) => element.id));
+    definition.elements = elements.map((element) =>
+      targetSet.has(element.id) ? { ...element, groupId: group.id } : element
+    );
+  }
+
+  function removeSelectedFromGroup() {
+    if (selectedElements.length === 0) return;
+    for (const element of selectedElements) {
+      if (!element.groupId) continue;
+      element.groupId = undefined;
+    }
+  }
+
+  function ungroupGroup(id = selectedGroupId) {
+    const group = id ? groups.find((candidate) => candidate.id === id) : undefined;
+    if (!group) return;
+    const parentId = group.parentId;
+    definition.groups = groups
+      .filter((candidate) => candidate.id !== group.id)
+      .map((candidate) =>
+        candidate.parentId === group.id ? { ...candidate, parentId } : candidate
+      );
+    definition.elements = elements.map((element) =>
+      element.groupId === group.id ? { ...element, groupId: parentId } : element
+    );
+    pruneBehaviorsAfterRemoval({ groups: new SvelteSet([group.id]) });
+    selectedGroupId = undefined;
+  }
+
+  function toggleGroupCollapsed(group: ThemeV2Group) {
+    group.collapsed = !group.collapsed;
+  }
+
+  function setAllGroupsCollapsed(collapsed: boolean) {
+    if (groups.length === 0) return;
+    definition.groups = groups.map((group) => ({ ...group, collapsed }));
+    statusMessage = collapsed ? 'Collapsed all groups' : 'Expanded all groups';
+  }
+
+  function toggleAllGroups() {
+    setAllGroupsCollapsed(anyGroupExpanded);
+  }
+
+  async function focusLayerSearch() {
+    leftTab = 'layers';
+    await tick();
+    layerSearchInput?.focus();
+    layerSearchInput?.select();
+  }
+
+  function toggleGroupFlag(group: ThemeV2Group, flag: 'hidden' | 'locked') {
+    group[flag] = !group[flag];
+  }
+
+  function groupDescendantCount(groupId: string, seen = new SvelteSet<string>()): number {
+    if (seen.has(groupId)) return 0;
+    seen.add(groupId);
+    let count = elements.filter((element) => element.groupId === groupId).length;
+    for (const child of groups.filter((group) => group.parentId === groupId)) {
+      count += groupDescendantCount(child.id, seen);
+    }
+    return count;
+  }
+
+  function validGroupId(id: string | undefined) {
+    return id && groups.some((group) => group.id === id) ? id : undefined;
+  }
+
+  function canNestGroup(groupId: string, parentId: string | undefined) {
+    if (!parentId) return true;
+    if (groupId === parentId) return false;
+    return !collectGroupIds(groupId).has(parentId);
+  }
+
+  function moveElementIntoGroup(sourceId: string, groupId: string) {
+    const source = elements.find((element) => element.id === sourceId);
+    const group = groups.find((candidate) => candidate.id === groupId);
+    if (!source || !group) return false;
+
+    const remaining = elements.filter((element) => element.id !== sourceId);
+    const groupIds = collectGroupIds(groupId);
+    let topIndex = -1;
+    remaining.forEach((element, index) => {
+      if (element.groupId && groupIds.has(element.groupId)) topIndex = index;
+    });
+
+    // Elements are stored bottom-to-top, so inserting after the group's top
+    // child places the dragged layer at the top of that group.
+    source.groupId = groupId;
+    remaining.splice(topIndex + 1, 0, source);
+    definition.elements = remaining;
+    group.collapsed = false;
+    expandGroupPath(group.id);
+    statusMessage = `Moved ${elementLabel(source)} into ${groupLabel(group)}`;
+    return true;
+  }
+
+  function moveElementBetween(sourceId: string, targetId: string, position: 'above' | 'below') {
+    if (sourceId === targetId) return false;
+    const source = elements.find((element) => element.id === sourceId);
+    const target = elements.find((element) => element.id === targetId);
+    if (!source || !target) return false;
+
+    const remaining = elements.filter((element) => element.id !== sourceId);
+    const targetIndex = remaining.findIndex((element) => element.id === targetId);
+    if (targetIndex < 0) return false;
+
+    // The layer list is rendered top-to-bottom, while `elements` is ordered
+    // bottom-to-top. Inserting after the target in the array moves the layer
+    // above it in the list.
+    const insertAt = position === 'above' ? targetIndex + 1 : targetIndex;
+    const parentId = validGroupId(target.groupId);
+    source.groupId = parentId;
+    remaining.splice(insertAt, 0, source);
+    definition.elements = remaining;
+    if (parentId) expandGroupPath(parentId);
+    statusMessage = `Moved ${elementLabel(source)} ${position} ${elementLabel(target)}`;
+    return true;
+  }
+
+  function moveGroupToParent(groupId: string, parentId: string | undefined) {
+    const group = groups.find((candidate) => candidate.id === groupId);
+    if (!group || group.parentId === parentId) return false;
+    if (!canNestGroup(groupId, parentId)) return false;
+
+    const parent = parentId ? groups.find((candidate) => candidate.id === parentId) : undefined;
+    group.parentId = parent?.id;
+    if (parent) {
+      parent.collapsed = false;
+      expandGroupPath(parent.id);
+    }
+    statusMessage = parent
+      ? `Moved ${groupLabel(group)} into ${groupLabel(parent)}`
+      : `Moved ${groupLabel(group)} out of its group`;
+    return true;
+  }
+
+  function moveElementToRoot(sourceId: string) {
+    const source = elements.find((element) => element.id === sourceId);
+    if (!source || !source.groupId) return false;
+    source.groupId = undefined;
+    statusMessage = `Moved ${elementLabel(source)} out of its group`;
+    return true;
   }
 
   function closeContextMenu() {
     contextMenuOpen = false;
+    layerContextMenuOpen = false;
+    contextMenuTargetId = undefined;
+    contextMenuGroupId = undefined;
   }
 
   function prepareContextMenu(targetId: string | undefined) {
     if (loading) return;
 
+    contextMenuGroupId = undefined;
     if (targetId) {
       if (!selectedSet.has(targetId)) selectElement(targetId);
     } else {
       selectedIds = [];
+      selectedGroupId = undefined;
     }
     contextMenuTargetId = targetId;
   }
 
+  function prepareGroupContextMenu(groupId: string) {
+    if (loading) return;
+    selectedIds = [];
+    selectedGroupId = groupId;
+    contextMenuTargetId = undefined;
+    contextMenuGroupId = groupId;
+  }
+
   function elementLabel(element: ThemeV2Element) {
-    if (element.name?.trim()) return element.name.trim();
-    if (element.type === 'text') return element.text.slice(0, 36) || 'Text layer';
-    if (element.type === 'shape') return element.shape;
-    return element.src.split('/').pop() || element.type;
+    return themeElementLabel(element);
   }
 
   function moveElements(updates: { id: string; x: number; y: number }[]) {
@@ -628,55 +1504,100 @@
     }
   }
 
-  function reorderLayer(sourceId: string, targetId: string, position: 'above' | 'below') {
-    if (sourceId === targetId) return;
-    const sourceIndex = elements.findIndex((element) => element.id === sourceId);
-    if (sourceIndex < 0) return;
-
-    const source = elements[sourceIndex];
-    const remaining = elements.filter((element) => element.id !== sourceId);
-    const targetIndex = remaining.findIndex((element) => element.id === targetId);
-    if (targetIndex < 0) return;
-
-    // The layer list is rendered top-to-bottom, while `elements` is ordered
-    // bottom-to-top. Inserting after the target in the array moves the layer
-    // above it in the list.
-    const insertAt = position === 'above' ? targetIndex + 1 : targetIndex;
-    remaining.splice(insertAt, 0, source);
-    definition.elements = remaining;
-  }
-
-  function startLayerDrag(event: DragEvent, id: string) {
-    draggingLayerId = id;
+  function startLayerDrag(event: DragEvent, kind: 'element' | 'group', id: string) {
+    draggingLayer = { kind, id };
     dropTarget = undefined;
+
+    if (kind === 'group') {
+      if (selectedGroupId !== id) selectGroup(id);
+    } else if (!selectedSet.has(id)) {
+      selectElement(id);
+    }
+
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', id);
     }
   }
 
-  function updateLayerDrop(event: DragEvent, id: string) {
-    if (!draggingLayerId || draggingLayerId === id) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  function dropPosition(event: DragEvent): 'above' | 'below' {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    dropTarget = {
-      id,
-      position: event.clientY < rect.top + rect.height / 2 ? 'above' : 'below',
-    };
+    return event.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
   }
 
-  function dropLayer(event: DragEvent, id: string) {
-    event.preventDefault();
-    if (draggingLayerId && dropTarget) {
-      reorderLayer(draggingLayerId, id, dropTarget.position);
+  function updateGroupDrop(event: DragEvent, groupId: string) {
+    const source = draggingLayer;
+    if (!source) return;
+    if (source.kind === 'group' && !canNestGroup(source.id, groupId)) {
+      if (dropTarget?.mode === 'inside' && dropTarget.groupId === groupId) {
+        dropTarget = undefined;
+      }
+      return;
     }
-    draggingLayerId = undefined;
-    dropTarget = undefined;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    dropTarget = { mode: 'inside', groupId };
+  }
+
+  function updateElementDrop(event: DragEvent, elementId: string) {
+    if (draggingLayer?.kind !== 'element' || draggingLayer.id === elementId) {
+      if (dropTarget?.mode === 'between' && dropTarget.elementId === elementId) {
+        dropTarget = undefined;
+      }
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    dropTarget = { mode: 'between', elementId, position: dropPosition(event) };
+  }
+
+  function updateRootDrop(event: DragEvent) {
+    if (!draggingLayer) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    dropTarget = { mode: 'root' };
+  }
+
+  function dropLayerOnGroup(event: DragEvent, groupId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const source = draggingLayer;
+    if (source) {
+      if (source.kind === 'element') moveElementIntoGroup(source.id, groupId);
+      else moveGroupToParent(source.id, groupId);
+    }
+    endLayerDrag();
+  }
+
+  function dropLayerOnElement(event: DragEvent, elementId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const source = draggingLayer;
+    if (source?.kind === 'element') {
+      const position = dropTarget?.mode === 'between' ? dropTarget.position : dropPosition(event);
+      moveElementBetween(source.id, elementId, position);
+    }
+    endLayerDrag();
+  }
+
+  function dropLayerOnRoot(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    const source = draggingLayer;
+    if (source) {
+      if (source.kind === 'element') moveElementToRoot(source.id);
+      else moveGroupToParent(source.id, undefined);
+    }
+    endLayerDrag();
   }
 
   function endLayerDrag() {
-    draggingLayerId = undefined;
+    draggingLayer = undefined;
     dropTarget = undefined;
   }
 
@@ -789,6 +1710,7 @@
         : createDefaultThemeV2();
       definition = ensureDefaults(parsed);
       savedFolder = context.folderName ?? undefined;
+      editorFolderPath = context.folderPath ?? undefined;
       const httpBase = await themeAssetBase();
       assetBase =
         httpBase && context.folderName
@@ -798,9 +1720,12 @@
             : '';
       pickedAssets = [];
       selectedIds = [];
+      selectedGroupId = undefined;
+      layerClipboard = undefined;
       selectedFontsourceId = undefined;
       fontDownloading = false;
       renamingId = undefined;
+      resetCanvasViewState();
       resetHistory();
       lastSavedKey = snapshotKey(captureSnapshot());
       const draft = readDraft();
@@ -812,11 +1737,15 @@
       console.error(error);
       definition = ensureDefaults(createDefaultThemeV2());
       savedFolder = undefined;
+      editorFolderPath = undefined;
       assetBase = '';
       pickedAssets = [];
       selectedIds = [];
+      selectedGroupId = undefined;
+      layerClipboard = undefined;
       selectedFontsourceId = undefined;
       fontDownloading = false;
+      resetCanvasViewState();
       resetHistory();
       lastSavedKey = snapshotKey(captureSnapshot());
       recoverableDraft = undefined;
@@ -855,6 +1784,7 @@
     video: [{ name: 'Video (WebM recommended)', extensions: ['webm', 'mp4', 'm4v', 'mov'] }],
     audio: [{ name: 'Audio', extensions: ['mp3', 'ogg', 'wav', 'm4a', 'flac'] }],
     font: [{ name: 'Font', extensions: ['woff2', 'woff', 'ttf', 'otf'] }],
+    lottie: [{ name: 'Lottie animation', extensions: ['json'] }],
   };
 
   async function chooseAsset(kind: AssetKind): Promise<ThemeV2Asset | undefined> {
@@ -868,7 +1798,9 @@
             ? 'Choose a video'
             : kind === 'audio'
               ? 'Choose theme music'
-              : 'Import a font file',
+              : kind === 'lottie'
+                ? 'Choose a Lottie JSON animation'
+                : 'Import a font file',
       filters: assetFilters[kind],
     });
     if (typeof selected !== 'string') return;
@@ -878,6 +1810,16 @@
     const asset = { source: selected, name };
     pickedAssets = [...pickedAssets.filter((candidate) => candidate.name !== name), asset];
     return asset;
+  }
+
+  function setVariableDefault(name: string, value: ThemeV2ScriptValue | undefined) {
+    const variables = { ...(definition.variables ?? {}) };
+    if (value === undefined) {
+      delete variables[name];
+    } else {
+      variables[name] = value;
+    }
+    definition.variables = variables;
   }
 
   function setBackgroundType(type: ThemeV2Definition['background']['type']) {
@@ -918,6 +1860,7 @@
         blur,
       };
     }
+    if (type === 'video') definition.audio = undefined;
   }
 
   async function chooseBackground(type: 'image' | 'video') {
@@ -949,13 +1892,17 @@
   }
 
   async function chooseAudio() {
+    if (definition.background.type === 'video') {
+      notifyError('Theme music cannot be used while a video is selected as the background.');
+      return;
+    }
     const asset = await chooseAsset('audio');
     if (!asset) return;
     definition.audio = { src: asset.name, loop: definition.audio?.loop !== false };
   }
 
   function uniqueFamily(label: string) {
-    const existing = new Set((definition.fonts ?? []).map((font) => font.family));
+    const existing = new SvelteSet((definition.fonts ?? []).map((font) => font.family));
     let family = label.trim() || 'Custom Font';
     let suffix = 2;
     while (existing.has(family)) family = `${label.trim()} ${suffix++}`;
@@ -986,8 +1933,11 @@
       return true;
     }
     if (definition.audio?.src === name) return true;
+    if ((definition.fonts ?? []).some((font) => font.src === name)) return true;
     return elements.some(
-      (element) => (element.type === 'image' || element.type === 'video') && element.src === name
+      (element) =>
+        ((element.type === 'image' || element.type === 'video') && element.src === name) ||
+        (element.type === 'svelte' && element.source.includes(name))
     );
   }
 
@@ -1008,6 +1958,9 @@
       if (definition.typography?.heading === font.family) {
         definition.typography.heading = 'Sora Variable';
       }
+      if (definition.typography?.mono === font.family) {
+        definition.typography.mono = 'Space Mono';
+      }
       for (const element of elements) {
         if (element.type === 'text' && element.fontFamily === font.family) {
           element.fontFamily = 'Sora Variable';
@@ -1022,7 +1975,9 @@
 
   function addText() {
     const element = createThemeV2Element('text', elements.length);
+    if (selectedGroupId) element.groupId = selectedGroupId;
     definition.elements = [...elements, element];
+    selectedGroupId = undefined;
     selectedIds = [element.id];
     leftTab = 'layers';
   }
@@ -1034,14 +1989,60 @@
       | ThemeV2ImageElement
       | ThemeV2VideoElement;
     element.src = asset.name;
+    if (selectedGroupId) element.groupId = selectedGroupId;
     definition.elements = [...elements, element];
+    selectedGroupId = undefined;
     selectedIds = [element.id];
     leftTab = 'layers';
   }
 
   function addShape() {
     const element = createThemeV2Element('shape', elements.length);
+    if (selectedGroupId) element.groupId = selectedGroupId;
     definition.elements = [...elements, element];
+    selectedGroupId = undefined;
+    selectedIds = [element.id];
+    leftTab = 'layers';
+  }
+
+  function addSvelte() {
+    const element = createThemeV2Element('svelte', elements.length);
+    if (selectedGroupId) element.groupId = selectedGroupId;
+    definition.elements = [...elements, element];
+    selectedGroupId = undefined;
+    selectedIds = [element.id];
+    leftTab = 'layers';
+  }
+
+  function addLayer(
+    type:
+      | 'data'
+      | 'icon'
+      | 'repeater'
+      | 'gauge'
+      | 'ticker'
+      | 'button'
+      | 'path'
+      | 'particles'
+      | 'clock'
+      | 'countdown'
+  ) {
+    const element = createThemeV2Element(type, elements.length);
+    if (selectedGroupId) element.groupId = selectedGroupId;
+    definition.elements = [...elements, element];
+    selectedGroupId = undefined;
+    selectedIds = [element.id];
+    leftTab = 'layers';
+  }
+
+  async function addLottie() {
+    const asset = await chooseAsset('lottie');
+    if (!asset) return;
+    const element = createThemeV2Element('lottie', elements.length) as ThemeV2LottieElement;
+    element.src = asset.name;
+    if (selectedGroupId) element.groupId = selectedGroupId;
+    definition.elements = [...elements, element];
+    selectedGroupId = undefined;
     selectedIds = [element.id];
     leftTab = 'layers';
   }
@@ -1051,22 +2052,215 @@
     if (element) Object.assign(element, patch);
   }
 
+  function patchGroup(id: string, patch: Partial<ThemeV2Group>) {
+    const group = groups.find((candidate) => candidate.id === id);
+    if (group) Object.assign(group, patch);
+  }
+
   function updateElement(id: string, patch: Partial<ThemeV2Element>) {
     patchElement(id, patch);
   }
 
-  async function replaceSelectedAsset(kind: 'image' | 'video') {
-    if (
-      !selectedElement ||
-      (selectedElement.type !== 'image' && selectedElement.type !== 'video')
-    ) {
+  async function replaceSelectedAsset(kind: 'image' | 'video' | 'lottie') {
+    const element = selectedElement;
+    if (!element) return;
+    if (kind === 'lottie' ? element.type !== 'lottie' : element.type !== kind) return;
+    const asset = await chooseAsset(kind);
+    if (asset) updateElement(element.id, { src: asset.name });
+  }
+
+  async function pickElementMask() {
+    const element = selectedElement;
+    if (!element) return;
+    const asset = await chooseAsset('image');
+    if (!asset) return;
+    element.mask = {
+      shape: 'image',
+      src: asset.name,
+      fit: element.mask?.fit ?? 'cover',
+      radius: element.mask?.radius ?? 0,
+      sides: element.mask?.sides ?? 6,
+      innerRadius: element.mask?.innerRadius ?? 0.5,
+    };
+  }
+
+  async function pickRepeaterImage() {
+    const element = selectedElement;
+    if (!element || element.type !== 'repeater') return;
+    const asset = await chooseAsset('image');
+    if (asset) updateElement(element.id, { src: asset.name, source: 'image' });
+  }
+
+  async function pickGroupMask() {
+    const group = selectedGroup;
+    if (!group) return;
+    const asset = await chooseAsset('image');
+    if (!asset) return;
+    group.mask = {
+      shape: 'image',
+      src: asset.name,
+      fit: group.mask?.fit ?? 'cover',
+      radius: group.mask?.radius ?? 0,
+      sides: group.mask?.sides ?? 6,
+      innerRadius: group.mask?.innerRadius ?? 0.5,
+    };
+  }
+
+  function copySelection() {
+    if (!selectedGroup && selectedElements.length === 0) return false;
+    const snapshot = $state.snapshot(definition) as ThemeV2Definition;
+    if (selectedGroup) {
+      const groupIds = collectGroupIds(selectedGroup.id);
+      const copiedGroups = (snapshot.groups ?? []).filter((group) => groupIds.has(group.id));
+      const copiedElements = (snapshot.elements ?? []).filter(
+        (element) => element.groupId && groupIds.has(element.groupId)
+      );
+      layerClipboard = { groups: copiedGroups, elements: copiedElements };
+      statusMessage = `Copied ${groupLabel(selectedGroup)}`;
+      return true;
+    }
+
+    if (selectedElements.length === 0) return false;
+    const copiedElements = (snapshot.elements ?? []).filter((element) =>
+      selectedSet.has(element.id)
+    );
+    if (copiedElements.length === 0) return false;
+    layerClipboard = { groups: [], elements: copiedElements };
+    statusMessage = `Copied ${copiedElements.length} layer${copiedElements.length === 1 ? '' : 's'}`;
+    return true;
+  }
+
+  function cutSelection() {
+    if (selectedGroup) {
+      if (!copySelection()) return;
+      const label = groupLabel(selectedGroup);
+      removeGroupTree(selectedGroup.id);
+      statusMessage = `Cut ${label}`;
       return;
     }
-    const asset = await chooseAsset(kind);
-    if (asset) updateElement(selectedElement.id, { src: asset.name });
+
+    if (selectedElements.length === 0) return;
+    const count = selectedElements.length;
+    if (!copySelection()) return;
+    deleteSelected();
+    statusMessage = `Cut ${count} layer${count === 1 ? '' : 's'}`;
+  }
+
+  function pasteClipboard(targetGroupId?: string) {
+    const clipboard = layerClipboard;
+    if (!clipboard) return;
+
+    const targetGroup = targetGroupId
+      ? groups.find((group) => group.id === targetGroupId)
+      : undefined;
+    if (clipboard.groups.length === 0 && clipboard.elements.length === 0) return;
+
+    pasteSerial += 1;
+    const suffix = `${Date.now().toString(36)}_${pasteSerial}`;
+    const groupIdMap = new SvelteMap<string, string>();
+    for (const [index, group] of clipboard.groups.entries()) {
+      groupIdMap.set(group.id, `group_${suffix}_${index}`);
+    }
+
+    const copiedGroups = clipboard.groups.map((group) => ({
+      ...group,
+      id: groupIdMap.get(group.id)!,
+      parentId: (group.parentId ? groupIdMap.get(group.parentId) : undefined) ?? targetGroup?.id,
+      collapsed: false,
+    }));
+
+    const copiedElements = clipboard.elements.map((element, index) => {
+      let groupId: string | undefined;
+      if (element.groupId && groupIdMap.has(element.groupId)) {
+        groupId = groupIdMap.get(element.groupId);
+      } else if (targetGroup) {
+        groupId = targetGroup.id;
+      } else if (element.groupId && groups.some((group) => group.id === element.groupId)) {
+        groupId = element.groupId;
+      }
+
+      return {
+        ...element,
+        id: `element_${suffix}_${index}`,
+        groupId,
+        x: Math.max(0, Math.min(1000 - element.width, element.x + 24)),
+        y: Math.max(0, Math.min(650 - element.height, element.y + 24)),
+      } as ThemeV2Element;
+    });
+
+    definition.groups = [...groups, ...copiedGroups];
+    definition.elements = [...elements, ...copiedElements];
+    if (targetGroup) targetGroup.collapsed = false;
+
+    selectedBehaviorId = undefined;
+    leftTab = 'layers';
+    if (copiedGroups.length > 0) {
+      const primary = copiedGroups.find((group) => !group.parentId) ?? copiedGroups[0];
+      selectedIds = [];
+      selectedGroupId = primary?.id;
+    } else {
+      selectedIds = copiedElements.map((element) => element.id);
+      selectedGroupId = undefined;
+    }
+
+    const parts: string[] = [];
+    if (copiedGroups.length > 0) {
+      parts.push(`${copiedGroups.length} group${copiedGroups.length === 1 ? '' : 's'}`);
+    }
+    if (copiedElements.length > 0) {
+      parts.push(`${copiedElements.length} layer${copiedElements.length === 1 ? '' : 's'}`);
+    }
+    statusMessage = `Pasted ${parts.join(' and ')}`;
+  }
+
+  function duplicateGroup(groupId = selectedGroupId) {
+    const source = groupId ? groups.find((group) => group.id === groupId) : undefined;
+    if (!source) return false;
+
+    const snapshot = $state.snapshot(definition) as ThemeV2Definition;
+    const treeIds = collectGroupIds(source.id);
+    const sourceGroups = (snapshot.groups ?? []).filter((group) => treeIds.has(group.id));
+    const sourceElements = (snapshot.elements ?? []).filter(
+      (element) => element.groupId && treeIds.has(element.groupId)
+    );
+    const stamp = `${Date.now().toString(36)}_${++pasteSerial}`;
+    const idMap = new SvelteMap<string, string>();
+    sourceGroups.forEach((group, index) => idMap.set(group.id, `group_${stamp}_${index}`));
+
+    const copiedGroups = sourceGroups.map((group) => ({
+      ...group,
+      id: idMap.get(group.id)!,
+      parentId: group.id === source.id ? group.parentId : idMap.get(group.parentId ?? ''),
+      name: group.id === source.id ? `${groupLabel(source)} copy` : group.name,
+      collapsed: group.id === source.id ? false : group.collapsed,
+    }));
+    const copiedElements = sourceElements.map((element, index) => ({
+      ...element,
+      id: `element_${stamp}_${index}`,
+      groupId: element.groupId ? idMap.get(element.groupId) : undefined,
+      x: Math.max(0, Math.min(1000 - element.width, element.x + 24)),
+      y: Math.max(0, Math.min(650 - element.height, element.y + 24)),
+    })) as ThemeV2Element[];
+
+    definition.groups = [
+      ...groups.map((group) =>
+        group.id === source.parentId ? { ...group, collapsed: false } : group
+      ),
+      ...copiedGroups,
+    ];
+    definition.elements = [...elements, ...copiedElements];
+    selectedIds = [];
+    selectedGroupId = idMap.get(source.id);
+    leftTab = 'layers';
+    statusMessage = `Duplicated ${groupLabel(source)}`;
+    return true;
   }
 
   function duplicateSelected() {
+    if (selectedGroup) {
+      duplicateGroup(selectedGroup.id);
+      return;
+    }
     if (selectedElements.length === 0) return;
     const stamp = Date.now().toString(36);
     const copies = selectedElements.map((element, index) => ({
@@ -1081,7 +2275,9 @@
 
   function deleteSelected() {
     if (selectedIds.length === 0) return;
-    definition.elements = elements.filter((element) => !selectedSet.has(element.id));
+    const removedElements = new SvelteSet(selectedIds);
+    definition.elements = elements.filter((element) => !removedElements.has(element.id));
+    pruneBehaviorsAfterRemoval({ elements: removedElements });
     selectedIds = [];
   }
 
@@ -1106,6 +2302,49 @@
     const modifier = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
 
+    if (
+      !typing &&
+      event.altKey &&
+      logicTargets.length > 0 &&
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+    ) {
+      event.preventDefault();
+      jumpLogicTarget(event.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+    if (
+      modifier &&
+      key === 'f' &&
+      !typing &&
+      !shortcutsOpen &&
+      !closeDialogOpen &&
+      !validationOpen
+    ) {
+      event.preventDefault();
+      void focusLayerSearch();
+      return;
+    }
+    if (modifier && !typing && (key === '+' || key === '=')) {
+      event.preventDefault();
+      zoomCanvasBy(CANVAS_ZOOM_STEP);
+      return;
+    }
+    if (modifier && !typing && key === '-') {
+      event.preventDefault();
+      zoomCanvasBy(1 / CANVAS_ZOOM_STEP);
+      return;
+    }
+    if (modifier && !typing && key === '0') {
+      event.preventDefault();
+      resetCanvasView();
+      return;
+    }
+    if (!typing && event.key === '?') {
+      event.preventDefault();
+      shortcutsOpen = true;
+      return;
+    }
+
     if (modifier && key === 'z') {
       if (typing) return;
       event.preventDefault();
@@ -1125,9 +2364,38 @@
       saveTheme();
       return;
     }
+    if (modifier && key === 'c') {
+      if (typing) return;
+      event.preventDefault();
+      copySelection();
+      return;
+    }
+    if (modifier && key === 'x') {
+      if (typing) return;
+      event.preventDefault();
+      cutSelection();
+      return;
+    }
+    if (modifier && key === 'v') {
+      if (typing) return;
+      event.preventDefault();
+      const copiedGroupIsSelected =
+        selectedGroupId &&
+        layerClipboard?.groups.some((group) => group.id === selectedGroupId) === true;
+      const targetGroupId = copiedGroupIsSelected
+        ? undefined
+        : (selectedGroupId ??
+          (selectedElements.length === 1 ? selectedElements[0].groupId : undefined));
+      pasteClipboard(targetGroupId);
+      return;
+    }
     if (event.key === 'Escape') {
-      if (contextMenuOpen) {
-        contextMenuOpen = false;
+      if (shortcutsOpen) {
+        shortcutsOpen = false;
+        return;
+      }
+      if (contextMenuOpen || layerContextMenuOpen) {
+        closeContextMenu();
         return;
       }
       if (validationOpen) {
@@ -1139,7 +2407,12 @@
         closeDialogOpen = false;
         return;
       }
+      if (deleteGroupId) {
+        deleteGroupId = undefined;
+        return;
+      }
       selectedIds = [];
+      selectedGroupId = undefined;
       renamingId = undefined;
       return;
     }
@@ -1149,13 +2422,25 @@
       selectedIds = elements.filter((element) => !element.hidden).map((element) => element.id);
       return;
     }
-    if (typing || selectedIds.length === 0) return;
-
-    if (modifier && key === 'd') {
+    if (modifier && key === 'g') {
+      if (typing) return;
+      event.preventDefault();
+      if (selectedGroup) ungroupGroup();
+      else groupSelection();
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedGroup) {
+      event.preventDefault();
+      requestGroupDelete();
+      return;
+    }
+    if (modifier && key === 'd' && !typing) {
+      if (!selectedGroup && selectedIds.length === 0) return;
       event.preventDefault();
       duplicateSelected();
       return;
     }
+    if (typing || selectedIds.length === 0) return;
     if (modifier && event.key === 'ArrowUp') {
       event.preventDefault();
       moveSelected(1);
@@ -1238,6 +2523,7 @@
       themeToSave.preview = 'preview.png';
       await saveThemeProject(folderName, themeToSave, pickedAssets);
       savedFolder = folderName;
+      editorFolderPath = await path.join(await themesDirectory(), folderName);
       lastSavedKey = snapshotKey(captureSnapshot());
       clearDraft();
       recoverableDraft = undefined;
@@ -1286,8 +2572,22 @@
     if (background.type === 'image' || background.type === 'video') add(background.src);
     add(definition.audio?.src);
     for (const element of elements) {
-      if (element.type === 'image' || element.type === 'video') add(element.src);
+      if (
+        element.type === 'image' ||
+        element.type === 'video' ||
+        element.type === 'lottie' ||
+        (element.type === 'repeater' && element.source === 'image')
+      ) {
+        add(element.src);
+      }
+      add(element.mask?.src);
+      if (element.type === 'svelte') {
+        for (const match of element.source.matchAll(/asset\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) {
+          add(match[1]);
+        }
+      }
     }
+    for (const group of definition.groups ?? []) add(group.mask?.src);
     for (const font of definition.fonts ?? []) add(font.src);
     return refs;
   }
@@ -1318,32 +2618,194 @@
       if ((element.type === 'image' || element.type === 'video') && !element.src.trim()) {
         error(`The ${element.type} layer ${elementLabel(element)} has no asset.`);
       }
+      if (element.type === 'repeater' && element.source === 'image' && !element.src?.trim()) {
+        error(`The repeater ${elementLabel(element)} has no image.`);
+      }
+      if (element.mask?.shape === 'image' && !element.mask.src?.trim()) {
+        error(`The mask on ${elementLabel(element)} has no image.`);
+      }
+      if (
+        element.type === 'button' &&
+        element.action.type === 'url' &&
+        !/^https?:\/\//i.test(element.action.url)
+      ) {
+        error(`The button ${elementLabel(element)} needs a full http(s) URL.`);
+      }
+      if (element.type === 'svelte') {
+        const analysis = await analyzeThemeSvelteSource(
+          element.source,
+          `layer-${element.id}.svelte`
+        );
+        if (!element.source.trim()) {
+          error(`The Svelte layer ${elementLabel(element)} has no source.`);
+        } else if (!analysis.ok) {
+          const first = analysis.errors[0];
+          error(
+            `Svelte layer “${elementLabel(element)}”${first ? `: ${first.message}` : ' could not be compiled.'}`
+          );
+        }
+        for (const issue of analysis.warnings.slice(0, 2)) {
+          warning(
+            `Svelte layer “${elementLabel(element)}” at ${issue.line}:${issue.column}: ${issue.message}`
+          );
+        }
+      }
+    }
+    for (const group of groups) {
+      if (group.mask?.shape === 'image' && !group.mask.src?.trim()) {
+        error(`The mask on group “${group.name?.trim() || group.id}” has no image.`);
+      }
+    }
+
+    const elementIds = new SvelteSet(seenIds);
+    const groupIds = new SvelteSet(groups.map((group) => group.id));
+    const interactiveIds = new SvelteSet(
+      elements.filter((element) => element.interactive).map((element) => element.id)
+    );
+    for (const behavior of behaviors) {
+      const ruleName = behavior.name?.trim() || behavior.id;
+      const pointerTrigger =
+        behavior.trigger.type === 'click' ||
+        behavior.trigger.type === 'hover' ||
+        behavior.trigger.type === 'leave';
+      const elementTargetId = behavior.target?.type === 'element' ? behavior.target.id : undefined;
+      const groupTargetId = behavior.target?.type === 'group' ? behavior.target.id : undefined;
+      const hasScript = behavior.script !== undefined;
+      if (!hasScript && behavior.actions.length === 0) {
+        warning(`Rule “${ruleName}” has no actions.`);
+      }
+      if (hasScript) {
+        const parsed = parseThemeScript(behavior.script ?? '');
+        const firstError = parsed.errors[0];
+        if (firstError) {
+          error(`Rule “${ruleName}” script: ${formatThemeScriptError(firstError)}`);
+        } else if (!(behavior.script ?? '').trim()) {
+          warning(`Rule “${ruleName}” has an empty advanced script.`);
+        } else {
+          if (
+            themeScriptProgramCanLeaveLauncher(parsed.program) &&
+            behavior.trigger.type !== 'click'
+          ) {
+            warning(
+              `Rule “${ruleName}” has an external action that only runs from a click trigger.`
+            );
+          }
+          const scriptRefs = themeScriptProgramReferences(parsed.program);
+          for (const elementId of scriptRefs.elementIds) {
+            if (!elementIds.has(elementId)) {
+              error(
+                `Rule “${ruleName}” script references a layer that no longer exists: ${elementId}`
+              );
+            }
+          }
+          for (const groupId of scriptRefs.groupIds) {
+            if (!groupIds.has(groupId)) {
+              error(
+                `Rule “${ruleName}” script references a group that no longer exists: ${groupId}`
+              );
+            }
+          }
+        }
+      }
+      if (elementTargetId && !elementIds.has(elementTargetId)) {
+        error(`Rule “${ruleName}” is linked to a layer that no longer exists.`);
+      }
+      if (groupTargetId && !groupIds.has(groupTargetId)) {
+        error(`Rule “${ruleName}” is linked to a group that no longer exists.`);
+      }
+      if (pointerTrigger && elementTargetId && !interactiveIds.has(elementTargetId)) {
+        warning(`Rule “${ruleName}” is linked to a layer that is not marked Interactive.`);
+      }
+      if (
+        pointerTrigger &&
+        groupTargetId &&
+        !elements.some(
+          (element) =>
+            element.interactive === true &&
+            themeGroupContainsElement(groups, groupTargetId, element)
+        )
+      ) {
+        warning(`Rule “${ruleName}” needs at least one Interactive layer inside its linked group.`);
+      }
+      if (
+        (behavior.trigger.type === 'click' ||
+          behavior.trigger.type === 'hover' ||
+          behavior.trigger.type === 'leave') &&
+        behavior.trigger.elementId &&
+        !elementIds.has(behavior.trigger.elementId)
+      ) {
+        error(`Rule “${ruleName}” targets a layer that no longer exists.`);
+      }
+      for (const condition of behavior.conditions ?? []) {
+        if (condition.type === 'visible' && !elementIds.has(condition.elementId)) {
+          error(`Rule “${ruleName}” checks a layer that no longer exists.`);
+        }
+        if (condition.type === 'groupVisible' && !groupIds.has(condition.groupId)) {
+          error(`Rule “${ruleName}” checks a group that no longer exists.`);
+        }
+      }
+      if (!hasScript) {
+        for (const action of behavior.actions) {
+          if (
+            (action.type === 'showElement' ||
+              action.type === 'hideElement' ||
+              action.type === 'toggleElement') &&
+            !elementIds.has(action.elementId)
+          ) {
+            error(`Rule “${ruleName}” targets a layer that no longer exists.`);
+          }
+          if (
+            (action.type === 'showGroup' ||
+              action.type === 'hideGroup' ||
+              action.type === 'toggleGroup') &&
+            !groupIds.has(action.groupId)
+          ) {
+            error(`Rule “${ruleName}” targets a group that no longer exists.`);
+          }
+          if (action.type === 'openUrl' && !/^https?:\/\//i.test(action.url)) {
+            error(`Rule “${ruleName}” has a URL that does not start with http:// or https://.`);
+          }
+          if (
+            (action.type === 'launch' || action.type === 'openUrl') &&
+            behavior.trigger.type !== 'click'
+          ) {
+            warning(
+              `Rule “${ruleName}” has an external action that only runs from a click trigger.`
+            );
+          }
+        }
+      }
+      if (
+        pointerTrigger &&
+        'elementId' in behavior.trigger &&
+        behavior.trigger.elementId &&
+        !interactiveIds.has(behavior.trigger.elementId)
+      ) {
+        warning(`Rule “${ruleName}” listens to a layer that is not marked Interactive.`);
+      }
     }
 
     const refs = referencedAssets();
-    const themeFolder = savedFolder
-      ? await path.join(await themesDirectory(), savedFolder, 'assets')
-      : undefined;
+    // The editor is opened with the resolved theme folder, which can be
+    // outside the managed themes directory. Prefer it over rebuilding the
+    // path from the folder name, and use the native metadata command instead
+    // of the fs plugin so the check is not limited by its path scope.
+    const assetsFolder = editorFolderPath
+      ? await path.join(editorFolderPath, 'assets')
+      : savedFolder
+        ? await path.join(await themesDirectory(), savedFolder, 'assets')
+        : undefined;
     let totalBytes = 0;
     let fileCount = 0;
 
     for (const ref of refs) {
       const picked = pickedAssets.find((asset) => asset.name === ref);
-      let size: number | undefined;
-
-      if (picked) {
-        const pickedSize = await invoke<number | null>('file_size', { path: picked.source }).catch(
-          () => null
-        );
-        size = pickedSize ?? undefined;
-      } else if (themeFolder) {
-        const candidate = await path.join(themeFolder, ref);
-        try {
-          if (await fs.exists(candidate)) size = (await fs.stat(candidate)).size;
-        } catch {
-          // A missing or unreadable file is reported below.
-        }
-      }
+      const candidate =
+        picked?.source ?? (assetsFolder ? await path.join(assetsFolder, ref) : undefined);
+      const size = candidate
+        ? ((await invoke<number | null>('file_size', { path: candidate }).catch(() => null)) ??
+          undefined)
+        : undefined;
 
       if (size === undefined) {
         error(`Missing asset: ${ref}. Re-import it before exporting.`);
@@ -1476,7 +2938,286 @@
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} onresize={closeContextMenu} onblur={closeContextMenu} />
+<svelte:window
+  onkeydown={handleKeydown}
+  onresize={closeContextMenu}
+  onblur={() => {
+    closeContextMenu();
+    panning = false;
+  }}
+/>
+
+{#snippet contextMenuItems()}
+  <ContextMenu.Label
+    class="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+  >
+    {#if contextMenuGroup}
+      {groupLabel(contextMenuGroup)}
+    {:else if contextMenuTargetId}
+      {contextMenuSelection.length > 1
+        ? `${contextMenuSelection.length} layers selected`
+        : contextMenuSelection[0]
+          ? elementLabel(contextMenuSelection[0])
+          : 'Layer'}
+    {:else}
+      Canvas
+    {/if}
+  </ContextMenu.Label>
+
+  {#if contextMenuGroup}
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={copySelection}>
+      <Copy />
+      Copy group
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => duplicateGroup(contextMenuGroup?.id)}
+    >
+      <CopyPlus />
+      Duplicate group
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={cutSelection}>
+      <Scissors />
+      Cut group
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      disabled={!layerClipboard}
+      onclick={() => pasteClipboard(contextMenuGroup.id)}
+    >
+      <ClipboardPaste />
+      Paste into group
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => ungroupGroup(contextMenuGroup.id)}
+    >
+      <Ungroup />
+      Ungroup group
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      variant="destructive"
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => requestGroupDelete(contextMenuGroup.id)}
+    >
+      <Trash2 />
+      Delete group
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => toggleGroupFlag(contextMenuGroup, 'hidden')}
+    >
+      {#if contextMenuGroup.hidden}
+        <Eye />
+        Show group
+      {:else}
+        <EyeOff />
+        Hide group
+      {/if}
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => toggleGroupFlag(contextMenuGroup, 'locked')}
+    >
+      {#if contextMenuGroup.locked}
+        <Unlock />
+        Unlock group
+      {:else}
+        <Lock />
+        Lock group
+      {/if}
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => selectGroup(contextMenuGroup.id)}
+    >
+      <MousePointer2 />
+      Edit group
+    </ContextMenu.Item>
+  {:else if contextMenuTargetId}
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={copySelection}>
+      <Copy />
+      Copy
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={cutSelection}>
+      <Scissors />
+      Cut
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      disabled={!layerClipboard}
+      onclick={() =>
+        pasteClipboard(
+          contextMenuSelection.length === 1 ? contextMenuSelection[0].groupId : undefined
+        )}
+    >
+      <ClipboardPaste />
+      Paste
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={duplicateSelected}>
+      <CopyPlus />
+      Duplicate
+    </ContextMenu.Item>
+    {#if contextMenuSelection.length === 1 && contextMenuSelection[0].groupId}
+      <ContextMenu.Item
+        class="gap-2 py-1.5 text-[11px]"
+        onclick={() => {
+          const groupId = contextMenuSelection[0]?.groupId;
+          if (groupId) selectGroup(groupId);
+        }}
+      >
+        <Boxes />
+        Select parent group
+      </ContextMenu.Item>
+    {/if}
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={groupSelection}>
+      <Boxes />
+      Group selection
+    </ContextMenu.Item>
+    {#if contextMenuSelection.some((element) => element.groupId)}
+      <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={removeSelectedFromGroup}>
+        <Ungroup />
+        Remove from group
+      </ContextMenu.Item>
+    {/if}
+    {#if contextMenuSelection.length === 1}
+      <ContextMenu.Item
+        class="gap-2 py-1.5 text-[11px]"
+        disabled={selectedIndex >= elements.length - 1}
+        onclick={() => moveSelected(1)}
+      >
+        <ChevronUp />
+        Bring forward
+      </ContextMenu.Item>
+      <ContextMenu.Item
+        class="gap-2 py-1.5 text-[11px]"
+        disabled={selectedIndex <= 0}
+        onclick={() => moveSelected(-1)}
+      >
+        <ChevronDown />
+        Send backward
+      </ContextMenu.Item>
+    {/if}
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => toggleSelectedFlag('hidden')}>
+      {#if contextMenuAllHidden}
+        <Eye />
+        Show {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+      {:else}
+        <EyeOff />
+        Hide {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+      {/if}
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => toggleSelectedFlag('locked')}>
+      {#if contextMenuAllLocked}
+        <Unlock />
+        Unlock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+      {:else}
+        <Lock />
+        Lock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+      {/if}
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item
+      variant="destructive"
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={deleteSelected}
+    >
+      <Trash2 />
+      Delete {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
+    </ContextMenu.Item>
+  {:else}
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      disabled={!layerClipboard}
+      onclick={() => pasteClipboard()}
+    >
+      <ClipboardPaste />
+      Paste
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addText}>
+      <Type />
+      Add text
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addMedia('image')}>
+      <ImageIcon />
+      Add image
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addMedia('video')}>
+      <Video />
+      Add video
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addShape}>
+      <Shapes />
+      Add shape
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addSvelte}>
+      <Component />
+      Add Svelte component
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('data')}>
+      <Type />
+      Add data layer
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('icon')}>
+      <Sparkles />
+      Add icon
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('repeater')}>
+      <Repeat />
+      Add repeater
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('gauge')}>
+      <Gauge />
+      Add gauge
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('ticker')}>
+      <Megaphone />
+      Add ticker
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('button')}>
+      <MousePointerClick />
+      Add button
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('path')}>
+      <Spline />
+      Add vector path
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('particles')}>
+      <Sparkles />
+      Add particles
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('clock')}>
+      <Clock />
+      Add clock
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('countdown')}>
+      <Timer />
+      Add countdown
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addLottie}>
+      <Film />
+      Add Lottie animation
+    </ContextMenu.Item>
+    <ContextMenu.Separator class="my-1 bg-theme-800" />
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      disabled={elements.length === 0}
+      onclick={() => {
+        selectedIds = elements.filter((element) => !element.hidden).map((element) => element.id);
+      }}
+    >
+      <MousePointer2 />
+      Select all layers
+    </ContextMenu.Item>
+  {/if}
+{/snippet}
 
 {#if selectedFontPreviewCss}
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -1493,7 +3234,7 @@
       </div>
       <div class="min-w-0">
         <div class="flex items-center gap-2">
-          <h1 class="truncate text-sm font-semibold">Advanced theme editor</h1>
+          <h1 class="truncate text-sm font-semibold">Theme editor</h1>
           <Badge
             variant="outline"
             class="border-primary/25 bg-primary/15 px-2 py-0.5 text-[9px] text-primary"
@@ -1507,12 +3248,29 @@
           {/if}
         </div>
         <p class="truncate text-[10px] text-muted-foreground">
-          {definition.name || 'Untitled theme'} · freeform home screen canvas
+          {definition.name || 'Untitled theme'}
         </p>
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <span class="mr-2 hidden text-[10px] text-muted-foreground sm:block">{statusMessage}</span>
+      <span
+        class="mr-2 hidden text-[10px] sm:block {dirty
+          ? 'text-amber-300'
+          : 'text-muted-foreground'}"
+        title={dirty ? 'You have changes that are not saved to the theme folder' : statusMessage}
+      >
+        {dirty ? 'Unsaved changes' : statusMessage}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="size-8"
+        title="Keyboard shortcuts (?)"
+        aria-label="Keyboard shortcuts"
+        onclick={() => (shortcutsOpen = true)}
+      >
+        <Keyboard class="size-4" />
+      </Button>
       <Button
         variant="ghost"
         size="icon"
@@ -1593,83 +3351,9 @@
     </div>
   {/if}
 
-  <div class="grid min-h-0 flex-1 grid-cols-[64px_282px_minmax(0,1fr)_324px] overflow-hidden">
-    <aside class="flex flex-col items-center gap-1.5 border-r border-theme-800 bg-black/25 p-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg {selectedIds.length === 0
-          ? 'bg-primary/20 text-primary hover:bg-primary/25'
-          : ''}"
-        title="Select and move layers"
-        aria-pressed={selectedIds.length === 0}
-        onclick={() => (selectedIds = [])}
-      >
-        <MousePointer2 class="size-4" />
-      </Button>
-      <Separator class="my-1 w-8 bg-theme-800" />
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg text-muted-foreground"
-        title="Add text layer"
-        onclick={addText}
-      >
-        <Type class="size-4" />
-        <span class="text-[8px]">Text</span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg text-muted-foreground"
-        title="Add image layer"
-        onclick={() => addMedia('image')}
-      >
-        <ImageIcon class="size-4" />
-        <span class="text-[8px]">Image</span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg text-muted-foreground"
-        title="Add video layer (WebM recommended)"
-        onclick={() => addMedia('video')}
-      >
-        <Video class="size-4" />
-        <span class="text-[8px]">Video</span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg text-muted-foreground"
-        title="Add shape layer"
-        onclick={addShape}
-      >
-        <Shapes class="size-4" />
-        <span class="text-[8px]">Shape</span>
-      </Button>
-      <Separator class="my-1 w-8 bg-theme-800" />
-      <Button
-        variant="ghost"
-        size="icon"
-        class="size-11 flex-col gap-0.5 rounded-lg {leftTab === 'theme'
-          ? 'bg-primary/20 text-primary hover:bg-primary/25'
-          : 'text-muted-foreground'}"
-        title="Theme settings"
-        aria-pressed={leftTab === 'theme'}
-        onclick={() => (leftTab = 'theme')}
-      >
-        <Palette class="size-4" />
-        <span class="text-[8px]">Theme</span>
-      </Button>
-      <div class="mt-auto rounded-lg border border-theme-800 bg-black/20 px-1.5 py-1 text-center">
-        <p class="text-[8px] uppercase tracking-wide text-muted-foreground">Canvas</p>
-        <p class="font-mono text-[9px] text-theme-100">1000×650</p>
-      </div>
-    </aside>
-
+  <div class="grid min-h-0 flex-1 grid-cols-[282px_minmax(0,1fr)_324px] overflow-hidden">
     <aside class="flex min-h-0 flex-col border-r border-theme-800 bg-theme-900/25">
-      <div class="grid shrink-0 grid-cols-3 gap-1 border-b border-theme-800 p-2">
+      <div class="grid shrink-0 grid-cols-4 gap-1 border-b border-theme-800 p-2">
         <Button
           variant="ghost"
           size="sm"
@@ -1697,7 +3381,19 @@
         <Button
           variant="ghost"
           size="sm"
-          class="h-8 gap-1.5 px-1.5 text-[10px] {leftTab === 'fonts'
+          class="h-8 gap-1.5 px-1 text-[10px] {leftTab === 'logic'
+            ? 'bg-primary/20 text-primary hover:bg-primary/25'
+            : 'text-muted-foreground'}"
+          aria-pressed={leftTab === 'logic'}
+          onclick={openLogicTab}
+        >
+          <Zap class="size-3.5" />
+          Logic
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 gap-1.5 px-1 text-[10px] {leftTab === 'fonts'
             ? 'bg-primary/20 text-primary hover:bg-primary/25'
             : 'text-muted-foreground'}"
           aria-pressed={leftTab === 'fonts'}
@@ -1709,198 +3405,568 @@
       </div>
 
       {#if leftTab === 'layers'}
-        <div class="min-h-0 flex-1 overflow-y-auto p-2">
-          <div class="mb-2 flex items-center justify-between px-1">
-            <span class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {elements.length} layer{elements.length === 1 ? '' : 's'}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground"
-              onclick={addText}
-            >
-              <Plus class="size-3" />
-              Add
-            </Button>
-          </div>
-          {#if elements.length === 0}
-            <div class="rounded-lg border border-dashed border-theme-800 p-4 text-center">
-              <Layers class="mx-auto size-6 text-theme-600" />
-              <p class="mt-2 text-xs font-medium text-theme-100">Your canvas is empty</p>
-              <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-                Add text, images, videos or shapes to build on top of the launcher home screen.
-              </p>
+        <div class="flex min-h-0 flex-1 flex-col">
+          <div class="shrink-0 border-b border-theme-800 p-2">
+            <div class="flex items-center justify-between px-1">
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {#if layerSearchActive}
+                  {layerSearchMatchCount} match{layerSearchMatchCount === 1 ? '' : 'es'}
+                {:else}
+                  {elements.length} layer{elements.length === 1 ? '' : 's'}
+                  {#if groups.length > 0}
+                    · {groups.length} group{groups.length === 1 ? '' : 's'}
+                  {/if}
+                {/if}
+              </span>
+              <div class="flex items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-6 text-muted-foreground"
+                  title="Previous layer or group with logic (Alt/Option+↑)"
+                  aria-label="Previous layer or group with logic"
+                  disabled={logicTargets.length === 0}
+                  onclick={() => jumpLogicTarget(-1)}
+                >
+                  <ChevronUp class="size-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-6 text-muted-foreground"
+                  title="Next layer or group with logic (Alt/Option+↓)"
+                  aria-label="Next layer or group with logic"
+                  disabled={logicTargets.length === 0}
+                  onclick={() => jumpLogicTarget(1)}
+                >
+                  <ChevronDown class="size-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-6 text-muted-foreground"
+                  title={anyGroupExpanded ? 'Collapse all groups' : 'Expand all groups'}
+                  aria-label={anyGroupExpanded ? 'Collapse all groups' : 'Expand all groups'}
+                  disabled={groups.length === 0}
+                  onclick={toggleAllGroups}
+                >
+                  {#if anyGroupExpanded}
+                    <ChevronsUp class="size-3" />
+                  {:else}
+                    <ChevronsDown class="size-3" />
+                  {/if}
+                </Button>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    {#snippet child({ props })}
+                      <Button
+                        {...props}
+                        variant="ghost"
+                        size="sm"
+                        class="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground"
+                      >
+                        <Plus class="size-3" />
+                        Add
+                      </Button>
+                    {/snippet}
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content align="end" class="w-44 border-theme-700 bg-theme-950">
+                    <DropdownMenu.Label
+                      class="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      Add layer
+                    </DropdownMenu.Label>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={addText}>
+                      <Type />
+                      Text
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addMedia('image')}>
+                      <ImageIcon />
+                      Image
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addMedia('video')}>
+                      <Video />
+                      Video
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={addShape}>
+                      <Shapes />
+                      Shape
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={addSvelte}>
+                      <Component />
+                      Svelte component
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('data')}>
+                      <Type />
+                      Data
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('icon')}>
+                      <Sparkles />
+                      Icon
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('repeater')}
+                    >
+                      <Repeat />
+                      Repeater
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('gauge')}>
+                      <Gauge />
+                      Gauge
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('ticker')}>
+                      <Megaphone />
+                      Ticker
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('button')}>
+                      <MousePointerClick />
+                      Button
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('path')}>
+                      <Spline />
+                      Vector path
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('particles')}
+                    >
+                      <Sparkles />
+                      Particles
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addLayer('clock')}>
+                      <Clock />
+                      Clock
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('countdown')}
+                    >
+                      <Timer />
+                      Countdown
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={addLottie}>
+                      <Film />
+                      Lottie animation
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                    <DropdownMenu.Item class="gap-2 text-[11px]" onclick={() => addGroup()}>
+                      <Boxes />
+                      Group
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              </div>
             </div>
-          {:else}
-            <div class="space-y-1" role="list">
-              {#each [...elements].reverse() as element (element.id)}
-                {@const selected = selectedSet.has(element.id)}
-                <div
-                  role="listitem"
-                  class="group relative flex items-center gap-1 rounded-md border px-1 py-1 {selected
-                    ? 'border-primary/50 bg-primary/10'
-                    : 'border-transparent hover:border-theme-800'} {element.hidden
-                    ? 'opacity-60'
-                    : ''}"
-                  ondragover={(event) => updateLayerDrop(event, element.id)}
-                  ondrop={(event) => dropLayer(event, element.id)}
-                  ondragleave={() => {
-                    if (dropTarget?.id === element.id) dropTarget = undefined;
+            <div class="relative mt-2">
+              <Search
+                class="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                class="h-7 border-theme-800 bg-theme-950 pl-7 pr-7 text-[10px] text-theme-50"
+                placeholder="Find layers and groups…"
+                aria-label="Find layers and groups"
+                bind:ref={layerSearchInput}
+                bind:value={layerQuery}
+                onkeydown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    layerQuery = '';
+                    return;
+                  }
+                  if (event.key !== 'Enter' || !layerSearchActive) return;
+                  const first = visibleLayerRows.find((row) =>
+                    layerRowMatches(row, layerSearchQuery)
+                  );
+                  if (first?.kind === 'group') {
+                    selectGroup(first.group.id);
+                  } else if (first) {
+                    selectElement(first.element.id, false);
+                  }
+                }}
+              />
+              {#if layerSearchActive}
+                <button
+                  type="button"
+                  class="absolute right-1 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                  title="Clear search"
+                  aria-label="Clear layer search"
+                  onclick={() => {
+                    layerQuery = '';
+                    layerSearchInput?.focus();
                   }}
                 >
-                  {#if dropTarget?.id === element.id}
-                    <span
-                      class="pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded bg-primary {dropTarget.position ===
-                      'above'
-                        ? '-top-px'
-                        : '-bottom-px'}"
-                    ></span>
-                  {/if}
-
-                  {#if renamingId === element.id}
-                    <div class="flex min-w-0 flex-1 items-center gap-1.5 px-1">
-                      <span
-                        class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
-                      >
-                        {#if element.type === 'text'}
-                          <Type class="size-3.5" />
-                        {:else if element.type === 'image'}
-                          <ImageIcon class="size-3.5" />
-                        {:else if element.type === 'video'}
-                          <Video class="size-3.5" />
-                        {:else}
-                          <Shapes class="size-3.5" />
-                        {/if}
-                      </span>
-                      <input
-                        class="h-6 min-w-0 flex-1 rounded border border-primary/50 bg-theme-950 px-1.5 text-[11px] text-theme-50 outline-none"
-                        value={element.name ?? ''}
-                        placeholder={elementLabel(element)}
-                        use:focusInput
-                        oninput={(event) =>
-                          renameElement(
-                            element.id,
-                            (event.currentTarget as HTMLInputElement).value
-                          )}
-                        onblur={() => (renamingId = undefined)}
-                        onkeydown={(event) => {
-                          if (event.key === 'Enter' || event.key === 'Escape') {
-                            event.preventDefault();
-                            renamingId = undefined;
-                          }
-                        }}
-                      />
-                    </div>
-                  {:else}
-                    <button
-                      type="button"
-                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left"
-                      aria-pressed={selected}
-                      onclick={(event) => {
-                        selectElement(element.id, event.shiftKey || event.metaKey || event.ctrlKey);
-                        leftTab = 'layers';
-                      }}
-                    >
-                      <span
-                        class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
-                      >
-                        {#if element.type === 'text'}
-                          <Type class="size-3.5" />
-                        {:else if element.type === 'image'}
-                          <ImageIcon class="size-3.5" />
-                        {:else if element.type === 'video'}
-                          <Video class="size-3.5" />
-                        {:else}
-                          <Shapes class="size-3.5" />
-                        {/if}
-                      </span>
-                      <span class="min-w-0 flex-1">
-                        <span
-                          class="block truncate text-[11px] font-medium text-theme-100"
-                          title="Double-click to rename"
-                          role="presentation"
-                          ondblclick={(event) => {
-                            event.stopPropagation();
-                            renamingId = element.id;
-                          }}
-                        >
-                          {elementLabel(element)}
-                        </span>
-                        <span class="block font-mono text-[9px] text-muted-foreground">
-                          {Math.round(element.width)}×{Math.round(element.height)} · {element.type}
-                        </span>
-                      </span>
-                    </button>
-                  {/if}
-
-                  <div class="flex shrink-0 items-center gap-0.5">
-                    <button
-                      type="button"
-                      class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
-                      title={element.hidden ? 'Show layer' : 'Hide layer'}
-                      aria-label={element.hidden ? 'Show layer' : 'Hide layer'}
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        toggleElementFlag(element, 'hidden');
-                      }}
-                    >
-                      {#if element.hidden}
-                        <EyeOff class="size-3.5" />
-                      {:else}
-                        <Eye class="size-3.5" />
-                      {/if}
-                    </button>
-                    <button
-                      type="button"
-                      class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
-                      title={element.locked ? 'Unlock layer' : 'Lock layer'}
-                      aria-label={element.locked ? 'Unlock layer' : 'Lock layer'}
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        toggleElementFlag(element, 'locked');
-                      }}
-                    >
-                      {#if element.locked}
-                        <Lock class="size-3.5" />
-                      {:else}
-                        <Unlock class="size-3.5" />
-                      {/if}
-                    </button>
-                    <button
-                      type="button"
-                      draggable="true"
-                      class="flex size-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100 active:cursor-grabbing"
-                      title="Drag to reorder layer"
-                      aria-label="Drag to reorder layer"
-                      ondragstart={(event) => startLayerDrag(event, element.id)}
-                      ondragend={endLayerDrag}
-                    >
-                      <GripVertical class="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              {/each}
+                  <X class="size-3" />
+                </button>
+              {/if}
             </div>
-          {/if}
-        </div>
-        <div class="grid shrink-0 grid-cols-2 gap-1.5 border-t border-theme-800 p-2">
-          <Button
-            variant="secondary"
-            class="h-8 gap-1.5 text-[10px]"
-            onclick={() => addMedia('image')}
-          >
-            <ImageIcon class="size-3.5" />
-            Image
-          </Button>
-          <Button
-            variant="secondary"
-            class="h-8 gap-1.5 text-[10px]"
-            onclick={() => addMedia('video')}
-          >
-            <Video class="size-3.5" />
-            Video
-          </Button>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto p-2" bind:this={layerListHost}>
+            {#if elements.length === 0 && groups.length === 0}
+              <div class="rounded-lg border border-dashed border-theme-800 p-4 text-center">
+                <Layers class="mx-auto size-6 text-theme-600" />
+                <p class="mt-2 text-xs font-medium text-theme-100">Your canvas is empty</p>
+                <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  Add text, images, videos or shapes to build on top of the launcher home screen.
+                </p>
+              </div>
+            {:else if layerSearchActive && visibleLayerRows.length === 0}
+              <div class="rounded-lg border border-dashed border-theme-800 p-4 text-center">
+                <Search class="mx-auto size-5 text-theme-600" />
+                <p class="mt-2 text-xs font-medium text-theme-100">No matching layers</p>
+                <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  Try a layer name, group name or layer type. Collapsed groups are searched too.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  class="mt-3 h-7 text-[10px]"
+                  onclick={() => {
+                    layerQuery = '';
+                    layerSearchInput?.focus();
+                  }}
+                >
+                  Clear search
+                </Button>
+              </div>
+            {:else}
+              <ContextMenu.Root bind:open={layerContextMenuOpen}>
+                <ContextMenu.Trigger class="block">
+                  <div
+                    class="space-y-1"
+                    role="list"
+                    oncontextmenu={(event) => {
+                      if (event.target === event.currentTarget) prepareContextMenu(undefined);
+                    }}
+                  >
+                    {#each visibleLayerRows as row (layerRowKey(row))}
+                      {#if row.kind === 'group'}
+                        {@const badge = logicBadges.get(`group:${row.group.id}`)}
+                        {@const groupExpanded = layerSearchActive || !row.group.collapsed}
+                        <div
+                          role="listitem"
+                          data-layer-key={`g:${row.group.id}`}
+                          class="group relative flex items-center gap-1 rounded-md border px-1 py-1 {selectedGroupId ===
+                          row.group.id
+                            ? 'border-primary/50 bg-primary/10'
+                            : 'border-transparent hover:border-theme-800'} {row.group.hidden
+                            ? 'opacity-60'
+                            : ''} {dropTarget?.mode === 'inside' &&
+                          dropTarget.groupId === row.group.id
+                            ? 'border-primary bg-primary/20 ring-1 ring-primary/40'
+                            : ''} {draggingLayer?.kind === 'group' &&
+                          draggingLayer.id === row.group.id
+                            ? 'opacity-40'
+                            : ''}"
+                          style="margin-left:{row.depth * 14}px"
+                          ondragover={(event) => updateGroupDrop(event, row.group.id)}
+                          ondrop={(event) => dropLayerOnGroup(event, row.group.id)}
+                          oncontextmenu={() => prepareGroupContextMenu(row.group.id)}
+                        >
+                          <button
+                            type="button"
+                            class="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                            title={layerSearchActive
+                              ? 'Clear the search to change group expansion'
+                              : groupExpanded
+                                ? 'Collapse group'
+                                : 'Expand group'}
+                            aria-label={groupExpanded ? 'Collapse group' : 'Expand group'}
+                            aria-expanded={groupExpanded}
+                            onclick={() => {
+                              if (layerSearchActive) return;
+                              toggleGroupCollapsed(row.group);
+                            }}
+                          >
+                            {#if groupExpanded}
+                              <ChevronDown class="size-3.5" />
+                            {:else}
+                              <ChevronRight class="size-3.5" />
+                            {/if}
+                          </button>
+                          <span
+                            class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                          >
+                            <Boxes class="size-3.5" />
+                          </span>
+                          <button
+                            type="button"
+                            class="min-w-0 flex-1 text-left"
+                            onclick={() => selectGroup(row.group.id)}
+                          >
+                            <span class="block truncate text-[11px] font-medium text-theme-100">
+                              {groupLabel(row.group)}
+                            </span>
+                            <span class="block font-mono text-[9px] text-muted-foreground">
+                              {groupDescendantCount(row.group.id)} layer{groupDescendantCount(
+                                row.group.id
+                              ) === 1
+                                ? ''
+                                : 's'}
+                            </span>
+                          </button>
+                          <ThemeLogicBadge
+                            count={badge?.count ?? 0}
+                            warning={badge?.warning ?? false}
+                            onopen={() => openLinkedLogic('group', row.group.id)}
+                          />
+                          <div class="flex shrink-0 items-center gap-0.5">
+                            <button
+                              type="button"
+                              class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                              title={row.group.hidden ? 'Show group' : 'Hide group'}
+                              aria-label={row.group.hidden ? 'Show group' : 'Hide group'}
+                              onclick={() => toggleGroupFlag(row.group, 'hidden')}
+                            >
+                              {#if row.group.hidden}
+                                <EyeOff class="size-3.5" />
+                              {:else}
+                                <Eye class="size-3.5" />
+                              {/if}
+                            </button>
+                            <button
+                              type="button"
+                              class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                              title={row.group.locked ? 'Unlock group' : 'Lock group'}
+                              aria-label={row.group.locked ? 'Unlock group' : 'Lock group'}
+                              onclick={() => toggleGroupFlag(row.group, 'locked')}
+                            >
+                              {#if row.group.locked}
+                                <Lock class="size-3.5" />
+                              {:else}
+                                <Unlock class="size-3.5" />
+                              {/if}
+                            </button>
+                            <button
+                              type="button"
+                              draggable="true"
+                              class="flex size-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100 active:cursor-grabbing"
+                              title="Drag group into another group, or out to the root"
+                              aria-label="Drag group"
+                              ondragstart={(event) => startLayerDrag(event, 'group', row.group.id)}
+                              ondragend={endLayerDrag}
+                            >
+                              <GripVertical class="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      {:else}
+                        {@const element = row.element}
+                        {@const selected = selectedSet.has(element.id)}
+                        {@const badge = logicBadges.get(`element:${element.id}`)}
+                        <div
+                          role="listitem"
+                          data-layer-key={`e:${element.id}`}
+                          class="group relative flex items-center gap-1 rounded-md border px-1 py-1 {selected
+                            ? 'border-primary/50 bg-primary/10'
+                            : 'border-transparent hover:border-theme-800'} {element.hidden
+                            ? 'opacity-60'
+                            : ''} {draggingLayer?.kind === 'element' &&
+                          draggingLayer.id === element.id
+                            ? 'opacity-40'
+                            : ''}"
+                          style="margin-left:{row.depth * 14}px"
+                          ondragover={(event) => updateElementDrop(event, element.id)}
+                          ondrop={(event) => dropLayerOnElement(event, element.id)}
+                          ondragleave={(event) => {
+                            const next = event.relatedTarget as Node | null;
+                            if (next && event.currentTarget.contains(next)) return;
+                            if (
+                              dropTarget?.mode === 'between' &&
+                              dropTarget.elementId === element.id
+                            ) {
+                              dropTarget = undefined;
+                            }
+                          }}
+                          oncontextmenu={() => prepareContextMenu(element.id)}
+                        >
+                          {#if dropTarget?.mode === 'between' && dropTarget.elementId === element.id}
+                            <span
+                              class="pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded bg-primary {dropTarget.position ===
+                              'above'
+                                ? '-top-px'
+                                : '-bottom-px'}"
+                            ></span>
+                          {/if}
+
+                          {#if renamingId === element.id}
+                            <div class="flex min-w-0 flex-1 items-center gap-1.5 px-1">
+                              <span
+                                class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                              >
+                                {#if element.type === 'text'}
+                                  <Type class="size-3.5" />
+                                {:else if element.type === 'image'}
+                                  <ImageIcon class="size-3.5" />
+                                {:else if element.type === 'video'}
+                                  <Video class="size-3.5" />
+                                {:else if element.type === 'svelte'}
+                                  <Component class="size-3.5" />
+                                {:else if element.type === 'path'}
+                                  <Spline class="size-3.5" />
+                                {:else if element.type === 'particles'}
+                                  <Sparkles class="size-3.5" />
+                                {:else if element.type === 'clock'}
+                                  <Clock class="size-3.5" />
+                                {:else if element.type === 'countdown'}
+                                  <Timer class="size-3.5" />
+                                {:else}
+                                  <Shapes class="size-3.5" />
+                                {/if}
+                              </span>
+                              <input
+                                class="h-6 min-w-0 flex-1 rounded border border-primary/50 bg-theme-950 px-1.5 text-[11px] text-theme-50 outline-none"
+                                value={element.name ?? ''}
+                                placeholder={elementLabel(element)}
+                                use:focusInput
+                                oninput={(event) =>
+                                  renameElement(
+                                    element.id,
+                                    (event.currentTarget as HTMLInputElement).value
+                                  )}
+                                onblur={() => (renamingId = undefined)}
+                                onkeydown={(event) => {
+                                  if (event.key === 'Enter' || event.key === 'Escape') {
+                                    event.preventDefault();
+                                    renamingId = undefined;
+                                  }
+                                }}
+                              />
+                            </div>
+                          {:else}
+                            <button
+                              type="button"
+                              class="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left"
+                              aria-pressed={selected}
+                              onclick={(event) => {
+                                selectElement(
+                                  element.id,
+                                  event.shiftKey || event.metaKey || event.ctrlKey
+                                );
+                                leftTab = 'layers';
+                              }}
+                            >
+                              <span
+                                class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                              >
+                                {#if element.type === 'text'}
+                                  <Type class="size-3.5" />
+                                {:else if element.type === 'image'}
+                                  <ImageIcon class="size-3.5" />
+                                {:else if element.type === 'video'}
+                                  <Video class="size-3.5" />
+                                {:else if element.type === 'svelte'}
+                                  <Component class="size-3.5" />
+                                {:else if element.type === 'path'}
+                                  <Spline class="size-3.5" />
+                                {:else if element.type === 'particles'}
+                                  <Sparkles class="size-3.5" />
+                                {:else if element.type === 'clock'}
+                                  <Clock class="size-3.5" />
+                                {:else if element.type === 'countdown'}
+                                  <Timer class="size-3.5" />
+                                {:else}
+                                  <Shapes class="size-3.5" />
+                                {/if}
+                              </span>
+                              <span class="min-w-0 flex-1">
+                                <span
+                                  class="block truncate text-[11px] font-medium text-theme-100"
+                                  title="Double-click to rename"
+                                  role="presentation"
+                                  ondblclick={(event) => {
+                                    event.stopPropagation();
+                                    renamingId = element.id;
+                                  }}
+                                >
+                                  {elementLabel(element)}
+                                </span>
+                                <span class="block font-mono text-[9px] text-muted-foreground">
+                                  {Math.round(element.width)}×{Math.round(element.height)} · {element.type}
+                                </span>
+                              </span>
+                            </button>
+                          {/if}
+
+                          <ThemeLogicBadge
+                            count={badge?.count ?? 0}
+                            warning={badge?.warning ?? false}
+                            onopen={() => openLinkedLogic('element', element.id)}
+                          />
+
+                          <div class="flex shrink-0 items-center gap-0.5">
+                            <button
+                              type="button"
+                              class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                              title={element.hidden ? 'Show layer' : 'Hide layer'}
+                              aria-label={element.hidden ? 'Show layer' : 'Hide layer'}
+                              onclick={(event) => {
+                                event.stopPropagation();
+                                toggleElementFlag(element, 'hidden');
+                              }}
+                            >
+                              {#if element.hidden}
+                                <EyeOff class="size-3.5" />
+                              {:else}
+                                <Eye class="size-3.5" />
+                              {/if}
+                            </button>
+                            <button
+                              type="button"
+                              class="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100"
+                              title={element.locked ? 'Unlock layer' : 'Lock layer'}
+                              aria-label={element.locked ? 'Unlock layer' : 'Lock layer'}
+                              onclick={(event) => {
+                                event.stopPropagation();
+                                toggleElementFlag(element, 'locked');
+                              }}
+                            >
+                              {#if element.locked}
+                                <Lock class="size-3.5" />
+                              {:else}
+                                <Unlock class="size-3.5" />
+                              {/if}
+                            </button>
+                            <button
+                              type="button"
+                              draggable="true"
+                              class="flex size-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:bg-theme-800 hover:text-theme-100 active:cursor-grabbing"
+                              title="Drag to reorder, move into a group, or move out of one"
+                              aria-label="Drag layer"
+                              ondragstart={(event) => startLayerDrag(event, 'element', element.id)}
+                              ondragend={endLayerDrag}
+                            >
+                              <GripVertical class="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                    {#if draggingLayer}
+                      <div
+                        role="listitem"
+                        aria-label="Drop here to move out of all groups"
+                        class="mt-1 flex h-9 items-center justify-center gap-1.5 rounded-md border border-dashed px-2 text-[10px] transition-colors {dropTarget?.mode ===
+                        'root'
+                          ? 'border-primary bg-primary/15 text-primary'
+                          : 'border-theme-700 text-muted-foreground'}"
+                        ondragover={updateRootDrop}
+                        ondrop={dropLayerOnRoot}
+                      >
+                        <Ungroup class="size-3.5 shrink-0" />
+                        Drop here to move out of all groups
+                      </div>
+                    {/if}
+                  </div>
+                </ContextMenu.Trigger>
+                <ContextMenu.Content class="w-56 border-theme-700 bg-theme-950">
+                  {@render contextMenuItems()}
+                </ContextMenu.Content>
+              </ContextMenu.Root>
+            {/if}
+          </div>
         </div>
       {:else if leftTab === 'fonts'}
         <div class="flex min-h-0 flex-1 flex-col">
@@ -1977,6 +4043,7 @@
               <div class="space-y-0.5">
                 {#each visibleFontsourceFonts as font (font.id)}
                   {@const fontPreview = defaultFontsourceOptions(font)}
+                  {@const bundledFamily = bundledThemeFontFamily(font.family)}
                   <Button
                     variant="ghost"
                     class="h-auto w-full justify-between gap-2 whitespace-normal rounded px-2 py-1.5 text-left font-normal {selectedFontsourceId ===
@@ -1988,8 +4055,8 @@
                   >
                     <span class="min-w-0">
                       <FontPreview
-                        family={font.family}
-                        src={fontsourceFontUrl(font, fontPreview)}
+                        family={bundledFamily ?? font.family}
+                        src={bundledFamily ? '' : fontsourceFontUrl(font, fontPreview)}
                         weight={String(fontPreview.weight)}
                         style={fontPreview.style}
                         class="block truncate text-[12px] leading-tight"
@@ -1998,7 +4065,15 @@
                         >{font.category.replace('-', ' ')}</span
                       >
                     </span>
-                    {#if font.variable}
+                    {#if bundledFamily}
+                      <Badge
+                        variant="outline"
+                        class="shrink-0 border-primary/40 bg-primary/10 px-1 py-0 text-[8px] text-primary"
+                        title="Bundled with the launcher — no download needed"
+                      >
+                        BUNDLED
+                      </Badge>
+                    {:else if font.variable}
                       <Badge
                         variant="outline"
                         class="shrink-0 border-primary/25 px-1 py-0 text-[8px] text-primary"
@@ -2038,24 +4113,41 @@
                       .length}
                     subsets
                   </p>
+                  {#if selectedFontIsBundled}
+                    <p class="mt-0.5 flex items-center gap-1 text-[9px] text-primary">
+                      <CheckCircle2 class="size-3 shrink-0" />
+                      Bundled with the launcher
+                    </p>
+                  {/if}
                 </div>
-                {#if selectedFontsource.variable}
-                  <Badge
-                    variant="outline"
-                    class="shrink-0 border-primary/25 px-1.5 py-0 text-[8px] text-primary"
-                  >
-                    Variable
-                  </Badge>
-                {/if}
+                <div class="flex shrink-0 items-center gap-1">
+                  {#if selectedFontIsBundled}
+                    <Badge
+                      variant="outline"
+                      class="border-primary/40 bg-primary/10 px-1.5 py-0 text-[8px] text-primary"
+                    >
+                      Bundled
+                    </Badge>
+                  {/if}
+                  {#if selectedFontsource.variable}
+                    <Badge
+                      variant="outline"
+                      class="shrink-0 border-primary/25 px-1.5 py-0 text-[8px] text-primary"
+                    >
+                      Variable
+                    </Badge>
+                  {/if}
+                </div>
               </div>
               <div
                 class="overflow-hidden rounded-md border border-theme-800 bg-theme-950 px-2 py-2"
               >
                 <p
                   class="truncate text-base text-theme-100"
-                  style="font-family:{FONT_PREVIEW_FAMILY};font-weight:{selectedFontsource.variable
-                    ? 600
-                    : fontWeight}"
+                  style:font-family={selectedFontIsBundled
+                    ? fontStack(selectedFontBundledFamily)
+                    : FONT_PREVIEW_FAMILY}
+                  style:font-weight={selectedFontsource.variable ? 600 : fontWeight}
                 >
                   The quick brown fox
                 </p>
@@ -2127,11 +4219,14 @@
               <Button
                 class="h-8 w-full gap-1.5 text-[10px]"
                 onclick={addSelectedFontsource}
-                disabled={fontDownloading || selectedFontIsAdded}
+                disabled={fontDownloading || selectedFontIsAdded || selectedFontIsBundled}
               >
                 {#if fontDownloading}
                   <LoaderCircle class="animate-spin" />
                   Downloading…
+                {:else if selectedFontIsBundled}
+                  <CheckCircle2 class="size-3.5" />
+                  Bundled with launcher
                 {:else if selectedFontIsAdded}
                   <Check class="size-3.5" />
                   Added to theme
@@ -2140,13 +4235,116 @@
                   Download & add
                 {/if}
               </Button>
+              {#if selectedFontIsBundled}
+                <p class="text-center text-[9px] leading-relaxed text-muted-foreground">
+                  Already available in the launcher font menus — no download needed.
+                </p>
+              {/if}
             </div>
           {/if}
         </div>
+      {:else if leftTab === 'logic'}
+        <div class="flex min-h-0 flex-1 flex-col">
+          <div class="shrink-0 space-y-2 border-b border-theme-800 p-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {behaviors.length} rule{behaviors.length === 1 ? '' : 's'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-6 gap-1 px-1.5 text-[10px] text-muted-foreground"
+                onclick={addBehavior}
+              >
+                <Plus class="size-3" />
+                Add
+              </Button>
+            </div>
+            {#if behaviors.length > 0}
+              <div class="relative">
+                <Search
+                  class="pointer-events-none absolute left-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  class="h-7 border-theme-800 bg-theme-950 pl-7 text-[10px] text-theme-50"
+                  placeholder="Search rules or targets"
+                  aria-label="Search logic rules"
+                  bind:value={logicQuery}
+                />
+              </div>
+            {/if}
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto p-2">
+            {#if behaviors.length === 0}
+              <div class="rounded-lg border border-dashed border-theme-800 p-4 text-center">
+                <Zap class="mx-auto size-6 text-theme-600" />
+                <p class="mt-2 text-xs font-medium text-theme-100">No rules yet</p>
+                <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  Add a WHEN / IF / THEN rule to react to clicks, hovers, timers and screen changes.
+                </p>
+              </div>
+            {:else if filteredBehaviors.length === 0}
+              <div class="rounded-lg border border-dashed border-theme-800 p-4 text-center">
+                <Search class="mx-auto size-5 text-theme-600" />
+                <p class="mt-2 text-xs font-medium text-theme-100">No matching rules</p>
+                <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                  Try a rule name, layer name or group name.
+                </p>
+              </div>
+            {:else}
+              <div class="space-y-1">
+                {#each filteredBehaviors as behavior (behavior.id)}
+                  <button
+                    type="button"
+                    class="flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left transition-colors {selectedBehaviorId ===
+                    behavior.id
+                      ? 'border-primary/50 bg-primary/10'
+                      : 'border-transparent hover:border-theme-800 hover:bg-theme-900/60'}"
+                    onclick={() => selectBehavior(behavior.id)}
+                  >
+                    <span
+                      class="flex size-6 shrink-0 items-center justify-center rounded bg-theme-900"
+                    >
+                      <Zap class="size-3.5 text-primary" />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-1.5">
+                        <span class="truncate text-[11px] font-medium text-theme-100">
+                          {behavior.name?.trim() || 'Rule'}
+                        </span>
+                        {#if behavior.target}
+                          <span
+                            class="shrink-0 rounded bg-theme-900 px-1 py-0.5 text-[8px] text-primary/90"
+                            title={themeBehaviorTargetLabel(behavior.target, elements, groups)}
+                          >
+                            {behavior.target.type === 'group' ? 'Group' : 'Layer'}
+                          </span>
+                        {/if}
+                      </span>
+                      <span class="mt-0.5 block truncate text-[9px] text-muted-foreground">
+                        {themeBehaviorSummary(behavior, elements, groups)}
+                      </span>
+                    </span>
+                    {#if behavior.enabled === false}
+                      <span class="mt-0.5 text-[8px] font-semibold uppercase text-muted-foreground"
+                        >Off</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+          <p
+            class="shrink-0 border-t border-theme-800 p-2 text-[9px] leading-relaxed text-muted-foreground"
+          >
+            Linked rules are editable from their layer or group inspector. Pointer rules need
+            <strong class="text-theme-100">Interactive</strong> layers.
+          </p>
+        </div>
       {:else}
-        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-          <section class="space-y-3">
-            <h3 class="text-xs font-semibold text-theme-100">Theme details</h3>
+        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+          <ThemeSection title="Theme details" bordered={false} contentClass="space-y-3 pt-2">
             <div class="space-y-1.5">
               <Label for="theme-name" class={labelClass}>Name</Label>
               <Input
@@ -2219,10 +4417,15 @@
                 />
               </div>
             </div>
-          </section>
+          </ThemeSection>
 
-          <section class="space-y-3 border-t border-theme-800 pt-3">
-            <h3 class="text-xs font-semibold text-theme-100">Background</h3>
+          <ThemeVariableDefaults
+            variables={editableScriptVariables}
+            defaults={definition.variables ?? {}}
+            onchange={setVariableDefault}
+          />
+
+          <ThemeSection title="Background" contentClass="space-y-3 pt-2.5">
             <div class="grid grid-cols-4 gap-1 rounded-md bg-black/30 p-1">
               {#each backgroundTypes as option (option.value)}
                 <Button
@@ -2407,13 +4610,14 @@
                 onValueChange={(value) => (definition.background.opacity = value)}
               />
             </div>
-          </section>
+          </ThemeSection>
 
-          <section class="space-y-3 border-t border-theme-800 pt-3">
-            <h3 class="flex items-center gap-1.5 text-xs font-semibold text-theme-100">
-              <Sparkles class="size-3.5 text-primary" />
-              Overlay & effects
-            </h3>
+          <ThemeSection
+            title="Overlay & effects"
+            icon={Sparkles}
+            open={false}
+            contentClass="space-y-3 pt-2.5"
+          >
             <div class="grid grid-cols-2 gap-2">
               <div class="space-y-1.5">
                 <div class="flex items-center justify-between">
@@ -2533,13 +4737,9 @@
                 </div>
               </div>
             {/if}
-          </section>
+          </ThemeSection>
 
-          <section class="space-y-3 border-t border-theme-800 pt-3">
-            <h3 class="flex items-center gap-1.5 text-xs font-semibold text-theme-100">
-              <Type class="size-3.5 text-primary" />
-              Typography
-            </h3>
+          <ThemeSection title="Typography" icon={Type} open={false} contentClass="space-y-3 pt-2.5">
             <div class="space-y-1.5">
               <Label for="font-body" class={labelClass}>Launcher font</Label>
               <Select.Root
@@ -2584,6 +4784,31 @@
                 </Select.Content>
               </Select.Root>
             </div>
+            <div class="space-y-1.5">
+              <Label for="font-mono" class={labelClass}>Monospace font</Label>
+              <Select.Root
+                type="single"
+                value={definition.typography.mono ?? 'Space Mono'}
+                onValueChange={(value) => {
+                  if (value) definition.typography.mono = value;
+                }}
+              >
+                <Select.Trigger
+                  id="font-mono"
+                  class="h-9 border-theme-800 bg-theme-950 text-xs text-theme-50"
+                >
+                  {definition.typography.mono ?? 'Space Mono'}
+                </Select.Trigger>
+                <Select.Content class="border-theme-800 bg-theme-950">
+                  {#each fontOptions as font (font.family)}
+                    <Select.Item value={font.family} label={`${font.label} · ${font.category}`} />
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+              <p class="text-[10px] leading-relaxed text-muted-foreground">
+                Used for paths, versions and telemetry text.
+              </p>
+            </div>
             <div class="grid grid-cols-2 gap-2">
               <Button variant="secondary" class="h-8 gap-1.5 text-[10px]" onclick={openFontBrowser}>
                 <Search class="size-3.5" />
@@ -2623,58 +4848,113 @@
               Browse every Fontsource family, or import your own WOFF2, WOFF, TTF or OTF file.
               Downloaded fonts are bundled into the theme when you save.
             </p>
-          </section>
+          </ThemeSection>
 
-          <section class="space-y-3 border-t border-theme-800 pt-3">
-            <h3 class="flex items-center gap-1.5 text-xs font-semibold text-theme-100">
-              <Music class="size-3.5 text-primary" />
-              Music
-            </h3>
-            <div class="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                class="h-8 flex-1 gap-1.5 text-[10px]"
-                onclick={chooseAudio}
+          <ThemeSection
+            title="Icon set"
+            icon={Sparkles}
+            open={false}
+            contentClass="space-y-3 pt-2.5"
+          >
+            <Select.Root
+              type="single"
+              value={definition.iconSet ?? 'lucide'}
+              onValueChange={(value) => {
+                if (value === 'lucide' || value === 'phosphor' || value === 'tabler') {
+                  definition.iconSet = value;
+                }
+              }}
+            >
+              <Select.Trigger
+                id="theme-icon-set"
+                class="h-9 border-theme-800 bg-theme-950 text-xs text-theme-50"
               >
-                <Upload class="size-3.5" />
-                {definition.audio?.src ? 'Replace' : 'Choose music'}
-              </Button>
-              <span class="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
-                {definition.audio?.src || 'Optional MP3, OGG, WAV, M4A or FLAC'}
-              </span>
-              {#if definition.audio}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="size-8 text-muted-foreground"
-                  title="Remove music"
-                  onclick={() => (definition.audio = undefined)}
+                {THEME_ICON_SETS.find((option) => option.value === (definition.iconSet ?? 'lucide'))
+                  ?.label ?? 'Lucide'}
+              </Select.Trigger>
+              <Select.Content class="border-theme-800 bg-theme-950">
+                {#each THEME_ICON_SETS as option (option.value)}
+                  <Select.Item value={option.value} label={option.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            <div
+              class="flex items-center gap-2 rounded-md border border-theme-800 bg-theme-950 p-2"
+            >
+              {#each THEME_ICON_PREVIEW_NAMES as name (name)}
+                <span
+                  class="flex size-8 items-center justify-center rounded-md bg-theme-900 text-theme-100"
                 >
-                  <X class="size-3.5" />
-                </Button>
-              {/if}
+                  <ThemeIcon {name} set={definition.iconSet ?? 'lucide'} class="size-4" />
+                </span>
+              {/each}
+              <span class="ml-auto text-[9px] text-muted-foreground">Live preview</span>
             </div>
-            {#if definition.audio}
-              <div class="flex items-center gap-2">
-                <Checkbox
-                  id="audio-loop"
-                  checked={definition.audio.loop !== false}
-                  onCheckedChange={(checked) => {
-                    if (definition.audio) definition.audio.loop = checked === true;
-                  }}
-                />
-                <Label for="audio-loop" class="text-[10px] font-normal text-muted-foreground">
-                  Loop the music. Playback uses the title bar volume control.
-                </Label>
-              </div>
-            {/if}
-          </section>
+            <p class="text-[10px] leading-relaxed text-muted-foreground">
+              Changes launcher navigation, status, settings and theme-browser icons. The icon data
+              ships with the launcher, so themes still work offline.
+            </p>
+          </ThemeSection>
 
-          <section class="space-y-3 border-t border-theme-800 pt-3">
-            <h3 class="flex items-center gap-1.5 text-xs font-semibold text-theme-100">
-              <Code2 class="size-3.5 text-primary" />
-              Custom CSS
-            </h3>
+          <ThemeSection title="Music" icon={Music} open={false} contentClass="space-y-3 pt-2.5">
+            {#if definition.background.type === 'video'}
+              <div
+                class="flex items-start gap-2 rounded-md border border-theme-800 bg-black/20 p-2"
+              >
+                <Lock class="mt-0.5 size-3.5 text-muted-foreground" />
+                <p class="text-[10px] leading-relaxed text-muted-foreground">
+                  Music is unavailable while a video is used as the background. Switch to an image,
+                  color, or gradient to choose theme music.
+                </p>
+              </div>
+            {:else}
+              <div class="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  class="h-8 flex-1 gap-1.5 text-[10px]"
+                  onclick={chooseAudio}
+                >
+                  <Upload class="size-3.5" />
+                  {definition.audio?.src ? 'Replace' : 'Choose music'}
+                </Button>
+                <span class="min-w-0 flex-1 truncate font-mono text-[9px] text-muted-foreground">
+                  {definition.audio?.src || 'Optional MP3, OGG, WAV, M4A or FLAC'}
+                </span>
+                {#if definition.audio}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-8 text-muted-foreground"
+                    title="Remove music"
+                    onclick={() => (definition.audio = undefined)}
+                  >
+                    <X class="size-3.5" />
+                  </Button>
+                {/if}
+              </div>
+              {#if definition.audio}
+                <div class="flex items-center gap-2">
+                  <Checkbox
+                    id="audio-loop"
+                    checked={definition.audio.loop !== false}
+                    onCheckedChange={(checked) => {
+                      if (definition.audio) definition.audio.loop = checked === true;
+                    }}
+                  />
+                  <Label for="audio-loop" class="text-[10px] font-normal text-muted-foreground">
+                    Loop the music. Playback uses the title bar volume control.
+                  </Label>
+                </div>
+              {/if}
+            {/if}
+          </ThemeSection>
+
+          <ThemeSection
+            title="Custom CSS"
+            icon={Code2}
+            open={false}
+            contentClass="space-y-3 pt-2.5"
+          >
             <Textarea
               class="min-h-28 resize-y border-theme-800 bg-theme-950 font-mono text-[10px] text-theme-50"
               spellcheck="false"
@@ -2682,184 +4962,193 @@
               bind:value={definition.css}
             />
             <p class="text-[10px] text-muted-foreground">
-              Applied after the launcher styles. Keep it scoped where possible.
+              Applied after the launcher styles. The live canvas previews these rules; keep them
+              scoped where possible.
             </p>
-          </section>
+          </ThemeSection>
         </div>
       {/if}
     </aside>
 
     <main class="flex min-h-0 min-w-0 flex-col bg-theme-900/50">
       <div
-        class="flex h-10 shrink-0 items-center justify-between border-b border-theme-800 px-4 text-[10px] text-muted-foreground"
+        class="flex h-10 shrink-0 items-center justify-between border-b border-theme-800 px-3 text-[10px] text-muted-foreground"
       >
-        <span class="flex items-center gap-2">
-          <span class="size-1.5 rounded-full bg-emerald-400"></span>
-          Launcher home · live canvas
+        <span class="flex min-w-0 items-center gap-2">
+          <span class="size-1.5 shrink-0 rounded-full bg-emerald-400"></span>
+          <span class="truncate">Launcher home · live canvas</span>
         </span>
-        <span class="font-mono">{Math.round(canvasScale * 100)}%</span>
+        <div class="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-6 text-muted-foreground"
+            title="Zoom out (Cmd/Ctrl+-)"
+            aria-label="Zoom out"
+            onclick={() => zoomCanvasBy(1 / CANVAS_ZOOM_STEP)}
+          >
+            <Minus class="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-6 w-12 px-0 font-mono text-[10px] text-theme-100"
+            title="Reset to fit to window (Cmd/Ctrl+0)"
+            aria-label="Reset canvas zoom to fit to window"
+            onclick={resetCanvasView}
+          >
+            {Math.round(canvasScale * 100)}%
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-6 text-muted-foreground"
+            title="Zoom in (Cmd/Ctrl++)"
+            aria-label="Zoom in"
+            onclick={() => zoomCanvasBy(CANVAS_ZOOM_STEP)}
+          >
+            <Plus class="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-6 text-muted-foreground"
+            title="Fit to window (Cmd/Ctrl+0)"
+            aria-label="Fit canvas to window"
+            onclick={resetCanvasView}
+          >
+            <Maximize2 class="size-3.5" />
+          </Button>
+          <span class="mx-0.5 h-4 w-px bg-theme-800"></span>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-6 {panMode
+              ? 'bg-primary/20 text-primary hover:bg-primary/25'
+              : 'text-muted-foreground'}"
+            title="Pan mode — drag the canvas to move it"
+            aria-label="Pan mode"
+            aria-pressed={panMode}
+            onclick={() => {
+              panMode = !panMode;
+              panning = false;
+            }}
+          >
+            <Hand class="size-3.5" />
+          </Button>
+        </div>
       </div>
       <div
-        class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6"
+        class="relative min-h-0 flex-1 overflow-hidden p-6"
         style="background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.10) 1px, transparent 0);background-size:24px 24px;"
         bind:this={canvasHost}
         role="presentation"
+        onwheel={handleCanvasWheel}
       >
         {#if loading}
-          <div class="flex flex-col items-center gap-3 text-muted-foreground">
+          <div
+            class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground"
+          >
             <LoaderCircle class="size-6 animate-spin" />
             <span class="text-xs">Opening theme…</span>
           </div>
         {:else}
-          <ContextMenu.Root bind:open={contextMenuOpen}>
-            <ContextMenu.Trigger
-              class="relative overflow-hidden rounded-xl border border-theme-700 shadow-2xl"
-              style="width:{1000 * canvasScale}px;height:{650 * canvasScale}px;"
-            >
-              <div
-                style="width:1000px;height:650px;transform:scale({canvasScale});transform-origin:top left;"
+          <div
+            class="absolute left-1/2 top-1/2"
+            style="transform:translate(calc(-50% + {canvasPanX}px), calc(-50% + {canvasPanY}px));"
+          >
+            <ContextMenu.Root bind:open={contextMenuOpen}>
+              <ContextMenu.Trigger
+                class="relative overflow-hidden rounded-xl border border-theme-700 shadow-2xl"
+                style="width:{CANVAS_WIDTH * canvasScale}px;height:{CANVAS_HEIGHT * canvasScale}px;"
               >
-                <ThemeStage
-                  {definition}
-                  assets={assetBase}
-                  assetOverrides={previewAssets}
-                  {selectedIds}
-                  interactive
-                  scale={canvasScale}
-                  onselect={(id, additive) => selectElement(id, additive)}
-                  onselectmany={(ids, additive) => selectMany(ids, additive)}
-                  onmove={moveElements}
-                  onpatch={(id, patch) => patchElement(id, patch)}
-                  oncontext={(id) => prepareContextMenu(id)}
-                />
-              </div>
-            </ContextMenu.Trigger>
+                <div
+                  style="width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;transform:scale({canvasScale});transform-origin:top left;"
+                >
+                  <ThemeStage
+                    {definition}
+                    assets={assetBase}
+                    assetOverrides={previewAssets}
+                    {selectedIds}
+                    {selectedGroupId}
+                    interactive
+                    scale={canvasScale}
+                    variables={previewScriptVariables}
+                    onselect={(id, additive) => selectElement(id, additive)}
+                    onselectmany={(ids, additive) => selectMany(ids, additive)}
+                    onselectgroup={(id) => selectGroup(id)}
+                    onmove={moveElements}
+                    onpatch={(id, patch) => patchElement(id, patch)}
+                    onpatchgroup={(id, patch) => patchGroup(id, patch)}
+                    oncontext={(id) => prepareContextMenu(id)}
+                    oncontextgroup={(id) => prepareGroupContextMenu(id)}
+                  />
+                </div>
+              </ContextMenu.Trigger>
 
-            <ContextMenu.Content class="w-56 border-theme-700 bg-theme-950">
-              <ContextMenu.Label
-                class="px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
-              >
-                {#if contextMenuTargetId}
-                  {contextMenuSelection.length > 1
-                    ? `${contextMenuSelection.length} layers selected`
-                    : contextMenuSelection[0]
-                      ? elementLabel(contextMenuSelection[0])
-                      : 'Layer'}
-                {:else}
-                  Canvas
-                {/if}
-              </ContextMenu.Label>
+              <ContextMenu.Content class="w-56 border-theme-700 bg-theme-950">
+                {@render contextMenuItems()}
+              </ContextMenu.Content>
+            </ContextMenu.Root>
+          </div>
 
-              {#if contextMenuTargetId}
-                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={duplicateSelected}>
-                  <Copy />
-                  Duplicate
-                </ContextMenu.Item>
-                {#if contextMenuSelection.length === 1}
-                  <ContextMenu.Item
-                    class="gap-2 py-1.5 text-[11px]"
-                    disabled={selectedIndex >= elements.length - 1}
-                    onclick={() => moveSelected(1)}
-                  >
-                    <ChevronUp />
-                    Bring forward
-                  </ContextMenu.Item>
-                  <ContextMenu.Item
-                    class="gap-2 py-1.5 text-[11px]"
-                    disabled={selectedIndex <= 0}
-                    onclick={() => moveSelected(-1)}
-                  >
-                    <ChevronDown />
-                    Send backward
-                  </ContextMenu.Item>
-                {/if}
-                <ContextMenu.Separator class="my-1 bg-theme-800" />
-                <ContextMenu.Item
-                  class="gap-2 py-1.5 text-[11px]"
-                  onclick={() => toggleSelectedFlag('hidden')}
-                >
-                  {#if contextMenuAllHidden}
-                    <Eye />
-                    Show {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
-                  {:else}
-                    <EyeOff />
-                    Hide {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
-                  {/if}
-                </ContextMenu.Item>
-                <ContextMenu.Item
-                  class="gap-2 py-1.5 text-[11px]"
-                  onclick={() => toggleSelectedFlag('locked')}
-                >
-                  {#if contextMenuAllLocked}
-                    <Unlock />
-                    Unlock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
-                  {:else}
-                    <Lock />
-                    Lock {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
-                  {/if}
-                </ContextMenu.Item>
-                <ContextMenu.Separator class="my-1 bg-theme-800" />
-                <ContextMenu.Item
-                  variant="destructive"
-                  class="gap-2 py-1.5 text-[11px]"
-                  onclick={deleteSelected}
-                >
-                  <Trash2 />
-                  Delete {contextMenuSelection.length === 1 ? 'layer' : 'layers'}
-                </ContextMenu.Item>
-              {:else}
-                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addText}>
-                  <Type />
-                  Add text
-                </ContextMenu.Item>
-                <ContextMenu.Item
-                  class="gap-2 py-1.5 text-[11px]"
-                  onclick={() => addMedia('image')}
-                >
-                  <ImageIcon />
-                  Add image
-                </ContextMenu.Item>
-                <ContextMenu.Item
-                  class="gap-2 py-1.5 text-[11px]"
-                  onclick={() => addMedia('video')}
-                >
-                  <Video />
-                  Add video
-                </ContextMenu.Item>
-                <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addShape}>
-                  <Shapes />
-                  Add shape
-                </ContextMenu.Item>
-                <ContextMenu.Separator class="my-1 bg-theme-800" />
-                <ContextMenu.Item
-                  class="gap-2 py-1.5 text-[11px]"
-                  disabled={elements.length === 0}
-                  onclick={() => {
-                    selectedIds = elements
-                      .filter((element) => !element.hidden)
-                      .map((element) => element.id);
-                  }}
-                >
-                  <MousePointer2 />
-                  Select all layers
-                </ContextMenu.Item>
-              {/if}
-            </ContextMenu.Content>
-          </ContextMenu.Root>
+          {#if panMode}
+            <div
+              class="absolute inset-0 z-30 touch-none {panning ? 'cursor-grabbing' : 'cursor-grab'}"
+              role="presentation"
+              onpointerdown={startCanvasPan}
+              onpointermove={moveCanvasPan}
+              onpointerup={endCanvasPan}
+              onpointercancel={endCanvasPan}
+            ></div>
+          {/if}
         {/if}
       </div>
       <div
         class="flex h-8 shrink-0 items-center justify-between border-t border-theme-800 px-4 text-[9px] text-muted-foreground"
       >
-        <span>
-          Drag to move · shift/cmd-click or drag empty space to multi-select · Alt skips snapping
-        </span>
+        <span> Drag to move · Wheel pan · Ctrl/Cmd+wheel zoom · Cmd/Ctrl+0 fit · ? shortcuts </span>
         <span class="font-mono">{elements.length} elements</span>
       </div>
     </main>
 
     <aside class="flex min-h-0 flex-col border-l border-theme-800 bg-theme-900/35">
-      {#if selectedIds.length > 1}
+      {#if leftTab === 'logic'}
+        {#if selectedBehavior}
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            <ThemeBehaviorInspector
+              behavior={selectedBehavior}
+              {elements}
+              {groups}
+              variables={scriptVariables}
+              ondelete={() => deleteBehavior(selectedBehavior.id)}
+            />
+          </div>
+        {:else}
+          <div class="flex min-h-0 flex-1 items-center justify-center p-4">
+            <div class="rounded-xl border border-theme-800 bg-black/20 p-4 text-center">
+              <div
+                class="mx-auto flex size-10 items-center justify-center rounded-full bg-primary/15 text-primary"
+              >
+                <Zap class="size-5" />
+              </div>
+              <p class="mt-3 text-xs font-semibold text-theme-100">Select a rule</p>
+              <p class="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                Choose a rule on the left, or add one to start wiring interactions.
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                class="mt-3 h-8 gap-1.5 text-[10px]"
+                onclick={addBehavior}
+              >
+                <Plus class="size-3.5" />
+                Add rule
+              </Button>
+            </div>
+          </div>
+        {/if}
+      {:else if selectedIds.length > 1}
         <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
           <span class="flex-1 text-[10px] font-semibold text-theme-100">
             {selectedIds.length} layers selected
@@ -2883,11 +5172,13 @@
             <Trash2 class="size-3.5" />
           </Button>
         </div>
-        <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-          <section class="space-y-2">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Align
-            </p>
+        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+          <ThemeSection
+            title="Align"
+            bordered={false}
+            headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            contentClass="space-y-2 pt-2"
+          >
             <div class="grid grid-cols-3 gap-1">
               <Button
                 variant="secondary"
@@ -2926,11 +5217,12 @@
                 onclick={() => alignSelected('bottom')}>Bottom</Button
               >
             </div>
-          </section>
-          <section class="space-y-2 border-t border-theme-800 pt-3">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Distribute
-            </p>
+          </ThemeSection>
+          <ThemeSection
+            title="Distribute"
+            headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            contentClass="space-y-2 pt-2.5"
+          >
             <div class="grid grid-cols-2 gap-1">
               <Button
                 variant="secondary"
@@ -2948,11 +5240,12 @@
             <p class="text-[10px] leading-relaxed text-muted-foreground">
               Distribute needs at least three selected layers.
             </p>
-          </section>
-          <section class="space-y-2 border-t border-theme-800 pt-3">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Layers
-            </p>
+          </ThemeSection>
+          <ThemeSection
+            title="Layers"
+            headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            contentClass="space-y-2 pt-2.5"
+          >
             <div class="grid grid-cols-2 gap-1">
               <Button
                 variant="secondary"
@@ -2966,12 +5259,69 @@
                 class="h-8 text-[10px]"
                 onclick={() => toggleSelectedFlag('locked')}>Lock / unlock</Button
               >
+              <Button
+                variant="secondary"
+                size="sm"
+                class="col-span-2 h-8 gap-1.5 text-[10px]"
+                onclick={groupSelection}
+              >
+                <Boxes class="size-3.5" />
+                Group selection
+              </Button>
             </div>
             <p class="text-[10px] leading-relaxed text-muted-foreground">
               Use the alignment buttons to arrange a multi-layer selection. Press Escape to clear
               it.
             </p>
-          </section>
+          </ThemeSection>
+        </div>
+      {:else if selectedGroup}
+        <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
+          <span class="min-w-0 flex-1 truncate text-[10px] font-semibold text-theme-100">
+            {groupLabel(selectedGroup)}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="h-8 px-2 text-[10px]"
+            onclick={() => ungroupGroup()}
+          >
+            Ungroup
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            class="size-8"
+            title="Duplicate group"
+            aria-label="Duplicate group"
+            onclick={() => duplicateGroup()}
+          >
+            <CopyPlus class="size-3.5" />
+          </Button>
+          <Button
+            variant="destructive"
+            size="icon"
+            class="size-8"
+            title="Delete group and its layers"
+            aria-label="Delete group and its layers"
+            onclick={() => requestGroupDelete()}
+          >
+            <Trash2 class="size-3.5" />
+          </Button>
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <ThemeGroupInspector
+            group={selectedGroup}
+            {behaviors}
+            {elements}
+            {groups}
+            variables={scriptVariables}
+            focusToken={logicFocusKey === `group:${selectedGroup.id}` ? logicFocusToken : 0}
+            onungroup={() => ungroupGroup()}
+            onpickmask={pickGroupMask}
+            onaddbehavior={createBehavior}
+            ondeleterule={deleteBehavior}
+          />
         </div>
       {:else if selectedElement}
         <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
@@ -3018,7 +5368,16 @@
           <ThemeElementInspector
             element={selectedElement}
             {fontOptions}
+            {elements}
+            {behaviors}
+            {groups}
+            variables={scriptVariables}
+            focusToken={logicFocusKey === `element:${selectedElement.id}` ? logicFocusToken : 0}
             onreplace={replaceSelectedAsset}
+            onpickmask={pickElementMask}
+            onpickrepeater={pickRepeaterImage}
+            onaddbehavior={createBehavior}
+            ondeleterule={deleteBehavior}
           />
         </div>
       {:else}
@@ -3069,45 +5428,167 @@
               <Shapes class="size-4 text-primary" />
               Shape
             </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={addSvelte}
+            >
+              <Component class="size-4 text-primary" />
+              Svelte
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('data')}
+            >
+              <Type class="size-4 text-primary" />
+              Data
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('icon')}
+            >
+              <Sparkles class="size-4 text-primary" />
+              Icon
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('repeater')}
+            >
+              <Repeat class="size-4 text-primary" />
+              Repeater
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('gauge')}
+            >
+              <Gauge class="size-4 text-primary" />
+              Gauge
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('ticker')}
+            >
+              <Megaphone class="size-4 text-primary" />
+              Ticker
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('button')}
+            >
+              <MousePointerClick class="size-4 text-primary" />
+              Button
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('path')}
+            >
+              <Spline class="size-4 text-primary" />
+              Path
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('particles')}
+            >
+              <Sparkles class="size-4 text-primary" />
+              Particles
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('clock')}
+            >
+              <Clock class="size-4 text-primary" />
+              Clock
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('countdown')}
+            >
+              <Timer class="size-4 text-primary" />
+              Countdown
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={addLottie}
+            >
+              <Film class="size-4 text-primary" />
+              Lottie
+            </Button>
           </div>
 
-          <div class="mt-4 space-y-2 rounded-lg border border-theme-800 bg-black/20 p-3">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Theme summary
-            </p>
-            <div class="flex items-center justify-between text-[10px]">
-              <span class="text-muted-foreground">Background</span>
-              <span class="capitalize text-theme-100">{definition.background.type}</span>
-            </div>
-            <div class="flex items-center justify-between text-[10px]">
-              <span class="text-muted-foreground">Elements</span>
-              <span class="text-theme-100">{elements.length}</span>
-            </div>
-            <div class="flex items-center justify-between text-[10px]">
-              <span class="text-muted-foreground">Fonts</span>
-              <span class="text-theme-100">{(definition.fonts ?? []).length} custom</span>
-            </div>
-            <div class="flex items-center justify-between text-[10px]">
-              <span class="text-muted-foreground">Folder</span>
-              <span class="max-w-[150px] truncate font-mono text-theme-100">
-                {savedFolder ?? 'not saved yet'}
-              </span>
-            </div>
-          </div>
-
-          <div
-            class="mt-4 rounded-lg border border-theme-800 bg-black/20 p-3 text-[10px] leading-relaxed text-muted-foreground"
+          <ThemeSection
+            title="Theme summary"
+            class="mt-4"
+            bordered={false}
+            contentClass="space-y-2 pt-2"
           >
-            <p class="mb-1 font-semibold text-theme-100">Shortcuts</p>
+            <div class="space-y-2 rounded-lg border border-theme-800 bg-black/20 p-3">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-muted-foreground">Background</span>
+                <span class="capitalize text-theme-100">{definition.background.type}</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-muted-foreground">Elements</span>
+                <span class="text-theme-100">{elements.length}</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-muted-foreground">Fonts</span>
+                <span class="text-theme-100">{(definition.fonts ?? []).length} custom</span>
+              </div>
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-muted-foreground">Theme folder</span>
+                <span class="max-w-[150px] truncate font-mono text-theme-100">
+                  {savedFolder ?? 'not saved yet'}
+                </span>
+              </div>
+            </div>
+          </ThemeSection>
+
+          <ThemeSection
+            title="Shortcuts"
+            class="mt-4"
+            bordered={false}
+            open={false}
+            contentClass="space-y-1 rounded-lg border border-theme-800 bg-black/20 p-3 pt-3 text-[10px] leading-relaxed text-muted-foreground"
+          >
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+Z</span> undo</p>
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+Shift+Z</span> redo</p>
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+S</span> save theme</p>
-            <p><span class="font-mono text-theme-100">Cmd/Ctrl+D</span> duplicate layer</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl+F</span> find layers and groups</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl + / -</span> zoom canvas</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl+0</span> fit canvas to window</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl+C / X / V</span> copy, cut, paste</p>
+            <p><span class="font-mono text-theme-100">Cmd/Ctrl+D</span> duplicate layer or group</p>
             <p><span class="font-mono text-theme-100">Cmd/Ctrl+A</span> select all layers</p>
             <p><span class="font-mono text-theme-100">Shift/Cmd+click</span> add to selection</p>
             <p><span class="font-mono text-theme-100">Arrows</span> nudge selected layers</p>
-            <p><span class="font-mono text-theme-100">Delete</span> remove selected layers</p>
-          </div>
+            <p>
+              <span class="font-mono text-theme-100">Alt/Option+↑ / ↓</span> jump to layers or groups
+              with logic
+            </p>
+            <p>
+              <span class="font-mono text-theme-100">Delete</span> remove selected layers or group
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="mt-2 h-6 w-full px-1 text-[10px] text-muted-foreground"
+              onclick={() => (shortcutsOpen = true)}
+            >
+              <Keyboard class="size-3" />
+              All shortcuts
+            </Button>
+          </ThemeSection>
 
           <Button class="mt-4 w-full" onclick={() => saveTheme()} disabled={saving || loading}>
             {#if saving}
@@ -3136,6 +5617,70 @@
     </span>
     <span>API 2.0 · advanced editor</span>
   </footer>
+
+  {#if shortcutsOpen}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="presentation"
+      onclick={(event) => {
+        if (event.target === event.currentTarget) shortcutsOpen = false;
+      }}
+    >
+      <div
+        class="flex max-h-[80vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-theme-700 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortcuts-title"
+      >
+        <div class="flex items-center gap-3 border-b border-theme-800 p-4">
+          <div
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
+          >
+            <Keyboard class="size-4" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h2 id="shortcuts-title" class="text-sm font-semibold">Keyboard shortcuts</h2>
+            <p class="mt-0.5 text-[10px] text-muted-foreground">
+              Everything in the editor is reachable from the keyboard.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7"
+            title="Close shortcuts"
+            aria-label="Close shortcuts"
+            onclick={() => (shortcutsOpen = false)}
+          >
+            <X class="size-3.5" />
+          </Button>
+        </div>
+        <div class="grid min-h-0 flex-1 gap-x-6 gap-y-0.5 overflow-y-auto p-4 sm:grid-cols-2">
+          {#each shortcutRows as shortcut (shortcut.label)}
+            <div
+              class="flex items-center justify-between gap-3 border-b border-theme-800/70 px-1 py-1.5 text-[11px] last:border-0"
+            >
+              <span class="min-w-0 truncate text-muted-foreground">{shortcut.label}</span>
+              <span class="flex shrink-0 items-center gap-1">
+                {#each shortcut.keys as key, index (key)}
+                  {#if index > 0}<span class="text-theme-600">+</span>{/if}
+                  <kbd
+                    class="rounded border border-theme-700 bg-theme-900 px-1.5 py-0.5 font-mono text-[9px] text-theme-100"
+                  >
+                    {key}
+                  </kbd>
+                {/each}
+              </span>
+            </div>
+          {/each}
+        </div>
+        <div class="border-t border-theme-800 px-4 py-2 text-[9px] text-muted-foreground">
+          Tip: press <kbd class="font-mono text-theme-100">?</kbd> anywhere in the editor to reopen this
+          list.
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if validationOpen && validationReport}
     {@const errors = validationReport.issues.filter((issue) => issue.level === 'error')}
@@ -3230,7 +5775,7 @@
               {:else}
                 <Download />
               {/if}
-              Export anyway
+              {warnings.length ? 'Export anyway' : 'Export theme'}
             </Button>
           {/if}
         </div>
@@ -3272,6 +5817,60 @@
               <Save />
             {/if}
             Save and close
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if deleteGroupTarget}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      role="presentation"
+    >
+      <div
+        class="w-full max-w-md rounded-xl border border-theme-700 bg-theme-950 p-5 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-group-title"
+      >
+        <div class="flex items-start gap-3">
+          <div
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive"
+          >
+            <Trash2 class="size-4" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h2 id="delete-group-title" class="text-sm font-semibold">
+              Delete “{groupLabel(deleteGroupTarget)}”?
+            </h2>
+            <p class="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {#if deleteGroupLayerCount > 0}
+                <strong class="text-theme-100">{deleteGroupLayerLabel}</strong>
+                {#if deleteGroupNestedCount > 0}
+                  and <strong class="text-theme-100">{deleteGroupNestedLabel}</strong>
+                {/if}
+                will be deleted with this group.
+              {:else if deleteGroupNestedCount > 0}
+                This group has no layers, but
+                <strong class="text-theme-100">{deleteGroupNestedLabel}</strong> will be deleted with
+                it.
+              {:else}
+                This group has no layers.
+              {/if}
+            </p>
+            <p class="mt-2 text-[10px] leading-relaxed text-muted-foreground/70">
+              You can undo this with Cmd/Ctrl+Z.
+            </p>
+          </div>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onclick={() => (deleteGroupId = undefined)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" size="sm" onclick={confirmGroupDelete}>
+            <Trash2 class="size-3.5" />
+            Delete group
           </Button>
         </div>
       </div>

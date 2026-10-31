@@ -14,5 +14,26 @@ export const BUNDLED_THEME_FONTS: ThemeFontChoice[] = [
   { label: 'JetBrains Mono', family: 'JetBrains Mono Variable', category: 'Mono' },
 ];
 
+const quoteFamily = (family: string) => `"${family.replace(/["\\]/g, '\\$&')}"`;
+
 export const fontStack = (family: string | undefined, fallback = 'Sora Variable') =>
-  `"${(family || fallback).replace(/["\\]/g, '\\$&')}", ui-sans-serif, system-ui, sans-serif`;
+  `${quoteFamily(family || fallback)}, ui-sans-serif, system-ui, sans-serif`;
+
+export const monoFontStack = (family: string | undefined, fallback = 'Space Mono') =>
+  `${quoteFamily(family || fallback)}, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`;
+
+const normalizeFamily = (family: string) =>
+  family
+    .trim()
+    .toLowerCase()
+    .replace(/\s+variable$/, '');
+
+/** Resolve a Fontsource family name to the family the launcher already ships. */
+export const bundledThemeFontFamily = (family: string | undefined) => {
+  if (!family) return undefined;
+  const normalized = normalizeFamily(family);
+  return BUNDLED_THEME_FONTS.find(
+    (font) =>
+      normalizeFamily(font.family) === normalized || normalizeFamily(font.label) === normalized
+  )?.family;
+};

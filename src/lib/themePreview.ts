@@ -1,9 +1,44 @@
+import { resolveThemeDataValue, themeGlobalData } from './themeData';
+import { THEME_ICON_BODIES } from './themeIconData';
+import {
+  themeArcGeometry,
+  themeClockDate,
+  themeClockTime,
+  themeCountdownText,
+  themeParticleSeeds,
+  themeSvgGradientVector,
+} from './themeLayers';
+import { themeScriptInitialVariables } from './themeScript';
+import { interpolateThemeText } from './themeTextVariables';
 import {
   readableTextColor,
+  themeElementTransformMatrix,
+  themeFilterCss,
+  themeGroupAncestors,
+  themeGroupBounds,
+  themeGroupTransformMatrix,
+  themeMaskPolygonPoints,
+  themeTransformPoint,
+  type ThemeV2ButtonElement,
+  type ThemeV2ClockElement,
+  type ThemeV2CountdownElement,
+  type ThemeV2DataElement,
   type ThemeV2Definition,
   type ThemeV2Element,
+  type ThemeV2GaugeElement,
+  type ThemeV2Group,
+  type ThemeV2IconElement,
+  type ThemeV2LottieElement,
+  type ThemeV2ParticlesElement,
+  type ThemeV2PathElement,
+  type ThemeV2RepeaterElement,
+  type ThemeV2ScriptValue,
+  type ThemeV2ShapeElement,
   type ThemeV2TextElement,
+  type ThemeV2TickerElement,
 } from './themeV2';
+import lottie from 'lottie-web';
+import { get } from 'svelte/store';
 
 const WIDTH = 1000;
 const HEIGHT = 650;
@@ -37,6 +72,8 @@ type PreviewContext = {
   videoFrames: Map<string, Promise<LoadedMedia | undefined>>;
   fonts: Map<string, string>;
   fontFamilies: Map<string, string>;
+  icons: Map<string, Promise<LoadedMedia | undefined>>;
+  variables: Record<string, ThemeV2ScriptValue>;
 };
 
 const IMAGE_TYPES: Record<string, string> = {
@@ -270,6 +307,126 @@ const loadImageAsset = (context: PreviewContext, path: string) => {
   return promise;
 };
 
+const loadThemeIcon = (context: PreviewContext, name: string, color: string) => {
+  const set = context.definition.iconSet ?? 'lucide';
+  const icon =
+    THEME_ICON_BODIES[set]?.[name as keyof (typeof THEME_ICON_BODIES)[typeof set]] ??
+    THEME_ICON_BODIES.lucide[name as keyof (typeof THEME_ICON_BODIES)['lucide']];
+  if (!icon) return Promise.resolve(undefined);
+
+  const key = `${set}|${name}|${color}`;
+  const cached = context.icons.get(key);
+  if (cached) return cached;
+
+  const safeColor = color.replace(/["<>]/g, '');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${icon.width} ${icon.height}" color="${safeColor}">${icon.body}</svg>`;
+  const promise = loadHtmlImage(`data:image/svg+xml,${encodeURIComponent(svg)}`)
+    .then<LoadedMedia>((image) => ({
+      source: image,
+      width: icon.width,
+      height: icon.height,
+    }))
+    .catch((error) => {
+      console.warn(`Could not render the theme icon ${name}`, error);
+      return undefined;
+    });
+
+  context.icons.set(key, promise);
+  return promise;
+};
+
+const applyGroupMasks = (
+  context: PreviewContext,
+  ancestors: ThemeV2Group[],
+  elements: ThemeV2Element[],
+  groups: ThemeV2Group[]
+) => {
+  const { ctx } = context;
+  for (const group of [...ancestors].reverse()) {
+    const mask = group.mask;
+    if (!mask || mask.shape === 'image') continue;
+    const bounds = themeGroupBounds(groups, elements, group.id);
+    if (!bounds) continue;
+    const matrix = themeGroupTransformMatrix(group, elements, groups);
+    const toStage = (x: number, y: number) =>
+      themeTransformPoint(matrix, bounds.left + x, bounds.top + y);
+
+    ctx.beginPath();
+    if (mask.shape === 'rectangle') {
+      const points = [
+        toStage(0, 0),
+        toStage(bounds.width, 0),
+        toStage(bounds.width, bounds.height),
+        toStage(0, bounds.height),
+      ];
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+    } else if (mask.shape === 'ellipse') {
+      const steps = 48;
+      for (let index = 0; index < steps; index += 1) {
+        const angle = (index / steps) * Math.PI * 2;
+        const point = toStage(
+          bounds.width / 2 + Math.cos(angle) * (bounds.width / 2),
+          bounds.height / 2 + Math.sin(angle) * (bounds.height / 2)
+        );
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      }
+      ctx.closePath();
+    } else {
+      const points = themeMaskPolygonPoints(
+        mask.sides ?? 6,
+        mask.shape === 'star',
+        mask.innerRadius ?? 0.5
+      );
+      points.forEach((point, index) => {
+        const stage = toStage((point.x / 100) * bounds.width, (point.y / 100) * bounds.height);
+        if (index === 0) ctx.moveTo(stage.x, stage.y);
+        else ctx.lineTo(stage.x, stage.y);
+      });
+      ctx.closePath();
+    }
+    ctx.clip();
+  }
+};
+
+const applyElementMask = (context: PreviewContext, element: ThemeV2Element) => {
+  const mask = element.mask;
+  if (!mask || mask.shape === 'image') return;
+  const { ctx } = context;
+  ctx.beginPath();
+  if (mask.shape === 'rectangle') {
+    roundRect(ctx, element.x, element.y, element.width, element.height, mask.radius ?? 0);
+  } else if (mask.shape === 'ellipse') {
+    ctx.ellipse(
+      element.x + element.width / 2,
+      element.y + element.height / 2,
+      element.width / 2,
+      element.height / 2,
+      0,
+      0,
+      Math.PI * 2
+    );
+  } else {
+    const points = themeMaskPolygonPoints(
+      mask.sides ?? 6,
+      mask.shape === 'star',
+      mask.innerRadius ?? 0.5
+    );
+    points.forEach((point, index) => {
+      const x = element.x + (point.x / 100) * element.width;
+      const y = element.y + (point.y / 100) * element.height;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+  }
+  ctx.clip();
+};
+
 const loadVideoFrame = (context: PreviewContext, path: string) => {
   const cached = context.videoFrames.get(path);
   if (cached) return cached;
@@ -311,21 +468,32 @@ const loadThemeFonts = async (context: PreviewContext) => {
   const families = new Set<string>();
   const bodyFont = context.definition.typography?.body;
   const headingFont = context.definition.typography?.heading;
+  const monoFont = context.definition.typography?.mono;
   if (bodyFont) families.add(bodyFont);
   if (headingFont) families.add(headingFont);
+  if (monoFont) families.add(monoFont);
   for (const element of context.definition.elements ?? []) {
     if (element.type === 'text' && element.fontFamily) families.add(element.fontFamily);
   }
 
   // Bundled Fontsource families are imported globally but only downloaded when
-  // used. Ask for the weights we draw so the canvas does not fall back to a
-  // system font on its first render.
+  // used. Ask for the weights and styles we draw so the canvas does not fall
+  // back to a system font on its first render.
+  const requests = new Set<string>();
+  for (const family of families) {
+    for (const weight of [400, 600, 700]) {
+      requests.add(`normal ${weight} 16px ${quoteFamily(family)}`);
+    }
+  }
+  for (const element of context.definition.elements ?? []) {
+    if (element.type !== 'text') continue;
+    const family = element.fontFamily ?? bodyFont ?? DEFAULT_BODY_FONT;
+    const style = element.fontStyle === 'italic' ? 'italic' : 'normal';
+    const weight = element.fontWeight ?? 600;
+    requests.add(`${style} ${weight} 16px ${quoteFamily(family)}`);
+  }
   await Promise.all(
-    [...families].flatMap((family) =>
-      [400, 600, 700].map((weight) =>
-        document.fonts.load(`${weight} 16px ${quoteFamily(family)}`).catch(() => undefined)
-      )
-    )
+    [...requests].map((request) => document.fonts.load(request).catch(() => undefined))
   );
   await document.fonts.ready.catch(() => undefined);
 
@@ -404,6 +572,41 @@ const drawMedia = (
     drawWidth,
     drawHeight
   );
+};
+
+const drawTintedMedia = (
+  context: PreviewContext,
+  media: LoadedMedia,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fit: 'cover' | 'contain',
+  tint: string
+) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
+  const offscreen = canvas.getContext('2d');
+  if (!offscreen) return;
+
+  const scale =
+    fit === 'contain'
+      ? Math.min(width / media.width, height / media.height)
+      : Math.max(width / media.width, height / media.height);
+  const drawWidth = media.width * scale;
+  const drawHeight = media.height * scale;
+  offscreen.drawImage(
+    media.source,
+    (width - drawWidth) / 2,
+    (height - drawHeight) / 2,
+    drawWidth,
+    drawHeight
+  );
+  offscreen.globalCompositeOperation = 'source-in';
+  offscreen.fillStyle = tint;
+  offscreen.fillRect(0, 0, canvas.width, canvas.height);
+  context.ctx.drawImage(canvas, x, y, width, height);
 };
 
 const supportsCanvasFilter = (ctx: CanvasRenderingContext2D) => {
@@ -555,7 +758,17 @@ const drawBackground = async (context: PreviewContext) => {
 
 const drawIcon = (
   context: PreviewContext,
-  name: 'home' | 'paint' | 'settings' | 'user' | 'play' | 'music' | 'brush' | 'wifi',
+  name:
+    | 'home'
+    | 'paint'
+    | 'palette'
+    | 'settings'
+    | 'sliders'
+    | 'user'
+    | 'play'
+    | 'music'
+    | 'brush'
+    | 'wifi',
   centerX: number,
   centerY: number,
   size: number,
@@ -595,6 +808,41 @@ const drawIcon = (
     ctx.lineTo(centerX - half * 0.14, centerY - half * 0.32);
     ctx.closePath();
     ctx.fill();
+  } else if (name === 'palette') {
+    ctx.beginPath();
+    ctx.ellipse(
+      centerX - half * 0.04,
+      centerY + half * 0.02,
+      half * 0.74,
+      half * 0.62,
+      -0.25,
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(centerX + half * 0.38, centerY + half * 0.22, half * 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+    for (const [x, y] of [
+      [-0.38, -0.18],
+      [-0.12, -0.4],
+      [0.18, -0.42],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(centerX + half * x, centerY + half * y, half * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (name === 'sliders') {
+    for (let index = -1; index <= 1; index += 1) {
+      const y = centerY + half * index * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(centerX - half * 0.78, y);
+      ctx.lineTo(centerX + half * 0.78, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(centerX + half * index * 0.38, y, half * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else if (name === 'settings') {
     ctx.beginPath();
     ctx.arc(centerX, centerY, half * 0.3, 0, Math.PI * 2);
@@ -709,20 +957,21 @@ const drawSidebar = (context: PreviewContext, logo?: LoadedMedia) => {
   ctx.fillText('3.2.7', centerX, 82);
   ctx.restore();
 
-  const navIcons = ['home', 'paint', 'settings'] as const;
+  const navIcons = ['home', 'palette', 'sliders'] as const;
   navIcons.forEach((icon, index) => {
     const y = 99 + index * 60;
-    fillRoundedRect(
-      ctx,
-      18.5,
-      y,
-      48,
-      48,
-      14,
-      index === 0 ? rgba(accent, 0.5) : 'rgba(0, 0, 0, 0.2)'
-    );
+    const active = index === 0;
+    fillRoundedRect(ctx, 18.5, y, 48, 48, 14, active ? accent : 'rgba(0, 0, 0, 0.2)');
     strokeRoundedRect(ctx, 18.5, y, 48, 48, 14, 'rgba(255, 255, 255, 0.15)');
-    drawIcon(context, icon, centerX, y + 24, 20, 'rgba(255, 255, 255, 0.85)', 1.6);
+    drawIcon(
+      context,
+      icon,
+      centerX,
+      y + 24,
+      20,
+      active ? accentText : 'rgba(255, 255, 255, 0.85)',
+      1.6
+    );
   });
 
   const avatarY = HEIGHT - 12 - 40;
@@ -966,20 +1215,83 @@ const drawFooter = (context: PreviewContext) => {
   ctx.restore();
 };
 
+const transformText = (text: string, transform: ThemeV2TextElement['textTransform']) => {
+  if (transform === 'uppercase') return text.toUpperCase();
+  if (transform === 'lowercase') return text.toLowerCase();
+  if (transform === 'capitalize')
+    return text.replace(/\b\w/g, (character) => character.toUpperCase());
+  return text;
+};
+
+const textGradient = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  angle: number,
+  from: string,
+  to: string
+) => {
+  const radians = (angle * Math.PI) / 180;
+  const directionX = Math.sin(radians);
+  const directionY = -Math.cos(radians);
+  const length = Math.abs(width * directionX) + Math.abs(height * directionY);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const gradient = ctx.createLinearGradient(
+    centerX - (directionX * length) / 2,
+    centerY - (directionY * length) / 2,
+    centerX + (directionX * length) / 2,
+    centerY + (directionY * length) / 2
+  );
+  gradient.addColorStop(0, from);
+  gradient.addColorStop(1, to);
+  return gradient;
+};
+
 const drawTextElement = (context: PreviewContext, element: ThemeV2TextElement) => {
   const { ctx } = context;
   const fontSize = element.fontSize ?? 28;
   const fontWeight = element.fontWeight ?? 600;
+  const fontStyle = element.fontStyle === 'italic' ? 'italic' : 'normal';
   const lineHeight = fontSize * (element.lineHeight ?? 1.2);
-  const font = canvasFont(context, element.fontFamily ?? DEFAULT_BODY_FONT, fontSize, fontWeight);
-  const lines = wrapText(context, element.text, element.width, font);
+  const font = canvasFont(
+    context,
+    element.fontFamily ?? DEFAULT_BODY_FONT,
+    fontSize,
+    fontWeight,
+    fontStyle
+  );
+  const text = transformText(
+    interpolateThemeText(element.text, context.variables),
+    element.textTransform
+  );
+  const lines = wrapText(context, text, element.width, font);
+  const decoration = element.textDecoration ?? 'none';
+  const underline = decoration.includes('underline');
+  const strike = decoration.includes('line-through');
+  const outlineWidth = element.outlineWidth ?? 0;
+  const shadowBlur = element.shadowBlur ?? 0;
+  const shadowX = element.shadowOffsetX ?? 0;
+  const shadowY = element.shadowOffsetY ?? 0;
+  const hasShadow = shadowBlur > 0 || shadowX !== 0 || shadowY !== 0;
+  const fill =
+    element.fillMode === 'gradient'
+      ? textGradient(
+          ctx,
+          element.width,
+          element.height,
+          element.gradientAngle ?? 90,
+          element.gradientFrom ?? '#ff006e',
+          element.gradientTo ?? '#7c3aed'
+        )
+      : (element.color ?? '#ffffff');
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, element.width, element.height);
   ctx.clip();
   ctx.font = font;
-  ctx.fillStyle = element.color ?? '#ffffff';
+  ctx.fillStyle = fill;
   ctx.textBaseline = 'top';
   ctx.textAlign =
     element.align === 'center' ? 'center' : element.align === 'right' ? 'right' : 'left';
@@ -1000,26 +1312,714 @@ const drawTextElement = (context: PreviewContext, element: ThemeV2TextElement) =
     ctxWithSpacing.letterSpacing = `${spacing}px`;
   }
 
+  if (hasShadow) {
+    ctx.shadowColor = element.shadowColor ?? '#000000';
+    ctx.shadowBlur = shadowBlur;
+    ctx.shadowOffsetX = shadowX;
+    ctx.shadowOffsetY = shadowY;
+  }
+  if (outlineWidth > 0) {
+    ctx.strokeStyle = element.outlineColor ?? '#000000';
+    ctx.lineWidth = outlineWidth * 2;
+    ctx.lineJoin = 'round';
+  }
+
   lines.forEach((line, index) => {
-    ctx.fillText(line, textX, startY + index * lineHeight);
+    const y = startY + index * lineHeight;
+    if (outlineWidth > 0) ctx.strokeText(line, textX, y);
+    ctx.fillText(line, textX, y);
+
+    if ((underline || strike) && line.trim()) {
+      const lineWidth = ctx.measureText(line).width;
+      const x =
+        element.align === 'center'
+          ? textX - lineWidth / 2
+          : element.align === 'right'
+            ? textX - lineWidth
+            : textX;
+      const baseline = y + fontSize * 0.82;
+
+      ctx.save();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = Math.max(1, fontSize * 0.06);
+      ctx.beginPath();
+      if (underline) {
+        const underlineY = baseline + fontSize * 0.08;
+        ctx.moveTo(x, underlineY);
+        ctx.lineTo(x + lineWidth, underlineY);
+      }
+      if (strike) {
+        const strikeY = baseline - fontSize * 0.3;
+        ctx.moveTo(x, strikeY);
+        ctx.lineTo(x + lineWidth, strikeY);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
   });
   ctx.restore();
 };
 
-const drawElement = async (context: PreviewContext, element: ThemeV2Element) => {
+const drawDataElement = (context: PreviewContext, element: ThemeV2DataElement) => {
+  const raw = resolveThemeDataValue(element.field, {
+    global: get(themeGlobalData),
+    theme: {
+      name: context.definition.name,
+      author: context.definition.author,
+      version: context.definition.version,
+    },
+    screen: 'home',
+    mode: element.mode,
+  });
+  const template = element.text?.trim() ? element.text : '{value}';
+  const text = interpolateThemeText(template.replaceAll('{value}', raw), context.variables);
+  drawTextElement(context, { ...element, type: 'text', text } as ThemeV2TextElement);
+};
+
+const shapeGradient = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  angle: number,
+  from: string,
+  to: string
+) => {
+  const radians = (angle * Math.PI) / 180;
+  const directionX = Math.sin(radians);
+  const directionY = -Math.cos(radians);
+  const length = Math.abs(width * directionX) + Math.abs(height * directionY);
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const gradient = ctx.createLinearGradient(
+    centerX - (directionX * length) / 2,
+    centerY - (directionY * length) / 2,
+    centerX + (directionX * length) / 2,
+    centerY + (directionY * length) / 2
+  );
+  gradient.addColorStop(0, from);
+  gradient.addColorStop(1, to);
+  return gradient;
+};
+
+const drawShapeElement = (context: PreviewContext, element: ThemeV2ShapeElement) => {
+  const { ctx } = context;
+  const { x, y, width, height } = element;
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+
+  if (element.shape === 'arc') {
+    const geometry = themeArcGeometry(
+      element.startAngle ?? 0,
+      element.endAngle ?? 270,
+      element.thickness ?? 12,
+      width,
+      height
+    );
+    const size = Math.max(1, Math.min(width, height));
+    ctx.save();
+    ctx.translate(x + (width - size) / 2, y + (height - size) / 2);
+    ctx.scale(size / 100, size / 100);
+    ctx.strokeStyle =
+      element.fillMode === 'gradient'
+        ? shapeGradient(
+            ctx,
+            0,
+            0,
+            100,
+            100,
+            element.gradientAngle ?? 135,
+            element.gradientFrom ?? '#ff006e',
+            element.gradientTo ?? '#7c3aed'
+          )
+        : (element.fill ?? '#ff006e');
+    ctx.lineWidth = geometry.strokeWidth;
+    ctx.lineCap = element.rounded === false ? 'butt' : 'round';
+    ctx.stroke(new Path2D(geometry.d));
+    ctx.restore();
+    return;
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  if (element.shape === 'ellipse') {
+    ctx.ellipse(centerX, centerY, width / 2, height / 2, 0, 0, Math.PI * 2);
+  } else if (element.shape === 'polygon' || element.shape === 'star') {
+    const points = themeMaskPolygonPoints(
+      element.points ?? 6,
+      element.shape === 'star',
+      element.innerRadius ?? 0.5
+    );
+    points.forEach((point, index) => {
+      const px = x + (point.x / 100) * width;
+      const py = y + (point.y / 100) * height;
+      if (index === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+  } else {
+    roundRect(ctx, x, y, width, height, element.radius ?? 16);
+  }
+
+  ctx.fillStyle =
+    element.fillMode === 'gradient'
+      ? shapeGradient(
+          ctx,
+          x,
+          y,
+          width,
+          height,
+          element.gradientAngle ?? 135,
+          element.gradientFrom ?? '#ff006e',
+          element.gradientTo ?? '#7c3aed'
+        )
+      : (element.fill ?? '#ff006e');
+  ctx.fill();
+
+  if ((element.borderWidth ?? 0) > 0) {
+    ctx.strokeStyle = element.borderColor ?? '#ffffff';
+    ctx.lineWidth = element.borderWidth ?? 0;
+    if (element.borderStyle === 'dashed') ctx.setLineDash([10, 6]);
+    else if (element.borderStyle === 'dotted') ctx.setLineDash([2, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+};
+
+const drawIconElement = async (context: PreviewContext, element: ThemeV2IconElement) => {
+  const { ctx } = context;
+  const size = Math.min(element.width, element.height) * ((element.scale ?? 100) / 100);
+  const centerX = element.x + element.width / 2;
+  const centerY = element.y + element.height / 2;
+  const color = element.color ?? '#ffffff';
+  const icon = await loadThemeIcon(context, element.icon, color);
+
+  ctx.save();
+  if (icon) {
+    ctx.drawImage(icon.source, centerX - size / 2, centerY - size / 2, size, size);
+  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, size / 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+const drawRepeaterElement = async (context: PreviewContext, element: ThemeV2RepeaterElement) => {
+  const { ctx } = context;
+  const tileWidth = Math.max(4, element.tileWidth ?? 28);
+  const tileHeight = Math.max(4, element.tileHeight ?? 28);
+  const gapX = Math.max(0, element.gapX ?? 8);
+  const gapY = Math.max(0, element.gapY ?? 8);
+  const columns =
+    element.columns && element.columns > 0
+      ? element.columns
+      : Math.max(1, Math.floor((element.width + gapX) / (tileWidth + gapX)));
+  const rows =
+    element.rows && element.rows > 0
+      ? element.rows
+      : Math.max(1, Math.floor((element.height + gapY) / (tileHeight + gapY)));
+  const total = Math.min(240, columns * rows);
+
+  const media =
+    element.source === 'image' && element.src
+      ? await loadImageAsset(context, element.src)
+      : undefined;
+  const icon =
+    element.source === 'icon'
+      ? await loadThemeIcon(context, element.icon ?? 'music', element.color ?? '#ffffff')
+      : undefined;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(element.x, element.y, element.width, element.height);
+  ctx.clip();
+
+  for (let index = 0; index < total; index += 1) {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const x = element.x + column * (tileWidth + gapX);
+    const y = element.y + row * (tileHeight + gapY);
+    if (media) {
+      drawMedia(context, media, x, y, tileWidth, tileHeight, 'cover');
+    } else if (icon) {
+      const size = Math.min(tileWidth, tileHeight);
+      ctx.drawImage(
+        icon.source,
+        x + (tileWidth - size) / 2,
+        y + (tileHeight - size) / 2,
+        size,
+        size
+      );
+    }
+  }
+
+  ctx.restore();
+};
+
+const gaugeValue = (context: PreviewContext, element: ThemeV2GaugeElement) => {
+  const bound = element.variable ? Number(context.variables[element.variable]) : Number.NaN;
+  const value = Number.isFinite(bound) ? bound : (element.value ?? 0.5);
+  return clamp(value, 0, 1);
+};
+
+const drawGaugeElement = (context: PreviewContext, element: ThemeV2GaugeElement) => {
+  const { ctx } = context;
+  const percent = gaugeValue(context, element);
+  const thickness = element.thickness ?? 12;
+  const centerX = element.x + element.width / 2;
+  const centerY = element.y + element.height / 2;
+  const trackColor = element.trackColor ?? '#000000';
+  const fillColor = element.fillColor ?? '#ff006e';
+  const rounded = element.rounded !== false;
+  const label = (() => {
+    const template = element.label?.trim() ? element.label : '';
+    return interpolateThemeText(
+      template
+        .replaceAll('{percent}', String(Math.round(percent * 100)))
+        .replaceAll('{value}', percent.toFixed(2)),
+      context.variables
+    );
+  })();
+
+  ctx.save();
+  if (element.mode === 'ring') {
+    const radius = Math.max(4, Math.min(element.width, element.height) / 2 - thickness / 2);
+    ctx.lineWidth = thickness;
+    ctx.lineCap = rounded ? 'round' : 'butt';
+    ctx.strokeStyle = trackColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = fillColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * percent);
+    ctx.stroke();
+  } else {
+    fillRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      rounded ? element.height / 2 : 0,
+      trackColor
+    );
+    ctx.save();
+    roundRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width * percent,
+      element.height,
+      rounded ? element.height / 2 : 0
+    );
+    ctx.clip();
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(element.x, element.y, element.width * percent, element.height);
+    ctx.restore();
+  }
+
+  if (label) {
+    ctx.fillStyle = element.labelColor ?? '#ffffff';
+    ctx.font = canvasFont(
+      context,
+      element.fontFamily ?? DEFAULT_BODY_FONT,
+      element.fontSize ?? 20,
+      700
+    );
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, centerX, centerY, element.width - 8);
+  }
+  ctx.restore();
+};
+
+const drawTickerElement = (context: PreviewContext, element: ThemeV2TickerElement) => {
+  const { ctx } = context;
+  ctx.save();
+  if (element.background) {
+    ctx.fillStyle = element.background;
+    ctx.fillRect(element.x, element.y, element.width, element.height);
+  }
+  ctx.beginPath();
+  ctx.rect(element.x, element.y, element.width, element.height);
+  ctx.clip();
+  ctx.fillStyle = element.color ?? '#ffffff';
+  ctx.font = canvasFont(
+    context,
+    element.fontFamily ?? DEFAULT_BODY_FONT,
+    element.fontSize ?? 24,
+    element.fontWeight ?? 600
+  );
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const text = interpolateThemeText(element.text, context.variables);
+  ctx.fillText(text, element.x + 6, element.y + element.height / 2, element.width - 12);
+  ctx.restore();
+};
+
+const drawButtonElement = async (context: PreviewContext, element: ThemeV2ButtonElement) => {
+  const { ctx } = context;
+  const radius = element.radius ?? 10;
+  ctx.save();
+  fillRoundedRect(
+    ctx,
+    element.x,
+    element.y,
+    element.width,
+    element.height,
+    radius,
+    element.background ?? '#ff006e'
+  );
+  if ((element.borderWidth ?? 0) > 0) {
+    strokeRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      radius,
+      element.borderColor ?? '#ffffff',
+      element.borderWidth ?? 0
+    );
+  }
+
+  const fontSize = element.fontSize ?? 16;
+  const label = interpolateThemeText(element.label, context.variables);
+  ctx.font = canvasFont(
+    context,
+    element.fontFamily ?? DEFAULT_BODY_FONT,
+    fontSize,
+    element.fontWeight ?? 600
+  );
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const labelWidth = ctx.measureText(label).width;
+  const iconSize = fontSize * 1.1;
+  const hasIcon = Boolean(element.icon);
+  const totalWidth = labelWidth + (hasIcon ? iconSize + 8 : 0);
+  const startX = element.x + (element.width - totalWidth) / 2;
+  const centerY = element.y + element.height / 2;
+  const color = element.color ?? '#ffffff';
+
+  if (element.icon) {
+    const icon = await loadThemeIcon(context, element.icon, color);
+    if (icon) {
+      ctx.drawImage(icon.source, startX, centerY - iconSize / 2, iconSize, iconSize);
+    }
+  }
+
+  ctx.fillStyle = color;
+  ctx.fillText(label, startX + (hasIcon ? iconSize + 8 : 0), centerY, element.width - 8);
+  ctx.restore();
+};
+
+const drawPathElement = (context: PreviewContext, element: ThemeV2PathElement) => {
+  const { ctx } = context;
+  let path: Path2D;
+  try {
+    path = new Path2D(element.path);
+  } catch {
+    return;
+  }
+
+  const scaleX = Math.max(0.01, element.width / 100);
+  const scaleY = Math.max(0.01, element.height / 100);
+  ctx.save();
+  ctx.translate(element.x, element.y);
+  ctx.scale(scaleX, scaleY);
+  if (element.fillMode === 'gradient') {
+    const vector = themeSvgGradientVector(element.gradientAngle ?? 135);
+    const gradient = ctx.createLinearGradient(
+      vector.x1 * 100,
+      vector.y1 * 100,
+      vector.x2 * 100,
+      vector.y2 * 100
+    );
+    gradient.addColorStop(0, element.gradientFrom ?? '#ff006e');
+    gradient.addColorStop(1, element.gradientTo ?? '#7c3aed');
+    ctx.fillStyle = gradient;
+  } else {
+    ctx.fillStyle = element.fill ?? '#ff006e';
+  }
+  ctx.fill(path);
+
+  if (element.stroke && (element.strokeWidth ?? 0) > 0) {
+    ctx.strokeStyle = element.stroke;
+    ctx.lineWidth = (element.strokeWidth ?? 0) / ((scaleX + scaleY) / 2);
+    ctx.lineCap = element.strokeLinecap ?? 'round';
+    ctx.lineJoin = 'round';
+    if (element.strokeStyle === 'dashed') ctx.setLineDash([3, 2]);
+    else if (element.strokeStyle === 'dotted') ctx.setLineDash([0.1, 1.8]);
+    ctx.stroke(path);
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+};
+
+const drawParticlesElement = (context: PreviewContext, element: ThemeV2ParticlesElement) => {
+  const { ctx } = context;
+  const seeds = themeParticleSeeds(element);
+  const baseSize = Math.max(1, element.size ?? 6);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(element.x, element.y, element.width, element.height);
+  ctx.clip();
+  for (const seed of seeds) {
+    const x = element.x + (seed.left / 100) * element.width;
+    const y = element.y + (seed.top / 100) * element.height;
+    const size = baseSize * seed.size;
+    ctx.globalAlpha = seed.opacity;
+    ctx.fillStyle = seed.alternate ? (element.color2 ?? '#ff006e') : (element.color ?? '#ffffff');
+    ctx.beginPath();
+    if (element.preset === 'sparkles') {
+      ctx.moveTo(x, y - size / 2);
+      ctx.lineTo(x + size * 0.16, y - size * 0.16);
+      ctx.lineTo(x + size / 2, y);
+      ctx.lineTo(x + size * 0.16, y + size * 0.16);
+      ctx.lineTo(x, y + size / 2);
+      ctx.lineTo(x - size * 0.16, y + size * 0.16);
+      ctx.lineTo(x - size / 2, y);
+      ctx.lineTo(x - size * 0.16, y - size * 0.16);
+      ctx.closePath();
+    } else if (element.preset === 'confetti') {
+      ctx.rect(x - size / 2, y - size / 4, size, size / 2);
+    } else if (element.preset === 'petals') {
+      ctx.ellipse(x, y, size / 2, size / 4, seed.spin * 0.01, 0, Math.PI * 2);
+    } else {
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+};
+
+const drawClockElement = (context: PreviewContext, element: ThemeV2ClockElement) => {
+  const { ctx } = context;
+  const now = new Date();
+  const color = element.color ?? '#ffffff';
+  const accent = element.accentColor ?? '#ff006e';
+
+  if ((element.mode ?? 'digital') === 'analog') {
+    const size = Math.max(1, Math.min(element.width, element.height));
+    const centerX = element.width / 2;
+    const centerY = element.height / 2;
+    const radius = size / 2 - 2;
+    ctx.save();
+    ctx.translate((element.width - size) / 2, (element.height - size) / 2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    for (let index = 0; index < 12; index += 1) {
+      const angle = (index * Math.PI) / 6;
+      const inner = radius - (index % 3 === 0 ? 12 : 8);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = index % 3 === 0 ? 0.85 : 0.4;
+      ctx.lineWidth = index % 3 === 0 ? 2 : 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX + Math.sin(angle) * inner, centerY - Math.cos(angle) * inner);
+      ctx.lineTo(
+        centerX + Math.sin(angle) * (radius - 2),
+        centerY - Math.cos(angle) * (radius - 2)
+      );
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const seconds = now.getSeconds();
+    const minutes = now.getMinutes() + seconds / 60;
+    const hours = (now.getHours() % 12) + minutes / 60;
+    const hand = (angle: number, length: number, width: number, fill: string) => {
+      ctx.strokeStyle = fill;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      const radians = (angle * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(centerX + Math.sin(radians) * length, centerY - Math.cos(radians) * length);
+      ctx.stroke();
+    };
+    hand(hours * 30, radius * 0.52, 4, color);
+    hand(minutes * 6, radius * 0.74, 2.6, color);
+    if (element.showSeconds !== false) hand(seconds * 6, radius * 0.84, 1.2, accent);
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  const align = element.align ?? 'center';
+  const textX = align === 'left' ? 0 : align === 'right' ? element.width : element.width / 2;
+  ctx.save();
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  const fontSize = element.fontSize ?? 40;
+  const captionSize = Math.max(9, Math.round(fontSize * 0.32));
+  const centerY = element.height / 2;
+
+  if (element.label) {
+    ctx.fillStyle = accent;
+    ctx.font = canvasFont(context, element.fontFamily ?? DEFAULT_BODY_FONT, captionSize, 600);
+    ctx.fillText(element.label.toUpperCase(), textX, centerY - fontSize * 0.72);
+  }
+  ctx.fillStyle = color;
+  ctx.font = canvasFont(
+    context,
+    element.fontFamily ?? DEFAULT_BODY_FONT,
+    fontSize,
+    element.fontWeight ?? 700
+  );
+  ctx.fillText(themeClockTime(element, now), textX, centerY, element.width);
+  if (element.showDate) {
+    ctx.fillStyle = accent;
+    ctx.font = canvasFont(context, element.fontFamily ?? DEFAULT_BODY_FONT, captionSize, 500);
+    ctx.fillText(themeClockDate(now), textX, centerY + fontSize * 0.68);
+  }
+  ctx.restore();
+};
+
+const drawCountdownElement = (context: PreviewContext, element: ThemeV2CountdownElement) => {
+  const { ctx } = context;
+  const align = element.align ?? 'center';
+  const textX = align === 'left' ? 0 : align === 'right' ? element.width : element.width / 2;
+  ctx.save();
+  ctx.fillStyle = element.color ?? '#ffffff';
+  ctx.font = canvasFont(
+    context,
+    element.fontFamily ?? DEFAULT_BODY_FONT,
+    element.fontSize ?? 40,
+    element.fontWeight ?? 700
+  );
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(themeCountdownText(element, new Date()), textX, element.height / 2, element.width);
+  ctx.restore();
+};
+
+const drawLottieElement = async (context: PreviewContext, element: ThemeV2LottieElement) => {
+  const bytes = await readAssetBytes(context, element.src);
+  if (!bytes) {
+    drawLottiePlaceholder(context, element);
+    return;
+  }
+
+  try {
+    const data = JSON.parse(new TextDecoder().decode(bytes));
+    const container = document.createElement('div');
+    container.style.width = `${element.width}px`;
+    container.style.height = `${element.height}px`;
+    const animation = lottie.loadAnimation({
+      container,
+      renderer: 'canvas',
+      loop: false,
+      autoplay: false,
+      animationData: data,
+      rendererSettings: { preserveAspectRatio: 'xMidYMid meet', clearCanvas: true },
+    });
+
+    await new Promise<void>((resolve) => {
+      if (animation.isLoaded) {
+        resolve();
+        return;
+      }
+      animation.addEventListener('DOMLoaded', () => resolve());
+      window.setTimeout(resolve, 1500);
+    });
+    animation.goToAndStop(0, true);
+    const lottieCanvas = container.querySelector('canvas');
+    if (lottieCanvas) {
+      context.ctx.drawImage(lottieCanvas, element.x, element.y, element.width, element.height);
+    }
+    animation.destroy();
+  } catch (error) {
+    console.warn('Could not render the Lottie preview frame', error);
+    drawLottiePlaceholder(context, element);
+  }
+};
+
+const drawLottiePlaceholder = (context: PreviewContext, element: ThemeV2Element) => {
+  const { ctx } = context;
+  const accent = context.definition.accentColor ?? DEFAULT_ACCENT;
+  ctx.save();
+  ctx.strokeStyle = rgba(accent, 0.7);
+  ctx.fillStyle = rgba(accent, 0.09);
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 5]);
+  roundRect(ctx, element.x, element.y, element.width, element.height, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+  ctx.font = `600 12px "${DEFAULT_BODY_FONT}", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('LOTTIE ANIMATION', element.x + element.width / 2, element.y + element.height / 2);
+  ctx.restore();
+};
+
+const drawElement = async (
+  context: PreviewContext,
+  element: ThemeV2Element,
+  elements: ThemeV2Element[],
+  groups: ThemeV2Group[],
+  groupOpacity = 1,
+  filter = ''
+) => {
   const { ctx } = context;
   const centerX = element.x + element.width / 2;
   const centerY = element.y + element.height / 2;
+  const matrix = themeElementTransformMatrix(element, elements, groups);
 
   ctx.save();
-  ctx.globalAlpha = clamp(element.opacity ?? 1, 0, 1);
-  ctx.translate(centerX, centerY);
-  ctx.rotate(((element.rotation ?? 0) * Math.PI) / 180);
-  ctx.translate(-centerX, -centerY);
+  ctx.globalAlpha = clamp((element.opacity ?? 1) * groupOpacity, 0, 1);
+  if (filter) ctx.filter = filter;
+  ctx.translate(element.x, element.y);
+  ctx.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+  ctx.translate(-element.x, -element.y);
+  applyGroupMasks(context, themeGroupAncestors(groups, element).reverse(), elements, groups);
+  applyElementMask(context, element);
 
   if (element.type === 'text') {
     ctx.translate(element.x, element.y);
     drawTextElement(context, element);
+  } else if (element.type === 'data') {
+    ctx.translate(element.x, element.y);
+    drawDataElement(context, element);
+  } else if (element.type === 'icon') {
+    await drawIconElement(context, element);
+  } else if (element.type === 'repeater') {
+    await drawRepeaterElement(context, element);
+  } else if (element.type === 'gauge') {
+    drawGaugeElement(context, element);
+  } else if (element.type === 'ticker') {
+    drawTickerElement(context, element);
+  } else if (element.type === 'button') {
+    await drawButtonElement(context, element);
+  } else if (element.type === 'lottie') {
+    await drawLottieElement(context, element);
+  } else if (element.type === 'path') {
+    drawPathElement(context, element);
+  } else if (element.type === 'particles') {
+    drawParticlesElement(context, element);
+  } else if (element.type === 'clock') {
+    ctx.translate(element.x, element.y);
+    drawClockElement(context, element);
+  } else if (element.type === 'countdown') {
+    ctx.translate(element.x, element.y);
+    drawCountdownElement(context, element);
+  } else if (element.type === 'shape') {
+    drawShapeElement(context, element);
   } else if (element.type === 'image' || element.type === 'video') {
     const media =
       element.type === 'video'
@@ -1031,15 +2031,28 @@ const drawElement = async (context: PreviewContext, element: ThemeV2Element) => 
     ctx.clip();
 
     if (media) {
-      drawMedia(
-        context,
-        media,
-        element.x,
-        element.y,
-        element.width,
-        element.height,
-        element.fit ?? 'cover'
-      );
+      if (element.type === 'image' && element.tint) {
+        drawTintedMedia(
+          context,
+          media,
+          element.x,
+          element.y,
+          element.width,
+          element.height,
+          element.fit ?? 'cover',
+          element.tint
+        );
+      } else {
+        drawMedia(
+          context,
+          media,
+          element.x,
+          element.y,
+          element.width,
+          element.height,
+          element.fit ?? 'cover'
+        );
+      }
     } else {
       ctx.fillStyle = rgba(context.definition.accentColor ?? DEFAULT_ACCENT, 0.18);
       ctx.fillRect(element.x, element.y, element.width, element.height);
@@ -1048,21 +2061,23 @@ const drawElement = async (context: PreviewContext, element: ThemeV2Element) => 
       }
     }
     ctx.restore();
-  } else {
+  } else if (element.type === 'svelte') {
+    // Thumbnail rendering is canvas-only; compiled Svelte cannot run here.
+    // Draw a labelled placeholder so authors can still see the layer bounds.
     ctx.save();
-    ctx.fillStyle = element.fill ?? '#ff006e';
-    ctx.beginPath();
-    if (element.shape === 'ellipse') {
-      ctx.ellipse(centerX, centerY, element.width / 2, element.height / 2, 0, 0, Math.PI * 2);
-    } else {
-      roundRect(ctx, element.x, element.y, element.width, element.height, element.radius ?? 16);
-    }
+    ctx.strokeStyle = rgba(context.definition.accentColor ?? DEFAULT_ACCENT, 0.7);
+    ctx.fillStyle = rgba(context.definition.accentColor ?? DEFAULT_ACCENT, 0.09);
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([7, 5]);
+    roundRect(context.ctx, element.x, element.y, element.width, element.height, 14);
     ctx.fill();
-    if ((element.borderWidth ?? 0) > 0) {
-      ctx.strokeStyle = element.borderColor ?? '#ffffff';
-      ctx.lineWidth = element.borderWidth ?? 0;
-      ctx.stroke();
-    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+    ctx.font = `600 12px "${DEFAULT_BODY_FONT}", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CUSTOM SVELTE LAYER', centerX, centerY);
     ctx.restore();
   }
 
@@ -1099,6 +2114,8 @@ export const renderThemePreview = async ({
     videoFrames: new Map(),
     fonts: new Map(),
     fontFamilies: new Map(),
+    icons: new Map(),
+    variables: themeScriptInitialVariables(definition),
   };
 
   try {
@@ -1124,8 +2141,18 @@ export const renderThemePreview = async ({
     drawStatsCard(context);
     drawFooter(context);
     for (const element of definition.elements ?? []) {
-      if (element.hidden) continue;
-      await drawElement(context, element);
+      const ancestors = themeGroupAncestors(definition.groups, element);
+      if (element.hidden || ancestors.some((group) => group.hidden)) continue;
+      const groupOpacity = ancestors.reduce((opacity, group) => opacity * (group.opacity ?? 1), 1);
+      const filter = themeFilterCss(element.filters, ...ancestors.map((group) => group.filters));
+      await drawElement(
+        context,
+        element,
+        definition.elements ?? [],
+        definition.groups ?? [],
+        groupOpacity,
+        filter
+      );
     }
 
     return await canvasToBlob(canvas);

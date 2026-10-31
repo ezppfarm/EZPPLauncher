@@ -43,7 +43,11 @@
   });
 
   $effect(() => {
-    if (!visible || !src) return;
+    if (!visible) return;
+    if (!src) {
+      renderedFamily = family;
+      return;
+    }
     let cancelled = false;
     const previewFamily = `EZPPSourcePreview_${previewCount++}`;
 
