@@ -61,10 +61,14 @@
       `font-family:${fontStack(bodyFont)}`,
       `--primary:${accent}`,
       `--primary-foreground:${accentText}`,
+      `--accent:${accent}`,
+      `--accent-foreground:${accentText}`,
       `--ring:${accent}`,
       `--color-primary:${accent}`,
       `--color-primary-foreground:${accentText}`,
       `--color-primary-500:${accent}`,
+      `--color-accent:${accent}`,
+      `--color-accent-foreground:${accentText}`,
       `--color-ring:${accent}`,
       `--font-mono:${monoFontStack(monoFont)}`,
     ].join(';')
@@ -91,11 +95,13 @@
       <div class="rounded-[1.1rem] bg-primary/30 p-1.5 ring-1 ring-inset ring-white/15">
         <img class="pointer-events-none size-[43px]" src={Logo} alt="" draggable="false" />
       </div>
-      <span
-        class="rounded-full bg-primary px-2 py-0 text-[8px] font-semibold text-primary-foreground"
-      >
-        3.2.7
-      </span>
+      {#if variables.launcher_version !== undefined && variables.launcher_version !== ''}
+        <span
+          class="rounded-full bg-primary px-2 py-0 text-[8px] font-semibold text-primary-foreground"
+        >
+          {variables.launcher_version}
+        </span>
+      {/if}
       <div
         class="mt-3 flex size-12 items-center justify-center rounded-[0.85rem] bg-primary p-3 text-primary-foreground ring-1 ring-inset ring-white/15"
       >

@@ -4,7 +4,8 @@
   "description": "Capabilities for the main launcher and theme editor windows",
   "windows": [
     "main",
-    "theme-editor"
+    "theme-editor",
+    "presence-editor"
   ],
   "permissions": [
     "core:default",

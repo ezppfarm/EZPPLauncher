@@ -114,6 +114,40 @@
       />
       <Label for="group-locked" class="text-[10px] font-normal text-muted-foreground">Locked</Label>
     </div>
+    <div
+      class="flex items-center gap-1.5"
+      title="Smoothly morph text and number changes across layers in this group using Torph."
+    >
+      <Checkbox
+        id="group-morph"
+        checked={group.morph === true}
+        onCheckedChange={(checked) => (group.morph = checked === true)}
+      />
+      <Label for="group-morph" class="text-[10px] font-normal text-muted-foreground">
+        Morph text (Torph)
+      </Label>
+    </div>
+    {#if group.morph}
+      <div class="w-full space-y-1 pt-1">
+        <div class="flex items-center justify-between">
+          <Label for="group-morph-duration" class={label}>Morph duration</Label>
+          <span class="text-[10px] text-muted-foreground">{group.morphDuration ?? 400}ms</span>
+        </div>
+        <Input
+          id="group-morph-duration"
+          class={field}
+          type="number"
+          min="50"
+          max="3000"
+          step="50"
+          value={group.morphDuration ?? 400}
+          oninput={(event) => {
+            const val = Number((event.currentTarget as HTMLInputElement).value);
+            group.morphDuration = Number.isFinite(val) && val > 0 ? val : 400;
+          }}
+        />
+      </div>
+    {/if}
   </ThemeSection>
 
   <ThemeCssClasses

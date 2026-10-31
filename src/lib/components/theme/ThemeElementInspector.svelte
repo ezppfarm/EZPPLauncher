@@ -2,6 +2,7 @@
   import ThemeComponentEditor from '$lib/components/theme/ThemeComponentEditor.svelte';
   import ThemeCssClasses from '$lib/components/theme/ThemeCssClasses.svelte';
   import ThemeFilterControls from '$lib/components/theme/ThemeFilterControls.svelte';
+  import ThemeIconPicker from '$lib/components/theme/ThemeIconPicker.svelte';
   import ThemeLinkedLogic from '$lib/components/theme/ThemeLinkedLogic.svelte';
   import ThemeSection from '$lib/components/theme/ThemeSection.svelte';
   import ThemeTextStyleControls from '$lib/components/theme/ThemeTextStyleControls.svelte';
@@ -14,11 +15,13 @@
   import * as Select from '$lib/components/ui/select';
   import Slider from '$lib/components/ui/slider/slider.svelte';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
   import type { ThemeFontChoice } from '$lib/themeFonts';
-  import { THEME_ICON_NAMES } from '$lib/themeIcons';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
   import {
     THEME_DATA_FIELDS,
     THEME_PARTICLE_PRESETS,
+    themeGroupAncestors,
     type ThemeV2Behavior,
     type ThemeV2BehaviorTarget,
     type ThemeV2Element,
@@ -48,6 +51,10 @@
     elements,
     behaviors,
     groups,
+    iconSet = DEFAULT_THEME_ICON_SET,
+    themeName = 'My Theme',
+    themeAuthor = '',
+    themeVersion = '1.0.0',
     variables = [],
     focusToken = 0,
     onreplace,
@@ -61,6 +68,10 @@
     elements: ThemeV2Element[];
     behaviors: ThemeV2Behavior[];
     groups: ThemeV2Group[];
+    iconSet?: ThemeIconSet;
+    themeName?: string;
+    themeAuthor?: string;
+    themeVersion?: string;
     variables?: string[];
     focusToken?: number;
     onreplace: (kind: 'image' | 'video' | 'lottie') => void;
@@ -92,6 +103,70 @@
       node.setSelectionRange(caret, caret);
     });
   }
+
+  const currentFieldLabel = $derived(
+    element.type === 'data'
+      ? (THEME_DATA_FIELDS.find((f) => f.value === element.field)?.label ?? element.field)
+      : ''
+  );
+
+  const currentRawValue = $derived(
+    element.type === 'data'
+      ? resolveThemeDataValue(element.field, {
+          global: $themeGlobalData,
+          theme: {
+            name: themeName || 'Theme',
+            author: themeAuthor || '',
+            version: themeVersion || '1.0.0',
+          },
+          screen: 'home',
+          mode: element.mode,
+        })
+      : ''
+  );
+
+  const currentSampleValue = $derived(
+    element.type === 'data' ? getThemeDataSampleValue(element.field, element.mode) : ''
+  );
+
+  const currentEffectiveValue = $derived(
+    element.type === 'data'
+      ? currentRawValue && currentRawValue.trim() !== ''
+        ? currentRawValue
+        : (element.defaultValue ?? '')
+      : ''
+  );
+
+  const previewDisplayValue = $derived(
+    element.type === 'data'
+      ? currentEffectiveValue && currentEffectiveValue.trim() !== ''
+        ? currentEffectiveValue
+        : currentSampleValue
+      : ''
+  );
+
+  const previewResult = $derived.by(() => {
+    if (element.type !== 'data') return '';
+    const template = element.text?.trim() ? element.text : '{value}';
+    const fallback = element.defaultValue ?? '';
+    return template
+      .replaceAll('{value}', previewDisplayValue)
+      .replaceAll('{defaultValue}', fallback)
+      .replaceAll('{fallback}', fallback);
+  });
+
+  const parentGroupAncestors = $derived(
+    element.groupId && groups ? themeGroupAncestors(groups, element) : []
+  );
+
+  const parentGroupMorphs = $derived(parentGroupAncestors.some((group) => group.morph === true));
+
+  const parentGroupMorphDuration = $derived.by(() => {
+    for (const group of parentGroupAncestors) {
+      if (group.morphDuration && group.morphDuration > 0) return group.morphDuration;
+    }
+    return undefined;
+  });
 </script>
 
 <div class="space-y-3 p-3">
@@ -237,6 +312,63 @@
         Interactive
       </Label>
     </div>
+    <div
+      class="flex items-center gap-1.5"
+      title="Smoothly morph text and number changes using Torph."
+    >
+      <Checkbox
+        id="element-morph"
+        checked={element.morph === true || (element.morph !== false && parentGroupMorphs)}
+        onCheckedChange={(checked) => {
+          if (parentGroupMorphs) {
+            element.morph = checked === true ? true : false;
+          } else {
+            element.morph = checked === true;
+          }
+        }}
+      />
+      <Label for="element-morph" class="text-[10px] font-normal text-muted-foreground">
+        Morph text (Torph)
+      </Label>
+      {#if parentGroupMorphs && element.morph !== false}
+        <span class="text-[9px] text-muted-foreground" title="Inherited from parent group"
+          >(group)</span
+        >
+      {/if}
+      {#if parentGroupMorphs && element.morph !== undefined}
+        <button
+          type="button"
+          class="text-[9px] text-primary hover:underline ml-0.5"
+          onclick={() => delete element.morph}
+          title="Reset to inherit from group"
+        >
+          reset
+        </button>
+      {/if}
+    </div>
+    {#if element.morph === true || (element.morph !== false && parentGroupMorphs)}
+      <div class="w-full space-y-1 pt-1">
+        <div class="flex items-center justify-between">
+          <Label for="element-morph-duration" class={label}>Morph duration</Label>
+          <span class="text-[10px] text-muted-foreground">
+            {element.morphDuration ?? (parentGroupMorphDuration || 400)}ms
+          </span>
+        </div>
+        <Input
+          id="element-morph-duration"
+          class={field}
+          type="number"
+          min="50"
+          max="3000"
+          step="50"
+          value={element.morphDuration ?? (parentGroupMorphDuration || 400)}
+          oninput={(event) => {
+            const val = Number((event.currentTarget as HTMLInputElement).value);
+            element.morphDuration = Number.isFinite(val) && val > 0 ? val : 400;
+          }}
+        />
+      </div>
+    {/if}
   </ThemeSection>
 
   <ThemeCssClasses
@@ -259,7 +391,7 @@
   {#if element.type === 'text' || element.type === 'data'}
     <ThemeSection title={element.type === 'data' ? 'Data' : 'Text'} contentClass="space-y-3 pt-2.5">
       {#if element.type === 'data'}
-        <div class="space-y-1">
+        <div class="space-y-1.5">
           <Label for="element-data-field" class={label}>Value</Label>
           <Select.Root
             type="single"
@@ -272,8 +404,7 @@
               id="element-data-field"
               class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
             >
-              {THEME_DATA_FIELDS.find((field) => field.value === element.field)?.label ??
-                element.field}
+              {currentFieldLabel}
             </Select.Trigger>
             <Select.Content class="border-theme-800 bg-theme-950">
               {#each THEME_DATA_FIELDS as field (field.value)}
@@ -281,6 +412,48 @@
               {/each}
             </Select.Content>
           </Select.Root>
+
+          <!-- Current Evaluated Value Display -->
+          <div class="rounded-md border border-theme-800/80 bg-theme-950/80 p-2 space-y-1">
+            <div class="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span class="font-medium">Selected Value ({currentFieldLabel})</span>
+              {#if currentRawValue && currentRawValue.trim() !== ''}
+                <span
+                  class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400 border border-emerald-500/25"
+                >
+                  Live value
+                </span>
+              {:else if element.defaultValue && element.defaultValue.trim() !== ''}
+                <span
+                  class="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-400 border border-amber-500/25"
+                >
+                  Default
+                </span>
+              {:else if currentSampleValue}
+                <span
+                  class="rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-medium text-sky-400 border border-sky-500/25"
+                >
+                  Sample preview
+                </span>
+              {:else}
+                <span
+                  class="rounded bg-theme-800 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground"
+                >
+                  Empty
+                </span>
+              {/if}
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="truncate font-mono text-xs font-semibold text-theme-50">
+                {previewDisplayValue ? previewDisplayValue : '(empty)'}
+              </span>
+              {#if !currentRawValue && (!element.defaultValue || element.defaultValue.trim() === '') && currentSampleValue}
+                <span class="text-[9px] text-muted-foreground shrink-0"> (sample preview) </span>
+              {:else if !currentRawValue && element.defaultValue}
+                <span class="text-[9px] text-muted-foreground shrink-0"> (using default) </span>
+              {/if}
+            </div>
+          </div>
         </div>
         {#if element.field.startsWith('user.') && element.field !== 'user.name' && element.field !== 'user.country'}
           <div class="space-y-1">
@@ -321,6 +494,26 @@
             <code class="rounded bg-theme-900 px-1 py-0.5 text-theme-100">&#123;score&#125;</code>
             still work too.
           </p>
+        </div>
+        <div class="space-y-1">
+          <Label for="element-data-default" class={label}>Default value</Label>
+          <Input
+            id="element-data-default"
+            class={field}
+            bind:value={element.defaultValue}
+            placeholder={element.field === 'user.name' ? 'e.g. Guest' : 'e.g. -'}
+          />
+          <p class="text-[9px] leading-relaxed text-muted-foreground">
+            Fallback value used when the data is empty or unavailable (such as when logged out).
+          </p>
+        </div>
+        <div class="rounded-md border border-theme-800/60 bg-theme-900/40 p-2 space-y-0.5">
+          <div class="text-[9px] uppercase tracking-wide text-muted-foreground font-semibold">
+            Result Preview
+          </div>
+          <div class="truncate font-mono text-xs font-semibold text-primary">
+            {previewResult || '(empty)'}
+          </div>
         </div>
       {:else}
         <div class="space-y-1">
@@ -950,27 +1143,9 @@
     <ThemeSection title="Icon" contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-icon" class={label}>Icon</Label>
-        <Select.Root
-          type="single"
-          value={element.icon}
-          onValueChange={(value) => {
-            if (value) element.icon = value as typeof element.icon;
-          }}
-        >
-          <Select.Trigger
-            id="element-icon"
-            class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
-          >
-            {element.icon}
-          </Select.Trigger>
-          <Select.Content class="border-theme-800 bg-theme-950">
-            {#each THEME_ICON_NAMES as name (name)}
-              <Select.Item value={name} label={name} />
-            {/each}
-          </Select.Content>
-        </Select.Root>
+        <ThemeIconPicker bind:value={element.icon} {iconSet} />
         <p class="text-[9px] leading-relaxed text-muted-foreground">
-          Icons follow the theme's icon set, so the same layer switches families with the theme.
+          Choose from over 17,000 icons. Launcher icons adapt to the theme's icon family.
         </p>
       </div>
       <div class="grid grid-cols-2 gap-2">
@@ -1033,25 +1208,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div class="space-y-1">
             <Label for="element-repeater-icon" class={label}>Icon</Label>
-            <Select.Root
-              type="single"
-              value={element.icon ?? 'music'}
-              onValueChange={(value) => {
-                if (value) element.icon = value as typeof element.icon;
-              }}
-            >
-              <Select.Trigger
-                id="element-repeater-icon"
-                class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
-              >
-                {element.icon ?? 'music'}
-              </Select.Trigger>
-              <Select.Content class="border-theme-800 bg-theme-950">
-                {#each THEME_ICON_NAMES as name (name)}
-                  <Select.Item value={name} label={name} />
-                {/each}
-              </Select.Content>
-            </Select.Root>
+            <ThemeIconPicker bind:value={element.icon} {iconSet} />
           </div>
           <div class="space-y-1">
             <Label for="element-repeater-color" class={label}>Color</Label>
@@ -1439,26 +1596,7 @@
       <div class="grid grid-cols-2 gap-2">
         <div class="space-y-1">
           <Label for="element-button-icon" class={label}>Icon</Label>
-          <Select.Root
-            type="single"
-            value={element.icon ?? 'none'}
-            onValueChange={(value) => {
-              element.icon = value && value !== 'none' ? (value as typeof element.icon) : undefined;
-            }}
-          >
-            <Select.Trigger
-              id="element-button-icon"
-              class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
-            >
-              {element.icon ?? 'None'}
-            </Select.Trigger>
-            <Select.Content class="border-theme-800 bg-theme-950">
-              <Select.Item value="none" label="None" />
-              {#each THEME_ICON_NAMES as name (name)}
-                <Select.Item value={name} label={name} />
-              {/each}
-            </Select.Content>
-          </Select.Root>
+          <ThemeIconPicker bind:value={element.icon} {iconSet} allowNone />
         </div>
         <div class="space-y-1">
           <Label for="element-button-radius" class={label}>Radius</Label>

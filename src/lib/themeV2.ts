@@ -141,6 +141,10 @@ export type ThemeV2Group = ThemeV2Transform & {
   mask?: ThemeV2Mask;
   /** Space-separated CSS classes inherited by every layer in the group. */
   cssClasses?: string;
+  /** Smoothly morph text and number changes using torph across layers in this group. */
+  morph?: boolean;
+  /** Morph animation duration in milliseconds (default 400). */
+  morphDuration?: number;
 };
 
 /** A shape or image used to clip a layer or group. */
@@ -185,6 +189,10 @@ export type ThemeV2ElementBase = ThemeV2Transform & {
   mask?: ThemeV2Mask;
   /** Space-separated CSS classes added to the rendered layer wrapper. */
   cssClasses?: string;
+  /** Smoothly morph text and number changes using torph when content changes. */
+  morph?: boolean;
+  /** Morph animation duration in milliseconds (default 400). */
+  morphDuration?: number;
 };
 
 export type ThemeV2TextDecoration =
@@ -263,6 +271,8 @@ export type ThemeV2DataElement = ThemeV2ElementBase &
     mode?: ThemeV2DataMode;
     /** Template for the value; `{value}` is replaced. Defaults to `{value}`. */
     text: string;
+    /** Fallback value when live data is missing or empty (e.g. when logged out). */
+    defaultValue?: string;
   };
 
 export type ThemeV2ImageElement = ThemeV2ElementBase & {
@@ -755,6 +765,11 @@ const normalizeGroups = (raw: unknown): ThemeV2Group[] => {
     const filters = normalizeFilters(source.filters);
     const cssClasses = themeClassNames(source.cssClasses);
     const mask = normalizeMask(source.mask);
+    const morph = typeof source.morph === 'boolean' ? source.morph : undefined;
+    const morphDuration =
+      typeof source.morphDuration === 'number' && Number.isFinite(source.morphDuration)
+        ? clamp(source.morphDuration, 400, 50, 5000)
+        : undefined;
     const group: ThemeV2Group = {
       id,
       name: typeof source.name === 'string' ? source.name.slice(0, 80) : undefined,
@@ -769,6 +784,8 @@ const normalizeGroups = (raw: unknown): ThemeV2Group[] => {
       ...(filters ? { filters } : {}),
       ...(mask ? { mask } : {}),
       ...(cssClasses ? { cssClasses } : {}),
+      ...(morph !== undefined ? { morph } : {}),
+      ...(morphDuration !== undefined ? { morphDuration } : {}),
     };
     groups.push(group);
   });
@@ -899,6 +916,11 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
     'text'
   );
   const cssClasses = themeClassNames(source.cssClasses);
+  const morph = typeof source.morph === 'boolean' ? source.morph : undefined;
+  const morphDuration =
+    typeof source.morphDuration === 'number' && Number.isFinite(source.morphDuration)
+      ? clamp(source.morphDuration, 400, 50, 5000)
+      : undefined;
   const base = {
     id: text(source.id, `element_${index + 1}`).slice(0, 64),
     name: typeof source.name === 'string' ? source.name.slice(0, 80) : undefined,
@@ -915,6 +937,8 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
     filters: normalizeFilters(source.filters),
     mask: normalizeMask(source.mask),
     ...(cssClasses ? { cssClasses } : {}),
+    ...(morph !== undefined ? { morph } : {}),
+    ...(morphDuration !== undefined ? { morphDuration } : {}),
   };
 
   if (type === 'text') {
@@ -933,6 +957,9 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
       field: oneOf(source.field, DATA_FIELD_VALUES, 'user.name' as ThemeV2DataField),
       mode: oneOf(source.mode, ['osu', 'taiko', 'catch', 'mania'] as const, 'osu'),
       text: typeof source.text === 'string' ? source.text.slice(0, 400) : '{value}',
+      ...(typeof source.defaultValue === 'string'
+        ? { defaultValue: source.defaultValue.slice(0, 200) }
+        : {}),
       ...normalizeTextStyle(source),
     };
   }
@@ -1445,6 +1472,7 @@ export const createThemeV2Element = (type: ThemeV2Element['type'], index = 0): T
         type,
         field: 'user.name',
         text: 'Welcome, {value}!',
+        defaultValue: 'Guest',
         fontSize: 26,
         width: 420,
         height: 60,
@@ -2258,10 +2286,11 @@ export const themeV2Css = (
   assetOverrides: Record<string, string> = {}
 ) => {
   const accent = definition.accentColor;
+  const accentText = accent ? readableTextColor(accent) : '#ffffff';
   // `.dark` also defines the primary variables, so the override needs a
   // selector that is at least as specific as `html.dark`.
   const accentCss = accent
-    ? `:root,:root.dark,:root.light{--primary:${accent};--primary-foreground:${readableTextColor(accent)};--ring:${accent};--color-primary:${accent};--color-primary-500:${accent};--color-primary-foreground:${readableTextColor(accent)};}`
+    ? `:root,:root.dark,:root.light{--primary:${accent};--primary-foreground:${accentText};--accent:${accent};--accent-foreground:${accentText};--ring:${accent};--color-primary:${accent};--color-primary-500:${accent};--color-primary-foreground:${accentText};--color-accent:${accent};--color-accent-foreground:${accentText};}`
     : '';
   const body = definition.typography?.body?.trim();
   const heading = definition.typography?.heading?.trim();

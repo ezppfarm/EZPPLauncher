@@ -345,7 +345,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="border-theme-800 bg-theme-950"
+        class="border-theme-800 bg-theme-950 hover:border-primary hover:bg-primary hover:text-primary-foreground transition-colors"
         onclick={copyReport}
       >
         <ClipboardCopy class="size-4" />
@@ -354,7 +354,7 @@
       <Button
         variant="outline"
         size="sm"
-        class="border-theme-800 bg-theme-950"
+        class="border-theme-800 bg-theme-950 hover:border-primary hover:bg-primary hover:text-primary-foreground transition-colors"
         onclick={runChecks}
         disabled={checking}
       >

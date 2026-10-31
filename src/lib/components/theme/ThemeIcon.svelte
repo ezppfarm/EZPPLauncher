@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { THEME_ICON_BODIES } from '$lib/themeIconData';
+  import { getThemeIconBody } from '$lib/themeIconCatalog';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconName, type ThemeIconSet } from '$lib/themeIcons';
 
   let {
@@ -14,9 +14,7 @@
     class?: string;
   } = $props();
 
-  const icon = $derived(
-    THEME_ICON_BODIES[set]?.[name] ?? THEME_ICON_BODIES[DEFAULT_THEME_ICON_SET][name]
-  );
+  const icon = $derived(getThemeIconBody(name, set));
 </script>
 
 <svg

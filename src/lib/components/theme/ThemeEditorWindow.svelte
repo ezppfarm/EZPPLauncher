@@ -19,6 +19,8 @@
   import * as Select from '$lib/components/ui/select';
   import Slider from '$lib/components/ui/slider/slider.svelte';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import { config } from '$lib/config';
+  import { currentUserInfo } from '$lib/data';
   import {
     defaultFontsourceOptions,
     downloadFontsourceFont,
@@ -28,6 +30,15 @@
     themeFontKey,
     type FontsourceFont,
   } from '$lib/fontsource';
+  import {
+    launcherVersion,
+    onlineFriends,
+    osuBuild,
+    osuStream,
+    serverPing,
+    setupValues,
+  } from '$lib/global';
+  import { getLauncherVersion, getReleaseStream, getVersion } from '$lib/osuUtil';
   import {
     THEME_CLOCK_VARIABLE_NAMES,
     isThemeClockVariable,
@@ -80,6 +91,9 @@
     themesDirectory,
     toSafeName,
   } from '$lib/themes';
+  import type { EZPPUser, EZPPUserInfo } from '$lib/types';
+  import { currentUser } from '$lib/userAuthentication';
+  import { osuInstallationPath } from '$lib/userSettings';
   import { formatBytes } from '$lib/utils';
   import {
     AlertTriangle,
@@ -1766,12 +1780,37 @@
     }
   }
 
+  type ThemeEditorGlobalSyncPayload = {
+    user?: EZPPUser | null;
+    info?: EZPPUserInfo | null;
+    friends?: number;
+    osuBuild?: string;
+    osuStream?: string;
+    serverPing?: number;
+    launcherVersion?: string;
+  };
+
   onMount(() => {
     const observer = new ResizeObserver(updateCanvasScale);
     if (canvasHost) observer.observe(canvasHost);
     let unlisten: UnlistenFn | undefined;
     let unlistenClose: UnlistenFn | undefined;
+    let unlistenGlobalSync: UnlistenFn | undefined;
     listen('theme-editor-context', () => loadContext()).then((stop) => (unlisten = stop));
+    listen<ThemeEditorGlobalSyncPayload>('sync-theme-editor-global-data', (event) => {
+      const data = event.payload;
+      if (!data) return;
+      if (data.user !== undefined) currentUser.set(data.user ?? undefined);
+      if (data.info !== undefined) currentUserInfo.set(data.info ?? undefined);
+      if (data.friends !== undefined) onlineFriends.set(data.friends);
+      if (data.osuBuild) osuBuild.set(data.osuBuild);
+      if (data.osuStream) osuStream.set(data.osuStream);
+      if (data.serverPing !== undefined) serverPing.set(data.serverPing);
+      if (data.launcherVersion) launcherVersion.set(data.launcherVersion);
+    }).then((stop) => (unlistenGlobalSync = stop));
+
+    emit('request-theme-editor-global-data').catch(() => {});
+
     getCurrentWindow()
       .onCloseRequested((event) => {
         if (allowClose || !dirty) return;
@@ -1780,11 +1819,37 @@
       })
       .then((stop) => (unlistenClose = stop));
     loadContext();
+    getLauncherVersion()
+      .then((ver) => {
+        if (ver) launcherVersion.set(ver);
+      })
+      .catch(() => {});
+
+    const teardownValues = setupValues();
+
+    config
+      .value<string>('osu_installation_path')
+      .get('')
+      .then(async (path) => {
+        if (!path) return;
+        osuInstallationPath.set(path);
+        try {
+          const [stream, version] = await Promise.all([
+            getReleaseStream(path).catch(() => undefined),
+            getVersion(path).catch(() => undefined),
+          ]);
+          if (stream) osuStream.set(stream);
+          if (version) osuBuild.set(version);
+        } catch {}
+      })
+      .catch(() => {});
 
     return () => {
       observer.disconnect();
       unlisten?.();
       unlistenClose?.();
+      unlistenGlobalSync?.();
+      teardownValues?.();
       stopHistoryTimer();
     };
   });
@@ -2928,7 +2993,7 @@
       return;
     }
     allowClose = true;
-    await getCurrentWindow().close();
+    await invoke('close_theme_editor');
   }
 
   async function saveAndClose() {
@@ -2937,14 +3002,14 @@
     clearDraft();
     allowClose = true;
     closeDialogOpen = false;
-    await getCurrentWindow().close();
+    await invoke('close_theme_editor');
   }
 
   async function discardAndClose() {
     clearDraft();
     allowClose = true;
     closeDialogOpen = false;
-    await getCurrentWindow().close();
+    await invoke('close_theme_editor');
   }
 </script>
 
@@ -5379,6 +5444,10 @@
         <div class="min-h-0 flex-1 overflow-y-auto">
           <ThemeElementInspector
             bind:element={definition.elements[selectedIndex]}
+            iconSet={definition.iconSet}
+            themeName={definition.name}
+            themeAuthor={definition.author}
+            themeVersion={definition.version}
             {fontOptions}
             {elements}
             {behaviors}

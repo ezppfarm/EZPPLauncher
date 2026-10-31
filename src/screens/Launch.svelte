@@ -4,6 +4,7 @@
   import { ezppfarm } from '$lib/api/ezpp';
   import DiagnosticsPanel from '$lib/components/diagnostics/DiagnosticsPanel.svelte';
   import LogViewer from '$lib/components/logs/LogViewer.svelte';
+  import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -20,6 +21,11 @@
   import * as Select from '$lib/components/ui/select';
   import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
+  import {
+    loadDiscordPresenceConfig,
+    pushIdlePresenceFromConfig,
+    pushPlayingPresenceFromConfig,
+  } from '$lib/discordPresenceConfig';
   import { useDropZone } from '$lib/dropZone.svelte';
   import {
     getGamemodeInt,
@@ -280,6 +286,7 @@
   let restoreCandidate = $state<{ theme: Theme; backup: ThemeBackup } | undefined>(undefined);
   let restoringTheme = $state(false);
   let logViewerOpen = $state(false);
+  let presenceEditorOpen = $state(false);
 
   const themeFilterOptions = [
     { id: 'all', label: 'All themes', icon: 'all-themes' },
@@ -940,17 +947,7 @@
             const userStats = await ezppfarm.getUserInfo($currentUser.id, 'stats');
             const userStatus = await ezppfarm.getUserStatus($currentUser.id);
             if (userStatus?.player_status.online) {
-              let largeImageKey = 'ezppfarm';
-              let details = 'Idle...';
-              let customButton: { text?: string; url?: string } = {
-                text: undefined,
-                url: undefined,
-              };
-              let state =
-                userStatus.player_status.status.info_text.length > 0
-                  ? userStatus.player_status.status.info_text
-                  : '  ';
-
+              let actionName = 'Idle...';
               const gamemode = getModeAndTypeFromGamemode(userStatus.player_status.status.mode);
               const gamemodeName = getGamemodeName(
                 modeIntToStr(gamemode.mode),
@@ -959,76 +956,75 @@
 
               switch (userStatus.player_status.status.action) {
                 case EZPPActionStatus.AFK:
-                  details = 'AFK...';
-                  state = '  ';
+                  actionName = 'AFK...';
                   break;
                 case EZPPActionStatus.PLAYING:
-                  details = 'Playing...';
+                  actionName = 'Playing...';
                   break;
                 case EZPPActionStatus.EDITING:
-                  details = 'Editing...';
+                  actionName = 'Editing...';
                   break;
                 case EZPPActionStatus.MODDING:
-                  details = 'Modding...';
+                  actionName = 'Modding...';
                   break;
                 case EZPPActionStatus.MULTIPLAYER_SELECT:
-                  details = 'Multiplayer: Selecting a Beatmap...';
-                  state = '  ';
+                  actionName = 'Multiplayer: Selecting a Beatmap...';
                   break;
                 case EZPPActionStatus.WATCHING:
-                  details = 'Watching...';
+                  actionName = 'Watching...';
                   break;
                 case EZPPActionStatus.TESTING:
-                  details = 'Testing...';
+                  actionName = 'Testing...';
                   break;
                 case EZPPActionStatus.SUBMITTING:
-                  details = 'Submitting...';
+                  actionName = 'Submitting...';
                   break;
                 case EZPPActionStatus.MULTIPLAYER_IDLE:
-                  details = 'Multiplayer: Idle...';
-                  state = '  ';
+                  actionName = 'Multiplayer: Idle...';
                   break;
                 case EZPPActionStatus.MULTIPLAYER_PLAYING:
-                  details = 'Multiplayer: Playing...';
+                  actionName = 'Multiplayer: Playing...';
                   break;
                 case EZPPActionStatus.DIRECT:
-                  details = 'Browsing osu!direct...';
-                  state = '  ';
+                  actionName = 'Browsing osu!direct...';
                   break;
               }
 
-              if (userStatus.player_status.status.beatmap !== null) {
-                const beatmapCoverImage = `https://assets.ppy.sh/beatmaps/${userStatus.player_status.status.beatmap.set_id}/covers/list@2x.jpg`;
-                const isValidImage = await urlIsValidImage(beatmapCoverImage);
-                if (isValidImage) largeImageKey = beatmapCoverImage;
-                if (userStatus.player_status.status.action !== EZPPActionStatus.DIRECT)
-                  customButton = {
-                    text: 'View Beatmap',
-                    url: `https://ez-pp.farm/beatmapsets/${userStatus.player_status.status.beatmap.set_id}/${userStatus.player_status.status.beatmap.id}`,
-                  };
+              let beatmapCoverImage: string | null = null;
+              const beatmap = userStatus.player_status.status.beatmap;
+              let beatmapString =
+                userStatus.player_status.status.info_text.length > 0
+                  ? userStatus.player_status.status.info_text
+                  : '  ';
+
+              if (beatmap !== null) {
+                beatmapString = `${beatmap.artist} - ${beatmap.title} [${beatmap.version}]`;
+                const coverCandidate = `https://assets.ppy.sh/beatmaps/${beatmap.set_id}/covers/list@2x.jpg`;
+                const isValidImage = await urlIsValidImage(coverCandidate);
+                if (isValidImage) beatmapCoverImage = coverCandidate;
               }
 
-              details = `[${gamemodeName}] ${details}`;
               try {
                 const currentModeStats =
                   userStats?.player.stats[userStatus.player_status.status.mode];
-                let username = $currentUser.name;
 
-                if (currentModeStats && currentModeStats.rank > 0)
-                  username += ` (#${currentModeStats.rank})`;
-
-                await Promise.all([
-                  presence.updateUser({
-                    username,
-                    id: $currentUser.id.toFixed(),
-                  }),
-                  presence.updateButton(customButton),
-                  presence.updateStatus({
-                    details,
-                    state,
-                    largeImageKey,
-                  }),
-                ]);
+                await pushPlayingPresenceFromConfig({
+                  user: $currentUser,
+                  mode: gamemodeName,
+                  action: actionName,
+                  beatmap: beatmapString,
+                  artist: beatmap?.artist,
+                  title: beatmap?.title,
+                  diff: beatmap?.version,
+                  version: $launcherVersion || undefined,
+                  beatmapCoverUrl: beatmapCoverImage,
+                  beatmapUrl: beatmap
+                    ? `https://ez-pp.farm/beatmapsets/${beatmap.set_id}/${beatmap.id}`
+                    : null,
+                  rank: currentModeStats?.rank,
+                  pp: currentModeStats?.pp,
+                  accuracy: currentModeStats ? `${currentModeStats.acc.toFixed(2)}%` : undefined,
+                });
               } catch (err) {
                 console.log(err);
               }
@@ -1052,17 +1048,10 @@
       if (presenceUpdater) {
         window.clearInterval(presenceUpdater);
         try {
-          await Promise.all([
-            presence.updateUser({
-              username: '  ',
-              id: null,
-            }),
-            presence.updateStatus({
-              details: '  ',
-              state: 'Idle in Launcher...',
-              largeImageKey: 'ezppfarm',
-            }),
-          ]);
+          await pushIdlePresenceFromConfig({
+            user: $currentUser,
+            version: $launcherVersion || undefined,
+          });
         } catch (err) {
           console.log(err);
         }
@@ -1355,6 +1344,18 @@
         askForTrackingPermission = true;
       }
     })();
+
+    loadDiscordPresenceConfig().then((cfg) => {
+      if ($discordPresence) {
+        pushIdlePresenceFromConfig(
+          {
+            user: $currentUser,
+            version: $launcherVersion || undefined,
+          },
+          cfg
+        ).catch(() => {});
+      }
+    });
 
     animate(ezppLogo, {
       opacity: [0, 1],
@@ -2494,6 +2495,31 @@
                                   </div>
                                 </div>
 
+                                <div class="flex items-center justify-between gap-6 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm">Activity Embed Customization</Label>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Customize details, actions, templates, interactive buttons,
+                                      and preview live Discord cards.
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    class="h-8 gap-1.5 px-3 text-xs shrink-0"
+                                    onclick={async () => {
+                                      try {
+                                        await invoke('open_presence_editor');
+                                      } catch {
+                                        presenceEditorOpen = true;
+                                      }
+                                    }}
+                                  >
+                                    <ThemeIcon name="palette" set={iconSet} class="size-3.5" />
+                                    Customize Activity
+                                  </Button>
+                                </div>
+
                                 <div class="flex items-start justify-between gap-8 py-3">
                                   <div class="min-w-0">
                                     <Label class="text-sm" for="setting-tracking"
@@ -3296,6 +3322,8 @@
   {#if logViewerOpen}
     <LogViewer onclose={() => (logViewerOpen = false)} />
   {/if}
+
+  <DiscordPresenceEditor bind:open={presenceEditorOpen} />
 </div>
 
 <style>

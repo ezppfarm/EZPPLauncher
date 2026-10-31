@@ -1,4 +1,5 @@
-import { resolveThemeDataValue, themeGlobalData } from './themeData';
+import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from './themeData';
+import { getThemeIconBody } from './themeIconCatalog';
 import { THEME_ICON_BODIES } from './themeIconData';
 import {
   themeArcGeometry,
@@ -309,9 +310,7 @@ const loadImageAsset = (context: PreviewContext, path: string) => {
 
 const loadThemeIcon = (context: PreviewContext, name: string, color: string) => {
   const set = context.definition.iconSet ?? 'lucide';
-  const icon =
-    THEME_ICON_BODIES[set]?.[name as keyof (typeof THEME_ICON_BODIES)[typeof set]] ??
-    THEME_ICON_BODIES.lucide[name as keyof (typeof THEME_ICON_BODIES)['lucide']];
+  const icon = getThemeIconBody(name, set);
   if (!icon) return Promise.resolve(undefined);
 
   const key = `${set}|${name}|${color}`;
@@ -948,15 +947,6 @@ const drawSidebar = (context: PreviewContext, logo?: LoadedMedia) => {
     ctx.restore();
   }
 
-  fillRoundedRect(ctx, centerX - 14, 75, 28, 13, 6.5, accent);
-  ctx.save();
-  ctx.fillStyle = accentText;
-  ctx.font = `600 8px ${quoteFamily('Sora Variable')}, ui-sans-serif, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('3.2.7', centerX, 82);
-  ctx.restore();
-
   const navIcons = ['home', 'palette', 'sliders'] as const;
   navIcons.forEach((icon, index) => {
     const y = 99 + index * 60;
@@ -1372,8 +1362,18 @@ const drawDataElement = (context: PreviewContext, element: ThemeV2DataElement) =
     screen: 'home',
     mode: element.mode,
   });
+  const fallback = element.defaultValue ?? '';
+  const sample = getThemeDataSampleValue(element.field, element.mode);
+  const value =
+    raw && raw.trim() !== '' ? raw : fallback && fallback.trim() !== '' ? fallback : sample;
   const template = element.text?.trim() ? element.text : '{value}';
-  const text = interpolateThemeText(template.replaceAll('{value}', raw), context.variables);
+  const text = interpolateThemeText(
+    template
+      .replaceAll('{value}', value)
+      .replaceAll('{defaultValue}', fallback)
+      .replaceAll('{fallback}', fallback),
+    context.variables
+  );
   drawTextElement(context, { ...element, type: 'text', text } as ThemeV2TextElement);
 };
 

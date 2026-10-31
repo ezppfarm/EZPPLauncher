@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import Logo from '$assets/logo.png';
+  import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
   import ThemeEditorWindow from '$lib/components/theme/ThemeEditorWindow.svelte';
   import ThemeV2Background from '$lib/components/theme/ThemeV2Background.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -11,6 +12,7 @@
   import Titlebar from '$lib/components/ui/titlebar/titlebar.svelte';
   import { config } from '$lib/config';
   import { Config } from '$lib/config_old';
+  import { currentUserInfo } from '$lib/data';
   import {
     active_custom_theme,
     currentLoadingInfo,
@@ -20,10 +22,14 @@
     discordPresence,
     firstStartup,
     launcherVersion,
+    onlineFriends,
     openTabletDriverEnabled,
     openTabletDriverPath,
+    osuBuild,
+    osuStream,
     platform,
     presenceLoading,
+    serverPing,
     setupValues,
     theme_reload_token,
     trackingEnabled,
@@ -41,6 +47,7 @@
   import { isThemeTrusted } from '$lib/themeTrust';
   import { themeV2Css } from '$lib/themeV2';
   import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
+  import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
     customCursor,
@@ -50,19 +57,28 @@
   } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import '../app.css';
-  import { listen } from '@tauri-apps/api/event';
+  import { Sparkles } from '@lucide/svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { emit, listen } from '@tauri-apps/api/event';
   import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { Buffer } from 'buffer';
   import { SemVer } from 'semver';
   import { sileo } from 'sileo';
   import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { fade } from 'svelte/transition';
 
   let { children } = $props();
 
   let unlistenEditorState: (() => void) | undefined;
-  onDestroy(() => unlistenEditorState?.());
+  let unlistenRequestEditorData: (() => void) | undefined;
+  let unlistenPresenceEditorState: (() => void) | undefined;
+  onDestroy(() => {
+    unlistenEditorState?.();
+    unlistenRequestEditorData?.();
+    unlistenPresenceEditorState?.();
+  });
 
   if (browser) initLogging();
 
@@ -75,7 +91,18 @@
     }
   })();
 
+  const presenceEditorWindow = (() => {
+    if (!browser) return false;
+    try {
+      return getCurrentWindow().label === 'presence-editor';
+    } catch {
+      return false;
+    }
+  })();
+
   let unsupported_platform = $state<boolean>(false);
+  let editorOpen = $state(false);
+  let presenceEditorOpen = $state(false);
 
   function disableReload() {
     if (window.location.hostname !== 'tauri.localhost') {
@@ -120,19 +147,69 @@
   }
 
   onMount(async () => {
-    if (editorWindow) return;
+    try {
+      const ver = await getLauncherVersion();
+      if (ver) launcherVersion.set(ver);
+    } catch {
+      // ignore
+    }
+
+    if (editorWindow || presenceEditorWindow) return;
 
     // The editor is a separate WebView, so the launcher cannot observe its
     // focus directly. Native code emits this state when the window is created
     // or destroyed, and the launcher pauses its own theme media while it is
     // open so both previews cannot play over each other.
+    const syncThemeEditorData = async () => {
+      try {
+        await emit('sync-theme-editor-global-data', {
+          user: get(currentUser),
+          info: get(currentUserInfo),
+          friends: get(onlineFriends),
+          osuBuild: get(osuBuild),
+          osuStream: get(osuStream),
+          serverPing: get(serverPing),
+          launcherVersion: get(launcherVersion),
+        });
+      } catch {}
+    };
+
+    try {
+      unlistenRequestEditorData = await listen('request-theme-editor-global-data', () => {
+        syncThemeEditorData();
+      });
+    } catch (error) {
+      console.warn('Could not listen for theme editor data requests', error);
+    }
+
     try {
       unlistenEditorState = await listen<boolean>('theme-editor-state', (event) => {
-        themeMediaSuspended.set(event.payload === true);
+        const isOpen = event.payload === true;
+        themeMediaSuspended.set(isOpen);
+        editorOpen = isOpen;
+        if (isOpen) syncThemeEditorData();
       });
-      if (await WebviewWindow.getByLabel('theme-editor')) themeMediaSuspended.set(true);
+      if (await WebviewWindow.getByLabel('theme-editor')) {
+        themeMediaSuspended.set(true);
+        editorOpen = true;
+        syncThemeEditorData();
+      }
     } catch (error) {
       console.warn('Could not sync the theme editor media state', error);
+    }
+
+    try {
+      unlistenPresenceEditorState = await listen<boolean>('presence-editor-state', (event) => {
+        const isOpen = event.payload === true;
+        presenceEditorOpen = isOpen;
+        if (isOpen) syncThemeEditorData();
+      });
+      if (await WebviewWindow.getByLabel('presence-editor')) {
+        presenceEditorOpen = true;
+        syncThemeEditorData();
+      }
+    } catch (error) {
+      console.warn('Could not sync the presence editor state', error);
     }
 
     window.Buffer = Buffer;
@@ -320,7 +397,69 @@
 
 {#if editorWindow}
   <ThemeEditorWindow />
+{:else if presenceEditorWindow}
+  <DiscordPresenceEditor standalone />
 {:else}
+  {#if editorOpen}
+    <div
+      class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/85 p-6 text-center select-none backdrop-blur-md"
+    >
+      <div
+        class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/20 text-primary ring-1 ring-inset ring-white/10"
+      >
+        <Sparkles class="size-7" />
+      </div>
+      <h2 class="text-base font-semibold text-white">Theme editor is open</h2>
+      <p class="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+        The launcher is locked while editing themes. Finish your changes or close the editor to
+        resume.
+      </p>
+      <div class="mt-5 flex items-center gap-2.5">
+        <Button class="h-8 gap-1.5 px-3 text-xs" onclick={() => invoke('focus_theme_editor')}>
+          Bring Editor to Front
+        </Button>
+        <Button
+          variant="secondary"
+          class="h-8 px-3 text-xs"
+          onclick={() => invoke('close_theme_editor')}
+        >
+          Close Editor
+        </Button>
+      </div>
+    </div>
+  {:else if presenceEditorOpen}
+    <div
+      class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/85 p-6 text-center select-none backdrop-blur-md"
+    >
+      <div
+        class="mb-4 flex size-14 items-center justify-center rounded-2xl bg-[#5865F2]/20 text-[#5865F2] ring-1 ring-inset ring-[#5865F2]/30"
+      >
+        <svg class="size-7 fill-current" viewBox="0 0 24 24">
+          <path
+            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"
+          />
+        </svg>
+      </div>
+      <h2 class="text-base font-semibold text-white">Discord Rich Presence editor is open</h2>
+      <p class="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-foreground">
+        The launcher is locked while editing your Rich Presence embed. Finish your changes or close
+        the editor to resume.
+      </p>
+      <div class="mt-5 flex items-center gap-2.5">
+        <Button class="h-8 gap-1.5 px-3 text-xs" onclick={() => invoke('focus_presence_editor')}>
+          Bring Editor to Front
+        </Button>
+        <Button
+          variant="secondary"
+          class="h-8 px-3 text-xs"
+          onclick={() => invoke('close_presence_editor')}
+        >
+          Close Editor
+        </Button>
+      </div>
+    </div>
+  {/if}
+
   {#if $customCursor}
     <OsuCursor smoothCursor={$cursorSmoothening} />
   {/if}

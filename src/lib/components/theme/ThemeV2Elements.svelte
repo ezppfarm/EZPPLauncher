@@ -2,7 +2,7 @@
   import ThemeCustomLayer from '$lib/components/theme/ThemeCustomLayer.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeLottieLayer from '$lib/components/theme/ThemeLottieLayer.svelte';
-  import { resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
+  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
   import { fontStack } from '$lib/themeFonts';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
   import {
@@ -42,6 +42,7 @@
   import { Boxes, ChevronRight, Move, RotateCw } from '@lucide/svelte';
   import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import { TextMorph } from 'torph/svelte';
 
   let {
     elements = [],
@@ -155,8 +156,32 @@
       mode: element.mode,
       now: clockNow,
     });
+    const fallback = element.defaultValue ?? '';
+    const sample = interactive ? getThemeDataSampleValue(element.field, element.mode) : '';
+    const value =
+      raw && raw.trim() !== '' ? raw : fallback && fallback.trim() !== '' ? fallback : sample;
     const template = element.text?.trim() ? element.text : '{value}';
-    return interpolateThemeText(template.replaceAll('{value}', raw), variables);
+    return interpolateThemeText(
+      template
+        .replaceAll('{value}', value)
+        .replaceAll('{defaultValue}', fallback)
+        .replaceAll('{fallback}', fallback),
+      variables
+    );
+  };
+
+  const isMorphEnabled = (element: ThemeV2Element): boolean => {
+    if (element.morph === true) return true;
+    if (element.morph === false) return false;
+    return ancestorsOf(element).some((group) => group.morph === true);
+  };
+
+  const morphDuration = (element: ThemeV2Element): number => {
+    if (element.morphDuration && element.morphDuration > 0) return element.morphDuration;
+    for (const group of ancestorsOf(element)) {
+      if (group.morphDuration && group.morphDuration > 0) return group.morphDuration;
+    }
+    return 400;
   };
 
   const maskedAncestors = (element: ThemeV2Element) =>
@@ -1232,6 +1257,10 @@
         )}"
       >
         {#if element.type === 'text' || element.type === 'data'}
+          {@const content =
+            element.type === 'data'
+              ? dataValue(element)
+              : interpolateThemeText(element.text, variables)}
           <div
             class="h-full w-full overflow-hidden"
             style="display:flex;align-items:{element.verticalAlign === 'center'
@@ -1244,16 +1273,26 @@
                 ? 'flex-end'
                 : 'flex-start'};text-align:{element.align ?? 'left'};"
           >
-            <span
-              style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
-                28}px;font-weight:{element.fontWeight ?? 600};line-height:{element.lineHeight ??
-                1.2};letter-spacing:{element.letterSpacing ??
-                0}px;white-space:pre-wrap;overflow-wrap:anywhere;{themeTextStyleCss(element)}"
-            >
-              {element.type === 'data'
-                ? dataValue(element)
-                : interpolateThemeText(element.text, variables)}
-            </span>
+            {#if isMorphEnabled(element)}
+              <TextMorph
+                text={String(content ?? '')}
+                duration={morphDuration(element)}
+                as="span"
+                style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                  28}px;font-weight:{element.fontWeight ?? 600};line-height:{element.lineHeight ??
+                  1.2};letter-spacing:{element.letterSpacing ??
+                  0}px;white-space:pre-wrap;overflow-wrap:anywhere;{themeTextStyleCss(element)}"
+              />
+            {:else}
+              <span
+                style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                  28}px;font-weight:{element.fontWeight ?? 600};line-height:{element.lineHeight ??
+                  1.2};letter-spacing:{element.letterSpacing ??
+                  0}px;white-space:pre-wrap;overflow-wrap:anywhere;{themeTextStyleCss(element)}"
+              >
+                {content}
+              </span>
+            {/if}
           </div>
         {:else if element.type === 'image'}
           {#if element.tint}
@@ -1420,14 +1459,27 @@
                 />
               </svg>
               {#if gaugeLabel(element)}
-                <span
-                  class="pointer-events-none absolute text-center"
-                  style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
-                    element.fontFamily
-                  )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
-                >
-                  {gaugeLabel(element)}
-                </span>
+                {@const label = gaugeLabel(element)}
+                {#if isMorphEnabled(element)}
+                  <TextMorph
+                    text={String(label ?? '')}
+                    duration={morphDuration(element)}
+                    as="span"
+                    class="pointer-events-none absolute text-center"
+                    style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
+                      element.fontFamily
+                    )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
+                  />
+                {:else}
+                  <span
+                    class="pointer-events-none absolute text-center"
+                    style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
+                      element.fontFamily
+                    )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
+                  >
+                    {label}
+                  </span>
+                {/if}
               {/if}
             </div>
           {:else}
@@ -1444,14 +1496,27 @@
                 ></div>
               </div>
               {#if gaugeLabel(element)}
-                <span
-                  class="pointer-events-none absolute inset-0 flex items-center justify-center"
-                  style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
-                    element.fontFamily
-                  )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
-                >
-                  {gaugeLabel(element)}
-                </span>
+                {@const label = gaugeLabel(element)}
+                {#if isMorphEnabled(element)}
+                  <TextMorph
+                    text={String(label ?? '')}
+                    duration={morphDuration(element)}
+                    as="span"
+                    class="pointer-events-none absolute inset-0 flex items-center justify-center"
+                    style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
+                      element.fontFamily
+                    )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
+                  />
+                {:else}
+                  <span
+                    class="pointer-events-none absolute inset-0 flex items-center justify-center"
+                    style="color:{element.labelColor ?? '#ffffff'};font-family:{fontStack(
+                      element.fontFamily
+                    )};font-size:{element.fontSize ?? 20}px;font-weight:700;"
+                  >
+                    {label}
+                  </span>
+                {/if}
               {/if}
             </div>
           {/if}
@@ -1472,7 +1537,15 @@
                     600};color:{element.color ?? '#ffffff'};text-transform:{element.textTransform ??
                     'none'};white-space:nowrap;"
                 >
-                  {interpolateThemeText(element.text, variables)}
+                  {#if isMorphEnabled(element)}
+                    <TextMorph
+                      text={String(interpolateThemeText(element.text, variables) ?? '')}
+                      duration={morphDuration(element)}
+                      as="span"
+                    />
+                  {:else}
+                    {interpolateThemeText(element.text, variables)}
+                  {/if}
                 </span>
               {/each}
             </div>
@@ -1506,7 +1579,16 @@
             {#if element.icon}
               <ThemeIcon name={element.icon} set={iconSet} size="1.1em" />
             {/if}
-            <span class="truncate">{interpolateThemeText(element.label, variables)}</span>
+            {#if isMorphEnabled(element)}
+              <TextMorph
+                text={String(interpolateThemeText(element.label, variables) ?? '')}
+                duration={morphDuration(element)}
+                as="span"
+                class="truncate"
+              />
+            {:else}
+              <span class="truncate">{interpolateThemeText(element.label, variables)}</span>
+            {/if}
           </button>
         {:else if element.type === 'path'}
           {@const gradientVector = themeSvgGradientVector(element.gradientAngle ?? 135)}
@@ -1646,21 +1728,46 @@
                     '#ff006e'};">{element.label}</span
                 >
               {/if}
-              <span
-                style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
-                  40}px;font-weight:{element.fontWeight ??
-                  700};line-height:1.05;color:{element.color ??
-                  '#ffffff'};font-variant-numeric:tabular-nums;"
-              >
-                {themeClockTime(element, now)}
-              </span>
-              {#if element.showDate}
+              {#if isMorphEnabled(element)}
+                <TextMorph
+                  text={String(themeClockTime(element, now) ?? '')}
+                  duration={morphDuration(element)}
+                  as="span"
+                  class="block"
+                  style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                    40}px;font-weight:{element.fontWeight ??
+                    700};line-height:1.05;color:{element.color ??
+                    '#ffffff'};font-variant-numeric:tabular-nums;"
+                />
+              {:else}
                 <span
-                  style="font-family:{fontStack(element.fontFamily)};font-size:{clockCaptionSize(
-                    element
-                  )}px;font-weight:500;color:{element.accentColor ?? '#ff006e'};"
-                  >{themeClockDate(now)}</span
+                  style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                    40}px;font-weight:{element.fontWeight ??
+                    700};line-height:1.05;color:{element.color ??
+                    '#ffffff'};font-variant-numeric:tabular-nums;"
                 >
+                  {themeClockTime(element, now)}
+                </span>
+              {/if}
+              {#if element.showDate}
+                {#if isMorphEnabled(element)}
+                  <TextMorph
+                    text={String(themeClockDate(now) ?? '')}
+                    duration={morphDuration(element)}
+                    as="span"
+                    class="block"
+                    style="font-family:{fontStack(element.fontFamily)};font-size:{clockCaptionSize(
+                      element
+                    )}px;font-weight:500;color:{element.accentColor ?? '#ff006e'};"
+                  />
+                {:else}
+                  <span
+                    style="font-family:{fontStack(element.fontFamily)};font-size:{clockCaptionSize(
+                      element
+                    )}px;font-weight:500;color:{element.accentColor ?? '#ff006e'};"
+                    >{themeClockDate(now)}</span
+                  >
+                {/if}
               {/if}
             </div>
           {/if}
@@ -1673,13 +1780,25 @@
                 ? 'flex-end'
                 : 'center'};text-align:{element.align ?? 'center'};"
           >
-            <span
-              style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
-                40}px;font-weight:{element.fontWeight ?? 700};color:{element.color ??
-                '#ffffff'};font-variant-numeric:tabular-nums;"
-            >
-              {themeCountdownText(element, clockNow)}
-            </span>
+            {#if isMorphEnabled(element)}
+              <TextMorph
+                text={String(themeCountdownText(element, clockNow) ?? '')}
+                duration={morphDuration(element)}
+                as="span"
+                class="block"
+                style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                  40}px;font-weight:{element.fontWeight ?? 700};color:{element.color ??
+                  '#ffffff'};font-variant-numeric:tabular-nums;"
+              />
+            {:else}
+              <span
+                style="font-family:{fontStack(element.fontFamily)};font-size:{element.fontSize ??
+                  40}px;font-weight:{element.fontWeight ?? 700};color:{element.color ??
+                  '#ffffff'};font-variant-numeric:tabular-nums;"
+              >
+                {themeCountdownText(element, clockNow)}
+              </span>
+            {/if}
           </div>
         {/if}
       </div>

@@ -6,13 +6,15 @@ use tauri::{AppHandle, RunEvent};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, interval};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PresenceButton {
     pub label: String,
     pub url: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PresenceData {
     pub state: String,
     pub details: String,
@@ -21,6 +23,8 @@ pub struct PresenceData {
     pub small_image_key: Option<String>,
     pub small_image_text: Option<String>,
     pub dynamic_button: Option<PresenceButton>,
+    pub secondary_button: Option<PresenceButton>,
+    pub show_timestamp: bool,
 }
 
 impl Default for PresenceData {
@@ -32,7 +36,15 @@ impl Default for PresenceData {
             large_image_text: "EZPPFarm".to_string(),
             small_image_key: None,
             small_image_text: None,
-            dynamic_button: None,
+            dynamic_button: Some(PresenceButton {
+                label: "Download the Launcher".to_string(),
+                url: "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest".to_string(),
+            }),
+            secondary_button: Some(PresenceButton {
+                label: "Join EZPPFarm".to_string(),
+                url: "https://ez-pp.farm/discord".to_string(),
+            }),
+            show_timestamp: true,
         }
     }
 }
@@ -162,9 +174,12 @@ impl PresenceActor {
         let mut builder = ActivityBuilder::new()
             .state(&self.data.state)
             .details(&self.data.details)
-            .start_timestamp(self.start_timestamp as u64)
             .large_image(&self.data.large_image_key)
             .large_text(&self.data.large_image_text);
+
+        if self.data.show_timestamp {
+            builder = builder.start_timestamp(self.start_timestamp as u64);
+        }
 
         if let Some(key) = &self.data.small_image_key {
             builder = builder.small_image(key);
@@ -174,14 +189,15 @@ impl PresenceActor {
         }
 
         if let Some(btn) = &self.data.dynamic_button {
-            builder = builder.button(&btn.label, &btn.url);
-        } else {
-            builder = builder.button(
-                "Download the Launcher",
-                "https://git.ez-pp.farm/EZPPFarm/EZPPLauncher/releases/latest",
-            );
+            if !btn.label.trim().is_empty() && !btn.url.trim().is_empty() {
+                builder = builder.button(&btn.label, &btn.url);
+            }
         }
-        builder = builder.button("Join EZPPFarm", "https://ez-pp.farm/discord");
+        if let Some(btn2) = &self.data.secondary_button {
+            if !btn2.label.trim().is_empty() && !btn2.url.trim().is_empty() {
+                builder = builder.button(&btn2.label, &btn2.url);
+            }
+        }
 
         let activity = builder.build();
 
@@ -284,6 +300,55 @@ pub async fn has_presence() -> bool {
         return rx.await.unwrap_or(false);
     }
     false
+}
+
+pub fn update_activity(
+    state: Option<&str>,
+    details: Option<&str>,
+    large_image_key: Option<&str>,
+    large_image_text: Option<&str>,
+    small_image_key: Option<Option<String>>,
+    small_image_text: Option<Option<String>>,
+    button1: Option<Option<PresenceButton>>,
+    button2: Option<Option<PresenceButton>>,
+    show_timestamp: Option<bool>,
+) {
+    let data = {
+        let mut guard = PRESENCE_DATA.lock().unwrap();
+        if let Some(s) = state {
+            guard.state = s.to_string();
+        }
+        if let Some(d) = details {
+            guard.details = d.to_string();
+        }
+        if let Some(img) = large_image_key {
+            guard.large_image_key = img.to_string();
+        }
+        if let Some(txt) = large_image_text {
+            guard.large_image_text = txt.to_string();
+        }
+        if let Some(key) = small_image_key {
+            guard.small_image_key = key;
+        }
+        if let Some(text) = small_image_text {
+            guard.small_image_text = text;
+        }
+        if let Some(b1) = button1 {
+            guard.dynamic_button = b1;
+        }
+        if let Some(b2) = button2 {
+            guard.secondary_button = b2;
+        }
+        if let Some(ts) = show_timestamp {
+            guard.show_timestamp = ts;
+        }
+        guard.clone()
+    };
+
+    let tx = PRESENCE_TX.clone();
+    tokio::spawn(async move {
+        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+    });
 }
 
 pub fn update_status(state: Option<&str>, details: Option<&str>, large_image_key: Option<&str>) {

@@ -1087,6 +1087,35 @@ pub struct PresenceButton {
     url: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceActivityPayload {
+    pub state: Option<String>,
+    pub details: Option<String>,
+    pub large_image_key: Option<String>,
+    pub large_image_text: Option<String>,
+    pub small_image_key: Option<Option<String>>,
+    pub small_image_text: Option<Option<String>>,
+    pub button1: Option<Option<presence::PresenceButton>>,
+    pub button2: Option<Option<presence::PresenceButton>>,
+    pub show_timestamp: Option<bool>,
+}
+
+#[tauri::command]
+pub async fn presence_update_activity(activity: PresenceActivityPayload) {
+    presence::update_activity(
+        activity.state.as_deref(),
+        activity.details.as_deref(),
+        activity.large_image_key.as_deref(),
+        activity.large_image_text.as_deref(),
+        activity.small_image_key,
+        activity.small_image_text,
+        activity.button1,
+        activity.button2,
+        activity.show_timestamp,
+    );
+}
+
 #[tauri::command]
 pub async fn presence_update_button(button: PresenceButton) {
     match (button.text.as_deref(), button.url.as_deref()) {
@@ -2168,6 +2197,9 @@ pub async fn open_theme_editor(app: AppHandle, theme_folder: Option<String>) -> 
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.hide();
+        }
         app.emit_to("theme-editor", "theme-editor-context", ())
             .map_err(|error| error.to_string())?;
         let _ = app.emit_to("main", "theme-editor-state", true);
@@ -2194,11 +2226,122 @@ pub async fn open_theme_editor(app: AppHandle, theme_folder: Option<String>) -> 
     let main_window = app.clone();
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
+            if let Some(main) = main_window.get_webview_window("main") {
+                let _ = main.show();
+                let _ = main.unminimize();
+                let _ = main.set_focus();
+            }
             let _ = main_window.emit_to("main", "theme-editor-state", false);
         }
     });
+
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.hide();
+    }
     let _ = app.emit_to("main", "theme-editor-state", true);
 
+    Ok(())
+}
+
+/// Focus the theme editor window and keep the main launcher window hidden.
+#[tauri::command]
+pub async fn focus_theme_editor(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("theme-editor") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.hide();
+        }
+    }
+    Ok(())
+}
+
+/// Close the theme editor window and restore the main launcher window.
+#[tauri::command]
+pub async fn close_theme_editor(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("theme-editor") {
+        let _ = window.close();
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+    }
+    let _ = app.emit_to("main", "theme-editor-state", false);
+    Ok(())
+}
+
+/// Open (or focus) the discord presence embed editor in its own native window.
+#[tauri::command]
+pub async fn open_presence_editor(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("presence-editor") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.hide();
+        }
+        let _ = app.emit_to("main", "presence-editor-state", true);
+        return Ok(());
+    }
+
+    let window =
+        WebviewWindowBuilder::new(&app, "presence-editor", WebviewUrl::App("index.html".into()))
+            .title("EZPPLauncher — Discord Rich Presence Editor")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(980.0, 650.0)
+            .resizable(true)
+            .center()
+            .build()
+            .map_err(|error| format!("Could not open the presence editor: {error}"))?;
+
+    let main_window = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, WindowEvent::Destroyed) {
+            if let Some(main) = main_window.get_webview_window("main") {
+                let _ = main.show();
+                let _ = main.unminimize();
+                let _ = main.set_focus();
+            }
+            let _ = main_window.emit_to("main", "presence-editor-state", false);
+        }
+    });
+
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.hide();
+    }
+    let _ = app.emit_to("main", "presence-editor-state", true);
+
+    Ok(())
+}
+
+/// Focus the presence editor window and keep the main launcher window hidden.
+#[tauri::command]
+pub async fn focus_presence_editor(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("presence-editor") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.hide();
+        }
+    }
+    Ok(())
+}
+
+/// Close the presence editor window and restore the main launcher window.
+#[tauri::command]
+pub async fn close_presence_editor(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("presence-editor") {
+        let _ = window.close();
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+    }
+    let _ = app.emit_to("main", "presence-editor-state", false);
     Ok(())
 }
 
