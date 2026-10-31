@@ -5,7 +5,6 @@ import {
   themeGlobalData,
 } from './themeData';
 import { getThemeIconBody } from './themeIconCatalog';
-import { THEME_ICON_BODIES } from './themeIconData';
 import {
   themeArcGeometry,
   themeClockDate,
@@ -1215,7 +1214,7 @@ const drawFooter = (context: PreviewContext, chrome?: ThemeV2Chrome) => {
   ctx.restore();
 };
 
-const getWidgetPlayerData = (context: PreviewContext) => {
+const getWidgetPlayerData = (_context: PreviewContext) => {
   const globalData = get(themeGlobalData);
   const name = globalData?.user?.name || getThemeDataSampleValue('user.name') || 'Player';
   const rank = globalData?.user?.stats?.osu?.rank
@@ -1318,8 +1317,7 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
   } else if (element.widget === 'header') {
     const { name } = getWidgetPlayerData(context);
     const hour = new Date().getHours();
-    const timeGreeting =
-      hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const greeting = `${timeGreeting}, ${name}!`;
 
     ctx.save();
@@ -1822,7 +1820,15 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
       const badgeW = 24;
       const badgeH = 20;
       const badgeX = element.x + element.width - badgeW - 10;
-      fillRoundedRect(ctx, badgeX, centerY - badgeH / 2, badgeW, badgeH, 4, 'rgba(251, 191, 36, 0.2)');
+      fillRoundedRect(
+        ctx,
+        badgeX,
+        centerY - badgeH / 2,
+        badgeW,
+        badgeH,
+        4,
+        'rgba(251, 191, 36, 0.2)'
+      );
       strokeRoundedRect(
         ctx,
         badgeX,

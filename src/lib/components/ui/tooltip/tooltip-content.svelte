@@ -1,29 +1,29 @@
 <script lang="ts">
-	import { Tooltip as TooltipPrimitive } from "bits-ui";
-	import TooltipPortal from "./tooltip-portal.svelte";
-	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
-	import type { ComponentProps } from "svelte";
+  import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+  import TooltipPortal from './tooltip-portal.svelte';
+  import { Tooltip as TooltipPrimitive } from 'bits-ui';
+  import type { ComponentProps } from 'svelte';
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		sideOffset = 6,
-		portalProps,
-		...restProps
-	}: TooltipPrimitive.ContentProps & {
-		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof TooltipPortal>>;
-	} = $props();
+  let {
+    ref = $bindable(null),
+    class: className,
+    sideOffset = 6,
+    portalProps,
+    ...restProps
+  }: TooltipPrimitive.ContentProps & {
+    portalProps?: WithoutChildrenOrChild<ComponentProps<typeof TooltipPortal>>;
+  } = $props();
 </script>
 
 <TooltipPortal {...portalProps}>
-	<TooltipPrimitive.Content
-		bind:ref
-		data-slot="tooltip-content"
-		{sideOffset}
-		class={cn(
-			"bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-end-2 data-[side=right]:slide-in-from-start-2 data-[side=top]:slide-in-from-bottom-2 z-50 overflow-hidden rounded-md border border-border px-3 py-1.5 text-xs shadow-md",
-			className
-		)}
-		{...restProps}
-	/>
+  <TooltipPrimitive.Content
+    bind:ref
+    data-slot="tooltip-content"
+    {sideOffset}
+    class={cn(
+      'bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-end-2 data-[side=right]:slide-in-from-start-2 data-[side=top]:slide-in-from-bottom-2 z-50 overflow-hidden rounded-md border border-border px-3 py-1.5 text-xs shadow-md',
+      className
+    )}
+    {...restProps}
+  />
 </TooltipPortal>

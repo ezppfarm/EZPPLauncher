@@ -9,7 +9,7 @@
   } from '$lib/themeIconCatalog';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
   import ThemeIcon from './ThemeIcon.svelte';
-  import { Check, ChevronDown, ChevronsUpDown, LayoutGrid, List, Search, X } from '@lucide/svelte';
+  import { Check, ChevronsUpDown, LayoutGrid, List, Search, X } from '@lucide/svelte';
 
   let {
     value = $bindable(undefined),

@@ -1,10 +1,5 @@
 import { THEME_ICON_BODIES, type ThemeIconBody } from './themeIconData';
-import {
-  DEFAULT_THEME_ICON_SET,
-  THEME_ICON_NAMES,
-  type ThemeIconName,
-  type ThemeIconSet,
-} from './themeIcons';
+import { DEFAULT_THEME_ICON_SET, THEME_ICON_NAMES, type ThemeIconSet } from './themeIcons';
 import lucideCollection from '@iconify-json/lucide/icons.json';
 import phCollection from '@iconify-json/ph/icons.json';
 import tablerCollection from '@iconify-json/tabler/icons.json';

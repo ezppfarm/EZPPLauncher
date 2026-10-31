@@ -73,7 +73,7 @@
       return;
     }
 
-    let next = '';
+    let next: string;
     if (withTime) {
       const d = new Date(
         calendarValue.year,

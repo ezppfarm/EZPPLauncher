@@ -18,8 +18,6 @@
   import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
   import type { ThemeFontChoice } from '$lib/themeFonts';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
-  import { openURL } from '$lib/utils';
-  import { sileo } from 'sileo';
   import {
     THEME_DATA_FIELDS,
     THEME_PARTICLE_PRESETS,
@@ -32,6 +30,7 @@
     type ThemeV2WidgetKind,
     type ThemeV2WidgetVariant,
   } from '$lib/themeV2';
+  import { openURL } from '$lib/utils';
   import {
     CircleUser,
     Clock,
@@ -51,6 +50,7 @@
     Timer,
     Type,
   } from '@lucide/svelte';
+  import { sileo } from 'sileo';
 
   let {
     element = $bindable(),
@@ -1643,7 +1643,8 @@
           Test Button Action
         </Button>
         <p class="text-[9px] leading-relaxed text-muted-foreground">
-          In editor mode, canvas clicks select layers for dragging. Test actions using this button, or Shift+click on canvas.
+          In editor mode, canvas clicks select layers for dragging. Test actions using this button,
+          or Shift+click on canvas.
         </p>
       </div>
       <div class="grid grid-cols-2 gap-2">
@@ -2502,7 +2503,8 @@
         {:else if element.widget === 'telemetry'}
           Pill bar showing beatmap counts, skin counts, ping, and osu! build.
         {:else if element.widget === 'header'}
-          Launcher title and dynamic greeting. Full shows title and subtitle, Compact shows an inline pill greeting, and Minimal displays title only.
+          Launcher title and dynamic greeting. Full shows title and subtitle, Compact shows an
+          inline pill greeting, and Minimal displays title only.
         {:else}
           Launcher title and dynamic greeting.
         {/if}

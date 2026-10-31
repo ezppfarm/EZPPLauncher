@@ -78,8 +78,6 @@ export const THEME_ICON_NAMES = [
 
 export type ThemeIconName = (typeof THEME_ICON_NAMES)[number] | (string & {});
 
-const ICON_NAME_SET = new Set<string>(THEME_ICON_NAMES);
-
 export const isThemeIconName = (value: unknown): value is ThemeIconName =>
   typeof value === 'string' && value.trim().length > 0 && value.length <= 120;
 

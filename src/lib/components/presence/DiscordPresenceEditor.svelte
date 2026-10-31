@@ -10,7 +10,6 @@
   import {
     DEFAULT_DISCORD_PRESENCE_CONFIG,
     DISCORD_PRESENCE_PRESETS,
-    discordPresenceCustomConfig,
     interpolatePresenceString,
     loadDiscordPresenceConfig,
     pushIdlePresenceFromConfig,
@@ -25,14 +24,11 @@
     Check,
     Clock,
     Code2,
-    Copy,
     ExternalLink,
-    Eye,
     Gamepad2,
     Globe,
     Home,
     Image as ImageIcon,
-    Info,
     Link,
     LoaderCircle,
     Maximize2,
@@ -41,10 +37,8 @@
     Play,
     Plus,
     RotateCcw,
-    Save,
     Sparkles,
     Type,
-    User,
     X,
   } from '@lucide/svelte';
   import { invoke } from '@tauri-apps/api/core';
@@ -101,8 +95,10 @@
   // Preset selector
   let selectedPresetName = $state<string>('EZPPFarm Default');
 
+  const SIM_MODES = ['osu!', 'taiko', 'catch', 'mania'] as const;
+
   // Simulation parameters for preview
-  let simMode = $state<'osu!' | 'taiko' | 'catch' | 'mania'>('osu!');
+  let simMode = $state<(typeof SIM_MODES)[number]>('osu!');
   let simAction = $state<string>('Playing...');
   let simBeatmapIndex = $state<number>(0);
   let simRank = $state<number>(1337);
@@ -206,7 +202,11 @@
 
     if (standalone) {
       try {
-        unlistenSync = await listen<any>('sync-theme-editor-global-data', (event) => {
+        unlistenSync = await listen<{
+          user?: Parameters<typeof currentUser.set>[0];
+          info?: Parameters<typeof currentUserInfo.set>[0];
+          launcherVersion?: string;
+        }>('sync-theme-editor-global-data', (event) => {
           if (event.payload?.user) currentUser.set(event.payload.user);
           if (event.payload?.info) currentUserInfo.set(event.payload.info);
           if (event.payload?.launcherVersion) launcherVersion.set(event.payload.launcherVersion);
@@ -844,7 +844,7 @@
                         Details (First Line)
                       </Label>
                       <span class="text-[10px] text-muted-foreground"
-                        >[{'{'}mode{'}'}] {'{'}action{'}'}</span
+                        >[{'{'}mode}] {'{'}action}</span
                       >
                     </div>
                     <Input
@@ -852,7 +852,7 @@
                       bind:value={workingConfig.playingDetails}
                       onfocus={() => handleInputFocus('playingDetails')}
                       onblur={handleInputBlur}
-                      placeholder="[{'{'}mode{'}'}] {'{'}action{'}'}"
+                      placeholder="[{'{'}mode}] {'{'}action}"
                       class="h-8 bg-black/40 text-xs border-theme-800 focus:border-primary"
                     />
                   </div>
@@ -862,14 +862,14 @@
                       <Label class="text-[11px] font-medium text-theme-200" for="playing-state">
                         State (Second Line)
                       </Label>
-                      <span class="text-[10px] text-muted-foreground">{'{'}beatmap{'}'}</span>
+                      <span class="text-[10px] text-muted-foreground">{'{'}beatmap}</span>
                     </div>
                     <Input
                       id="playing-state"
                       bind:value={workingConfig.playingState}
                       onfocus={() => handleInputFocus('playingState')}
                       onblur={handleInputBlur}
-                      placeholder="{'{'}beatmap{'}'}"
+                      placeholder="{'{'}beatmap}"
                       class="h-8 bg-black/40 text-xs border-theme-800 focus:border-primary"
                     />
                   </div>
@@ -907,14 +907,14 @@
                       >
                         Cover Art Hover Tooltip
                       </Label>
-                      <span class="text-[10px] text-muted-foreground">{'{'}beatmap{'}'}</span>
+                      <span class="text-[10px] text-muted-foreground">{'{'}beatmap}</span>
                     </div>
                     <Input
                       id="playing-large-text"
                       bind:value={workingConfig.playingLargeImageText}
                       onfocus={() => handleInputFocus('playingLargeImageText')}
                       onblur={handleInputBlur}
-                      placeholder="{'{'}beatmap{'}'}"
+                      placeholder="{'{'}beatmap}"
                       class="h-8 bg-black/40 text-xs border-theme-800 focus:border-primary"
                     />
                   </div>
@@ -945,7 +945,7 @@
                         Small Badge Hover Tooltip
                       </Label>
                       <span class="text-[10px] text-muted-foreground"
-                        >{'{'}username{'}'} (#{'{'}rank{'}'})</span
+                        >{'{'}username} (#{'{'}rank})</span
                       >
                     </div>
                     <Input
@@ -953,7 +953,7 @@
                       bind:value={workingConfig.playingSmallImageText}
                       onfocus={() => handleInputFocus('playingSmallImageText')}
                       onblur={handleInputBlur}
-                      placeholder="{'{'}username{'}'} (#{'{'}rank{'}'})"
+                      placeholder="{'{'}username} (#{'{'}rank})"
                       class="h-8 bg-black/40 text-xs border-theme-800 focus:border-primary"
                     />
                   </div>
@@ -1031,7 +1031,7 @@
               <ThemeSection
                 title="Button 1 (Playing In-Game)"
                 icon={Link}
-                description="Primary action button shown while playing osu! (supports {'{'}beatmapUrl{'}'})"
+                description="Primary action button shown while playing osu! (supports {'{'}beatmapUrl})"
               >
                 <div class="space-y-3">
                   <div
@@ -1067,7 +1067,7 @@
                           bind:value={workingConfig.playingButton1.url}
                           onfocus={() => handleInputFocus('playingButton1Url')}
                           onblur={handleInputBlur}
-                          placeholder="{'{'}beatmapUrl{'}'}"
+                          placeholder="{'{'}beatmapUrl}"
                           class="h-8 bg-black/40 text-xs border-theme-800 focus:border-primary"
                         />
                       </div>
@@ -1128,7 +1128,7 @@
                 bordered={false}
               >
                 <div class="space-y-2">
-                  {#each DISCORD_PRESENCE_PRESETS as preset}
+                  {#each DISCORD_PRESENCE_PRESETS as preset (preset.name)}
                     <div
                       class="flex flex-col gap-1.5 rounded-xl border border-theme-800/80 bg-theme-900/40 p-3 transition-colors hover:border-theme-700 {selectedPresetName ===
                       preset.name
@@ -1170,7 +1170,7 @@
                 description="Click any variable to copy or evaluate in the active field"
               >
                 <div class="space-y-1.5">
-                  {#each PLACEHOLDERS as p}
+                  {#each PLACEHOLDERS as p (p.token)}
                     <div
                       class="flex items-center justify-between rounded-lg border border-theme-800/40 bg-black/30 px-2.5 py-1.5 text-[11px]"
                     >
@@ -1215,7 +1215,7 @@
                 </span>
               </div>
               <div class="flex flex-wrap gap-1">
-                {#each PLACEHOLDERS as p}
+                {#each PLACEHOLDERS as p (p.token)}
                   <button
                     type="button"
                     class="group flex items-center gap-1 rounded border border-theme-800 bg-theme-900/90 px-1.5 py-0.5 text-[10px] text-theme-200 transition-all hover:border-primary/60 hover:bg-primary/20 hover:text-white active:scale-95"
@@ -1354,14 +1354,14 @@
               <div class="flex items-center gap-2">
                 <span class="text-muted-foreground">Mode:</span>
                 <div class="flex gap-0.5">
-                  {#each ['osu!', 'taiko', 'catch', 'mania'] as mode}
+                  {#each SIM_MODES as mode (mode)}
                     <button
                       type="button"
                       class="rounded px-2 py-0.5 text-[10px] font-semibold transition-colors {simMode ===
                       mode
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-black/40 text-theme-300 hover:text-white'}"
-                      onclick={() => (simMode = mode as any)}
+                      onclick={() => (simMode = mode)}
                     >
                       {mode}
                     </button>
@@ -1372,7 +1372,7 @@
               <div class="flex items-center gap-2">
                 <span class="text-muted-foreground">Action:</span>
                 <div class="flex gap-0.5">
-                  {#each ['Playing...', 'Editing...', 'AFK...'] as act}
+                  {#each ['Playing...', 'Editing...', 'AFK...'] as act (act)}
                     <button
                       type="button"
                       class="rounded px-2 py-0.5 text-[10px] transition-colors {simAction === act
@@ -1392,7 +1392,7 @@
                   bind:value={simBeatmapIndex}
                   class="rounded border border-theme-800 bg-black/60 px-2 py-0.5 text-[10px] text-theme-200"
                 >
-                  {#each SAMPLE_BEATMAPS as b, idx}
+                  {#each SAMPLE_BEATMAPS as b, idx (`${b.artist}-${b.title}-${idx}`)}
                     <option value={idx}>{b.artist} - {b.title}</option>
                   {/each}
                 </select>

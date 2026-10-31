@@ -156,7 +156,6 @@
     Clock,
     ExternalLink,
     Medal,
-    Sparkles,
     TrendingDown,
     TrendingUp,
     Trophy,
@@ -650,7 +649,6 @@
     userEvents.length === 0 ? 0 : Math.min(recentActivityIndex, userEvents.length - 1)
   );
   const activeEvent = $derived(userEvents[safeEventIndex]);
-  const latestEvent = $derived(activeEvent ?? userEvents[0]);
 
   const timeGreeting = $derived.by(() => {
     const hour = new Date().getHours();
@@ -2607,7 +2605,7 @@
                       <!-- Mini Feed of Recent Plays (clickable chips) -->
                       {#if userEvents.length > 1}
                         <div class="flex items-center gap-1.5 pt-0.5 overflow-x-auto no-scrollbar">
-                          {#each userEvents.slice(0, 4) as event, idx}
+                          {#each userEvents.slice(0, 4) as event, idx (`${event.time}-${idx}`)}
                             {@const eventGrade = gradeBadgeStyle(event.grade)}
                             <button
                               type="button"
@@ -3226,13 +3224,7 @@
                                     variant="outline"
                                     size="sm"
                                     class="h-8 gap-1.5 px-3 text-xs shrink-0"
-                                    onclick={async () => {
-                                      try {
-                                        await invoke('open_presence_editor');
-                                      } catch {
-                                        presenceEditorOpen = true;
-                                      }
-                                    }}
+                                    onclick={openDiscordPresenceEditor}
                                   >
                                     <ThemeIcon name="palette" set={iconSet} class="size-3.5" />
                                     Customize Activity

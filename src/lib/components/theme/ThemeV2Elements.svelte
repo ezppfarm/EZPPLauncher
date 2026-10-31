@@ -44,17 +44,7 @@
   } from '$lib/themeV2';
   import { currentUser } from '$lib/userAuthentication';
   import { countryCodeToEmoji, formatRelativeTime, openURL } from '$lib/utils';
-  import {
-    Boxes,
-    ChevronRight,
-    Clock,
-    Medal,
-    Move,
-    RotateCw,
-    TrendingDown,
-    TrendingUp,
-    Trophy,
-  } from '@lucide/svelte';
+  import { Boxes, ChevronRight, Clock, Move, RotateCw, Trophy } from '@lucide/svelte';
   import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { TextMorph } from 'torph/svelte';

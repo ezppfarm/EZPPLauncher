@@ -177,7 +177,7 @@ export const resolveThemeDataValue = (
   const { global, theme, screen, mode = 'osu', now = new Date() } = context;
   const stats = global.user.stats[mode];
 
-  let value = '';
+  let value: string;
   switch (field) {
     case 'user.name':
       value = global.user.name;
