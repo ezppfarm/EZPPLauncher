@@ -8,6 +8,7 @@
   import ThemeTransformControls from '$lib/components/theme/ThemeTransformControls.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
   import { Checkbox } from '$lib/components/ui/checkbox';
+  import DatePicker from '$lib/components/ui/date-picker/date-picker.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
@@ -1929,17 +1930,23 @@
     </ThemeSection>
   {:else if element.type === 'countdown'}
     <ThemeSection title="Countdown" contentClass="space-y-3 pt-2.5">
-      <div class="space-y-1">
-        <Label for="element-countdown-target" class={label}>Target date</Label>
-        <Input
+      <div class="space-y-1.5">
+        <Label for="element-countdown-target" class={label}>Target date & time</Label>
+        <DatePicker
           id="element-countdown-target"
-          class="{field} font-mono"
+          bind:value={element.target}
+          withTime={true}
+          placeholder="Pick a target date & time..."
+          class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50 hover:bg-theme-900"
+          contentClass="border-theme-800 bg-theme-950 text-theme-50"
+        />
+        <Input
+          class="{field} font-mono text-[10px]"
           placeholder="2027-01-01T00:00:00Z"
           bind:value={element.target}
         />
         <p class="text-[9px] leading-relaxed text-muted-foreground">
-          Use an ISO date-time with a timezone, for example <code>2027-01-01T00:00:00Z</code>. Empty
-          or invalid dates show zeroes.
+          Pick a date and time with the calendar, or paste an ISO date-time directly.
         </p>
       </div>
       <div class="space-y-1">

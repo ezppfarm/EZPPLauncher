@@ -1,8 +1,9 @@
 <script lang="ts">
   import { currentView, launcherVersion, trackingEnabled } from '$lib/global';
+  import Loading from '../screens/Loading.svelte';
   import { fade } from 'svelte/transition';
 
-  const View = $derived($currentView);
+  const View = $derived($currentView ?? Loading);
 </script>
 
 <svelte:head>

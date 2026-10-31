@@ -1,5 +1,4 @@
 import { browser } from '$app/environment';
-import Loading from '../screens/Loading.svelte';
 import { ezppfarm } from './api/ezpp';
 import type { Theme } from './themes';
 import type { Release } from './types';
@@ -7,7 +6,7 @@ import { setGlobalVolume } from './utils';
 import type { Component } from 'svelte';
 import { writable } from 'svelte/store';
 
-export const currentView = writable<Component>(Loading);
+export const currentView = writable<Component | null>(null);
 
 export const platform = writable<string>('');
 
