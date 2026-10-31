@@ -1,4 +1,9 @@
-import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from './themeData';
+import {
+  formatInteger,
+  getThemeDataSampleValue,
+  resolveThemeDataValue,
+  themeGlobalData,
+} from './themeData';
 import { getThemeIconBody } from './themeIconCatalog';
 import { THEME_ICON_BODIES } from './themeIconData';
 import {
@@ -12,6 +17,7 @@ import {
 import { themeScriptInitialVariables } from './themeScript';
 import { interpolateThemeText } from './themeTextVariables';
 import {
+  normalizeChrome,
   readableTextColor,
   themeElementTransformMatrix,
   themeFilterCss,
@@ -21,6 +27,7 @@ import {
   themeMaskPolygonPoints,
   themeTransformPoint,
   type ThemeV2ButtonElement,
+  type ThemeV2Chrome,
   type ThemeV2ClockElement,
   type ThemeV2CountdownElement,
   type ThemeV2DataElement,
@@ -37,6 +44,7 @@ import {
   type ThemeV2ShapeElement,
   type ThemeV2TextElement,
   type ThemeV2TickerElement,
+  type ThemeV2WidgetElement,
 } from './themeV2';
 import lottie from 'lottie-web';
 import { get } from 'svelte/store';
@@ -1114,7 +1122,7 @@ const drawPill = (
   return width;
 };
 
-const drawFooter = (context: PreviewContext) => {
+const drawFooter = (context: PreviewContext, chrome?: ThemeV2Chrome) => {
   const { ctx, definition } = context;
   const bodyFont = definition.typography?.body || DEFAULT_BODY_FONT;
   const accent = definition.accentColor ?? DEFAULT_ACCENT;
@@ -1132,52 +1140,54 @@ const drawFooter = (context: PreviewContext) => {
   ctx.lineTo(WIDTH, top + 0.5);
   ctx.stroke();
 
-  const stats = [
-    { icon: 'music' as const, color: '#60a5fa', value: '1.2k' },
-    { icon: 'brush' as const, color: '#fbbf24', value: '42' },
-    { icon: 'wifi' as const, color: '#34d399', value: '19ms' },
-  ];
+  if (chrome?.dockTelemetry !== false) {
+    const stats = [
+      { icon: 'music' as const, color: '#60a5fa', value: '1.2k' },
+      { icon: 'brush' as const, color: '#fbbf24', value: '42' },
+      { icon: 'wifi' as const, color: '#34d399', value: '19ms' },
+    ];
 
-  ctx.save();
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  for (const stat of stats) {
-    drawIcon(context, stat.icon, x + 7, centerY, 14, stat.color, 1.4);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = `500 11px ${quoteFamily(bodyFont)}, ui-sans-serif, sans-serif`;
-    ctx.fillText(stat.value, x + 20, centerY);
-    x += 20 + ctx.measureText(stat.value).width + 16;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    for (const stat of stats) {
+      drawIcon(context, stat.icon, x + 7, centerY, 14, stat.color, 1.4);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = `500 11px ${quoteFamily(bodyFont)}, ui-sans-serif, sans-serif`;
+      ctx.fillText(stat.value, x + 20, centerY);
+      x += 20 + ctx.measureText(stat.value).width + 16;
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, centerY - 7);
+    ctx.lineTo(x + 0.5, centerY + 7);
+    ctx.stroke();
+    x += 16;
+
+    x +=
+      drawPill(
+        context,
+        x,
+        centerY,
+        'stable',
+        'rgba(255, 255, 255, 0.5)',
+        'rgba(255, 255, 255, 0.1)',
+        'rgba(255, 255, 255, 0.06)'
+      ) + 16;
+    x +=
+      drawPill(
+        context,
+        x,
+        centerY,
+        '20260101.0',
+        'rgba(255, 255, 255, 0.5)',
+        'rgba(255, 255, 255, 0.1)',
+        'rgba(255, 255, 255, 0.06)'
+      ) + 16;
+    drawPill(context, x, centerY, 'Default skin', accent, rgba(accent, 0.2), rgba(accent, 0.25));
   }
-  ctx.restore();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-  ctx.beginPath();
-  ctx.moveTo(x + 0.5, centerY - 7);
-  ctx.lineTo(x + 0.5, centerY + 7);
-  ctx.stroke();
-  x += 16;
-
-  x +=
-    drawPill(
-      context,
-      x,
-      centerY,
-      'stable',
-      'rgba(255, 255, 255, 0.5)',
-      'rgba(255, 255, 255, 0.1)',
-      'rgba(255, 255, 255, 0.06)'
-    ) + 16;
-  x +=
-    drawPill(
-      context,
-      x,
-      centerY,
-      '20260101.0',
-      'rgba(255, 255, 255, 0.5)',
-      'rgba(255, 255, 255, 0.1)',
-      'rgba(255, 255, 255, 0.06)'
-    ) + 16;
-  drawPill(context, x, centerY, 'Default skin', accent, rgba(accent, 0.2), rgba(accent, 0.25));
 
   const buttonWidth = 256;
   const buttonHeight = 48;
@@ -1203,6 +1213,851 @@ const drawFooter = (context: PreviewContext) => {
   ctx.textBaseline = 'middle';
   ctx.fillText('Launch', buttonX + 48 + (buttonWidth - 48) / 2, centerY);
   ctx.restore();
+};
+
+const getWidgetPlayerData = (context: PreviewContext) => {
+  const globalData = get(themeGlobalData);
+  const name = globalData?.user?.name || getThemeDataSampleValue('user.name') || 'Player';
+  const rank = globalData?.user?.stats?.osu?.rank
+    ? `#${formatInteger(globalData.user.stats.osu.rank)}`
+    : getThemeDataSampleValue('user.rank');
+  const pp = globalData?.user?.stats?.osu?.pp
+    ? `${formatInteger(globalData.user.stats.osu.pp)}pp`
+    : getThemeDataSampleValue('user.pp');
+  const acc = globalData?.user?.stats?.osu?.accuracy
+    ? `${globalData.user.stats.osu.accuracy.toFixed(1)}%`
+    : getThemeDataSampleValue('user.accuracy');
+  const plays = globalData?.user?.stats?.osu?.plays
+    ? formatInteger(globalData.user.stats.osu.plays)
+    : getThemeDataSampleValue('user.plays');
+  const level = 75;
+  const levelProgress = 75;
+  const country = globalData?.user?.country || 'US';
+  return { name, rank, pp, acc, plays, level, levelProgress, country };
+};
+
+const drawWidgetElement = async (context: PreviewContext, element: ThemeV2WidgetElement) => {
+  const { ctx, definition } = context;
+  const bodyFont = definition.typography?.body || DEFAULT_BODY_FONT;
+  const headingFont = definition.typography?.heading || bodyFont;
+  const accent = definition.accentColor ?? DEFAULT_ACCENT;
+  const accentText = readableTextColor(accent);
+
+  if (element.widget === 'launch-button') {
+    const isIconOnly = element.variant === 'icon-only' || element.variant === 'minimal';
+    const isCompact = element.variant === 'compact';
+
+    if (isIconOnly) {
+      const radius = Math.min(element.width, element.height) / 2;
+      const centerX = element.x + element.width / 2;
+      const centerY = element.y + element.height / 2;
+
+      ctx.save();
+      ctx.shadowColor = rgba(accent, 0.35);
+      ctx.shadowBlur = 14;
+      fillRoundedRect(ctx, element.x, element.y, element.width, element.height, radius, accent);
+      ctx.restore();
+
+      const iconSize = Math.min(element.width, element.height) * 0.42;
+      drawIcon(context, 'play', centerX + 1, centerY, iconSize, accentText, 2);
+    } else if (isCompact) {
+      const radius = element.height / 2;
+      const centerY = element.y + element.height / 2;
+
+      ctx.save();
+      ctx.shadowColor = rgba(accent, 0.3);
+      ctx.shadowBlur = 12;
+      fillRoundedRect(ctx, element.x, element.y, element.width, element.height, radius, accent);
+      ctx.restore();
+
+      const iconSize = Math.min(14, element.height * 0.35);
+      ctx.save();
+      ctx.font = canvasFont(context, bodyFont, Math.min(12, element.height * 0.32), 700);
+      const text = 'Launch';
+      const textWidth = ctx.measureText(text).width;
+      const spacing = 7;
+      const totalW = iconSize + spacing + textWidth;
+      const startX = element.x + (element.width - totalW) / 2;
+
+      drawIcon(context, 'play', startX + iconSize / 2, centerY, iconSize, accentText, 1.8);
+
+      ctx.fillStyle = accentText;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, startX + iconSize + spacing, centerY);
+      ctx.restore();
+    } else {
+      // primary
+      const radius = element.height / 2;
+      const centerY = element.y + element.height / 2;
+
+      ctx.save();
+      ctx.shadowColor = rgba(accent, 0.35);
+      ctx.shadowBlur = 18;
+      fillRoundedRect(ctx, element.x, element.y, element.width, element.height, radius, accent);
+      ctx.restore();
+
+      const circleR = Math.max(12, element.height * 0.32);
+      const circleX = element.x + circleR + 10;
+      ctx.beginPath();
+      ctx.arc(circleX, centerY, circleR, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      ctx.fill();
+
+      drawIcon(context, 'play', circleX + 1, centerY, circleR * 1.05, accentText, 1.8);
+
+      ctx.save();
+      ctx.fillStyle = accentText;
+      ctx.font = canvasFont(context, bodyFont, Math.min(14, element.height * 0.33), 700);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const textCenterX = circleX + circleR + (element.x + element.width - (circleX + circleR)) / 2;
+      ctx.fillText('Launch', textCenterX, centerY);
+      ctx.restore();
+    }
+  } else if (element.widget === 'header') {
+    const { name } = getWidgetPlayerData(context);
+    const hour = new Date().getHours();
+    const timeGreeting =
+      hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const greeting = `${timeGreeting}, ${name}!`;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 2;
+
+    if (element.variant === 'minimal') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, headingFont, Math.min(26, element.height * 0.65), 800);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('EZPPLauncher', element.x, element.y + element.height / 2);
+    } else if (element.variant === 'compact') {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, headingFont, Math.min(24, element.height * 0.55), 800);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const centerY = element.y + element.height / 2;
+      ctx.fillText('EZPPLauncher', element.x, centerY);
+      const titleWidth = ctx.measureText('EZPPLauncher').width;
+
+      ctx.shadowColor = 'transparent';
+      drawPill(
+        context,
+        element.x + titleWidth + 14,
+        centerY,
+        greeting,
+        'rgba(255, 255, 255, 0.9)',
+        'rgba(0, 0, 0, 0.45)',
+        'rgba(255, 255, 255, 0.12)'
+      );
+    } else {
+      // full
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, headingFont, Math.min(30, element.height * 0.52), 800);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('EZPPLauncher', element.x, element.y + 4);
+
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      ctx.font = canvasFont(context, bodyFont, Math.min(13, element.height * 0.28), 500);
+      ctx.fillText(greeting, element.x, element.y + element.height - 20);
+    }
+    ctx.restore();
+  } else if (element.widget === 'avatar') {
+    const { country } = getWidgetPlayerData(context);
+    const radius =
+      element.variant === 'rounded'
+        ? 16
+        : element.variant === 'square'
+          ? 8
+          : Math.min(element.width, element.height) / 2;
+
+    if (element.showOnlineRing !== false) {
+      ctx.save();
+      strokeRoundedRect(
+        ctx,
+        element.x - 2,
+        element.y - 2,
+        element.width + 4,
+        element.height + 4,
+        radius + 2,
+        rgba(accent, 0.55),
+        2
+      );
+      ctx.restore();
+    }
+
+    fillRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      radius,
+      'rgba(15, 15, 22, 0.9)'
+    );
+    strokeRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      radius,
+      'rgba(255, 255, 255, 0.15)',
+      1
+    );
+
+    const iconSize = Math.min(element.width, element.height) * 0.48;
+    drawIcon(
+      context,
+      'user',
+      element.x + element.width / 2,
+      element.y + element.height / 2,
+      iconSize,
+      accent,
+      1.8
+    );
+
+    if (element.showCountry !== false && country) {
+      const badgeW = 20;
+      const badgeH = 14;
+      const badgeX = element.x + element.width - badgeW + 2;
+      const badgeY = element.y + element.height - badgeH + 2;
+      fillRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 4, 'rgba(0, 0, 0, 0.85)');
+      strokeRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 4, 'rgba(255, 255, 255, 0.25)', 1);
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(country.toUpperCase().slice(0, 2), badgeX + badgeW / 2, badgeY + badgeH / 2);
+      ctx.restore();
+    }
+  } else if (element.widget === 'telemetry') {
+    const radius = element.height / 2;
+    fillRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      radius,
+      'rgba(0, 0, 0, 0.45)'
+    );
+    strokeRoundedRect(
+      ctx,
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      radius,
+      'rgba(255, 255, 255, 0.12)',
+      1
+    );
+
+    const centerY = element.y + element.height / 2;
+    let cx = element.x + 16;
+
+    drawIcon(context, 'wifi', cx, centerY, 13, '#34d399', 1.5);
+    cx += 12;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.font = `600 11px ${quoteFamily(bodyFont)}, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('19ms', cx, centerY);
+    cx += ctx.measureText('19ms').width + 12;
+
+    drawPill(
+      context,
+      cx,
+      centerY,
+      'stable',
+      'rgba(255, 255, 255, 0.6)',
+      'rgba(255, 255, 255, 0.1)',
+      'rgba(255, 255, 255, 0.08)'
+    );
+    ctx.restore();
+  } else if (element.widget === 'player-card') {
+    const { name, rank, pp, level, levelProgress, acc, plays } = getWidgetPlayerData(context);
+
+    if (element.variant === 'minimal') {
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      const centerY = element.y + element.height / 2;
+      const avatarSize = Math.min(38, element.height - 14);
+      const avatarX = element.x + 10;
+      const avatarY = centerY - avatarSize / 2;
+
+      fillRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 10, 'rgba(20, 20, 28, 0.9)');
+      strokeRoundedRect(
+        ctx,
+        avatarX,
+        avatarY,
+        avatarSize,
+        avatarSize,
+        10,
+        'rgba(255, 255, 255, 0.15)',
+        1
+      );
+      drawIcon(
+        context,
+        'user',
+        avatarX + avatarSize / 2,
+        avatarY + avatarSize / 2,
+        avatarSize * 0.48,
+        accent,
+        1.5
+      );
+
+      const textX = avatarX + avatarSize + 10;
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 12, 700);
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(name, textX, centerY - 1);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.font = canvasFont(context, bodyFont, 10, 500);
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${rank} · ${pp}`, textX, centerY + 1);
+
+      const badgeW = 38;
+      const badgeH = 18;
+      const badgeX = element.x + element.width - badgeW - 10;
+      fillRoundedRect(ctx, badgeX, centerY - badgeH / 2, badgeW, badgeH, 5, rgba(accent, 0.2));
+      ctx.fillStyle = accent;
+      ctx.font = canvasFont(context, bodyFont, 9, 700);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`Lv.${level}`, badgeX + badgeW / 2, centerY);
+      ctx.restore();
+    } else if (element.variant === 'compact') {
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      const avatarSize = 42;
+      const avatarX = element.x + 14;
+      const avatarY = element.y + 14;
+      fillRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 12, 'rgba(20, 20, 28, 0.9)');
+      strokeRoundedRect(
+        ctx,
+        avatarX,
+        avatarY,
+        avatarSize,
+        avatarSize,
+        12,
+        'rgba(255, 255, 255, 0.15)',
+        1
+      );
+      drawIcon(
+        context,
+        'user',
+        avatarX + avatarSize / 2,
+        avatarY + avatarSize / 2,
+        avatarSize * 0.48,
+        accent,
+        1.5
+      );
+
+      const textX = avatarX + avatarSize + 12;
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 13, 700);
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, textX, avatarY + 2);
+      const nameW = ctx.measureText(name).width;
+
+      fillRoundedRect(ctx, textX + nameW + 8, avatarY + 1, 36, 17, 5, rgba(accent, 0.2));
+      ctx.fillStyle = accent;
+      ctx.font = canvasFont(context, bodyFont, 9, 700);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`Lv.${level}`, textX + nameW + 8 + 18, avatarY + 9.5);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.font = canvasFont(context, bodyFont, 10, 500);
+      ctx.fillText(`${rank} · ${pp}`, textX, avatarY + 24);
+
+      const bottomY = element.y + element.height - 38;
+      const cellW = (element.width - 36) / 2;
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.beginPath();
+      ctx.moveTo(element.x + 14, bottomY - 8);
+      ctx.lineTo(element.x + element.width - 14, bottomY - 8);
+      ctx.stroke();
+
+      fillRoundedRect(ctx, element.x + 14, bottomY, cellW, 28, 8, 'rgba(255, 255, 255, 0.05)');
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = canvasFont(context, bodyFont, 9, 500);
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Accuracy', element.x + 22, bottomY + 14);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 11, 700);
+      ctx.textAlign = 'right';
+      ctx.fillText(acc, element.x + 14 + cellW - 8, bottomY + 14);
+
+      const cell2X = element.x + 14 + cellW + 8;
+      fillRoundedRect(ctx, cell2X, bottomY, cellW, 28, 8, 'rgba(255, 255, 255, 0.05)');
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = canvasFont(context, bodyFont, 9, 500);
+      ctx.fillText('Plays', cell2X + 8, bottomY + 14);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 11, 700);
+      ctx.textAlign = 'right';
+      ctx.fillText(plays, cell2X + cellW - 8, bottomY + 14);
+      ctx.restore();
+    } else {
+      // full
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      const avatarSize = 48;
+      const avatarX = element.x + 16;
+      const avatarY = element.y + 16;
+      fillRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 12, 'rgba(20, 20, 28, 0.9)');
+      strokeRoundedRect(
+        ctx,
+        avatarX,
+        avatarY,
+        avatarSize,
+        avatarSize,
+        12,
+        'rgba(255, 255, 255, 0.15)',
+        1
+      );
+      drawIcon(
+        context,
+        'user',
+        avatarX + avatarSize / 2,
+        avatarY + avatarSize / 2,
+        avatarSize * 0.48,
+        accent,
+        1.5
+      );
+
+      const textX = avatarX + avatarSize + 14;
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 14, 700);
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, textX, avatarY + 3);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = canvasFont(context, bodyFont, 11, 600);
+      ctx.fillText(`Lv.${level}`, textX, avatarY + 26);
+      const lvW = ctx.measureText(`Lv.${level}`).width;
+
+      const barX = textX + lvW + 8;
+      const barY = avatarY + 30;
+      const barW = Math.max(50, Math.min(100, element.width - barX - 60));
+      fillRoundedRect(ctx, barX, barY, barW, 6, 3, 'rgba(255, 255, 255, 0.1)');
+      fillRoundedRect(ctx, barX, barY, barW * (levelProgress / 100), 6, 3, accent);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.font = '500 10px monospace';
+      ctx.fillText(`${levelProgress}%`, barX + barW + 8, barY - 2);
+
+      const divY = avatarY + avatarSize + 16;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.beginPath();
+      ctx.moveTo(element.x + 16, divY);
+      ctx.lineTo(element.x + element.width - 16, divY);
+      ctx.stroke();
+
+      const gridY = divY + 12;
+      const gap = 8;
+      const cellW = (element.width - 32 - gap) / 2;
+      const cellH = Math.max(34, (element.height - (gridY - element.y) - 14 - gap) / 2);
+
+      const stats = [
+        { label: 'Rank', value: rank, valueColor: '#ffffff' },
+        { label: 'Performance', value: pp, valueColor: accent },
+        { label: 'Accuracy', value: acc, valueColor: '#ffffff' },
+        { label: 'Plays', value: plays, valueColor: '#ffffff' },
+      ];
+
+      stats.forEach((st, idx) => {
+        const col = idx % 2;
+        const row = Math.floor(idx / 2);
+        const cx = element.x + 16 + col * (cellW + gap);
+        const cy = gridY + row * (cellH + gap);
+
+        fillRoundedRect(ctx, cx, cy, cellW, cellH, 10, 'rgba(255, 255, 255, 0.05)');
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = canvasFont(context, bodyFont, 9, 500);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(st.label, cx + 10, cy + 6);
+
+        ctx.fillStyle = st.valueColor;
+        ctx.font = canvasFont(context, bodyFont, 12, 700);
+        ctx.fillText(st.value, cx + 10, cy + cellH - 18);
+      });
+      ctx.restore();
+    }
+  } else if (element.widget === 'recent-activity') {
+    if (element.variant === 'minimal') {
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      const centerY = element.y + element.height / 2;
+      const coverSize = Math.min(38, element.height - 14);
+      const coverX = element.x + 10;
+      const coverY = centerY - coverSize / 2;
+
+      fillRoundedRect(ctx, coverX, coverY, coverSize, coverSize, 8, 'rgba(25, 20, 45, 0.9)');
+      strokeRoundedRect(
+        ctx,
+        coverX,
+        coverY,
+        coverSize,
+        coverSize,
+        8,
+        'rgba(255, 255, 255, 0.15)',
+        1
+      );
+      drawIcon(
+        context,
+        'music',
+        coverX + coverSize / 2,
+        coverY + coverSize / 2,
+        coverSize * 0.45,
+        '#60a5fa',
+        1.5
+      );
+
+      const textX = coverX + coverSize + 10;
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 12, 700);
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('Space Pirates', textX, centerY - 1);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.font = canvasFont(context, bodyFont, 10, 500);
+      ctx.textBaseline = 'top';
+      ctx.fillText('Waterflame · 5d ago', textX, centerY + 1);
+
+      const badgeW = 24;
+      const badgeH = 20;
+      const badgeX = element.x + element.width - badgeW - 10;
+      fillRoundedRect(ctx, badgeX, centerY - badgeH / 2, badgeW, badgeH, 4, 'rgba(251, 191, 36, 0.2)');
+      strokeRoundedRect(
+        ctx,
+        badgeX,
+        centerY - badgeH / 2,
+        badgeW,
+        badgeH,
+        4,
+        'rgba(251, 191, 36, 0.4)',
+        1
+      );
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '900 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S', badgeX + badgeW / 2, centerY);
+      ctx.restore();
+    } else if (element.variant === 'compact') {
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      ctx.save();
+      roundRect(ctx, element.x, element.y, element.width, element.height, 16);
+      ctx.clip();
+
+      const bannerH = Math.min(60, element.height * 0.55);
+      const bannerGrad = ctx.createLinearGradient(
+        element.x,
+        element.y,
+        element.x,
+        element.y + bannerH
+      );
+      bannerGrad.addColorStop(0, '#1e1b4b');
+      bannerGrad.addColorStop(1, '#09090b');
+      ctx.fillStyle = bannerGrad;
+      ctx.fillRect(element.x, element.y, element.width, bannerH);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.font = canvasFont(context, bodyFont, 9, 700);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('RECENT ACTIVITY', element.x + 12, element.y + 8);
+
+      const badgeW = 20;
+      const badgeH = 16;
+      const badgeX = element.x + element.width - badgeW - 12;
+      fillRoundedRect(ctx, badgeX, element.y + 7, badgeW, badgeH, 4, 'rgba(251, 191, 36, 0.2)');
+      strokeRoundedRect(
+        ctx,
+        badgeX,
+        element.y + 7,
+        badgeW,
+        badgeH,
+        4,
+        'rgba(251, 191, 36, 0.4)',
+        1
+      );
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '900 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S', badgeX + badgeW / 2, element.y + 7 + badgeH / 2);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 12, 700);
+      ctx.fillText('Space Pirates', element.x + 12, element.y + bannerH - 18);
+
+      const bottomCenterY = element.y + bannerH + (element.height - bannerH) / 2;
+      ctx.fillStyle = accent;
+      ctx.font = canvasFont(context, bodyFont, 10, 600);
+      ctx.textBaseline = 'middle';
+      ctx.fillText('[Galactic Thieves]', element.x + 12, bottomCenterY);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = canvasFont(context, bodyFont, 10, 700);
+      ctx.fillText('Rank #1', element.x + element.width - 12, bottomCenterY);
+      ctx.restore();
+    } else {
+      // full
+      fillRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(0, 0, 0, 0.55)'
+      );
+      strokeRoundedRect(
+        ctx,
+        element.x,
+        element.y,
+        element.width,
+        element.height,
+        16,
+        'rgba(255, 255, 255, 0.1)',
+        1
+      );
+
+      ctx.save();
+      roundRect(ctx, element.x, element.y, element.width, element.height, 16);
+      ctx.clip();
+
+      const bannerH = 80;
+      const bannerGrad = ctx.createLinearGradient(
+        element.x,
+        element.y,
+        element.x,
+        element.y + bannerH
+      );
+      bannerGrad.addColorStop(0, '#1e1b4b');
+      bannerGrad.addColorStop(1, '#09090b');
+      ctx.fillStyle = bannerGrad;
+      ctx.fillRect(element.x, element.y, element.width, bannerH);
+
+      drawPill(
+        context,
+        element.x + 12,
+        element.y + 16,
+        'RECENT ACTIVITY',
+        'rgba(255, 255, 255, 0.9)',
+        'rgba(0, 0, 0, 0.5)',
+        'rgba(255, 255, 255, 0.1)'
+      );
+
+      const badgeW = 24;
+      const badgeH = 18;
+      const badgeX = element.x + element.width - badgeW - 14;
+      fillRoundedRect(ctx, badgeX, element.y + 8, badgeW, badgeH, 4, 'rgba(251, 191, 36, 0.2)');
+      strokeRoundedRect(
+        ctx,
+        badgeX,
+        element.y + 8,
+        badgeW,
+        badgeH,
+        4,
+        'rgba(251, 191, 36, 0.4)',
+        1
+      );
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = '900 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S', badgeX + badgeW / 2, element.y + 8 + badgeH / 2);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = canvasFont(context, bodyFont, 13, 700);
+      ctx.textBaseline = 'top';
+      ctx.fillText('Space Pirates', element.x + 12, element.y + 44);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.font = canvasFont(context, bodyFont, 10, 500);
+      ctx.fillText('Waterflame', element.x + 12, element.y + 60);
+
+      const bodyTop = element.y + bannerH + 12;
+      ctx.fillStyle = accent;
+      ctx.font = canvasFont(context, bodyFont, 11, 600);
+      ctx.fillText('[Galactic Thieves]', element.x + 12, bodyTop);
+
+      drawPill(
+        context,
+        element.x + element.width - 70,
+        bodyTop + 6,
+        'Rank #1',
+        '#fbbf24',
+        'rgba(251, 191, 36, 0.12)',
+        'rgba(251, 191, 36, 0.25)'
+      );
+
+      const divY = bodyTop + 24;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.beginPath();
+      ctx.moveTo(element.x + 12, divY);
+      ctx.lineTo(element.x + element.width - 12, divY);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.font = canvasFont(context, bodyFont, 10, 500);
+      ctx.fillText('5d ago', element.x + 12, divY + 8);
+
+      ctx.textAlign = 'right';
+      ctx.fillText('ez-pp.farm', element.x + element.width - 12, divY + 8);
+
+      ctx.restore();
+    }
+  }
+};
+
+const drawDashboardCards = async (context: PreviewContext, chrome: ThemeV2Chrome) => {
+  if (chrome.playerCard !== false) {
+    const playerWidget: ThemeV2WidgetElement = {
+      id: '__dashboard_player_card__',
+      type: 'widget',
+      widget: 'player-card',
+      variant: 'full',
+      x: SIDEBAR_WIDTH + 32,
+      y: 190,
+      width: 380,
+      height: 220,
+    };
+    await drawWidgetElement(context, playerWidget);
+  }
+
+  if (chrome.recentActivity !== false) {
+    const activityWidget: ThemeV2WidgetElement = {
+      id: '__dashboard_activity_card__',
+      type: 'widget',
+      widget: 'recent-activity',
+      variant: 'full',
+      x: SIDEBAR_WIDTH + 32 + (chrome.playerCard !== false ? 400 : 0),
+      y: 190,
+      width: 380,
+      height: 220,
+    };
+    await drawWidgetElement(context, activityWidget);
+  }
 };
 
 const transformText = (text: string, transform: ThemeV2TextElement['textTransform']) => {
@@ -2079,6 +2934,8 @@ const drawElement = async (
     ctx.textBaseline = 'middle';
     ctx.fillText('CUSTOM SVELTE LAYER', centerX, centerY);
     ctx.restore();
+  } else if (element.type === 'widget') {
+    await drawWidgetElement(context, element);
   }
 
   ctx.restore();
@@ -2135,11 +2992,23 @@ export const renderThemePreview = async ({
       }
     }
 
+    const chrome = normalizeChrome(definition.chrome, definition.elements);
+
     await drawBackground(context);
     drawSidebar(context, logo);
-    drawHeader(context);
-    drawStatsCard(context);
-    drawFooter(context);
+    if (chrome.header !== false) {
+      drawHeader(context);
+    }
+    if (chrome.layoutMode === 'dashboard') {
+      await drawDashboardCards(context, chrome);
+    } else if (chrome.layoutMode === 'classic') {
+      if (chrome.playerCard !== false) {
+        drawStatsCard(context);
+      }
+    }
+    if (chrome.dock !== false) {
+      drawFooter(context, chrome);
+    }
     for (const element of definition.elements ?? []) {
       const ancestors = themeGroupAncestors(definition.groups, element);
       if (element.hidden || ancestors.some((group) => group.hidden)) continue;

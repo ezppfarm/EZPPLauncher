@@ -2,6 +2,9 @@
   import ThemeCustomLayer from '$lib/components/theme/ThemeCustomLayer.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeLottieLayer from '$lib/components/theme/ThemeLottieLayer.svelte';
+  import * as Avatar from '$lib/components/ui/avatar';
+  import { currentUserInfo } from '$lib/data';
+  import { launching as launchingStore } from '$lib/global';
   import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
   import { fontStack } from '$lib/themeFonts';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
@@ -39,7 +42,19 @@
     type ThemeV2Point,
     type ThemeV2ScriptValue,
   } from '$lib/themeV2';
-  import { Boxes, ChevronRight, Move, RotateCw } from '@lucide/svelte';
+  import { currentUser } from '$lib/userAuthentication';
+  import { countryCodeToEmoji, formatRelativeTime, openURL } from '$lib/utils';
+  import {
+    Boxes,
+    ChevronRight,
+    Clock,
+    Medal,
+    Move,
+    RotateCw,
+    TrendingDown,
+    TrendingUp,
+    Trophy,
+  } from '@lucide/svelte';
   import { onDestroy } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { TextMorph } from 'torph/svelte';
@@ -62,6 +77,10 @@
     visibility = {},
     groupVisibility = {},
     variables = {},
+    launching = undefined,
+    launchProgress = -1,
+    launchText = 'Launch',
+    launchDisabled = false,
     oninteraction,
     onselect,
     onselectmany,
@@ -91,6 +110,10 @@
     groupVisibility?: Record<string, boolean>;
     /** Rule variables available to `{name}` placeholders in text layers. */
     variables?: Record<string, ThemeV2ScriptValue>;
+    launching?: boolean;
+    launchProgress?: number;
+    launchText?: string;
+    launchDisabled?: boolean;
     oninteraction?: (id: string, type: 'click' | 'hover' | 'leave') => void;
     onselect?: (id: string | undefined, additive?: boolean) => void;
     onselectmany?: (ids: string[], additive?: boolean) => void;
@@ -102,6 +125,8 @@
     oncontextgroup?: (id: string, event: MouseEvent) => void;
     onbuttonaction?: (action: ThemeV2ButtonAction) => void;
   } = $props();
+
+  const isLaunching = $derived(launching !== undefined ? launching : $launchingStore);
 
   const assetUrl = (path: string) => assetOverrides[path] ?? themeAssetUrl(assets, path);
 
@@ -138,9 +163,17 @@
       (element) =>
         (element.type === 'data' && element.field.startsWith('clock.')) ||
         element.type === 'clock' ||
-        element.type === 'countdown'
+        element.type === 'countdown' ||
+        (element.type === 'widget' && element.widget === 'header')
     )
   );
+
+  const timeGreeting = $derived.by(() => {
+    const hour = clockNow.getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  });
 
   $effect(() => {
     if (!usesClock) return;
@@ -1560,9 +1593,13 @@
             />
           {/key}
         {:else if element.type === 'button'}
+          {@const isActionLaunch = element.action?.type === 'launch'}
           <button
             type="button"
-            class="theme-button flex h-full w-full items-center justify-center gap-2 px-4"
+            class="theme-button flex h-full w-full items-center justify-center gap-2 px-4 {isActionLaunch &&
+            isLaunching
+              ? 'cursor-wait brightness-90'
+              : ''}"
             style="--theme-button-hover:{element.hoverBackground ??
               '#ff4d94'};background:{element.background ?? '#ff006e'};color:{element.color ??
               '#ffffff'};border:{element.borderWidth
@@ -1570,16 +1607,31 @@
               : 'none'};border-radius:{element.radius ?? 10}px;font-family:{fontStack(
               element.fontFamily
             )};font-size:{element.fontSize ?? 16}px;font-weight:{element.fontWeight ?? 600};"
+            disabled={isActionLaunch && (launchDisabled || isLaunching)}
             onclick={(event) => {
-              if (interactive) return;
+              if (interactive) {
+                if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                  event.stopPropagation();
+                  onbuttonaction?.(element.action);
+                }
+                return;
+              }
+              if (isActionLaunch && (launchDisabled || isLaunching)) return;
               event.stopPropagation();
+              triggerInteraction(element, 'click');
               onbuttonaction?.(element.action);
             }}
           >
-            {#if element.icon}
+            {#if isActionLaunch && isLaunching}
+              <ThemeIcon name="loader" set={iconSet} size="1.1em" class="animate-spin" />
+            {:else if element.icon}
               <ThemeIcon name={element.icon} set={iconSet} size="1.1em" />
             {/if}
-            {#if isMorphEnabled(element)}
+            {#if isActionLaunch && isLaunching}
+              <span class="truncate">
+                {launchProgress > 0 ? `${launchText} (${Math.round(launchProgress)}%)` : launchText}
+              </span>
+            {:else if isMorphEnabled(element)}
               <TextMorph
                 text={String(interpolateThemeText(element.label, variables) ?? '')}
                 duration={morphDuration(element)}
@@ -1798,6 +1850,630 @@
               >
                 {themeCountdownText(element, clockNow)}
               </span>
+            {/if}
+          </div>
+        {:else if element.type === 'widget'}
+          <div class="pointer-events-auto h-full w-full select-none overflow-visible">
+            {#if element.widget === 'launch-button'}
+              {#if element.variant === 'icon-only' || element.variant === 'minimal'}
+                {@const btnRadius = Math.max(
+                  12,
+                  Math.round(Math.min(element.width, element.height) / 2) - 6
+                )}
+                {@const btnCircumference = 2 * Math.PI * btnRadius}
+                {@const strokeOffset =
+                  launchProgress === -1
+                    ? btnCircumference * 0.7
+                    : btnCircumference -
+                      (Math.max(0, Math.min(100, launchProgress)) / 100) * btnCircumference}
+                <button
+                  type="button"
+                  class="relative flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-all {isLaunching
+                    ? 'cursor-wait brightness-95'
+                    : launchDisabled
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer hover:scale-105 hover:brightness-110 active:scale-95'}"
+                  disabled={launchDisabled || isLaunching}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    if (!launchDisabled && !isLaunching) {
+                      onbuttonaction?.({ type: 'launch' });
+                    }
+                  }}
+                  title={isLaunching ? launchText : 'Launch osu!'}
+                >
+                  {#if isLaunching}
+                    <!-- Rotating progress ring SVG -->
+                    <svg
+                      class="absolute inset-0 h-full w-full {launchProgress === -1
+                        ? 'animate-spin'
+                        : '-rotate-90'}"
+                      viewBox="0 0 {element.width} {element.height}"
+                    >
+                      <circle
+                        cx={element.width / 2}
+                        cy={element.height / 2}
+                        r={btnRadius}
+                        fill="none"
+                        stroke="rgba(0,0,0,0.25)"
+                        stroke-width="3"
+                      />
+                      <circle
+                        cx={element.width / 2}
+                        cy={element.height / 2}
+                        r={btnRadius}
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-dasharray={btnCircumference}
+                        stroke-dashoffset={strokeOffset}
+                        class="transition-[stroke-dashoffset] duration-150"
+                      />
+                    </svg>
+
+                    {#if launchProgress > 0}
+                      <span
+                        class="relative z-10 text-[11px] font-black tracking-tight text-primary-foreground"
+                      >
+                        {Math.round(launchProgress)}%
+                      </span>
+                    {:else}
+                      <ThemeIcon
+                        name="loader"
+                        set={iconSet}
+                        class="relative z-10 size-6 animate-spin text-primary-foreground"
+                      />
+                    {/if}
+                  {:else}
+                    <ThemeIcon name="launch" set={iconSet} class="size-6 fill-current ml-0.5" />
+                  {/if}
+                </button>
+              {:else if element.variant === 'compact'}
+                <button
+                  type="button"
+                  class="relative flex h-full w-full items-center justify-center gap-2 rounded-full bg-primary px-3 text-xs font-bold text-primary-foreground shadow-md shadow-primary/25 transition-all {isLaunching
+                    ? 'cursor-wait brightness-95'
+                    : launchDisabled
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer hover:brightness-110 active:scale-[0.98]'}"
+                  disabled={launchDisabled || isLaunching}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    if (!launchDisabled && !isLaunching) {
+                      onbuttonaction?.({ type: 'launch' });
+                    }
+                  }}
+                  title={isLaunching ? launchText : 'Launch osu!'}
+                >
+                  {#if isLaunching}
+                    <ThemeIcon
+                      name="loader"
+                      set={iconSet}
+                      class="size-3.5 animate-spin fill-current"
+                    />
+                    <span>{launchProgress > 0 ? `${Math.round(launchProgress)}%` : launchText}</span
+                    >
+                  {:else}
+                    <ThemeIcon name="launch" set={iconSet} class="size-3.5 fill-current" />
+                    <span>Launch</span>
+                  {/if}
+                </button>
+              {:else}
+                <button
+                  type="button"
+                  class="relative flex h-full w-full items-center justify-center gap-2.5 rounded-full bg-primary px-5 font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all {isLaunching
+                    ? 'cursor-wait brightness-95'
+                    : launchDisabled
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer hover:brightness-110 active:scale-[0.98]'}"
+                  disabled={launchDisabled || isLaunching}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    if (!launchDisabled && !isLaunching) {
+                      onbuttonaction?.({ type: 'launch' });
+                    }
+                  }}
+                  title={isLaunching ? launchText : 'Launch osu!'}
+                >
+                  <div class="flex size-7 items-center justify-center rounded-full bg-black/20">
+                    {#if isLaunching}
+                      <ThemeIcon
+                        name="loader"
+                        set={iconSet}
+                        class="size-3.5 animate-spin text-primary-foreground"
+                      />
+                    {:else}
+                      <ThemeIcon
+                        name="launch"
+                        set={iconSet}
+                        class="ml-0.5 size-3.5 fill-current text-primary-foreground"
+                      />
+                    {/if}
+                  </div>
+                  <span class="text-sm font-bold tracking-wide">
+                    {isLaunching
+                      ? launchProgress > 0
+                        ? `${launchText} (${Math.round(launchProgress)}%)`
+                        : launchText
+                      : 'Launch'}
+                  </span>
+                </button>
+              {/if}
+            {:else if element.widget === 'player-card'}
+              {@const playerStats =
+                $currentUserInfo?.stats?.['0'] ?? $themeGlobalData?.user?.stats?.osu}
+              {@const accuracyVal =
+                playerStats && 'acc' in playerStats
+                  ? playerStats.acc
+                  : playerStats && 'accuracy' in playerStats
+                    ? playerStats.accuracy
+                    : 98.3}
+              {@const playerId = $currentUser?.id ?? $currentUserInfo?.info?.id ?? 0}
+              {@const playerName = $currentUser?.name ?? 'Player'}
+              {@const country = $currentUserInfo?.info?.country}
+              {@const levelVal = playerStats && 'level' in playerStats ? playerStats.level : 1}
+              {@const levelProgress =
+                playerStats && 'level_progress' in playerStats ? playerStats.level_progress : 75}
+              {@const rankVal = playerStats?.rank ? playerStats.rank : 102}
+              {@const countryRankVal =
+                playerStats && 'country_rank' in playerStats ? playerStats.country_rank : undefined}
+              {@const ppVal = playerStats?.pp ? playerStats.pp : 4521}
+              {@const playsVal = playerStats?.plays
+                ? Number(playerStats.plays).toLocaleString()
+                : '11,813'}
+
+              {#if element.variant === 'minimal'}
+                <div
+                  class="flex h-full w-full items-center gap-2.5 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <div class="relative shrink-0">
+                    <Avatar.Root
+                      class="size-10 rounded-xl border border-white/15 bg-theme-900 shadow"
+                    >
+                      <Avatar.Image
+                        src="https://a.ez-pp.farm/{playerId}"
+                        alt={playerName}
+                        class="h-full w-full object-cover"
+                      />
+                      <Avatar.Fallback
+                        class="flex h-full w-full items-center justify-center bg-theme-900 text-primary"
+                      >
+                        <ThemeIcon name="user" set={iconSet} size={18} />
+                      </Avatar.Fallback>
+                    </Avatar.Root>
+                    {#if country}
+                      <span
+                        class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-md border border-white/20 bg-black/90 px-1 py-0.5 text-[9px] leading-none shadow"
+                        title={country.toUpperCase()}
+                      >
+                        {countryCodeToEmoji(country)}
+                      </span>
+                    {/if}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <span class="block truncate text-xs font-bold text-white">{playerName}</span>
+                    <span class="block text-[10px] font-medium text-muted-foreground">
+                      #{rankVal} · {ppVal}pp
+                    </span>
+                  </div>
+                  <span
+                    class="shrink-0 rounded-md bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold text-primary"
+                  >
+                    Lv.{levelVal}
+                  </span>
+                </div>
+              {:else if element.variant === 'compact'}
+                <div
+                  class="flex h-full w-full flex-col justify-between rounded-2xl border border-white/10 bg-black/55 p-3 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="relative shrink-0">
+                      <Avatar.Root
+                        class="size-11 rounded-xl border border-white/15 bg-theme-900 shadow"
+                      >
+                        <Avatar.Image
+                          src="https://a.ez-pp.farm/{playerId}"
+                          alt={playerName}
+                          class="h-full w-full object-cover"
+                        />
+                        <Avatar.Fallback
+                          class="flex h-full w-full items-center justify-center bg-theme-900 text-primary"
+                        >
+                          <ThemeIcon name="user" set={iconSet} size={20} />
+                        </Avatar.Fallback>
+                      </Avatar.Root>
+                      {#if country}
+                        <span
+                          class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-md border border-white/20 bg-black/90 px-1 py-0.5 text-[9px] leading-none shadow"
+                          title={country.toUpperCase()}
+                        >
+                          {countryCodeToEmoji(country)}
+                        </span>
+                      {/if}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-1.5">
+                        <span class="block truncate text-sm font-bold text-white">{playerName}</span
+                        >
+                        <span
+                          class="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold text-primary"
+                        >
+                          Lv.{levelVal}
+                        </span>
+                      </div>
+                      <span class="block text-[10px] font-medium text-muted-foreground">
+                        #{rankVal} · {ppVal}pp
+                      </span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 border-t border-white/5 pt-2 text-xs">
+                    <div
+                      class="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1"
+                    >
+                      <span class="text-[9px] font-medium text-muted-foreground">Accuracy</span>
+                      <span class="text-[11px] font-bold text-white">{accuracyVal.toFixed(1)}%</span
+                      >
+                    </div>
+                    <div
+                      class="flex items-center justify-between rounded-lg bg-white/5 px-2.5 py-1"
+                    >
+                      <span class="text-[9px] font-medium text-muted-foreground">Plays</span>
+                      <span class="text-[11px] font-bold text-white">{playsVal}</span>
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div
+                  class="flex h-full w-full flex-col justify-between rounded-2xl border border-white/10 bg-black/55 p-3.5 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="relative shrink-0">
+                        <Avatar.Root
+                          class="size-12 rounded-xl border border-white/15 bg-theme-900 shadow-md"
+                        >
+                          <Avatar.Image
+                            src="https://a.ez-pp.farm/{playerId}"
+                            alt={playerName}
+                            class="h-full w-full object-cover"
+                          />
+                          <Avatar.Fallback
+                            class="flex h-full w-full items-center justify-center bg-theme-900 text-primary"
+                          >
+                            <ThemeIcon name="user" set={iconSet} size={22} />
+                          </Avatar.Fallback>
+                        </Avatar.Root>
+                        {#if country}
+                          <span
+                            class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-md border border-white/20 bg-black/90 px-1 py-0.5 text-[10px] leading-none shadow"
+                            title={country.toUpperCase()}
+                          >
+                            {countryCodeToEmoji(country)}
+                          </span>
+                        {/if}
+                      </div>
+
+                      <div class="min-w-0 flex flex-col">
+                        <span class="block truncate text-sm font-bold text-white">{playerName}</span
+                        >
+                        <div class="flex items-center gap-2 mt-1">
+                          <span class="text-[11px] font-semibold text-white/80 shrink-0">
+                            Lv.{levelVal}
+                          </span>
+                          <div class="w-20 rounded-full bg-white/10 h-1.5 overflow-hidden">
+                            <div
+                              class="h-full bg-primary rounded-full transition-all"
+                              style="width: {levelProgress}%"
+                            ></div>
+                          </div>
+                          <span class="text-[10px] text-muted-foreground font-mono">
+                            {levelProgress}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 border-t border-white/5 pt-2 mt-2">
+                    <div class="rounded-xl bg-white/5 p-2 flex flex-col justify-center">
+                      <div class="flex items-center justify-between">
+                        <span class="text-[9px] font-medium text-muted-foreground">Rank</span>
+                        {#if countryRankVal}
+                          <span class="text-[9px] font-bold text-primary">#{countryRankVal}</span>
+                        {/if}
+                      </div>
+                      <span class="text-xs font-bold text-white mt-0.5">#{rankVal}</span>
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 p-2 flex flex-col justify-center">
+                      <span class="text-[9px] font-medium text-muted-foreground">Performance</span>
+                      <span class="text-xs font-bold text-primary mt-0.5">{ppVal}pp</span>
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 p-2 flex flex-col justify-center">
+                      <span class="text-[9px] font-medium text-muted-foreground">Accuracy</span>
+                      <span class="text-xs font-bold text-white mt-0.5"
+                        >{accuracyVal.toFixed(1)}%</span
+                      >
+                    </div>
+
+                    <div class="rounded-xl bg-white/5 p-2 flex flex-col justify-center">
+                      <span class="text-[9px] font-medium text-muted-foreground">Plays</span>
+                      <span class="text-xs font-bold text-white mt-0.5">{playsVal}</span>
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            {:else if element.widget === 'recent-activity'}
+              {@const event = $currentUserInfo?.events?.[0]}
+              {#if element.variant === 'minimal'}
+                <div
+                  class="flex h-full w-full items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  {#if event?.setId}
+                    <img
+                      src="https://assets.ppy.sh/beatmaps/{event.setId}/covers/cover.jpg"
+                      alt={event.title}
+                      class="size-10 shrink-0 rounded-lg object-cover"
+                    />
+                  {:else}
+                    <div
+                      class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-theme-900 text-primary"
+                    >
+                      <Trophy class="size-4" />
+                    </div>
+                  {/if}
+                  <div class="min-w-0 flex-1">
+                    <span class="block truncate text-xs font-bold text-white"
+                      >{event?.title ?? 'Space Pirates'}</span
+                    >
+                    <span class="block truncate text-[10px] text-muted-foreground">
+                      {event?.artist ?? 'Waterflame'} · {event
+                        ? formatRelativeTime(event.time)
+                        : '5d ago'}
+                    </span>
+                  </div>
+                  <span
+                    class="shrink-0 rounded border border-amber-300/40 bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-black text-amber-300"
+                  >
+                    {event?.grade ?? 'S'}
+                  </span>
+                </div>
+              {:else if element.variant === 'compact'}
+                <div
+                  class="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-black/55 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <div class="relative h-14 w-full shrink-0 overflow-hidden bg-theme-900/80">
+                    {#if event?.setId}
+                      <img
+                        src="https://assets.ppy.sh/beatmaps/{event.setId}/covers/cover.jpg"
+                        alt={event.title}
+                        class="h-full w-full object-cover"
+                      />
+                    {/if}
+                    <div
+                      class="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"
+                    ></div>
+                    <div class="absolute top-1.5 left-2 right-2 flex items-center justify-between">
+                      <span class="text-[9px] font-bold uppercase tracking-wider text-white/90"
+                        >Recent Activity</span
+                      >
+                      <span
+                        class="rounded border border-amber-300/40 bg-amber-400/20 px-1 py-0.2 text-[9px] font-black text-amber-300"
+                      >
+                        {event?.grade ?? 'S'}
+                      </span>
+                    </div>
+                    <div
+                      class="absolute bottom-1 left-2 right-2 truncate text-xs font-bold text-white"
+                    >
+                      {event?.title ?? 'Space Pirates'}
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between px-2.5 py-1.5 text-[10px]">
+                    <span class="max-w-[180px] truncate font-semibold text-primary"
+                      >[{event?.version ?? 'Galactic Thieves'}]</span
+                    >
+                    <span class="font-bold text-amber-300">Rank #{event?.rank ?? 1}</span>
+                  </div>
+                </div>
+              {:else}
+                <div
+                  class="relative flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-black/55 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <!-- Cover Banner -->
+                  <div class="relative h-20 w-full shrink-0 overflow-hidden bg-theme-900/80">
+                    {#if event?.setId}
+                      <img
+                        src="https://assets.ppy.sh/beatmaps/{event.setId}/covers/cover.jpg"
+                        alt={event.title}
+                        class="h-full w-full object-cover"
+                      />
+                    {/if}
+                    <div
+                      class="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"
+                    ></div>
+                    <div
+                      class="absolute top-2 left-2.5 right-2.5 flex items-center justify-between"
+                    >
+                      <span
+                        class="rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90"
+                      >
+                        Recent Activity
+                      </span>
+                      <span
+                        class="rounded border border-amber-300/40 bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-black text-amber-300"
+                      >
+                        {event?.grade ?? 'S'}
+                      </span>
+                    </div>
+                    <div class="absolute bottom-1.5 left-2.5 right-2.5 flex min-w-0 flex-col">
+                      <span class="truncate text-xs font-bold text-white"
+                        >{event?.title ?? 'Space Pirates'}</span
+                      >
+                      <span class="truncate text-[10px] text-white/70"
+                        >{event?.artist ?? 'Waterflame'}</span
+                      >
+                    </div>
+                  </div>
+
+                  <!-- Metrics Body -->
+                  <div class="flex flex-1 flex-col justify-center gap-2 p-2.5">
+                    <div class="flex items-center justify-between gap-1 text-[11px]">
+                      <span class="max-w-[180px] truncate font-semibold text-primary">
+                        [{event?.version ?? 'Galactic Thieves'}]
+                      </span>
+                      <div
+                        class="flex items-center gap-1 rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-300"
+                      >
+                        <Trophy class="size-3" />
+                        <span>Rank #{event?.rank ?? 1}</span>
+                      </div>
+                    </div>
+                    <div
+                      class="flex items-center justify-between border-t border-white/5 pt-1.5 text-[10px] text-muted-foreground"
+                    >
+                      <span class="flex items-center gap-1 font-mono">
+                        <Clock class="size-2.5" />
+                        {event ? formatRelativeTime(event.time) : '5d ago'}
+                      </span>
+                      <span class="text-white/60">ez-pp.farm</span>
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            {:else if element.widget === 'telemetry'}
+              <div
+                class="flex h-full w-full items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 text-xs text-white/80 backdrop-blur-md"
+              >
+                <div class="flex items-center gap-1">
+                  <ThemeIcon name="wifi" set={iconSet} class="size-3 text-emerald-400" />
+                  <span class="text-[10px]">{$themeGlobalData?.server?.ping ?? 19}ms</span>
+                </div>
+                <span
+                  class="rounded-full border border-white/5 bg-white/10 px-2 py-0.5 text-[9px] text-white/50"
+                >
+                  {$themeGlobalData?.osu?.stream ?? 'stable'}
+                </span>
+              </div>
+            {:else if element.widget === 'header'}
+              {#if element.variant === 'minimal'}
+                <div class="flex h-full items-center">
+                  <span
+                    class="theme-heading text-2xl font-extrabold tracking-tight drop-shadow-md text-theme-50"
+                  >
+                    EZPPLauncher
+                  </span>
+                </div>
+              {:else if element.variant === 'compact'}
+                <div class="flex h-full items-center gap-3">
+                  <span
+                    class="theme-heading text-2xl font-extrabold tracking-tight drop-shadow-md text-theme-50"
+                  >
+                    EZPPLauncher
+                  </span>
+                  <span
+                    class="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur-md"
+                  >
+                    {timeGreeting},
+                    <span class="font-semibold text-white">{$currentUser?.name ?? 'Guest'}</span>!
+                  </span>
+                </div>
+              {:else}
+                <div class="flex h-full flex-col justify-center">
+                  <span
+                    class="theme-heading text-3xl font-extrabold tracking-tight drop-shadow-md text-theme-50"
+                  >
+                    EZPPLauncher
+                  </span>
+                  <span class="text-xs font-medium text-white/70 drop-shadow mt-0.5">
+                    {timeGreeting},
+                    <span class="font-semibold text-white">{$currentUser?.name ?? 'Guest'}</span>!
+                  </span>
+                </div>
+              {/if}
+            {:else if element.widget === 'avatar'}
+              {@const shapeClass =
+                element.variant === 'rounded'
+                  ? 'rounded-2xl'
+                  : element.variant === 'square'
+                    ? 'rounded-md'
+                    : 'rounded-full'}
+              {@const playerId = $currentUser?.id ?? $currentUserInfo?.info?.id ?? 0}
+              {@const playerName = $currentUser?.name ?? 'Player'}
+              {@const country = $currentUserInfo?.info?.country}
+              {@const level = $currentUserInfo?.stats?.['0']?.level}
+              <div
+                class="group/avatar relative flex h-full w-full items-center justify-center {interactive
+                  ? ''
+                  : 'cursor-pointer'}"
+                role="button"
+                tabindex="0"
+                onclick={(e) => {
+                  if (!interactive && playerId) {
+                    e.stopPropagation();
+                    void openURL(`https://ez-pp.farm/u/${playerId}`);
+                  }
+                }}
+                onkeydown={(e) => {
+                  if (!interactive && playerId && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void openURL(`https://ez-pp.farm/u/${playerId}`);
+                  }
+                }}
+                title={playerName}
+              >
+                <!-- Online Glow Ring -->
+                {#if element.showOnlineRing !== false}
+                  <div
+                    class="absolute inset-0 {shapeClass} ring-2 ring-primary/40 ring-offset-2 ring-offset-black/50 transition-all duration-300 group-hover/avatar:ring-primary/80"
+                  ></div>
+                {/if}
+
+                <!-- Avatar Image / Fallback -->
+                <Avatar.Root
+                  class="h-full w-full {shapeClass} overflow-hidden border border-white/15 bg-theme-900 shadow-lg transition-transform duration-300 group-hover/avatar:scale-105"
+                >
+                  <Avatar.Image
+                    src="https://a.ez-pp.farm/{playerId}"
+                    alt={playerName}
+                    class="h-full w-full object-cover"
+                  />
+                  <Avatar.Fallback
+                    class="flex h-full w-full items-center justify-center bg-theme-900 text-primary"
+                  >
+                    <ThemeIcon
+                      name="user"
+                      set={iconSet}
+                      size={Math.max(
+                        16,
+                        Math.round(Math.min(element.width, element.height) * 0.45)
+                      )}
+                    />
+                  </Avatar.Fallback>
+                </Avatar.Root>
+
+                <!-- Country Flag Emoji Badge -->
+                {#if element.showCountry !== false && country}
+                  <span
+                    class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-md border border-white/20 bg-black/90 px-1 py-0.5 text-[10px] leading-none shadow-md backdrop-blur-sm"
+                    title={country.toUpperCase()}
+                  >
+                    {countryCodeToEmoji(country)}
+                  </span>
+                {/if}
+
+                <!-- Level Badge -->
+                {#if element.showLevel && level !== undefined}
+                  <span
+                    class="absolute -top-1 -left-1 flex items-center justify-center rounded-md border border-primary/40 bg-black/90 px-1 py-0.5 text-[9px] font-bold leading-none text-primary shadow-md"
+                  >
+                    Lv.{level}
+                  </span>
+                {/if}
+              </div>
             {/if}
           </div>
         {/if}

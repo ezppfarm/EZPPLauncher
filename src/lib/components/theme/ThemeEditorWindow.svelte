@@ -71,18 +71,26 @@
     createDefaultThemeV2,
     createThemeV2Behavior,
     createThemeV2Element,
+    normalizeChrome,
     normalizeThemeV2,
     themeAssetName,
+    themeHasLaunchButton,
     type ThemeV2Asset,
+    type ThemeV2Background,
     type ThemeV2BehaviorTarget,
+    type ThemeV2ButtonAction,
+    type ThemeV2Chrome,
     type ThemeV2Definition,
     type ThemeV2Element,
     type ThemeV2Font,
     type ThemeV2Group,
     type ThemeV2ImageElement,
+    type ThemeV2LayoutMode,
     type ThemeV2LottieElement,
     type ThemeV2ScriptValue,
     type ThemeV2VideoElement,
+    type ThemeV2WidgetElement,
+    type ThemeV2WidgetKind,
   } from '$lib/themeV2';
   import {
     exportThemeFolder,
@@ -94,7 +102,7 @@
   import type { EZPPUser, EZPPUserInfo } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import { osuInstallationPath } from '$lib/userSettings';
-  import { formatBytes } from '$lib/utils';
+  import { formatBytes, openURL } from '$lib/utils';
   import {
     AlertTriangle,
     Boxes,
@@ -105,6 +113,7 @@
     ChevronUp,
     ChevronsDown,
     ChevronsUp,
+    CircleUser,
     ClipboardPaste,
     Clock,
     Code2,
@@ -121,6 +130,7 @@
     Image as ImageIcon,
     Keyboard,
     Layers,
+    LayoutGrid,
     LoaderCircle,
     Lock,
     Maximize2,
@@ -230,6 +240,18 @@
 
   let definition = $state<ThemeV2Definition>(createDefaultThemeV2());
   let pickedAssets = $state<ThemeV2Asset[]>([]);
+  let lastImageBackground = $state<Extract<ThemeV2Background, { type: 'image' }> | undefined>(
+    undefined
+  );
+  let lastVideoBackground = $state<Extract<ThemeV2Background, { type: 'video' }> | undefined>(
+    undefined
+  );
+  let lastColorBackground = $state<Extract<ThemeV2Background, { type: 'color' }> | undefined>(
+    undefined
+  );
+  let lastGradientBackground = $state<Extract<ThemeV2Background, { type: 'gradient' }> | undefined>(
+    undefined
+  );
   let assetBase = $state('');
   let savedFolder = $state<string | undefined>(undefined);
   let editorFolderPath = $state<string | undefined>(undefined);
@@ -292,6 +314,46 @@
   const elements = $derived(definition.elements ?? []);
   const groups = $derived(definition.groups ?? []);
   const behaviors = $derived(definition.behaviors ?? []);
+  const themeChrome = $derived(
+    definition.chrome ?? normalizeChrome(undefined, definition.elements)
+  );
+  const hasValidLaunchButton = $derived(themeHasLaunchButton(definition));
+
+  function updateChrome<K extends keyof ThemeV2Chrome>(key: K, value: ThemeV2Chrome[K]) {
+    const current = definition.chrome ?? normalizeChrome(undefined, definition.elements);
+    definition.chrome = {
+      ...current,
+      [key]: value,
+    };
+  }
+
+  function setLayoutMode(mode: ThemeV2LayoutMode) {
+    const current = definition.chrome ?? normalizeChrome(undefined, definition.elements);
+    if (mode === 'dashboard') {
+      definition.chrome = {
+        ...current,
+        layoutMode: 'dashboard',
+        playerCard: true,
+        recentActivity: true,
+        pills: true,
+        dock: true,
+      };
+    } else if (mode === 'classic') {
+      definition.chrome = {
+        ...current,
+        layoutMode: 'classic',
+        playerCard: true,
+        recentActivity: false,
+        pills: false,
+        dock: true,
+      };
+    } else {
+      definition.chrome = {
+        ...current,
+        layoutMode: 'custom',
+      };
+    }
+  }
   const logicBadges = $derived.by(() => {
     const badges = new SvelteMap<string, { count: number; warning: boolean }>();
 
@@ -814,17 +876,24 @@
     if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId);
   }
 
-  const ensureDefaults = (theme: ThemeV2Definition): ThemeV2Definition => ({
-    ...theme,
-    typography: {
-      body: theme.typography?.body ?? 'Sora Variable',
-      heading: theme.typography?.heading ?? theme.typography?.body ?? 'Sora Variable',
-      ...(theme.typography?.mono ? { mono: theme.typography.mono } : {}),
-    },
-    fonts: theme.fonts ?? [],
-    elements: theme.elements ?? [],
-    groups: theme.groups ?? [],
-  });
+  const ensureDefaults = (theme: ThemeV2Definition): ThemeV2Definition => {
+    if (theme.background.type === 'image' && theme.background.src && !lastImageBackground) {
+      lastImageBackground = { ...theme.background };
+    } else if (theme.background.type === 'video' && theme.background.src && !lastVideoBackground) {
+      lastVideoBackground = { ...theme.background };
+    }
+    return {
+      ...theme,
+      typography: {
+        body: theme.typography?.body ?? 'Sora Variable',
+        heading: theme.typography?.heading ?? theme.typography?.body ?? 'Sora Variable',
+        ...(theme.typography?.mono ? { mono: theme.typography.mono } : {}),
+      },
+      fonts: theme.fonts ?? [],
+      elements: theme.elements ?? [],
+      groups: theme.groups ?? [],
+    };
+  };
 
   type EditorSnapshot = {
     definition: ThemeV2Definition;
@@ -1899,43 +1968,81 @@
 
   function setBackgroundType(type: ThemeV2Definition['background']['type']) {
     const current = definition.background;
+
+    // Cache the active background before switching
+    if (current.type === 'image' && current.src) {
+      lastImageBackground = { ...current };
+    } else if (current.type === 'video' && current.src) {
+      lastVideoBackground = { ...current };
+    } else if (current.type === 'color') {
+      lastColorBackground = { ...current };
+    } else if (current.type === 'gradient') {
+      lastGradientBackground = { ...current };
+    }
+
     const opacity = current.opacity ?? 1;
     const blur = current.type === 'image' || current.type === 'video' ? (current.blur ?? 0) : 0;
     const fit =
       current.type === 'image' || current.type === 'video' ? (current.fit ?? 'cover') : 'cover';
+
     if (type === 'color') {
       definition.background = {
-        type,
-        color: current.type === 'color' ? current.color : '#181825',
-        opacity,
+        type: 'color',
+        color: current.type === 'color' ? current.color : (lastColorBackground?.color ?? '#181825'),
+        opacity: lastColorBackground?.opacity ?? opacity,
       };
     } else if (type === 'gradient') {
       definition.background = {
-        type,
-        from: current.type === 'gradient' ? current.from : '#181825',
-        to: current.type === 'gradient' ? current.to : '#3b1d4f',
-        angle: current.type === 'gradient' ? (current.angle ?? 135) : 135,
-        opacity,
+        type: 'gradient',
+        from:
+          current.type === 'gradient' ? current.from : (lastGradientBackground?.from ?? '#181825'),
+        to: current.type === 'gradient' ? current.to : (lastGradientBackground?.to ?? '#3b1d4f'),
+        angle:
+          current.type === 'gradient'
+            ? (current.angle ?? 135)
+            : (lastGradientBackground?.angle ?? 135),
+        opacity: lastGradientBackground?.opacity ?? opacity,
       };
     } else if (type === 'video') {
+      const candidateVideo =
+        current.type === 'video' && current.src
+          ? current.src
+          : lastVideoBackground?.src ||
+            pickedAssets.find((a) => /\.(mp4|webm|ogv|mov)$/i.test(a.name))?.name ||
+            '';
+
       definition.background = {
-        type,
-        src: current.type === 'video' ? current.src : '',
-        fit,
-        opacity,
-        blur,
-        muted: current.type === 'video' ? current.muted !== false : true,
+        type: 'video',
+        src: candidateVideo,
+        fit: current.type === 'video' ? fit : (lastVideoBackground?.fit ?? fit),
+        opacity: current.type === 'video' ? opacity : (lastVideoBackground?.opacity ?? opacity),
+        blur: current.type === 'video' ? blur : (lastVideoBackground?.blur ?? blur),
+        muted:
+          current.type === 'video' ? current.muted !== false : lastVideoBackground?.muted !== false,
       };
+      if (candidateVideo) {
+        lastVideoBackground = { ...definition.background };
+      }
+      definition.audio = undefined;
     } else {
+      const candidateImage =
+        current.type === 'image' && current.src
+          ? current.src
+          : lastImageBackground?.src ||
+            pickedAssets.find((a) => /\.(png|jpg|jpeg|webp|gif|avif)$/i.test(a.name))?.name ||
+            '';
+
       definition.background = {
-        type,
-        src: current.type === 'image' ? current.src : '',
-        fit,
-        opacity,
-        blur,
+        type: 'image',
+        src: candidateImage,
+        fit: current.type === 'image' ? fit : (lastImageBackground?.fit ?? fit),
+        opacity: current.type === 'image' ? opacity : (lastImageBackground?.opacity ?? opacity),
+        blur: current.type === 'image' ? blur : (lastImageBackground?.blur ?? blur),
       };
+      if (candidateImage) {
+        lastImageBackground = { ...definition.background };
+      }
     }
-    if (type === 'video') definition.audio = undefined;
   }
 
   async function chooseBackground(type: 'image' | 'video') {
@@ -1947,7 +2054,7 @@
     const opacity = current.opacity ?? 1;
     const blur = current.type === 'image' || current.type === 'video' ? (current.blur ?? 0) : 0;
     if (type === 'video') {
-      definition.background = {
+      const bg: Extract<ThemeV2Background, { type: 'video' }> = {
         type,
         src: asset.name,
         fit,
@@ -1955,14 +2062,18 @@
         blur,
         muted: current.type === 'video' ? current.muted !== false : true,
       };
+      definition.background = bg;
+      lastVideoBackground = { ...bg };
     } else {
-      definition.background = {
+      const bg: Extract<ThemeV2Background, { type: 'image' }> = {
         type,
         src: asset.name,
         fit,
         opacity,
         blur,
       };
+      definition.background = bg;
+      lastImageBackground = { ...bg };
     }
   }
 
@@ -2101,13 +2212,223 @@
       | 'particles'
       | 'clock'
       | 'countdown'
+      | 'widget',
+    widgetKind: ThemeV2WidgetKind = 'launch-button'
   ) {
     const element = createThemeV2Element(type, elements.length);
+    if (element.type === 'widget') {
+      element.widget = widgetKind;
+      if (widgetKind === 'player-card') {
+        element.width = 380;
+        element.height = 230;
+      } else if (widgetKind === 'avatar') {
+        element.width = 72;
+        element.height = 72;
+        element.variant = 'circle';
+        element.showCountry = true;
+        element.showLevel = true;
+        element.showOnlineRing = true;
+      } else if (widgetKind === 'recent-activity') {
+        element.width = 340;
+        element.height = 230;
+      } else if (widgetKind === 'telemetry') {
+        element.width = 320;
+        element.height = 42;
+      } else if (widgetKind === 'header') {
+        element.width = 340;
+        element.height = 64;
+      } else if (widgetKind === 'launch-button') {
+        element.width = 210;
+        element.height = 48;
+      }
+    }
     if (selectedGroupId) element.groupId = selectedGroupId;
     definition.elements = [...elements, element];
     selectedGroupId = undefined;
     selectedIds = [element.id];
     leftTab = 'layers';
+  }
+
+  function handleDetachWidget(widgetKind: ThemeV2WidgetKind) {
+    const newElements = [...(definition.elements ?? [])];
+    const currentChrome = definition.chrome ?? normalizeChrome(undefined, newElements);
+
+    if (widgetKind === 'header') {
+      let existing = newElements.find((el) => el.type === 'widget' && el.widget === 'header');
+      if (!existing) {
+        const headerWidget = createThemeV2Element(
+          'widget',
+          newElements.length
+        ) as ThemeV2WidgetElement;
+        headerWidget.widget = 'header';
+        headerWidget.name = 'Header Title';
+        headerWidget.x = 88;
+        headerWidget.y = 28;
+        headerWidget.width = 320;
+        headerWidget.height = 64;
+        newElements.push(headerWidget);
+        existing = headerWidget;
+      }
+      definition.chrome = {
+        ...currentChrome,
+        layoutMode: 'custom',
+        header: false,
+      };
+      definition.elements = newElements;
+      selectedIds = [existing.id];
+      leftTab = 'layers';
+    } else if (widgetKind === 'launch-button') {
+      let existing = newElements.find(
+        (el) =>
+          (el.type === 'widget' && el.widget === 'launch-button') ||
+          (el.type === 'button' && el.action.type === 'launch')
+      );
+      if (!existing) {
+        const launchBtn = createThemeV2Element(
+          'widget',
+          newElements.length
+        ) as ThemeV2WidgetElement;
+        launchBtn.widget = 'launch-button';
+        launchBtn.name = 'Launch Button';
+        launchBtn.x = 740;
+        launchBtn.y = 575;
+        launchBtn.width = 210;
+        launchBtn.height = 48;
+        newElements.push(launchBtn);
+        existing = launchBtn;
+      }
+      definition.chrome = {
+        ...currentChrome,
+        layoutMode: 'custom',
+        dock: false,
+      };
+      definition.elements = newElements;
+      selectedIds = [existing.id];
+      leftTab = 'layers';
+    } else if (widgetKind === 'player-card') {
+      let existing = newElements.find((el) => el.type === 'widget' && el.widget === 'player-card');
+      if (!existing) {
+        const playerCard = createThemeV2Element(
+          'widget',
+          newElements.length
+        ) as ThemeV2WidgetElement;
+        playerCard.widget = 'player-card';
+        playerCard.name = 'Player Card';
+        playerCard.x = 100;
+        playerCard.y = 150;
+        playerCard.width = 380;
+        playerCard.height = 230;
+        newElements.push(playerCard);
+        existing = playerCard;
+      }
+      definition.chrome = {
+        ...currentChrome,
+        layoutMode: 'custom',
+        playerCard: false,
+      };
+      definition.elements = newElements;
+      selectedIds = [existing.id];
+      leftTab = 'layers';
+    } else if (widgetKind === 'avatar') {
+      let existing = newElements.find((el) => el.type === 'widget' && el.widget === 'avatar');
+      if (!existing) {
+        const avatarWidget = createThemeV2Element(
+          'widget',
+          newElements.length
+        ) as ThemeV2WidgetElement;
+        avatarWidget.widget = 'avatar';
+        avatarWidget.name = 'Player Avatar';
+        avatarWidget.x = 80;
+        avatarWidget.y = 80;
+        avatarWidget.width = 72;
+        avatarWidget.height = 72;
+        avatarWidget.variant = 'circle';
+        avatarWidget.showCountry = true;
+        avatarWidget.showLevel = true;
+        avatarWidget.showOnlineRing = true;
+        newElements.push(avatarWidget);
+        existing = avatarWidget;
+      }
+      definition.chrome = {
+        ...currentChrome,
+        layoutMode: 'custom',
+      };
+      definition.elements = newElements;
+      selectedIds = [existing.id];
+      leftTab = 'layers';
+    } else if (widgetKind === 'recent-activity') {
+      let existing = newElements.find(
+        (el) => el.type === 'widget' && el.widget === 'recent-activity'
+      );
+      if (!existing) {
+        const recentActivity = createThemeV2Element(
+          'widget',
+          newElements.length
+        ) as ThemeV2WidgetElement;
+        recentActivity.widget = 'recent-activity';
+        recentActivity.name = 'Recent Activity';
+        recentActivity.x = 510;
+        recentActivity.y = 150;
+        recentActivity.width = 340;
+        recentActivity.height = 230;
+        newElements.push(recentActivity);
+        existing = recentActivity;
+      }
+      definition.chrome = {
+        ...currentChrome,
+        layoutMode: 'custom',
+        recentActivity: false,
+      };
+      definition.elements = newElements;
+      selectedIds = [existing.id];
+      leftTab = 'layers';
+    }
+  }
+
+  function detachAllToCanvas() {
+    handleDetachWidget('header');
+    handleDetachWidget('launch-button');
+    handleDetachWidget('player-card');
+    handleDetachWidget('recent-activity');
+  }
+
+  function restoreNativeDock() {
+    const currentChrome = definition.chrome ?? normalizeChrome(undefined, definition.elements);
+    definition.chrome = {
+      ...currentChrome,
+      layoutMode: 'dashboard',
+      dock: true,
+      playerCard: true,
+      recentActivity: true,
+      header: true,
+    };
+  }
+
+  function handleTestButtonAction(action: ThemeV2ButtonAction) {
+    if (action.type === 'navigate') {
+      sileo.info({
+        title: 'Button Action Test',
+        description: `Navigates to screen "${action.screen}" in launcher.`,
+      });
+    } else if (action.type === 'launch') {
+      sileo.info({
+        title: 'Button Action Test',
+        description: 'Launches osu! game.',
+      });
+    } else if (action.type === 'url') {
+      if (action.url) {
+        sileo.info({
+          title: 'Button Action Test',
+          description: `Opens ${action.url}`,
+        });
+        void openURL(action.url);
+      } else {
+        sileo.warning({
+          title: 'Button Action Test',
+          description: 'No URL specified',
+        });
+      }
+    }
   }
 
   async function addLottie() {
@@ -2676,6 +2997,11 @@
     if (!definition.author.trim()) error('The theme needs an author.');
     if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(definition.version.trim())) {
       warning('The version should use semantic versioning, for example 1.0.0.');
+    }
+    if (!themeHasLaunchButton(definition)) {
+      error(
+        'A launch button is required to launch osu!. Keep the bottom dock visible or add a launch button widget to your canvas.'
+      );
     }
 
     const background = definition.background;
@@ -3276,6 +3602,31 @@
       <Timer />
       Add countdown
     </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => addLayer('widget', 'launch-button')}
+    >
+      <LayoutGrid />
+      Add launch button widget
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => addLayer('widget', 'player-card')}
+    >
+      <LayoutGrid />
+      Add player card widget
+    </ContextMenu.Item>
+    <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={() => addLayer('widget', 'avatar')}>
+      <CircleUser />
+      Add player avatar widget
+    </ContextMenu.Item>
+    <ContextMenu.Item
+      class="gap-2 py-1.5 text-[11px]"
+      onclick={() => addLayer('widget', 'recent-activity')}
+    >
+      <LayoutGrid />
+      Add recent activity widget
+    </ContextMenu.Item>
     <ContextMenu.Item class="gap-2 py-1.5 text-[11px]" onclick={addLottie}>
       <Film />
       Add Lottie animation
@@ -3620,6 +3971,34 @@
                     >
                       <Timer />
                       Countdown
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('widget', 'launch-button')}
+                    >
+                      <LayoutGrid />
+                      Launch Button Widget
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('widget', 'player-card')}
+                    >
+                      <LayoutGrid />
+                      Player Card Widget
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('widget', 'avatar')}
+                    >
+                      <CircleUser />
+                      Player Avatar Widget
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      class="gap-2 text-[11px]"
+                      onclick={() => addLayer('widget', 'recent-activity')}
+                    >
+                      <LayoutGrid />
+                      Recent Activity Widget
                     </DropdownMenu.Item>
                     <DropdownMenu.Item class="gap-2 text-[11px]" onclick={addLottie}>
                       <Film />
@@ -4500,6 +4879,191 @@
             onchange={setVariableDefault}
           />
 
+          <ThemeSection title="Launcher Layout & Chrome" contentClass="space-y-3 pt-2.5">
+            <div class="space-y-1.5">
+              <Label class={labelClass}>Layout Preset</Label>
+              <div class="grid grid-cols-3 gap-1 rounded-md bg-black/30 p-1">
+                {#each [{ value: 'dashboard', label: 'Dashboard' }, { value: 'classic', label: 'Classic' }, { value: 'custom', label: 'Custom' }] as mode (mode.value)}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="h-7 px-1 text-[10px] {themeChrome.layoutMode === mode.value
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'text-muted-foreground'}"
+                    onclick={() => setLayoutMode(mode.value as ThemeV2LayoutMode)}
+                  >
+                    {mode.label}
+                  </Button>
+                {/each}
+              </div>
+              <p class="text-[10px] leading-relaxed text-muted-foreground">
+                {#if themeChrome.layoutMode === 'dashboard'}
+                  Modern dashboard with large player card and recent activity highlights.
+                {:else if themeChrome.layoutMode === 'classic'}
+                  Original minimal layout with compact bottom-left stats and open canvas.
+                {:else}
+                  Custom freeform canvas: default cards are hidden so your layers take center stage.
+                {/if}
+              </p>
+            </div>
+
+            <!-- Freeform Moveable Elements Box -->
+            <div class="space-y-2 rounded-lg border border-primary/30 bg-primary/10 p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-theme-50">Moveable Canvas Elements</span>
+                <Badge variant="outline" class="border-primary/40 text-[9px] text-primary"
+                  >Freeform</Badge
+                >
+              </div>
+              <p class="text-[10px] leading-relaxed text-theme-200">
+                Convert the Launch button, Player card, and Activity card into draggable layers so
+                you can position them anywhere.
+              </p>
+              <div class="flex flex-col gap-1.5 pt-1">
+                <Button
+                  size="sm"
+                  class="h-7 bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                  onclick={detachAllToCanvas}
+                >
+                  ✨ Detach All to Canvas
+                </Button>
+                <div class="grid grid-cols-2 gap-1 pt-0.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 border-theme-700 bg-theme-900/50 text-[10px] hover:bg-theme-800"
+                    onclick={() => handleDetachWidget('header')}
+                  >
+                    Move Header Title
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 border-theme-700 bg-theme-900/50 text-[10px] hover:bg-theme-800"
+                    onclick={() => handleDetachWidget('launch-button')}
+                  >
+                    Move Launch Button
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 border-theme-700 bg-theme-900/50 text-[10px] hover:bg-theme-800"
+                    onclick={() => handleDetachWidget('player-card')}
+                  >
+                    Move Player Card
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 border-theme-700 bg-theme-900/50 text-[10px] hover:bg-theme-800"
+                    onclick={() => handleDetachWidget('avatar')}
+                  >
+                    Move Avatar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 border-theme-700 bg-theme-900/50 text-[10px] hover:bg-theme-800"
+                    onclick={() => handleDetachWidget('recent-activity')}
+                  >
+                    Move Activity Card
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="h-6 text-[10px] text-muted-foreground hover:text-white"
+                    onclick={restoreNativeDock}
+                  >
+                    Restore Dock
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2 border-t border-theme-800 pt-2">
+              <Label class="text-xs font-semibold text-theme-100">Component Visibility</Label>
+
+              <div class="space-y-2">
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-theme-200"
+                >
+                  <span>Header Title & Greeting</span>
+                  <Checkbox
+                    checked={themeChrome.header !== false}
+                    onCheckedChange={(c) => updateChrome('header', c === true)}
+                  />
+                </label>
+
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-theme-200"
+                >
+                  <span>Player Card</span>
+                  <Checkbox
+                    checked={themeChrome.playerCard !== false}
+                    onCheckedChange={(c) => updateChrome('playerCard', c === true)}
+                  />
+                </label>
+
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-theme-200"
+                >
+                  <span>Recent Activity Card</span>
+                  <Checkbox
+                    checked={themeChrome.recentActivity !== false}
+                    onCheckedChange={(c) => updateChrome('recentActivity', c === true)}
+                  />
+                </label>
+
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-theme-200"
+                >
+                  <span>Bottom Dock</span>
+                  <Checkbox
+                    checked={themeChrome.dock !== false}
+                    onCheckedChange={(c) => updateChrome('dock', c === true)}
+                  />
+                </label>
+
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-theme-200"
+                >
+                  <span>Dock Telemetry Chips</span>
+                  <Checkbox
+                    checked={themeChrome.dockTelemetry !== false}
+                    onCheckedChange={(c) => updateChrome('dockTelemetry', c === true)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <!-- Launch Button Requirement Indicator -->
+            <div
+              class="rounded-md border p-2.5 text-[11px] {hasValidLaunchButton
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}"
+            >
+              <div class="flex items-center gap-1.5 font-bold">
+                {#if hasValidLaunchButton}
+                  <CheckCircle2 class="size-3.5 text-emerald-400" />
+                  <span>Launch button satisfied</span>
+                {:else}
+                  <AlertTriangle class="size-3.5 text-amber-400" />
+                  <span>Launch button required!</span>
+                {/if}
+              </div>
+              <p class="mt-1 text-[10px] leading-relaxed opacity-85">
+                {#if hasValidLaunchButton}
+                  Theme includes osu! launch capability ({themeChrome.dock !== false
+                    ? 'via bottom dock'
+                    : 'via canvas launch widget'}).
+                {:else}
+                  osu! requires a launch button. Turn on the Bottom Dock or add a Launch Button
+                  widget to the canvas.
+                {/if}
+              </p>
+            </div>
+          </ThemeSection>
+
           <ThemeSection title="Background" contentClass="space-y-3 pt-2.5">
             <div class="grid grid-cols-4 gap-1 rounded-md bg-black/30 p-1">
               {#each backgroundTypes as option (option.value)}
@@ -4619,6 +5183,11 @@
                       definition.background.type === 'video'
                     ) {
                       definition.background.blur = value;
+                      if (definition.background.type === 'image' && lastImageBackground) {
+                        lastImageBackground.blur = value;
+                      } else if (definition.background.type === 'video' && lastVideoBackground) {
+                        lastVideoBackground.blur = value;
+                      }
                     }
                   }}
                 />
@@ -4632,7 +5201,13 @@
                       definition.background.type === 'image' ||
                       definition.background.type === 'video'
                     ) {
-                      definition.background.fit = checked ? 'contain' : 'cover';
+                      const fitVal = checked ? 'contain' : 'cover';
+                      definition.background.fit = fitVal;
+                      if (definition.background.type === 'image' && lastImageBackground) {
+                        lastImageBackground.fit = fitVal;
+                      } else if (definition.background.type === 'video' && lastVideoBackground) {
+                        lastVideoBackground.fit = fitVal;
+                      }
                     }
                   }}
                 />
@@ -4651,6 +5226,9 @@
                     onCheckedChange={(checked) => {
                       if (definition.background.type === 'video') {
                         definition.background.muted = checked === true;
+                        if (lastVideoBackground) {
+                          lastVideoBackground.muted = checked === true;
+                        }
                       }
                     }}
                   />
@@ -5157,6 +5735,8 @@
                     onpatchgroup={(id, patch) => patchGroup(id, patch)}
                     oncontext={(id) => prepareContextMenu(id)}
                     oncontextgroup={(id) => prepareGroupContextMenu(id)}
+                    ondetach={handleDetachWidget}
+                    onbuttonaction={handleTestButtonAction}
                   />
                 </div>
               </ContextMenu.Trigger>
@@ -5604,6 +6184,38 @@
             >
               <Film class="size-4 text-primary" />
               Lottie
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('widget', 'launch-button')}
+            >
+              <LayoutGrid class="size-4 text-primary" />
+              Launch Button
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('widget', 'player-card')}
+            >
+              <LayoutGrid class="size-4 text-primary" />
+              Player Card
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('widget', 'avatar')}
+            >
+              <CircleUser class="size-4 text-primary" />
+              Player Avatar
+            </Button>
+            <Button
+              variant="secondary"
+              class="h-auto flex-col gap-1 p-3 text-[10px]"
+              onclick={() => addLayer('widget', 'recent-activity')}
+            >
+              <LayoutGrid class="size-4 text-primary" />
+              Recent Activity
             </Button>
           </div>
 

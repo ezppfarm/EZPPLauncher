@@ -18,6 +18,8 @@
   import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
   import type { ThemeFontChoice } from '$lib/themeFonts';
   import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
+  import { openURL } from '$lib/utils';
+  import { sileo } from 'sileo';
   import {
     THEME_DATA_FIELDS,
     THEME_PARTICLE_PRESETS,
@@ -27,15 +29,20 @@
     type ThemeV2Element,
     type ThemeV2Group,
     type ThemeV2MaskShape,
+    type ThemeV2WidgetKind,
+    type ThemeV2WidgetVariant,
   } from '$lib/themeV2';
   import {
+    CircleUser,
     Clock,
     Component,
     Film,
     Gauge,
     Image as ImageIcon,
+    LayoutGrid,
     Megaphone,
     MousePointerClick,
+    Play,
     RefreshCw,
     Repeat,
     Shapes,
@@ -198,6 +205,12 @@
         <Clock class="size-4" />
       {:else if element.type === 'countdown'}
         <Timer class="size-4" />
+      {:else if element.type === 'widget'}
+        {#if element.widget === 'avatar'}
+          <CircleUser class="size-4" />
+        {:else}
+          <LayoutGrid class="size-4" />
+        {/if}
       {:else}
         <ImageIcon class="size-4" />
       {/if}
@@ -1593,6 +1606,46 @@
           </p>
         </div>
       {/if}
+
+      <div class="space-y-1.5 pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          class="w-full gap-2 border-theme-700 bg-theme-900/60 text-xs text-theme-100 hover:bg-theme-800"
+          onclick={() => {
+            if (element.action.type === 'navigate') {
+              sileo.info({
+                title: 'Button Action Test',
+                description: `Navigates to screen "${element.action.screen}"`,
+              });
+            } else if (element.action.type === 'launch') {
+              sileo.info({
+                title: 'Button Action Test',
+                description: 'Launches osu!',
+              });
+            } else if (element.action.type === 'url') {
+              if (element.action.url) {
+                sileo.info({
+                  title: 'Button Action Test',
+                  description: `Opens ${element.action.url}`,
+                });
+                void openURL(element.action.url);
+              } else {
+                sileo.warning({
+                  title: 'Button Action Test',
+                  description: 'No URL specified',
+                });
+              }
+            }
+          }}
+        >
+          <Play class="size-3.5 text-primary" />
+          Test Button Action
+        </Button>
+        <p class="text-[9px] leading-relaxed text-muted-foreground">
+          In editor mode, canvas clicks select layers for dragging. Test actions using this button, or Shift+click on canvas.
+        </p>
+      </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="space-y-1">
           <Label for="element-button-icon" class={label}>Icon</Label>
@@ -2164,6 +2217,296 @@
           />
         </div>
       </div>
+    </ThemeSection>
+  {:else if element.type === 'widget'}
+    <ThemeSection title="Widget" contentClass="space-y-3 pt-2.5">
+      <div class="space-y-1.5">
+        <Label for="element-widget-type" class={label}>Widget Type</Label>
+        <Select.Root
+          type="single"
+          value={element.widget}
+          onValueChange={(val) => {
+            if (val) {
+              element.widget = val as ThemeV2WidgetKind;
+              if (val === 'player-card') {
+                element.width = 380;
+                element.height = 180;
+              } else if (val === 'avatar') {
+                element.width = 72;
+                element.height = 72;
+                if (!element.variant) element.variant = 'circle';
+              } else if (val === 'recent-activity') {
+                element.width = 320;
+                element.height = 180;
+              } else if (val === 'telemetry') {
+                element.width = 320;
+                element.height = 42;
+              } else if (val === 'header') {
+                element.width = 320;
+                element.height = 64;
+              } else if (val === 'launch-button') {
+                element.width = 200;
+                element.height = 52;
+              }
+            }
+          }}
+        >
+          <Select.Trigger
+            id="element-widget-type"
+            class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
+          >
+            {element.widget === 'launch-button'
+              ? 'Launch Button'
+              : element.widget === 'player-card'
+                ? 'Player Card'
+                : element.widget === 'avatar'
+                  ? 'Player Avatar'
+                  : element.widget === 'recent-activity'
+                    ? 'Recent Activity'
+                    : element.widget === 'telemetry'
+                      ? 'Telemetry Bar'
+                      : 'Header Title'}
+          </Select.Trigger>
+          <Select.Content class="border-theme-800 bg-theme-950">
+            <Select.Item value="launch-button" label="Launch Button" />
+            <Select.Item value="player-card" label="Player Card" />
+            <Select.Item value="avatar" label="Player Avatar" />
+            <Select.Item value="recent-activity" label="Recent Activity" />
+            <Select.Item value="telemetry" label="Telemetry Bar" />
+            <Select.Item value="header" label="Header Title" />
+          </Select.Content>
+        </Select.Root>
+      </div>
+
+      <div class="space-y-1.5">
+        <Label for="element-widget-variant" class={label}>Variant</Label>
+        <Select.Root
+          type="single"
+          value={element.variant ??
+            (element.widget === 'avatar'
+              ? 'circle'
+              : element.widget === 'launch-button'
+                ? 'primary'
+                : 'full')}
+          onValueChange={(val) => {
+            if (val) {
+              element.variant = val as ThemeV2WidgetVariant;
+              if (element.widget === 'player-card') {
+                if (val === 'minimal') {
+                  element.width = 280;
+                  element.height = 64;
+                } else if (val === 'compact') {
+                  element.width = 340;
+                  element.height = 120;
+                } else if (val === 'full') {
+                  element.width = 380;
+                  element.height = 200;
+                }
+              } else if (element.widget === 'recent-activity') {
+                if (val === 'minimal') {
+                  element.width = 280;
+                  element.height = 64;
+                } else if (val === 'compact') {
+                  element.width = 340;
+                  element.height = 120;
+                } else if (val === 'full') {
+                  element.width = 340;
+                  element.height = 200;
+                }
+              } else if (element.widget === 'launch-button') {
+                if (val === 'icon-only') {
+                  element.width = 48;
+                  element.height = 48;
+                } else if (val === 'compact') {
+                  element.width = 140;
+                  element.height = 42;
+                } else if (val === 'primary') {
+                  element.width = 210;
+                  element.height = 48;
+                }
+              } else if (element.widget === 'header') {
+                if (val === 'minimal') {
+                  element.width = 240;
+                  element.height = 42;
+                } else if (val === 'compact') {
+                  element.width = 380;
+                  element.height = 48;
+                } else if (val === 'full') {
+                  element.width = 320;
+                  element.height = 64;
+                }
+              }
+            }
+          }}
+        >
+          <Select.Trigger
+            id="element-widget-variant"
+            class="h-8 border-theme-800 bg-theme-950 text-xs text-theme-50"
+          >
+            {#if element.widget === 'avatar'}
+              {element.variant === 'rounded'
+                ? 'Rounded Square'
+                : element.variant === 'square'
+                  ? 'Square'
+                  : 'Circle'}
+            {:else if element.widget === 'launch-button'}
+              {element.variant === 'compact'
+                ? 'Compact (Pill)'
+                : element.variant === 'icon-only'
+                  ? 'Icon-Only (Circle)'
+                  : 'Primary (Capsule)'}
+            {:else}
+              {element.variant === 'compact'
+                ? 'Compact'
+                : element.variant === 'minimal' || element.variant === 'icon-only'
+                  ? 'Minimal'
+                  : 'Full'}
+            {/if}
+          </Select.Trigger>
+          <Select.Content class="border-theme-800 bg-theme-950">
+            {#if element.widget === 'avatar'}
+              <Select.Item value="circle" label="Circle" />
+              <Select.Item value="rounded" label="Rounded Square" />
+              <Select.Item value="square" label="Square" />
+            {:else if element.widget === 'launch-button'}
+              <Select.Item value="primary" label="Primary (Capsule)" />
+              <Select.Item value="compact" label="Compact (Pill)" />
+              <Select.Item value="icon-only" label="Icon-Only (Circle)" />
+            {:else}
+              <Select.Item value="full" label="Full" />
+              <Select.Item value="compact" label="Compact" />
+              <Select.Item value="minimal" label="Minimal" />
+            {/if}
+          </Select.Content>
+        </Select.Root>
+      </div>
+
+      {#if element.widget === 'avatar'}
+        <div class="space-y-2 border-t border-theme-800 pt-2">
+          <Label class={label}>Avatar Display Options</Label>
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="element-avatar-country"
+                checked={element.showCountry !== false}
+                onCheckedChange={(checked) => (element.showCountry = checked === true)}
+              />
+              <Label
+                for="element-avatar-country"
+                class="text-[11px] font-normal text-muted-foreground"
+              >
+                Show Country Flag Badge
+              </Label>
+            </div>
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="element-avatar-level"
+                checked={element.showLevel !== false}
+                onCheckedChange={(checked) => (element.showLevel = checked === true)}
+              />
+              <Label
+                for="element-avatar-level"
+                class="text-[11px] font-normal text-muted-foreground"
+              >
+                Show Level Badge
+              </Label>
+            </div>
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="element-avatar-ring"
+                checked={element.showOnlineRing !== false}
+                onCheckedChange={(checked) => (element.showOnlineRing = checked === true)}
+              />
+              <Label
+                for="element-avatar-ring"
+                class="text-[11px] font-normal text-muted-foreground"
+              >
+                Online Status Glow Ring
+              </Label>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Quick Snap Position Presets for Widgets -->
+      <div class="space-y-1.5 border-t border-theme-800 pt-2">
+        <Label class={label}>Quick Position Snaps</Label>
+        <div class="grid grid-cols-2 gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 border-theme-800 bg-theme-900/40 text-[10px] hover:bg-theme-800"
+            onclick={() => {
+              element.x = 1000 - element.width - 24;
+              element.y = 650 - element.height - 24;
+            }}
+          >
+            ↘ Bottom-Right
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 border-theme-800 bg-theme-900/40 text-[10px] hover:bg-theme-800"
+            onclick={() => {
+              element.x = Math.round((1000 - element.width) / 2);
+              element.y = 650 - element.height - 24;
+            }}
+          >
+            ↓ Bottom-Center
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 border-theme-800 bg-theme-900/40 text-[10px] hover:bg-theme-800"
+            onclick={() => {
+              element.x = 24;
+              element.y = 650 - element.height - 24;
+            }}
+          >
+            ↙ Bottom-Left
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 border-theme-800 bg-theme-900/40 text-[10px] hover:bg-theme-800"
+            onclick={() => {
+              element.x = 1000 - element.width - 24;
+              element.y = 24;
+            }}
+          >
+            ↗ Top-Right
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="col-span-2 h-6 border-theme-800 bg-theme-900/40 text-[10px] hover:bg-theme-800"
+            onclick={() => {
+              element.x = Math.round((1000 - element.width) / 2);
+              element.y = Math.round((650 - element.height) / 2);
+            }}
+          >
+            ⊙ Center on Canvas
+          </Button>
+        </div>
+      </div>
+
+      <p class="text-[9px] leading-relaxed text-muted-foreground">
+        {#if element.widget === 'launch-button'}
+          Interactive game launch button. Satisfies the required Launch button condition.
+        {:else if element.widget === 'player-card'}
+          Live stats card displaying rank, pp, accuracy, level, and playcount.
+        {:else if element.widget === 'avatar'}
+          Player avatar with live profile image, shape styles, country badge, and online ring.
+        {:else if element.widget === 'recent-activity'}
+          Highlights the player's latest play, beatmap cover art, and grade badge.
+        {:else if element.widget === 'telemetry'}
+          Pill bar showing beatmap counts, skin counts, ping, and osu! build.
+        {:else if element.widget === 'header'}
+          Launcher title and dynamic greeting. Full shows title and subtitle, Compact shows an inline pill greeting, and Minimal displays title only.
+        {:else}
+          Launcher title and dynamic greeting.
+        {/if}
+      </p>
     </ThemeSection>
   {/if}
 

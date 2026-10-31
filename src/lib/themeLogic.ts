@@ -26,6 +26,24 @@ export const themeElementLabel = (element: ThemeV2Element): string => {
   if (element.type === 'countdown')
     return element.target ? `Countdown · ${element.target}` : 'Countdown';
   if (element.type === 'svelte') return 'Svelte component';
+  if (element.type === 'widget') {
+    switch (element.widget) {
+      case 'launch-button':
+        return 'Launch button widget';
+      case 'player-card':
+        return 'Player card widget';
+      case 'recent-activity':
+        return 'Recent activity widget';
+      case 'telemetry':
+        return 'Telemetry bar widget';
+      case 'header':
+        return 'Header widget';
+      case 'avatar':
+        return 'Player avatar widget';
+      default:
+        return 'Widget';
+    }
+  }
   return element.src.split('/').pop() || element.type;
 };
 

@@ -510,6 +510,33 @@ export type ThemeV2SvelteElement = ThemeV2ElementBase & {
   source: string;
 };
 
+export type ThemeV2WidgetKind =
+  | 'player-card'
+  | 'recent-activity'
+  | 'launch-button'
+  | 'telemetry'
+  | 'header'
+  | 'avatar';
+
+export type ThemeV2WidgetVariant =
+  | 'primary'
+  | 'full'
+  | 'compact'
+  | 'minimal'
+  | 'icon-only'
+  | 'circle'
+  | 'rounded'
+  | 'square';
+
+export type ThemeV2WidgetElement = ThemeV2ElementBase & {
+  type: 'widget';
+  widget: ThemeV2WidgetKind;
+  variant?: ThemeV2WidgetVariant;
+  showCountry?: boolean;
+  showLevel?: boolean;
+  showOnlineRing?: boolean;
+};
+
 export type ThemeV2Element =
   | ThemeV2TextElement
   | ThemeV2DataElement
@@ -526,7 +553,20 @@ export type ThemeV2Element =
   | ThemeV2ParticlesElement
   | ThemeV2ClockElement
   | ThemeV2CountdownElement
-  | ThemeV2SvelteElement;
+  | ThemeV2SvelteElement
+  | ThemeV2WidgetElement;
+
+export type ThemeV2LayoutMode = 'dashboard' | 'classic' | 'custom';
+
+export type ThemeV2Chrome = {
+  layoutMode?: ThemeV2LayoutMode;
+  header?: boolean;
+  pills?: boolean;
+  playerCard?: boolean;
+  recentActivity?: boolean;
+  dock?: boolean;
+  dockTelemetry?: boolean;
+};
 
 export type ThemeV2ScriptScreen = 'home' | 'themes' | 'settings' | 'login';
 export type ThemeV2ScriptValue = string | number | boolean;
@@ -624,6 +664,8 @@ export type ThemeV2Definition = {
   accentColor?: string;
   /** Optional CSS appended after the launcher's own styles. */
   css?: string;
+  /** Launcher page layout mode and visibility of chrome components. */
+  chrome?: ThemeV2Chrome;
 };
 
 export type ThemeV2Asset = {
@@ -912,6 +954,7 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
       'clock',
       'countdown',
       'svelte',
+      'widget',
     ] as const,
     'text'
   );
@@ -932,7 +975,7 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
     opacity: clamp(source.opacity, 1, 0, 1),
     hidden: source.hidden === true,
     locked: source.locked === true,
-    interactive: source.interactive === true,
+    interactive: source.interactive === true || type === 'button' || type === 'widget',
     groupId: typeof source.groupId === 'string' ? source.groupId.slice(0, 64) : undefined,
     filters: normalizeFilters(source.filters),
     mask: normalizeMask(source.mask),
@@ -1187,6 +1230,41 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
         typeof source.source === 'string'
           ? source.source.slice(0, 100_000)
           : DEFAULT_THEME_SVELTE_SOURCE,
+    };
+  }
+
+  if (type === 'widget') {
+    const widget = oneOf(
+      source.widget,
+      ['player-card', 'recent-activity', 'launch-button', 'telemetry', 'header', 'avatar'] as const,
+      'launch-button'
+    );
+    const variant = oneOf(
+      source.variant,
+      [
+        'primary',
+        'full',
+        'compact',
+        'minimal',
+        'icon-only',
+        'circle',
+        'rounded',
+        'square',
+      ] as const,
+      widget === 'launch-button' ? 'primary' : widget === 'avatar' ? 'circle' : 'full'
+    );
+    const showCountry = typeof source.showCountry === 'boolean' ? source.showCountry : true;
+    const showLevel = typeof source.showLevel === 'boolean' ? source.showLevel : false;
+    const showOnlineRing =
+      typeof source.showOnlineRing === 'boolean' ? source.showOnlineRing : true;
+    return {
+      ...base,
+      type,
+      widget,
+      variant,
+      showCountry,
+      showLevel,
+      showOnlineRing,
     };
   }
 
@@ -1518,7 +1596,15 @@ export const createThemeV2Element = (type: ThemeV2Element['type'], index = 0): T
   }
   if (type === 'button') {
     return normalizeElement(
-      { ...base, type, label: 'Open themes', width: 220, height: 52, y: 320 },
+      {
+        ...base,
+        type,
+        label: 'Open themes',
+        action: { type: 'navigate', screen: 'themes' },
+        width: 220,
+        height: 52,
+        y: 320,
+      },
       index
     )! as ThemeV2ButtonElement;
   }
@@ -1572,6 +1658,18 @@ export const createThemeV2Element = (type: ThemeV2Element['type'], index = 0): T
       index
     )! as ThemeV2SvelteElement;
   }
+  if (type === 'widget') {
+    return normalizeElement(
+      {
+        ...base,
+        type,
+        widget: 'launch-button',
+        width: 220,
+        height: 60,
+      },
+      index
+    )! as ThemeV2WidgetElement;
+  }
   return normalizeElement(
     { ...base, type, text: 'Your text', fontSize: 40, width: 420, height: 90 },
     index
@@ -1580,6 +1678,58 @@ export const createThemeV2Element = (type: ThemeV2Element['type'], index = 0): T
 
 export const isThemeV2 = (apiVersion: unknown) =>
   typeof apiVersion === 'string' && apiVersion.split('.')[0] === '2';
+
+export const normalizeChrome = (raw: unknown, elements: ThemeV2Element[] = []): ThemeV2Chrome => {
+  const hasCustomElements = elements.length > 0;
+  if (!raw || typeof raw !== 'object') {
+    if (hasCustomElements) {
+      return {
+        layoutMode: 'classic',
+        header: true,
+        pills: false,
+        playerCard: true,
+        recentActivity: false,
+        dock: true,
+        dockTelemetry: true,
+      };
+    }
+    return {
+      layoutMode: 'dashboard',
+      header: true,
+      pills: true,
+      playerCard: true,
+      recentActivity: true,
+      dock: true,
+      dockTelemetry: true,
+    };
+  }
+  const source = raw as Record<string, unknown>;
+  const layoutMode = oneOf(
+    source.layoutMode,
+    ['dashboard', 'classic', 'custom'] as const,
+    hasCustomElements ? 'classic' : 'dashboard'
+  );
+  return {
+    layoutMode,
+    header: source.header !== false,
+    pills: source.pills !== false,
+    playerCard: source.playerCard !== false,
+    recentActivity: source.recentActivity !== false,
+    dock: source.dock !== false,
+    dockTelemetry: source.dockTelemetry !== false,
+  };
+};
+
+export const themeHasLaunchButton = (
+  definition: Pick<ThemeV2Definition, 'elements' | 'chrome'>
+): boolean => {
+  if (definition.chrome?.dock !== false) return true;
+  return definition.elements.some(
+    (el) =>
+      (el.type === 'widget' && el.widget === 'launch-button') ||
+      (el.type === 'button' && el.action.type === 'launch')
+  );
+};
 
 export const createDefaultThemeV2 = (): ThemeV2Definition => ({
   name: 'Untitled theme',
@@ -1617,6 +1767,15 @@ export const createDefaultThemeV2 = (): ThemeV2Definition => ({
   behaviors: [],
   accentColor: '#ff006e',
   css: '',
+  chrome: {
+    layoutMode: 'dashboard',
+    header: true,
+    pills: true,
+    playerCard: true,
+    recentActivity: true,
+    dock: true,
+    dockTelemetry: true,
+  },
 });
 
 /** Coerce a theme.json payload into the supported v2 shape. */
@@ -1731,6 +1890,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
     variables: normalizeVariableDefaults(raw.variables),
     accentColor: color(raw.accentColor, '#ff006e'),
     css: typeof raw.css === 'string' ? raw.css : '',
+    chrome: normalizeChrome(raw.chrome, elements),
   };
 };
 

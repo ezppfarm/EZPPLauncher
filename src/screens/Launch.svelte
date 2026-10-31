@@ -104,9 +104,11 @@
   } from '$lib/themeScript';
   import { isThemeTrusted, themeCodeKind, trustTheme } from '$lib/themeTrust';
   import {
+    normalizeChrome,
     themeAssetUrl,
     themeV2ThumbnailStyle,
     type ThemeV2ButtonAction,
+    type ThemeV2Chrome,
     type ThemeV2Definition,
     type ThemeV2ScriptScreen,
   } from '$lib/themeV2';
@@ -148,6 +150,17 @@
     setCurrentTimeGlobalMedia,
     urlIsValidImage,
   } from '$lib/utils';
+  import {
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    ExternalLink,
+    Medal,
+    Sparkles,
+    TrendingDown,
+    TrendingUp,
+    Trophy,
+  } from '@lucide/svelte';
   import NumberFlow from '@number-flow/svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -619,15 +632,163 @@
   let downloadingEZPPFiles = $state(false);
   let cleanup = $state(false);
 
+  let customGamemode = $state<number | undefined>(undefined);
   let selectedGamemode = $derived(
-    getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
+    customGamemode ?? getGamemodeInt(modeIntToStr($preferredMode), typeIntToStr($preferredType))
   );
   let selectedMode = $derived(getModeAndTypeFromGamemode(selectedGamemode).mode);
   let selectedType = $derived(getModeAndTypeFromGamemode(selectedGamemode).type);
 
   const updateGamemode = (newGamemode: string) => {
-    selectedGamemode = Number(newGamemode);
+    customGamemode = Number(newGamemode);
   };
+
+  const currentStats = $derived($currentUserInfo?.stats?.[selectedGamemode]);
+  let recentActivityIndex = $state(0);
+  const userEvents = $derived($currentUserInfo?.events ?? []);
+  const safeEventIndex = $derived(
+    userEvents.length === 0 ? 0 : Math.min(recentActivityIndex, userEvents.length - 1)
+  );
+  const activeEvent = $derived(userEvents[safeEventIndex]);
+  const latestEvent = $derived(activeEvent ?? userEvents[0]);
+
+  const timeGreeting = $derived.by(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  });
+
+  const countryCodeToEmoji = (code?: string): string => {
+    if (!code || code.length !== 2) return '🌐';
+    const codePoints = code
+      .toUpperCase()
+      .split('')
+      .map((c) => 127397 + c.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  };
+
+  const formatRelativeTime = (dateOrTimestamp: Date | string | number | undefined): string => {
+    if (!dateOrTimestamp) return '';
+    const date = typeof dateOrTimestamp === 'object' ? dateOrTimestamp : new Date(dateOrTimestamp);
+    if (isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+    if (diffSeconds < 60) return 'just now';
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const gradeBadgeStyle = (
+    grade?: string
+  ): { bg: string; text: string; glow: string; label: string } => {
+    const g = grade?.toUpperCase() ?? '';
+    switch (g) {
+      case 'XH':
+        return {
+          bg: 'bg-cyan-500/20 border-cyan-400/50',
+          text: 'text-cyan-300',
+          glow: 'shadow-[0_0_12px_rgba(34,211,238,0.35)]',
+          label: 'SS',
+        };
+      case 'X':
+        return {
+          bg: 'bg-amber-400/20 border-amber-300/50',
+          text: 'text-amber-300',
+          glow: 'shadow-[0_0_12px_rgba(251,191,36,0.35)]',
+          label: 'SS',
+        };
+      case 'SH':
+        return {
+          bg: 'bg-slate-300/20 border-slate-200/50',
+          text: 'text-slate-100',
+          glow: 'shadow-[0_0_12px_rgba(241,245,249,0.25)]',
+          label: 'S',
+        };
+      case 'S':
+        return {
+          bg: 'bg-amber-500/20 border-amber-400/50',
+          text: 'text-amber-400',
+          glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]',
+          label: 'S',
+        };
+      case 'A':
+        return {
+          bg: 'bg-emerald-500/20 border-emerald-400/50',
+          text: 'text-emerald-400',
+          glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]',
+          label: 'A',
+        };
+      case 'B':
+        return {
+          bg: 'bg-blue-500/20 border-blue-400/50',
+          text: 'text-blue-400',
+          glow: 'shadow-[0_0_12px_rgba(96,165,250,0.35)]',
+          label: 'B',
+        };
+      case 'C':
+        return {
+          bg: 'bg-purple-500/20 border-purple-400/50',
+          text: 'text-purple-400',
+          glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]',
+          label: 'C',
+        };
+      case 'D':
+      case 'F':
+        return {
+          bg: 'bg-rose-500/20 border-rose-400/50',
+          text: 'text-rose-400',
+          glow: 'shadow-[0_0_12px_rgba(251,113,133,0.35)]',
+          label: g || 'D',
+        };
+      default:
+        return {
+          bg: 'bg-white/10 border-white/20',
+          text: 'text-white/80',
+          glow: '',
+          label: g || '-',
+        };
+    }
+  };
+
+  const openDiscordPresenceEditor = async () => {
+    try {
+      await invoke('open_presence_editor');
+    } catch {
+      presenceEditorOpen = true;
+    }
+  };
+
+  const activeChrome = $derived.by<ThemeV2Chrome>(() => {
+    const def = $active_custom_theme?.definition;
+    if (!def) {
+      return {
+        layoutMode: 'dashboard',
+        header: true,
+        pills: true,
+        playerCard: true,
+        recentActivity: true,
+        dock: true,
+        dockTelemetry: true,
+      };
+    }
+    return normalizeChrome(def.chrome, def.elements);
+  });
+
+  const hasThemeLaunchButton = $derived.by<boolean>(() => {
+    const def = $active_custom_theme?.definition;
+    if (!def) return false;
+    return def.elements.some(
+      (el) =>
+        (el.type === 'widget' && el.widget === 'launch-button') ||
+        (el.type === 'button' && el.action.type === 'launch')
+    );
+  });
 
   const browse_osu_installation = async () => {
     const selectedPath = await pickOsuInstallation($platform);
@@ -1906,7 +2067,7 @@
   <div class="z-10 h-full overflow-hidden">
     {#if selectedView === 'HOME'}
       <div
-        class="flex flex-col-reverse h-full"
+        class="flex flex-col h-full justify-between overflow-hidden relative select-none"
         in:fly={{
           duration: $reduceAnimations ? 0 : 400,
           delay: $reduceAnimations ? 0 : 400,
@@ -1915,317 +2076,875 @@
         }}
         out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
       >
-        <div
-          class="relative z-10 px-8 py-4 flex items-center justify-between bg-black/40 backdrop-blur-sm border-t border-t-theme-900"
-        >
-          <div class="flex items-center gap-4">
-            {#if $osuInstallationPath !== ''}
-              <div class="flex items-center gap-2">
-                <ThemeIcon name="music" set={iconSet} class="size-3.5 text-blue-400" />
-                <span class="text-[11px] text-white/70 font-medium">
-                  {#if !$beatmapSets && $beatmapSets !== 0}
-                    <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
-                  {:else}
-                    {numberHumanReadable($beatmapSets ?? 0)}
-                  {/if}
+        <!-- Header: Branding & Quick Status Pills -->
+        {#if activeChrome.header !== false}
+          <div class="px-8 pt-7 pb-2 shrink-0 z-10 flex items-start justify-between gap-4">
+            <div class="flex flex-col">
+              <div class="flex items-center gap-2.5">
+                <span
+                  class="theme-heading text-3xl font-extrabold tracking-tight drop-shadow-md text-theme-50"
+                >
+                  EZPPLauncher
                 </span>
               </div>
-              <div class="flex items-center gap-2">
-                <ThemeIcon name="brush" set={iconSet} class="size-3.5 text-amber-400" />
-                <span class="text-[11px] text-white/70 font-medium">
-                  {#if !$skinsCount && $skinsCount !== 0}
-                    <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
-                  {:else}
-                    {numberHumanReadable($skinsCount ?? 0)}
-                  {/if}
-                </span>
-              </div>
-            {/if}
-            <div class="flex items-center gap-2">
-              {#if $serverConnectionFails > 1}
-                <ThemeIcon name="wifi-off" set={iconSet} class="size-3.5 text-red-400" />
-              {:else}
-                <ThemeIcon name="wifi" set={iconSet} class="size-3.5 text-emerald-400" />
-              {/if}
-              <span class="relative text-[11px] text-white/70 font-medium">
-                <div
-                  class="absolute top-0.5 left-1/2 -translate-x-1/2 {!$serverPing ||
-                  $serverConnectionFails > 1
-                    ? 'opacity-100'
-                    : 'opacity-0'} transition-opacity duration-1000"
-                >
-                  <ThemeIcon name="loader" set={iconSet} class="size-3.5 animate-spin" />
-                </div>
-                <div
-                  class="{!$serverPing || $serverConnectionFails > 1
-                    ? 'opacity-0'
-                    : 'opacity-100'} transition-opacity duration-1000"
-                >
-                  {#if $reduceAnimations}
-                    <span>{$serverPing}ms</span>
-                  {:else}
-                    <NumberFlow value={$serverPing ?? 0} trend={0} suffix="ms" />
-                  {/if}
-                </div>
+              <span class="text-xs font-medium text-white/70 drop-shadow mt-0.5">
+                {timeGreeting},
+                <span class="text-white font-semibold">{$currentUser?.name ?? 'Guest'}</span>!
               </span>
             </div>
-
-            {#if $osuInstallationPath !== ''}
-              <div class="w-px h-4 bg-white/10"></div>
-
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 border border-white/6"
-              >
-                {#if $osuStream}
-                  {releaseStreamToReadable($osuStream)}
-                {:else}
-                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
-                {/if}
-              </span>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 font-mono border border-white/6"
-              >
-                {#if $osuBuild}
-                  {$osuBuild}
-                {:else}
-                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
-                {/if}
-              </span>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/20"
-              >
-                {#if $currentSkin}
-                  {#if $currentSkin.length > 23}
-                    {$currentSkin.slice(0, 23) + '...'}
-                  {:else}
-                    {$currentSkin}
-                  {/if}
-                {:else}
-                  <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
-                {/if}
-              </span>
-            {/if}
           </div>
+        {:else}
+          <div></div>
+        {/if}
 
-          <DownloadButton
-            downloading={$launching}
-            {progress}
-            text={$launching
-              ? downloadingEZPPFiles
-                ? 'Downloading...'
-                : cleanup
-                  ? 'Cleaning up...'
-                  : 'Launching...'
-              : $serverConnectionFails > 1
-                ? 'No connection'
-                : $osuInstallationPath === ''
-                  ? 'Hmmm..'
-                  : 'Launch'}
-            subtext={$launching && !cleanup
-              ? launchInfo
-              : $osuInstallationPath === ''
-                ? 'osu! path is not set!'
-                : $serverConnectionFails > 1
-                  ? 'No connection...'
-                  : undefined}
-            disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
-            {iconSet}
-            onClick={async () => await launch()}
-          />
-        </div>
-        <div class="relative h-50">
-          {#if $currentUserInfo}
-            <div
-              class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center p-3 absolute top-0 left-0"
-              in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
-              out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
-            >
-              <Select.Root
-                type="single"
-                value={selectedGamemode.toFixed()}
-                onValueChange={updateGamemode}
-              >
-                <Select.Trigger
-                  class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 text-muted-foreground! font-semibold"
-                >
-                  <div class="flex flex-row items-center gap-2">
-                    {#if selectedMode === 0}
-                      <ThemeIcon
-                        name="osu-standard"
-                        set={iconSet}
-                        size={16}
-                        class="text-theme-200"
-                      />
-                    {:else if selectedMode === 1}
-                      <ThemeIcon name="osu-taiko" set={iconSet} size={16} class="text-theme-200" />
-                    {:else if selectedMode === 2}
-                      <ThemeIcon name="osu-catch" set={iconSet} size={16} class="text-theme-200" />
-                    {:else if selectedMode === 3}
-                      <ThemeIcon name="osu-mania" set={iconSet} size={16} class="text-theme-200" />
-                    {/if}
-                    {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
-                  </div>
-                </Select.Trigger>
-                <Select.Content class="bg-theme-950 border border-theme-900 rounded-lg max-h-72">
-                  {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
-                    {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
-                    <Select.Item value={gamemode.toFixed()}>
-                      <div class="flex flex-row gap-2 items-center">
-                        {#if gamemod.mode === 0}
-                          <ThemeIcon name="osu-standard" set={iconSet} size={16} />
-                        {:else if gamemod.mode === 1}
-                          <ThemeIcon name="osu-taiko" set={iconSet} size={16} />
-                        {:else if gamemod.mode === 2}
-                          <ThemeIcon name="osu-catch" set={iconSet} size={16} />
-                        {:else if gamemod.mode === 3}
-                          <ThemeIcon name="osu-mania" set={iconSet} size={16} />
-                        {/if}
-                        {getGamemodeName(modeIntToStr(gamemod.mode), typeIntToStr(gamemod.type))}
+        <!-- Center Area: Configurable Cards / Classic Mode / Canvas -->
+        {#if activeChrome.layoutMode === 'dashboard'}
+          {#if activeChrome.playerCard !== false || activeChrome.recentActivity !== false}
+            <div class="px-8 py-2 my-auto z-10 flex flex-row items-stretch gap-5 w-full max-w-4xl">
+              {#if activeChrome.playerCard !== false}
+                {#if $currentUserInfo}
+                  <!-- Enhanced Player Card -->
+                  <div
+                    class="flex-1 min-w-[340px] max-w-[460px] bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 p-4.5 flex flex-col justify-between gap-3 shadow-xl"
+                    in:fly={{ duration: $reduceAnimations ? 0 : 350, y: 8, opacity: 0 }}
+                  >
+                    <!-- Player Card Header -->
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="relative shrink-0">
+                          <Avatar.Root class="size-12 rounded-xl border border-white/15 shadow-md">
+                            <Avatar.Image
+                              src="https://a.ez-pp.farm/{$currentUser?.id ?? 0}"
+                              alt={$currentUser?.name ?? 'Player'}
+                            />
+                            <Avatar.Fallback class="bg-theme-900 rounded-xl">
+                              <ThemeIcon name="user" set={iconSet} size={22} />
+                            </Avatar.Fallback>
+                          </Avatar.Root>
+                          {#if $currentUserInfo.info.country}
+                            <span
+                              class="absolute -bottom-1 -right-1 flex items-center justify-center text-[11px] leading-none rounded-md bg-black/90 px-1 py-0.5 border border-white/20 shadow"
+                              title={$currentUserInfo.info.country.toUpperCase()}
+                            >
+                              {countryCodeToEmoji($currentUserInfo.info.country)}
+                            </span>
+                          {/if}
+                        </div>
+
+                        <div class="min-w-0 flex flex-col">
+                          <div class="flex items-center gap-1.5">
+                            <span
+                              class="font-bold text-sm text-theme-50 truncate"
+                              title={$currentUser?.name}
+                            >
+                              {$currentUser?.name ?? 'Player'}
+                            </span>
+                            <button
+                              type="button"
+                              class="text-muted-foreground hover:text-primary transition-colors p-0.5 rounded cursor-pointer"
+                              title="View profile on ez-pp.farm"
+                              onclick={() =>
+                                openURL(`https://ez-pp.farm/u/${$currentUserInfo.info.id}`)}
+                            >
+                              <ExternalLink class="size-3" />
+                            </button>
+                          </div>
+
+                          <!-- Level & Progress Bar -->
+                          <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[11px] font-semibold text-white/80 shrink-0">
+                              Lv.{currentStats?.level ?? 1}
+                            </span>
+                            <div class="w-24">
+                              <Progress
+                                value={currentStats?.level_progress ?? 0}
+                                max={100}
+                                class="h-1.5 bg-white/10"
+                              />
+                            </div>
+                            <span class="text-[10px] text-muted-foreground font-mono">
+                              {currentStats?.level_progress ?? 0}%
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-              <div class="grid grid-cols-2 gap-2 w-full m-3">
-                <div class="flex flex-col">
-                  <span class="text-xs text-muted-foreground font-semibold">Rank</span>
-                  <div class="flex items-center h-full font-semibold text-theme-50">
-                    {#if $currentUserInfo}
-                      <div in:fade>
-                        {#if $reduceAnimations}
-                          <span>
-                            #{numberHumanReadable(
-                              $currentUserInfo.stats[selectedGamemode].rank ?? 0
+
+                      <!-- Mode Selector Dropdown -->
+                      <div class="shrink-0">
+                        <Select.Root
+                          type="single"
+                          value={selectedGamemode.toFixed()}
+                          onValueChange={updateGamemode}
+                        >
+                          <Select.Trigger
+                            class="h-8 border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold px-2.5 rounded-lg text-theme-100"
+                          >
+                            <div class="flex flex-row items-center gap-1.5">
+                              {#if selectedMode === 0}
+                                <ThemeIcon
+                                  name="osu-standard"
+                                  set={iconSet}
+                                  size={14}
+                                  class="text-primary"
+                                />
+                              {:else if selectedMode === 1}
+                                <ThemeIcon
+                                  name="osu-taiko"
+                                  set={iconSet}
+                                  size={14}
+                                  class="text-primary"
+                                />
+                              {:else if selectedMode === 2}
+                                <ThemeIcon
+                                  name="osu-catch"
+                                  set={iconSet}
+                                  size={14}
+                                  class="text-primary"
+                                />
+                              {:else if selectedMode === 3}
+                                <ThemeIcon
+                                  name="osu-mania"
+                                  set={iconSet}
+                                  size={14}
+                                  class="text-primary"
+                                />
+                              {/if}
+                              <span
+                                >{getGamemodeName(
+                                  modeIntToStr(selectedMode),
+                                  typeIntToStr(selectedType)
+                                )}</span
+                              >
+                            </div>
+                          </Select.Trigger>
+                          <Select.Content
+                            class="bg-theme-950/95 backdrop-blur border border-theme-900 rounded-lg max-h-72"
+                          >
+                            {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
+                              {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
+                              <Select.Item value={gamemode.toFixed()} class="text-xs">
+                                <div class="flex flex-row gap-2 items-center">
+                                  {#if gamemod.mode === 0}
+                                    <ThemeIcon name="osu-standard" set={iconSet} size={14} />
+                                  {:else if gamemod.mode === 1}
+                                    <ThemeIcon name="osu-taiko" set={iconSet} size={14} />
+                                  {:else if gamemod.mode === 2}
+                                    <ThemeIcon name="osu-catch" set={iconSet} size={14} />
+                                  {:else if gamemod.mode === 3}
+                                    <ThemeIcon name="osu-mania" set={iconSet} size={14} />
+                                  {/if}
+                                  {getGamemodeName(
+                                    modeIntToStr(gamemod.mode),
+                                    typeIntToStr(gamemod.type)
+                                  )}
+                                </div>
+                              </Select.Item>
+                            {/each}
+                          </Select.Content>
+                        </Select.Root>
+                      </div>
+                    </div>
+
+                    <!-- Stat Grid: 4 cards with NumberFlow -->
+                    <div class="grid grid-cols-2 gap-2 mt-1">
+                      <!-- Global & Country Rank -->
+                      <div
+                        class="bg-white/5 border border-white/5 rounded-xl p-2.5 flex flex-col justify-center"
+                      >
+                        <div class="flex items-center justify-between">
+                          <span class="text-[11px] text-muted-foreground font-medium">Rank</span>
+                          {#if currentStats?.country_rank}
+                            <span class="text-[10px] text-primary font-bold">
+                              #{currentStats.country_rank}
+                              {countryCodeToEmoji($currentUserInfo.info.country)}
+                            </span>
+                          {/if}
+                        </div>
+                        <div class="text-base font-bold text-theme-50 mt-0.5">
+                          {#if $reduceAnimations}
+                            #{numberHumanReadable(currentStats?.rank ?? 0)}
+                          {:else}
+                            <NumberFlow trend={0} prefix="#" value={currentStats?.rank ?? 0} />
+                          {/if}
+                        </div>
+                      </div>
+
+                      <!-- Performance Points -->
+                      <div
+                        class="bg-white/5 border border-white/5 rounded-xl p-2.5 flex flex-col justify-center"
+                      >
+                        <span class="text-[11px] text-muted-foreground font-medium"
+                          >Performance</span
+                        >
+                        <div class="text-base font-bold text-primary mt-0.5">
+                          {#if $reduceAnimations}
+                            {numberHumanReadable(currentStats?.pp ?? 0)}pp
+                          {:else}
+                            <NumberFlow trend={0} suffix="pp" value={currentStats?.pp ?? 0} />
+                          {/if}
+                        </div>
+                      </div>
+
+                      <!-- Accuracy -->
+                      <div
+                        class="bg-white/5 border border-white/5 rounded-xl p-2.5 flex flex-col justify-center"
+                      >
+                        <span class="text-[11px] text-muted-foreground font-medium">Accuracy</span>
+                        <div class="text-base font-bold text-theme-50 mt-0.5">
+                          {#if $reduceAnimations}
+                            {(currentStats?.acc ?? 0).toFixed(2)}%
+                          {:else}
+                            <NumberFlow
+                              trend={0}
+                              suffix="%"
+                              value={Number((currentStats?.acc ?? 0).toFixed(2))}
+                            />
+                          {/if}
+                        </div>
+                      </div>
+
+                      <!-- Play Count -->
+                      <div
+                        class="bg-white/5 border border-white/5 rounded-xl p-2.5 flex flex-col justify-center"
+                      >
+                        <span class="text-[11px] text-muted-foreground font-medium">Plays</span>
+                        <div class="text-base font-bold text-theme-50 mt-0.5">
+                          {#if $reduceAnimations}
+                            {numberHumanReadable(currentStats?.plays ?? 0)}
+                          {:else}
+                            <NumberFlow trend={0} value={currentStats?.plays ?? 0} />
+                          {/if}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                {:else}
+                  <!-- Logged Out Welcome Card -->
+                  <div
+                    class="w-full max-w-md bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 p-6 flex flex-col gap-4 shadow-xl"
+                    in:fly={{ duration: $reduceAnimations ? 0 : 350, y: 8, opacity: 0 }}
+                  >
+                    <div class="flex items-center gap-3">
+                      <div
+                        class="size-11 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary"
+                      >
+                        <ThemeIcon name="user" set={iconSet} size={22} />
+                      </div>
+                      <div>
+                        <h3 class="font-bold text-sm text-theme-50">Welcome to EZPPFarm</h3>
+                        <p class="text-xs text-muted-foreground">
+                          Sign in to view your live stats and progress
+                        </p>
+                      </div>
+                    </div>
+
+                    <p class="text-xs text-white/70 leading-relaxed">
+                      Log in to track your global and country rank, PP, accuracy, level progression,
+                      and recent play scores directly on your dashboard.
+                    </p>
+
+                    <div class="flex items-center gap-2.5 pt-1">
+                      <Button
+                        class="flex-1 h-8 text-xs font-semibold"
+                        onclick={() => {
+                          selectedView = 'LOGIN';
+                        }}
+                      >
+                        Log In
+                      </Button>
+                      <Button
+                        variant="outline"
+                        class="flex-1 h-8 text-xs font-semibold border-white/15 hover:bg-white/10 text-white/80"
+                        onclick={async () => {
+                          await openURL('https://ez-pp.farm/register');
+                        }}
+                      >
+                        Register
+                      </Button>
+                    </div>
+                  </div>
+                {/if}
+              {/if}
+
+              <!-- Recent Activity Highlight Card -->
+              {#if activeChrome.recentActivity !== false && $currentUserInfo}
+                {#if activeEvent}
+                  {@const gradeInfo = gradeBadgeStyle(activeEvent.grade)}
+                  <div
+                    class="flex-1 min-w-[300px] max-w-[420px] bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shadow-xl flex flex-col justify-between group relative"
+                    in:fly={{
+                      duration: $reduceAnimations ? 0 : 350,
+                      y: 8,
+                      delay: 80,
+                      opacity: 0,
+                    }}
+                  >
+                    <!-- Top Section: Cover Art Banner -->
+                    <div class="relative h-24 w-full overflow-hidden bg-theme-900/80 shrink-0">
+                      {#if activeEvent.setId}
+                        <img
+                          src="https://assets.ppy.sh/beatmaps/{activeEvent.setId}/covers/cover.jpg"
+                          alt={activeEvent.title}
+                          class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onerror={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      {/if}
+                      <div
+                        class="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/30"
+                      ></div>
+
+                      <!-- Top badge row -->
+                      <div
+                        class="absolute top-2 left-2.5 right-2.5 flex items-center justify-between gap-1.5"
+                      >
+                        <div class="flex items-center gap-1.5 min-w-0">
+                          <span
+                            class="text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 border border-white/15"
+                          >
+                            Recent Play
+                          </span>
+                          {#if userEvents.length > 1}
+                            <div
+                              class="flex items-center gap-0.5 rounded-full bg-black/60 px-1 py-0.5 border border-white/10 text-[9px] text-white/70"
+                            >
+                              <button
+                                type="button"
+                                class="p-0.5 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                disabled={safeEventIndex === 0}
+                                onclick={() => {
+                                  if (safeEventIndex > 0) recentActivityIndex = safeEventIndex - 1;
+                                }}
+                                title="Previous Play"
+                              >
+                                <ChevronLeft class="size-3" />
+                              </button>
+                              <span class="font-mono text-[9px] px-0.5"
+                                >{safeEventIndex + 1}/{userEvents.length}</span
+                              >
+                              <button
+                                type="button"
+                                class="p-0.5 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                disabled={safeEventIndex >= userEvents.length - 1}
+                                onclick={() => {
+                                  if (safeEventIndex < userEvents.length - 1)
+                                    recentActivityIndex = safeEventIndex + 1;
+                                }}
+                                title="Next Play"
+                              >
+                                <ChevronRight class="size-3" />
+                              </button>
+                            </div>
+                          {/if}
+                        </div>
+
+                        <!-- Grade badge -->
+                        <div
+                          class="px-2 py-0.5 rounded-md text-xs font-black tracking-wider border {gradeInfo.bg} {gradeInfo.text} {gradeInfo.glow}"
+                        >
+                          {gradeInfo.label}
+                        </div>
+                      </div>
+
+                      <!-- Bottom song title & artist in cover banner -->
+                      <div class="absolute bottom-1.5 left-2.5 right-2.5 flex flex-col min-w-0">
+                        <span
+                          class="font-bold text-xs text-white drop-shadow truncate"
+                          title={activeEvent.title}
+                        >
+                          {activeEvent.title}
+                        </span>
+                        <span
+                          class="text-[10px] text-white/75 drop-shadow truncate"
+                          title={activeEvent.artist}
+                        >
+                          {activeEvent.artist}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Middle Content Area: Fills the card with useful gameplay performance metrics -->
+                    <div class="p-3 flex flex-col gap-2.5 flex-1 justify-center">
+                      <!-- Difficulty Pill & Gamemode Tag -->
+                      <div class="flex items-center justify-between gap-2 min-w-0">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                          <span
+                            class="text-[11px] font-semibold text-primary truncate max-w-[200px]"
+                            title={activeEvent.version}
+                          >
+                            [{activeEvent.version}]
+                          </span>
+                        </div>
+                        <div
+                          class="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/70"
+                        >
+                          {#if activeEvent.mode === 0}
+                            <ThemeIcon
+                              name="osu-standard"
+                              set={iconSet}
+                              size={12}
+                              class="text-primary"
+                            />
+                            <span>Standard</span>
+                          {:else if activeEvent.mode === 1}
+                            <ThemeIcon
+                              name="osu-taiko"
+                              set={iconSet}
+                              size={12}
+                              class="text-primary"
+                            />
+                            <span>Taiko</span>
+                          {:else if activeEvent.mode === 2}
+                            <ThemeIcon
+                              name="osu-catch"
+                              set={iconSet}
+                              size={12}
+                              class="text-primary"
+                            />
+                            <span>Catch</span>
+                          {:else if activeEvent.mode === 3}
+                            <ThemeIcon
+                              name="osu-mania"
+                              set={iconSet}
+                              size={12}
+                              class="text-primary"
+                            />
+                            <span>Mania</span>
+                          {/if}
+                        </div>
+                      </div>
+
+                      <!-- Performance Stat Callout Row -->
+                      <div class="grid grid-cols-2 gap-2">
+                        <!-- Rank Achievement Callout -->
+                        <div
+                          class="flex items-center gap-2 p-2 rounded-xl border {activeEvent.rank ===
+                          1
+                            ? 'bg-amber-400/10 border-amber-400/30 text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.15)]'
+                            : activeEvent.rank && activeEvent.rank <= 3
+                              ? 'bg-slate-300/10 border-slate-300/25 text-slate-200'
+                              : 'bg-white/5 border-white/5 text-white/90'}"
+                        >
+                          {#if activeEvent.rank === 1}
+                            <Trophy class="size-4 shrink-0 text-amber-400" />
+                            <div class="flex flex-col min-w-0">
+                              <span
+                                class="text-[9px] uppercase tracking-wider text-amber-300/80 font-bold"
+                                >Top Rank</span
+                              >
+                              <span class="text-xs font-black truncate">#1 Global</span>
+                            </div>
+                          {:else if activeEvent.rank && activeEvent.rank <= 3}
+                            <Medal class="size-4 shrink-0 text-slate-300" />
+                            <div class="flex flex-col min-w-0">
+                              <span
+                                class="text-[9px] uppercase tracking-wider text-slate-300/80 font-semibold"
+                                >Podium</span
+                              >
+                              <span class="text-xs font-bold truncate"
+                                >Rank #{activeEvent.rank}</span
+                              >
+                            </div>
+                          {:else if activeEvent.rank}
+                            <div
+                              class="size-4 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[10px]"
+                            >
+                              #
+                            </div>
+                            <div class="flex flex-col min-w-0">
+                              <span
+                                class="text-[9px] uppercase tracking-wider text-muted-foreground"
+                                >Placement</span
+                              >
+                              <span class="text-xs font-bold truncate"
+                                >Rank #{activeEvent.rank}</span
+                              >
+                            </div>
+                          {:else}
+                            <div class="flex flex-col min-w-0">
+                              <span
+                                class="text-[9px] uppercase tracking-wider text-muted-foreground"
+                                >Score</span
+                              >
+                              <span class="text-xs font-bold truncate">Completed</span>
+                            </div>
+                          {/if}
+                        </div>
+
+                        <!-- Status & Relative Time Callout -->
+                        <div
+                          class="flex flex-col justify-center p-2 rounded-xl bg-white/5 border border-white/5 min-w-0"
+                        >
+                          <div class="flex items-center gap-1">
+                            {#if activeEvent.event === 'GAINED'}
+                              <span
+                                class="flex items-center gap-0.5 text-[10px] font-bold text-emerald-400"
+                              >
+                                <TrendingUp class="size-3" /> Gained
+                              </span>
+                            {:else if activeEvent.event === 'LOST'}
+                              <span
+                                class="flex items-center gap-0.5 text-[10px] font-bold text-rose-400"
+                              >
+                                <TrendingDown class="size-3" /> Lost
+                              </span>
+                            {:else}
+                              <span class="text-[10px] font-medium text-white/80"
+                                >Play Achieved</span
+                              >
+                            {/if}
+                          </div>
+                          <span
+                            class="text-[10px] text-muted-foreground font-mono flex items-center gap-1 mt-0.5 truncate"
+                          >
+                            <Clock class="size-2.5 shrink-0" />
+                            {formatRelativeTime(activeEvent.time)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Mini Feed of Recent Plays (clickable chips) -->
+                      {#if userEvents.length > 1}
+                        <div class="flex items-center gap-1.5 pt-0.5 overflow-x-auto no-scrollbar">
+                          {#each userEvents.slice(0, 4) as event, idx}
+                            {@const eventGrade = gradeBadgeStyle(event.grade)}
+                            <button
+                              type="button"
+                              class="flex items-center gap-1 px-2 py-1 rounded-lg border transition-all text-left cursor-pointer shrink-0 {idx ===
+                              safeEventIndex
+                                ? 'bg-primary/20 border-primary text-white shadow-sm'
+                                : 'bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'}"
+                              onclick={() => (recentActivityIndex = idx)}
+                              title="{event.title} [{event.version}]"
+                            >
+                              <span class="text-[9px] font-black {eventGrade.text}"
+                                >{eventGrade.label}</span
+                              >
+                              <span class="text-[10px] font-medium truncate max-w-[70px]">
+                                {event.version}
+                              </span>
+                            </button>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+
+                    <!-- Event Details Footer Action Bar -->
+                    <div
+                      class="px-3 py-2 flex items-center justify-between gap-2 border-t border-white/5 bg-black/20 shrink-0"
+                    >
+                      <span class="text-[10px] text-muted-foreground font-mono">
+                        b/{activeEvent.mapId}
+                      </span>
+
+                      <div class="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-white/80 hover:text-white border border-white/10 transition-colors cursor-pointer"
+                          onclick={() =>
+                            openURL(
+                              `https://ez-pp.farm/beatmapsets/${activeEvent.setId}/${activeEvent.mapId}`
                             )}
-                          </span>
-                        {:else}
-                          <NumberFlow
-                            trend={0}
-                            prefix="#"
-                            value={$currentUserInfo.stats[selectedGamemode].rank ?? 0}
-                          />
-                        {/if}
+                          title="View Beatmap on ez-pp.farm"
+                        >
+                          <span>Map</span>
+                          <ExternalLink class="size-3" />
+                        </button>
                       </div>
-                    {:else}
-                      <div in:fade>
-                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
-                      </div>
-                    {/if}
+                    </div>
                   </div>
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-xs text-muted-foreground font-semibold">PP</span>
-                  <div class="flex items-center h-full font-semibold text-primary-200">
-                    {#if $currentUserInfo}
-                      <div in:fade>
-                        {#if $reduceAnimations}
-                          <span>
-                            {numberHumanReadable(
-                              $currentUserInfo.stats[selectedGamemode].pp ?? 0
-                            )}pp
-                          </span>
-                        {:else}
-                          <NumberFlow
-                            trend={0}
-                            suffix="pp"
-                            value={$currentUserInfo.stats[selectedGamemode].pp ?? 0}
-                          />
-                        {/if}
-                      </div>
-                    {:else}
-                      <div in:fade>
-                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
-                      </div>
-                    {/if}
+                {:else}
+                  <!-- No recent activity placeholder -->
+                  <div
+                    class="flex-1 min-w-[280px] max-w-[340px] bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 p-5 flex flex-col items-center justify-center text-center shadow-xl"
+                    in:fly={{
+                      duration: $reduceAnimations ? 0 : 350,
+                      y: 8,
+                      delay: 80,
+                      opacity: 0,
+                    }}
+                  >
+                    <div
+                      class="size-10 rounded-full bg-white/5 flex items-center justify-center mb-2.5 text-white/40"
+                    >
+                      <ThemeIcon name="osu-standard" set={iconSet} size={20} />
+                    </div>
+                    <span class="text-xs font-semibold text-white/80">No Recent Plays</span>
+                    <p class="text-[11px] text-muted-foreground mt-1 max-w-[220px]">
+                      Launch osu! and play a beatmap to see your latest performance highlighted
+                      here.
+                    </p>
                   </div>
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
-                  <div class="flex items-center h-full font-semibold text-theme-50">
-                    {#if $currentUserInfo}
-                      <div in:fade>
-                        {#if $reduceAnimations}
-                          <span>
-                            {($currentUserInfo.stats[selectedGamemode].acc ?? 0).toFixed(2)}%
-                          </span>
-                        {:else}
-                          <NumberFlow
-                            trend={0}
-                            suffix="%"
-                            value={$currentUserInfo.stats[selectedGamemode].acc.toFixed(2) ?? 0}
-                          />
-                        {/if}
-                      </div>
-                    {:else}
-                      <div in:fade>
-                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-xs text-muted-foreground font-semibold">Playcount</span>
-                  <div class="flex items-center h-full font-semibold text-theme-50">
-                    {#if $currentUserInfo}
-                      <div in:fade>
-                        {#if $reduceAnimations}
-                          <span>
-                            {numberHumanReadable(
-                              $currentUserInfo.stats[selectedGamemode].plays ?? 0
-                            )}
-                          </span>
-                        {:else}
-                          <NumberFlow
-                            trend={0}
-                            value={$currentUserInfo.stats[selectedGamemode].plays ?? 0}
-                          />
-                        {/if}
-                      </div>
-                    {:else}
-                      <div in:fade>
-                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={21} />
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              </div>
-            </div>
-          {:else}
-            <div
-              class="m-1 w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center justify-center p-3 gap-3 absolute top-0 left-0"
-              in:fly={{ duration: $reduceAnimations ? 0 : 400, y: 5, opacity: 0 }}
-              out:fly={{ duration: $reduceAnimations ? 0 : 400, y: -5, opacity: 0 }}
-            >
-              <div class="flex flex-col items-center gap-1 text-center">
-                <span class="font-semibold text-theme-50 text-sm">See your stats here</span>
-                <span class="text-xs text-muted-foreground"
-                  >Log in with your EZPPFarm account to track your rank, PP, accuracy and playcount.</span
-                >
-              </div>
-              <div class="flex flex-col gap-2 w-full">
-                <Button
-                  class="flex-1 h-7 text-xs"
-                  onclick={() => {
-                    selectedView = 'LOGIN';
-                  }}>Log In</Button
-                >
-                <Button
-                  variant="outline"
-                  class="flex-1 h-7 text-xs border-theme-800 text-muted-foreground hover:text-theme-50"
-                  onclick={async () => {
-                    await openURL('https://ez-pp.farm/register');
-                  }}>Register</Button
-                >
-              </div>
+                {/if}
+              {/if}
             </div>
           {/if}
-        </div>
-        <div class="flex flex-col mb-auto mt-12 px-6">
-          <span class="theme-heading text-4xl font-bold drop-shadow-lg">EZPPLauncher</span>
-          <span class="text-muted-foreground font-semibold drop-shadow-lg"
-            >Hello {$currentUser?.name ?? 'Guest'}!</span
+        {:else if activeChrome.layoutMode === 'classic'}
+          <!-- Classic Compact Mode -->
+          <div class="px-8 py-2 my-auto z-10 flex flex-col justify-end">
+            {#if activeChrome.playerCard !== false}
+              {#if $currentUserInfo}
+                <div
+                  class="w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center p-3 mb-2"
+                  in:fly={{ duration: $reduceAnimations ? 0 : 350, y: 5, opacity: 0 }}
+                >
+                  <Select.Root
+                    type="single"
+                    value={selectedGamemode.toFixed()}
+                    onValueChange={updateGamemode}
+                  >
+                    <Select.Trigger
+                      class="border-theme-800/90 bg-theme-900/90 hover:bg-theme-800/90 text-muted-foreground! font-semibold"
+                    >
+                      <div class="flex flex-row items-center gap-2">
+                        {#if selectedMode === 0}
+                          <ThemeIcon
+                            name="osu-standard"
+                            set={iconSet}
+                            size={16}
+                            class="text-theme-200"
+                          />
+                        {:else if selectedMode === 1}
+                          <ThemeIcon
+                            name="osu-taiko"
+                            set={iconSet}
+                            size={16}
+                            class="text-theme-200"
+                          />
+                        {:else if selectedMode === 2}
+                          <ThemeIcon
+                            name="osu-catch"
+                            set={iconSet}
+                            size={16}
+                            class="text-theme-200"
+                          />
+                        {:else if selectedMode === 3}
+                          <ThemeIcon
+                            name="osu-mania"
+                            set={iconSet}
+                            size={16}
+                            class="text-theme-200"
+                          />
+                        {/if}
+                        {getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType))}
+                      </div>
+                    </Select.Trigger>
+                    <Select.Content
+                      class="bg-theme-950 border border-theme-900 rounded-lg max-h-72"
+                    >
+                      {#each validModeTypeCombinationsSorted as gamemode (gamemode)}
+                        {@const gamemod = getModeAndTypeFromGamemode(gamemode)}
+                        <Select.Item value={gamemode.toFixed()}>
+                          <div class="flex flex-row gap-2 items-center">
+                            {#if gamemod.mode === 0}
+                              <ThemeIcon name="osu-standard" set={iconSet} size={16} />
+                            {:else if gamemod.mode === 1}
+                              <ThemeIcon name="osu-taiko" set={iconSet} size={16} />
+                            {:else if gamemod.mode === 2}
+                              <ThemeIcon name="osu-catch" set={iconSet} size={16} />
+                            {:else if gamemod.mode === 3}
+                              <ThemeIcon name="osu-mania" set={iconSet} size={16} />
+                            {/if}
+                            {getGamemodeName(
+                              modeIntToStr(gamemod.mode),
+                              typeIntToStr(gamemod.type)
+                            )}
+                          </div>
+                        </Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                  <div class="grid grid-cols-2 gap-2 w-full m-3">
+                    <div class="flex flex-col">
+                      <span class="text-xs text-muted-foreground font-semibold">Rank</span>
+                      <div class="flex items-center h-full font-semibold text-theme-50">
+                        <span>#{numberHumanReadable(currentStats?.rank ?? 0)}</span>
+                      </div>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-xs text-muted-foreground font-semibold">PP</span>
+                      <div class="flex items-center h-full font-semibold text-primary">
+                        <span>{numberHumanReadable(currentStats?.pp ?? 0)}pp</span>
+                      </div>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-xs text-muted-foreground font-semibold">Accuracy</span>
+                      <div class="flex items-center h-full font-semibold text-theme-50">
+                        <span>{(currentStats?.acc ?? 0).toFixed(2)}%</span>
+                      </div>
+                    </div>
+                    <div class="flex flex-col">
+                      <span class="text-xs text-muted-foreground font-semibold">Playcount</span>
+                      <div class="flex items-center h-full font-semibold text-theme-50">
+                        <span>{numberHumanReadable(currentStats?.plays ?? 0)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div
+                  class="w-72 h-48 bg-black/40 backdrop-blur-sm rounded-md ring-1 ring-inset ring-white/5 flex flex-col items-center justify-center p-3 gap-3 mb-2"
+                >
+                  <div class="flex flex-col items-center gap-1 text-center">
+                    <span class="font-semibold text-theme-50 text-sm">See your stats here</span>
+                    <span class="text-xs text-muted-foreground"
+                      >Log in with your EZPPFarm account to track your rank.</span
+                    >
+                  </div>
+                  <Button class="h-7 text-xs w-full" onclick={() => (selectedView = 'LOGIN')}
+                    >Log In</Button
+                  >
+                </div>
+              {/if}
+            {/if}
+          </div>
+        {/if}
+
+        <!-- Bottom Dock -->
+        {#if activeChrome.dock !== false}
+          <div
+            class="relative z-10 px-8 py-3.5 flex items-center justify-between bg-black/45 backdrop-blur-md border-t border-white/10 shrink-0"
           >
-        </div>
+            {#if activeChrome.dockTelemetry !== false}
+              <div class="flex items-center gap-3 flex-wrap">
+                {#if $osuInstallationPath !== ''}
+                  <div
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5"
+                  >
+                    <ThemeIcon name="music" set={iconSet} class="size-3.5 text-blue-400" />
+                    <span class="text-[11px] text-white/80 font-medium">
+                      {#if !$beatmapSets && $beatmapSets !== 0}
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
+                      {:else}
+                        {numberHumanReadable($beatmapSets ?? 0)}
+                      {/if}
+                    </span>
+                  </div>
+                  <div
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5"
+                  >
+                    <ThemeIcon name="brush" set={iconSet} class="size-3.5 text-amber-400" />
+                    <span class="text-[11px] text-white/80 font-medium">
+                      {#if !$skinsCount && $skinsCount !== 0}
+                        <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={12} />
+                      {:else}
+                        {numberHumanReadable($skinsCount ?? 0)}
+                      {/if}
+                    </span>
+                  </div>
+                  {#if $currentSkin}
+                    <span
+                      class="text-[10px] px-2.5 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 max-w-[180px] truncate"
+                      title={$currentSkin}
+                    >
+                      {$currentSkin}
+                    </span>
+                  {/if}
+                {/if}
+
+                <div
+                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/5"
+                >
+                  {#if $serverConnectionFails > 1}
+                    <ThemeIcon name="wifi-off" set={iconSet} class="size-3.5 text-red-400" />
+                  {:else}
+                    <ThemeIcon name="wifi" set={iconSet} class="size-3.5 text-emerald-400" />
+                  {/if}
+                  <span class="relative text-[11px] text-white/80 font-medium">
+                    {#if !$serverPing || $serverConnectionFails > 1}
+                      <ThemeIcon name="loader" set={iconSet} class="size-3 animate-spin" />
+                    {:else}
+                      {#if $reduceAnimations}
+                        <span>{$serverPing}ms</span>
+                      {:else}
+                        <NumberFlow value={$serverPing ?? 0} trend={0} suffix="ms" />
+                      {/if}
+                    {/if}
+                  </span>
+                </div>
+
+                {#if $osuInstallationPath !== ''}
+                  <span
+                    class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/5"
+                  >
+                    {#if $osuStream}
+                      {releaseStreamToReadable($osuStream)}
+                    {:else}
+                      <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
+                    {/if}
+                  </span>
+                  <span
+                    class="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 font-mono border border-white/5"
+                  >
+                    {#if $osuBuild}
+                      {$osuBuild}
+                    {:else}
+                      <ThemeIcon name="loader" set={iconSet} class="animate-spin" size={10} />
+                    {/if}
+                  </span>
+                {/if}
+              </div>
+            {:else}
+              <div></div>
+            {/if}
+
+            <DownloadButton
+              downloading={$launching}
+              {progress}
+              text={$launching
+                ? downloadingEZPPFiles
+                  ? 'Downloading...'
+                  : cleanup
+                    ? 'Cleaning up...'
+                    : 'Launching...'
+                : $serverConnectionFails > 1
+                  ? 'No connection'
+                  : $osuInstallationPath === ''
+                    ? 'Hmmm..'
+                    : 'Launch'}
+              subtext={$launching && !cleanup
+                ? launchInfo
+                : $osuInstallationPath === ''
+                  ? 'osu! path is not set!'
+                  : $serverConnectionFails > 1
+                    ? 'No connection...'
+                    : undefined}
+              disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
+              {iconSet}
+              onClick={async () => await launch()}
+            />
+          </div>
+        {:else if !hasThemeLaunchButton}
+          <!-- REQUIRED LAUNCH BUTTON: Dock is hidden and theme forgot a launch button -->
+          <div class="fixed bottom-6 right-6 z-40" in:scale>
+            <DownloadButton
+              downloading={$launching}
+              {progress}
+              text={$launching
+                ? downloadingEZPPFiles
+                  ? 'Downloading...'
+                  : cleanup
+                    ? 'Cleaning up...'
+                    : 'Launching...'
+                : $serverConnectionFails > 1
+                  ? 'No connection'
+                  : $osuInstallationPath === ''
+                    ? 'Hmmm..'
+                    : 'Launch'}
+              subtext={$launching && !cleanup
+                ? launchInfo
+                : $osuInstallationPath === ''
+                  ? 'osu! path is not set!'
+                  : $serverConnectionFails > 1
+                    ? 'No connection...'
+                    : undefined}
+              disabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
+              {iconSet}
+              onClick={async () => await launch()}
+            />
+          </div>
+        {/if}
       </div>
     {:else if selectedView === 'SETTINGS'}
       <div
@@ -3312,6 +4031,20 @@
           visibility={$themeScriptState.visibility}
           groupVisibility={$themeScriptState.groupVisibility}
           variables={$themeScriptState.variables}
+          launching={$launching}
+          launchProgress={progress}
+          launchText={$launching
+            ? downloadingEZPPFiles
+              ? 'Downloading...'
+              : cleanup
+                ? 'Cleaning up...'
+                : 'Launching...'
+            : $serverConnectionFails > 1
+              ? 'No connection'
+              : $osuInstallationPath === ''
+                ? 'No osu! path'
+                : 'Launch'}
+          launchDisabled={$osuInstallationPath === '' || $serverConnectionFails > 1 || $launching}
           oninteraction={triggerThemeScriptElement}
           onbuttonaction={handleThemeButtonAction}
         />

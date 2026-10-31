@@ -160,6 +160,7 @@ pub struct WineRuntime {
     prefix: PathBuf,
     wine_bin: PathBuf,
     wine_root: Option<PathBuf>,
+    app_bundle: Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -234,6 +235,7 @@ impl WineRuntime {
             prefix,
             wine_bin,
             wine_root,
+            app_bundle: app,
         })
     }
 
@@ -260,25 +262,68 @@ impl WineRuntime {
         command.env("WINEDLLOVERRIDES", "mscoree,mshtml=");
         command.env("FREETYPE_PROPERTIES", "truetype:interpreter-version=35");
 
+        let mut library_paths = Vec::new();
+
+        if let Some(app) = &self.app_bundle {
+            for dir in [
+                app.join("Contents/Frameworks"),
+                app.join("Contents/Frameworks/wswine.bundle/lib"),
+                app.join("Contents/Frameworks/wswine.bundle/lib64"),
+                app.join("Contents/Frameworks/wswine.bundle/lib32on64"),
+                app.join("Contents/SharedSupport/wine/lib"),
+                app.join("Contents/SharedSupport/wine/lib64"),
+                app.join("Contents/SharedSupport/wine/lib32on64"),
+                app.join("Frameworks"),
+            ] {
+                if dir.is_dir() {
+                    library_paths.push(dir);
+                }
+            }
+        }
+
+        for dir in [
+            self.prefix.join("Frameworks"),
+            self.prefix.join("lib"),
+            self.prefix.join("lib64"),
+            self.prefix.join("lib32on64"),
+        ] {
+            if dir.is_dir() {
+                library_paths.push(dir);
+            }
+        }
+
         if let Some(wine_root) = &self.wine_root {
-            let mut library_paths = vec![
+            for dir in [
                 wine_root.join("lib"),
                 wine_root.join("lib64"),
                 wine_root.join("lib32on64"),
                 wine_root.clone(),
-                PathBuf::from("/opt/local/lib"),
-                PathBuf::from("/usr/lib"),
-                PathBuf::from("/usr/libexec"),
-                PathBuf::from("/usr/lib/system"),
-                PathBuf::from("/opt/X11/lib"),
-            ];
-            if let Some(existing) = std::env::var_os("DYLD_FALLBACK_LIBRARY_PATH") {
-                library_paths.extend(std::env::split_paths(&existing));
+            ] {
+                if dir.is_dir() {
+                    library_paths.push(dir);
+                }
             }
-            if let Ok(library_path) = std::env::join_paths(library_paths) {
-                command.env("DYLD_FALLBACK_LIBRARY_PATH", &library_path);
-                command.env("WINESKIN_LIB_PATH_FOR_FALLBACK", &library_path);
+        }
+
+        for system_dir in [
+            PathBuf::from("/opt/local/lib"),
+            PathBuf::from("/usr/lib"),
+            PathBuf::from("/usr/libexec"),
+            PathBuf::from("/usr/lib/system"),
+            PathBuf::from("/opt/X11/lib"),
+        ] {
+            if system_dir.is_dir() {
+                library_paths.push(system_dir);
             }
+        }
+
+        if let Some(existing) = std::env::var_os("DYLD_FALLBACK_LIBRARY_PATH") {
+            library_paths.extend(std::env::split_paths(&existing));
+        }
+
+        if let Ok(library_path) = std::env::join_paths(library_paths) {
+            command.env("DYLD_FALLBACK_LIBRARY_PATH", &library_path);
+            command.env("WINESKIN_LIB_PATH_FOR_FALLBACK", &library_path);
         }
 
         let mut paths = vec![self.wine_bin.clone()];
@@ -310,14 +355,23 @@ impl WineRuntime {
             return;
         }
 
-        let _ = Command::new(wineserver)
-            .arg("-k")
+        let mut cmd = Command::new(wineserver);
+        cmd.arg("-k")
             .env("WINEPREFIX", &self.prefix)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await;
+            .stderr(Stdio::null());
+
+        if let Some(app) = &self.app_bundle {
+            if let Ok(fallback) = std::env::join_paths([
+                app.join("Contents/Frameworks"),
+                app.join("Frameworks"),
+            ]) {
+                cmd.env("DYLD_FALLBACK_LIBRARY_PATH", fallback);
+            }
+        }
+
+        let _ = cmd.status().await;
     }
 
     fn loader_for(&self, exe: &Path) -> PathBuf {
@@ -325,7 +379,7 @@ impl WineRuntime {
         let candidates: &[&str] = if is_64_bit {
             &["wine64", "wine"]
         } else {
-            &["wine32on64", "wine", "wine64"]
+            &["wine32on64", "wine64", "wine"]
         };
 
         candidates
@@ -783,8 +837,14 @@ fn find_wine_bin(prefix: &Path, app: Option<&Path>) -> Option<(PathBuf, Option<P
             app.join("Contents/SharedSupport/wine"),
             app.join("Contents/Resources/WineskinEngine.bundle/Wine"),
             app.join("Contents/Frameworks/wswine.bundle"),
+            app.join("Wineskin.app/Contents/Resources"),
         ] {
             push_wine_root(&mut candidates, root);
+        }
+
+        let wineskin_res = app.join("Wineskin.app/Contents/Resources");
+        if has_wine_loader(&wineskin_res) {
+            candidates.push((wineskin_res.clone(), Some(wineskin_res)));
         }
     }
 
@@ -847,7 +907,7 @@ fn has_wine_loader(bin: &Path) -> bool {
 }
 
 fn wine_version_for(bin: &Path) -> Option<String> {
-    let loader = ["wine64", "wine", "wine32on64"]
+    let loader = ["wine64", "wine32on64", "wine"]
         .iter()
         .map(|name| bin.join(name))
         .find(|path| path.is_file())?;

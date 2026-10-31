@@ -55,6 +55,32 @@ export const formatTimeReadable = (initialSeconds: number) => {
   return result.trim();
 };
 
+export const formatRelativeTime = (dateOrTimestamp: Date | string | number | undefined): string => {
+  if (!dateOrTimestamp) return 'recently';
+  const time = new Date(dateOrTimestamp).getTime();
+  if (isNaN(time)) return 'recently';
+  const diff = Date.now() - time;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+};
+
+export const countryCodeToEmoji = (code?: string): string => {
+  if (!code || code.length !== 2) return '🌐';
+  const codePoints = code
+    .toUpperCase()
+    .split('')
+    .map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+};
+
 export const releaseStreamToReadable = (releaseStream: string) => {
   if (releaseStream.replaceAll(' ', '').toLowerCase() === 'cuttingedge') return 'Cutting Edge';
   return 'Stable';
