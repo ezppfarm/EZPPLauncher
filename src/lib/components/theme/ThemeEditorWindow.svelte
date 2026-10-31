@@ -335,12 +335,22 @@
     ...themeScriptInitialVariables(definition),
     ...themeClockValues(new Date(previewClock)),
   });
+  const selectedGroupIndex = $derived(
+    selectedGroupId
+      ? (definition.groups ?? []).findIndex((group) => group.id === selectedGroupId)
+      : -1
+  );
   const selectedGroup = $derived(
-    selectedGroupId ? groups.find((group) => group.id === selectedGroupId) : undefined
+    selectedGroupIndex >= 0 && definition.groups ? definition.groups[selectedGroupIndex] : undefined
+  );
+  const selectedBehaviorIndex = $derived(
+    selectedBehaviorId
+      ? (definition.behaviors ?? []).findIndex((behavior) => behavior.id === selectedBehaviorId)
+      : -1
   );
   const selectedBehavior = $derived(
-    selectedBehaviorId
-      ? behaviors.find((behavior) => behavior.id === selectedBehaviorId)
+    selectedBehaviorIndex >= 0 && definition.behaviors
+      ? definition.behaviors[selectedBehaviorIndex]
       : undefined
   );
   function buildLayerRows(includeCollapsed: boolean): LayerRow[] {
@@ -5114,10 +5124,10 @@
 
     <aside class="flex min-h-0 flex-col border-l border-theme-800 bg-theme-900/35">
       {#if leftTab === 'logic'}
-        {#if selectedBehavior}
+        {#if selectedBehavior && selectedBehaviorIndex >= 0 && definition.behaviors}
           <div class="min-h-0 flex-1 overflow-y-auto">
             <ThemeBehaviorInspector
-              behavior={selectedBehavior}
+              bind:behavior={definition.behaviors[selectedBehaviorIndex]}
               {elements}
               {groups}
               variables={scriptVariables}
@@ -5310,20 +5320,22 @@
           </Button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto">
-          <ThemeGroupInspector
-            group={selectedGroup}
-            {behaviors}
-            {elements}
-            {groups}
-            variables={scriptVariables}
-            focusToken={logicFocusKey === `group:${selectedGroup.id}` ? logicFocusToken : 0}
-            onungroup={() => ungroupGroup()}
-            onpickmask={pickGroupMask}
-            onaddbehavior={createBehavior}
-            ondeleterule={deleteBehavior}
-          />
+          {#if selectedGroupIndex >= 0 && definition.groups}
+            <ThemeGroupInspector
+              bind:group={definition.groups[selectedGroupIndex]}
+              {behaviors}
+              {elements}
+              {groups}
+              variables={scriptVariables}
+              focusToken={logicFocusKey === `group:${selectedGroup.id}` ? logicFocusToken : 0}
+              onungroup={() => ungroupGroup()}
+              onpickmask={pickGroupMask}
+              onaddbehavior={createBehavior}
+              ondeleterule={deleteBehavior}
+            />
+          {/if}
         </div>
-      {:else if selectedElement}
+      {:else if selectedElement && selectedIndex >= 0 && definition.elements}
         <div class="flex shrink-0 items-center gap-1 border-b border-theme-800 p-2">
           <Button
             variant="secondary"
@@ -5366,7 +5378,7 @@
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto">
           <ThemeElementInspector
-            element={selectedElement}
+            bind:element={definition.elements[selectedIndex]}
             {fontOptions}
             {elements}
             {behaviors}

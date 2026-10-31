@@ -8,8 +8,8 @@
   import { Checkbox } from '$lib/components/ui/checkbox';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
-  import Slider from '$lib/components/ui/slider/slider.svelte';
   import * as Select from '$lib/components/ui/select';
+  import Slider from '$lib/components/ui/slider/slider.svelte';
   import {
     type ThemeV2Behavior,
     type ThemeV2BehaviorTarget,
@@ -20,7 +20,7 @@
   import { Boxes, RefreshCw, Ungroup } from '@lucide/svelte';
 
   let {
-    group,
+    group = $bindable(),
     behaviors,
     elements,
     groups,

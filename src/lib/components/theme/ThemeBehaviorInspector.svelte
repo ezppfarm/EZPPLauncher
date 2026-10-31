@@ -34,7 +34,7 @@
   import { SvelteSet } from 'svelte/reactivity';
 
   let {
-    behavior,
+    behavior = $bindable(),
     elements,
     groups = [],
     variables = [],

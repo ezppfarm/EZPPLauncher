@@ -43,7 +43,7 @@
   } from '@lucide/svelte';
 
   let {
-    element,
+    element = $bindable(),
     fontOptions,
     elements,
     behaviors,
