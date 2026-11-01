@@ -445,6 +445,8 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
 
   // Ensure all media elements mounted by v1 themes start playback automatically
   themeContainer.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+    media.muted = false;
+    media.volume = volume;
     playThemeMedia(media);
   });
 };

@@ -96,6 +96,14 @@ pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String>
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
 
+    unsafe extern "C" {
+        fn object_getInstanceVariable(
+            obj: *mut AnyObject,
+            name: *const std::ffi::c_char,
+            out_value: *mut *mut std::ffi::c_void,
+        ) -> *const std::ffi::c_void;
+    }
+
     window
         .with_webview(|webview| unsafe {
             let webview = webview.inner() as *mut AnyObject;
@@ -103,7 +111,18 @@ pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String>
                 return;
             }
 
-            let configuration: *mut AnyObject = msg_send![webview, configuration];
+            // -[WKWebView configuration] returns a copy. To affect live playback,
+            // access the internal `_configuration` ivar directly when available.
+            let mut raw_config: *mut std::ffi::c_void = std::ptr::null_mut();
+            let ivar_name = c"_configuration";
+            let ivar = object_getInstanceVariable(webview, ivar_name.as_ptr(), &mut raw_config);
+            let configuration: *mut AnyObject = if !ivar.is_null() && !raw_config.is_null() {
+                log::debug!(target: "launcher", "Accessing live WKWebView._configuration ivar");
+                raw_config as *mut AnyObject
+            } else {
+                msg_send![webview, configuration]
+            };
+
             if configuration.is_null() {
                 return;
             }

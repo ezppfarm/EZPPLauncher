@@ -277,9 +277,12 @@
     const last_theme = localThemes.find((t) => t.name === lastThemeName);
     const canLoadLastTheme = Boolean(last_theme && isThemeTrusted(last_theme));
 
+    const initialVolume = await config_theme_volume.get(0.15);
+    custom_theme_volume.set(initialVolume);
+
     if (!last_theme || !canLoadLastTheme) {
       await config.value<string>('theme').set('Default');
-      loadTheme(defaultTheme, $custom_theme_container!, await config_theme_volume.get(0.15));
+      loadTheme(defaultTheme, $custom_theme_container!, initialVolume);
       if (last_theme && !canLoadLastTheme) {
         sileo.error({
           title: 'Theme needs approval',
@@ -288,10 +291,10 @@
         });
       }
     } else {
-      loadTheme(last_theme, $custom_theme_container!, await config_theme_volume.get(0.15));
+      loadTheme(last_theme, $custom_theme_container!, initialVolume);
     }
 
-    custom_theme_volume.set(await config_theme_volume.get(0.15));
+    void invoke('reveal_window').catch(() => {});
     patch.set(await config_patching.get(true));
     customCursor.set(await config_custom_cursor.get(true));
     cursorSmoothening.set(await config_cursor_smoothening.get(true));
@@ -381,6 +384,23 @@
 </script>
 
 <svelte:head>
+  <style>
+    video::-webkit-media-controls,
+    video::-webkit-media-controls-enclosure,
+    video::-webkit-media-controls-panel,
+    video::-webkit-media-controls-play-button,
+    video::-webkit-media-controls-start-playback-button,
+    video::-webkit-media-controls-overlay-play-button,
+    video::-webkit-media-controls-overlay-enclosure {
+      display: none !important;
+      -webkit-appearance: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+  </style>
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html `<style>${$active_custom_theme?.cssStyle || ''}</style>`}
   {#if $active_custom_theme?.definition}

@@ -267,12 +267,13 @@ export function trackMediaContainer(node: HTMLElement) {
 
   function update() {
     custom_theme_audio_playing.set(
-      Array.from(media).some((el) => !el.paused && !(el instanceof HTMLVideoElement && el.muted))
+      Array.from(media).some((el) => !el.paused)
     );
   }
 
   function register(el: HTMLMediaElement) {
     media.add(el);
+    update();
 
     const handler = () => update();
     el.addEventListener('play', handler);
@@ -280,6 +281,7 @@ export function trackMediaContainer(node: HTMLElement) {
 
     return () => {
       media.delete(el);
+      update();
       el.removeEventListener('play', handler);
       el.removeEventListener('pause', handler);
     };

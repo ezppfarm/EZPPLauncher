@@ -15,7 +15,8 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
+import { custom_theme_volume } from './global';
 
 type MediaCleanup = () => void;
 
@@ -193,48 +194,29 @@ export const clearThemeMediaCache = () => {
   objectUrls.clear();
 };
 
-const unmutingArmed = new WeakSet<HTMLMediaElement>();
-
-/** Restore full sound as soon as the user interacts with the launcher. */
-const armUnmuteOnInteraction = (node: HTMLMediaElement, targetVolume: number) => {
-  if (unmutingArmed.has(node)) return;
-  unmutingArmed.add(node);
-
-  const unmute = () => {
-    window.removeEventListener('pointerdown', unmute, true);
-    window.removeEventListener('keydown', unmute, true);
-    window.removeEventListener('click', unmute, true);
-    unmutingArmed.delete(node);
-    if (node.isConnected) {
-      node.muted = false;
-      node.volume = targetVolume;
-      if (node.paused) {
-        void node.play().catch(() => {});
-      }
-    }
-  };
-
-  window.addEventListener('pointerdown', unmute, true);
-  window.addEventListener('keydown', unmute, true);
-  window.addEventListener('click', unmute, true);
-};
-
 /** Retry playback on the first click or key press after an autoplay rejection. */
 const armAutoplayRetry = (node: HTMLMediaElement) => {
   if (autoplayArmed.has(node)) return;
   autoplayArmed.add(node);
 
   const retry = () => {
-    document.removeEventListener('pointerdown', retry, true);
-    document.removeEventListener('keydown', retry, true);
-    document.removeEventListener('click', retry, true);
+    window.removeEventListener('pointerdown', retry, true);
+    window.removeEventListener('keydown', retry, true);
+    window.removeEventListener('click', retry, true);
+    window.removeEventListener('focus', retry, true);
     autoplayArmed.delete(node);
-    if (node.isConnected) void node.play().catch(() => {});
+    if (node.isConnected) {
+      node.muted = false;
+      const targetVolume = get(custom_theme_volume);
+      if (targetVolume > 0) node.volume = targetVolume;
+      void node.play().catch(() => {});
+    }
   };
 
-  document.addEventListener('pointerdown', retry, true);
-  document.addEventListener('keydown', retry, true);
-  document.addEventListener('click', retry, true);
+  window.addEventListener('pointerdown', retry, true);
+  window.addEventListener('keydown', retry, true);
+  window.addEventListener('click', retry, true);
+  window.addEventListener('focus', retry, true);
 };
 
 export const playThemeMedia = (node: HTMLMediaElement) => {
@@ -246,38 +228,28 @@ export const playThemeMedia = (node: HTMLMediaElement) => {
     node.removeAttribute('controls');
   }
 
-  void node
-    .play()
-    .then(() => {
-      console.debug('Theme media playing', {
-        element: node.tagName,
-        muted: node.muted,
-        volume: node.volume,
-        source: node.currentSrc,
-      });
-    })
-    .catch((error) => {
-      console.warn('Theme media autoplay was blocked', error);
-      if (node instanceof HTMLVideoElement && !node.muted) {
-        // Fallback: Start muted immediately so the background video plays
-        // automatically without freezing or showing native play buttons,
-        // and unmute on the first user interaction.
-        const targetVolume = node.volume > 0 ? node.volume : 0.15;
-        node.muted = true;
-        void node
-          .play()
-          .then(() => {
-            console.debug('Theme video started playing muted after autoplay block');
-            armUnmuteOnInteraction(node, targetVolume);
-          })
-          .catch((mutedError) => {
-            console.warn('Theme video muted autoplay was also blocked', mutedError);
-            armAutoplayRetry(node);
-          });
-      } else {
+  node.muted = false;
+  const currentVolume = get(custom_theme_volume);
+  if (node.volume === 0 && currentVolume > 0) {
+    node.volume = currentVolume;
+  }
+
+  const playPromise = node.play();
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.debug('Theme media playing', {
+          element: node.tagName,
+          muted: node.muted,
+          volume: node.volume,
+          source: node.currentSrc,
+        });
+      })
+      .catch((error) => {
+        console.warn('Theme media autoplay was blocked', error);
         armAutoplayRetry(node);
-      }
-    });
+      });
+  }
 };
 
 /**
@@ -291,13 +263,7 @@ const loadMediaSource = (node: HTMLMediaElement, source: string) => {
   mediaCleanups.delete(node);
 
   const previousTime = Number.isFinite(node.currentTime) ? node.currentTime : 0;
-  const wasPlaying = !node.paused;
-  const needsPreparation =
-    node instanceof HTMLVideoElement && isMac && loopbackThemePattern.test(source);
-
-  // Keep the last frame visible while the first H.264 encode runs instead of
-  // letting WebKit struggle through the software VP9 track.
-  if (needsPreparation) node.pause();
+  const wasPlaying = !node.paused || node.autoplay;
 
   void themeMediaUrl(source, node instanceof HTMLVideoElement).then((url) => {
     if (mediaTokens.get(node) !== token || !node.isConnected) return;
@@ -324,7 +290,7 @@ const loadMediaSource = (node: HTMLMediaElement, source: string) => {
         }
       }
 
-      if (wasPlaying || node.autoplay) playThemeMedia(node);
+      playThemeMedia(node);
     };
 
     const onError = () => {
@@ -336,7 +302,7 @@ const loadMediaSource = (node: HTMLMediaElement, source: string) => {
       if (node.src !== source) {
         node.src = source;
         node.load();
-        if (wasPlaying || node.autoplay) playThemeMedia(node);
+        playThemeMedia(node);
       }
     };
 
@@ -652,14 +618,18 @@ export function smoothThemeMedia(node: HTMLElement) {
       media.removeAttribute('controls');
     }
 
-    playThemeMedia(media);
-
     const source =
       media.getAttribute('src') ??
       media.querySelector<HTMLSourceElement>('source[src]')?.getAttribute('src') ??
       undefined;
-    if (!source) return;
-    if (!isThemeAssetUrl(source) && !loopbackThemePattern.test(source)) return;
+    if (!source) {
+      playThemeMedia(media);
+      return;
+    }
+    if (!isThemeAssetUrl(source) && !loopbackThemePattern.test(source)) {
+      playThemeMedia(media);
+      return;
+    }
     if (lastSource.get(media) === source) return;
 
     lastSource.set(media, source);

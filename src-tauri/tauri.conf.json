@@ -21,7 +21,8 @@
         "decorations": false,
         "resizable": false,
         "maximizable": false,
-        "shadow": true
+        "shadow": true,
+        "focus": true
       }
     ],
     "withGlobalTauri": true,

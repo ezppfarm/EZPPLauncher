@@ -27,57 +27,55 @@
 </script>
 
 <div data-tauri-drag-region class="titlebar z-[100]" class:macos-window={$platform === 'macos'}>
-  {#if $custom_theme_audio_playing}
-    {#if $custom_theme_audio_playing}
-      <div class="relative flex items-center justify-center group">
-        <div class="relative flex items-center justify-center p-1 cursor-pointer">
-          <div
-            class="absolute inset-0 bg-background rounded
-               scale-80 opacity-0
-               group-hover:opacity-100
-               group-hover:scale-100
-               {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'}"
-          ></div>
+  {#if $custom_theme_audio_playing || ($active_custom_theme && $active_custom_theme.name !== 'Default')}
+    <div class="relative flex items-center justify-center group">
+      <div class="relative flex items-center justify-center p-1 cursor-pointer">
+        <div
+          class="absolute inset-0 bg-background rounded
+             scale-80 opacity-0
+             group-hover:opacity-100
+             group-hover:scale-100
+             {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'}"
+        ></div>
 
-          {#if $custom_theme_volume > 0.7}
-            <ThemeIcon name="volume" set={iconSet} class="z-10 pointer-events-none" size={14} />
-          {:else if $custom_theme_volume >= 0.15}
-            <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
-          {:else if $custom_theme_volume > 0}
-            <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
-          {:else}
-            <ThemeIcon name="volume-off" set={iconSet} class="z-10 pointer-events-none" size={14} />
-          {/if}
-        </div>
+        {#if $custom_theme_volume > 0.7}
+          <ThemeIcon name="volume" set={iconSet} class="z-10 pointer-events-none" size={14} />
+        {:else if $custom_theme_volume >= 0.15}
+          <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
+        {:else if $custom_theme_volume > 0}
+          <ThemeIcon name="volume-low" set={iconSet} class="z-10 pointer-events-none" size={14} />
+        {:else}
+          <ThemeIcon name="volume-off" set={iconSet} class="z-10 pointer-events-none" size={14} />
+        {/if}
+      </div>
+
+      <div
+        class="absolute top-full right-0 translate-x-[7px]
+           opacity-0 invisible pointer-events-none -translate-y-2
+           group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
+           {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'}
+           z-50"
+      >
+        <div class="h-2 w-full"></div>
 
         <div
-          class="absolute top-full right-0 translate-x-[7px]
-             opacity-0 invisible pointer-events-none -translate-y-2
-             group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
-             {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'}
-             z-50"
+          class="flex items-center justify-center h-[120px] w-[35px]
+             bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl"
         >
-          <div class="h-2 w-full"></div>
-
-          <div
-            class="flex items-center justify-center h-[120px] w-[35px]
-               bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl"
-          >
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              bind:value={$custom_theme_volume}
-              oninput={() => {
-                config.value<number>('volume').set($custom_theme_volume);
-              }}
-              class="volume-slider"
-            />
-          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            bind:value={$custom_theme_volume}
+            oninput={() => {
+              config.value<number>('volume').set($custom_theme_volume);
+            }}
+            class="volume-slider"
+          />
         </div>
       </div>
-    {/if}
+    </div>
   {/if}
   <div class="relative flex items-center justify-center p-1 group" id="titlebar-minimize">
     <div

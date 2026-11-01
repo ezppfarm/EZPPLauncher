@@ -136,6 +136,9 @@ pub fn run() {
                 if let Err(error) = macos::allow_media_autoplay(&window) {
                     log::warn!(target: "launcher", "{error}");
                 }
+                if let Err(error) = macos::activate_and_focus_window(&window) {
+                    log::warn!(target: "launcher", "Could not focus launcher window on startup: {error}");
+                }
             }
 
             Ok(())
@@ -234,6 +237,9 @@ pub fn run() {
                 }
                 if let Err(error) = macos::allow_media_autoplay(&window) {
                     log::warn!(target: "launcher", "{error}");
+                }
+                if let Err(error) = macos::activate_and_focus_window(&window) {
+                    log::warn!(target: "launcher", "Could not focus launcher window on ready: {error}");
                 }
             }
 
