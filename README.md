@@ -1,7 +1,7 @@
 # EZPPLauncher
 
-**EZPPLauncher** is a custom launcher for the private osu! server [EZPPFarm](https://ez-pp.farm), built with **Rust** and **Svelte** using the [Tauri](https://tauri.app) framework.  
-It enhances the osu! experience with quality-of-life features and integration specifically designed for the EZPPFarm community.
+**EZPPLauncher** is a modern, feature-rich custom launcher for the private osu! server [EZPPFarm](https://ez-pp.farm), built with **Rust** and **Svelte 5** using the [Tauri](https://tauri.app) framework.  
+It enhances the osu! experience with quality-of-life features, advanced launcher theming, customized Discord Rich Presence, and seamless server integration. Windows and macOS are supported, with partial support for Linux.
 
 ---
 
@@ -13,101 +13,160 @@ It enhances the osu! experience with quality-of-life features and integration sp
 
 ## 🚀 Features
 
-- [x] Automatically updates osu! before launching
-- [x] Automatically start/stop the OpenTabletDriver Daemon (Windows)
-- [x] Automatic ingame login
-- [x] Patches the osu! client to show misses in Relax and Autopilot (Windows, Linux and macOS via Wine)
-- [x] Displays your EZPPFarm stats in the launcher
-- [x] Shows the number of imported beatmapsets
-- [x] Shows the number of imported skins
-- [x] Displays ping to the EZPPFarm server
-- [x] Discord Rich Presence
-- [x] Performance Display Overlay (currently in experimental patcher release stream)
-- [x] Launcher Theming (API 1.0 bundles and API 2.0 declarative themes)
-- [x] Advanced theme editor in its own window with freeform text/image/video/shape layers, custom Svelte 5 component layers with Monaco editing and inline compiler diagnostics, gradient/outline/shadow text effects, multi-select and snapping, a drag-and-drop layer tree with moves into and out of nested groups, layer/group transforms with independent X/Y scale and skew, hover group breadcrumbs, on-canvas layer/group rotate handles plus group move and scale handles, layer/group-linked WHEN/IF/THEN logic with quick navigation, safe advanced rule scripts with expressions, branches and loops, draft recovery, validation and export
-- [x] Theme update backups with one-click rollback, plus a trust prompt before running executable API 1.0 themes or API 2.0 themes with custom Svelte layers
-- [x] In-app diagnostics for osu!, Wine, the patcher, and the experimental stream's .NET 8 runtime, plus a log-bundle viewer
+### Game & Server Integration
+
+- [x] **Direct Server Launch**: Launches osu! directly with `-devserver ez-pp.farm`, bypassing osu! updater loops and preserving launch parameters.
+- [x] **Automatic In-Game Login**: Automatically signs into your EZPPFarm account upon game boot.
+- [x] **In-Game Relax & Autopilot Miss Patcher**: Injects a hook into the osu! client to display misses in Relax and Autopilot modes (Windows, macOS via Wine, and partially on Linux via osu-winello).
+- [x] **Live Player Stats**: Displays rank, PP, accuracy, playcount, and server latency directly on the launcher dashboard.
+- [x] **Library Indexing**: Automatically counts imported beatmapsets and skins.
+- [x] **OpenTabletDriver Integration**: Automatically starts and stops the OpenTabletDriver daemon on launch/exit (Windows only).
+- [x] **Performance Display Overlay**: In-game HUD overlay (available in the experimental patcher stream).
+
+### Visual Theme Engine v2 & In-App Studio
+
+- [x] **Declarative Theme API 2.0**: Modern JSON schema supporting background videos, audio, Lottie animations, and layered widgets without custom compilation.
+- [x] **Dedicated Visual Theme Editor**: Standalone resizable window with a full-featured visual canvas, live preview, and multi-element selection.
+- [x] **Custom Svelte 5 Component Layers**: Embed custom reactive Svelte 5 components with an integrated **Monaco code editor** and live compiler diagnostics.
+- [x] **Canvas Transform Tooling**: Multi-selection, snapping, freeform rotation, X/Y scale, skew, and group breadcrumb navigation.
+- [x] **Logic & Scripting System**: Visual WHEN/IF/THEN rule builder and sandboxed rule scripting (expressions, branches, loops, visibility toggles) without `eval`.
+- [x] **Dynamic Placeholders & Clock Expressions**: Real-time variables (`{username}`, `{rank}`, `{pp}`) and second-accurate clock variables (`{time}`, `{hour}`, `{minute}`).
+- [x] **Typography & Icon Families**: Gradient fills, outlines, drop shadows, custom `@fontsource` webfonts, and bundled Lucide, Phosphor, and Tabler icon catalogs.
+- [x] **Backup & Rollback System**: Automatic versioned theme snapshots with one-click restoration, plus security trust prompts for executable components.
+
+### Discord Rich Presence Studio
+
+- [x] **Dedicated Presence Editor Window**: In-app studio to customize your Discord presence.
+- [x] **Interactive Discord Embed Preview**: Real-time visual mockup mirroring Discord's user profile popout card.
+- [x] **Dynamic Placeholders**: Interpolate live stats (`{username}`, `{rank}`, `{pp}`, `{accuracy}`, `{playcount}`, `{version}`) into details, state, and asset tooltips.
+- [x] **Custom Action Buttons & Presets**: Configurable buttons linking to player profiles, leaderboards, or custom URLs, plus quick presets (Default, Grinding, Competitive, Relax, AFK).
+
+### Diagnostics, Logging & System Tools
+
+- [x] **In-App Diagnostics Panel**: Validates osu! folder integrity, write permissions, Wine runtimes, .NET 8 desktop runtime, FFmpeg, and patcher status.
+- [x] **Multi-Stream Log Viewer**: Dedicated rotating logs (`launcher.log`, `osu.log`, `patcher.log`) with session bundling, zip archive export, and an in-app viewer.
+- [x] **macOS Wine Automation**: Automatic font registry sanitization (eliminating GDI+ `AccessViolationException` crashes), Wine prefix management, and automated in-place patcher bytecode patching for .NET 4.0 runtimes under Wine.
+- [x] **Hardware-Accelerated Media Server**: Local HTTP range streaming server on macOS and Linux for smooth, low-memory WebM and MP4 video playback.
 
 ---
 
 ## 💻 Supported Platforms
 
-| Platform | Status                                                 |
-| -------- | ------------------------------------------------------ |
-| Windows  | ✅ Supported                                           |
-| macOS    | 🕧 Partially supported (via Wineskin/Whisky/CrossOver) |
-| Linux    | 🕧 Partially supported (via osu-winello)               |
+| Platform | Status                 | Runtime / Environment                                      |
+| -------- | ---------------------- | ---------------------------------------------------------- |
+| Windows  | ✅ Supported           | Native Win32                                               |
+| macOS    | ✅ Supported           | Wine wrapper (Wineskin, Whisky, CrossOver, or system Wine) |
+| Linux    | 🕧 Partially Supported | Wine / Proton (via osu-winello / wmctrl)                   |
 
-> **Windows** remains the fully supported platform. OpenTabletDriver is Windows-only. On macOS,
-> in-game patching runs the Windows patcher through the same Wine prefix as osu!. The stable
-> patcher stream needs no extra runtime; the experimental stream needs the .NET 8 Desktop Runtime
-> installed in that prefix.
-
-### macOS
-
-osu! stable is a Windows build, so on macOS it runs inside a Wine wrapper. EZPPLauncher
-supports Wineskin wrappers (the usual `osu!.app` wine skin), Whisky bottles and CrossOver
-bottles.
-
-The setup wizard automatically looks for Wineskins in `/Applications` and `~/Applications`.
-If detection fails, choose **Browse** and pick the `osu!.app` wrapper itself (or a Wine prefix
-folder); the launcher resolves the osu! installation inside it, so there is no need to open the
-bundle's package contents.
-
-Large VP8/VP9/AV1 theme videos are transcoded once to a cached 720p H.264/AAC file so WebKit
-can use the Mac's hardware decoder. The first large video triggers a one-time (~63 MB) download
-of a signed static FFmpeg 9.0.2 build from `ffmpeg.martin-riedl.de` into `~/.ezpplauncher/bin`;
-the launcher verifies its pinned SHA-256 and makes it executable. The managed build requires
-macOS 12 or newer. If the download fails, a system FFmpeg (Homebrew or MacPorts) is used; without
-either, themes still load but large WebM videos remain on WebKit's software decoder and may
-stutter. Theme authors can also ship an H.264/MP4 version alongside the WebM.
+> **Windows** and **macOS** are fully supported. **Linux is partially supported**: osu! must be managed through external community tooling ([`osu-winello`](https://github.com/NelloKudo/osu-winello)), window tracking requires `wmctrl`, OpenTabletDriver automation is unavailable, and the launcher is restricted to the stable patcher stream.
 
 ---
 
-## 🪵 Logs
+### 🍎 macOS Integration Details
 
-Launcher, osu! and patcher output is written to `.ezpplauncher/logs` in your home folder:
+osu! stable is a 32-bit Windows application, so on macOS it runs inside a Wine-based wrapper. EZPPLauncher natively supports **Wineskin wrappers** (the standard `osu!.app` bundle), **Whisky bottles**, and **CrossOver bottles**.
 
-| File           | Contents                                                       |
-| -------------- | -------------------------------------------------------------- |
-| `launcher.log` | Launcher lifecycle, webview console output and uncaught errors |
-| `osu.log`      | osu! and osu! updater output, including stdout/stderr          |
-| `patcher.log`  | Patcher output, including stdout/stderr                        |
+- **Automatic Wrapper Detection**: The setup wizard automatically searches `/Applications` and `~/Applications` for existing Wineskin bundles and Wine prefixes. If choosing **Browse**, selecting the `osu!.app` bundle directly resolves the underlying prefix without needing to navigate inside "Show Package Contents".
+- **Wine Prefix Font Fix**: macOS system font enumeration under Wine GDI+ can crash osu! on cold start with an `AccessViolationException` when reading Apple Braille fonts. EZPPLauncher automatically detects and cleans incompatible font entries from the prefix registry (`user.reg` / `system.reg`).
+- **Updater Loop Prevention**: Abnormal game exits can leave behind `.require_update`, `help.txt`, or `_pending` folders that cause `osu!.exe` to boot into the Bancho updater and lose command-line parameters. The launcher purges these markers before launch to ensure the `-devserver ez-pp.farm` flag is always preserved.
+- **Automated Patcher Bytecode Patching**: The Windows patcher (`osu!.patcher.exe`) targets .NET 4.5+ and embeds `ManagedInjector.Lib`. In Wine prefixes using the .NET Framework 4.0 runtime, generic `Marshal.SizeOf<T>()` and `Marshal.PtrToStructure<T>()` methods do not exist, and redirected standard I/O causes `Console.ReadKey()` crashes. EZPPLauncher automatically inspects and patches the patcher binary and its embedded Costura assemblies in-place, enabling seamless injection into the running game process under Wine.
+- **Hardware-Accelerated Theme Media**: Large VP8/VP9/AV1 theme videos are automatically transcoded to hardware-decoded H.264/AAC. The launcher manages a sandboxed static FFmpeg build in `~/.ezpplauncher/bin` (with fallback to system FFmpeg). Theme assets are served over an internal loopback server supporting HTTP range requests to minimize memory consumption.
+- **Native macOS Window Rounding**: Native Cocoa window clipping applies rounded corners and transparent borders to the Tauri window.
 
-A file is only created when that stream actually writes a line. On each new session, or when
-any file reaches 5 MiB, all three active files are bundled into a single
-`logs_<date>_<time>.zip`; the five most recent bundles are kept. You can turn file logging off,
-open the folder, or browse and filter a bundle in the built-in viewer from **Settings → Logging**.
-On Windows the folder is `%USERPROFILE%\.ezpplauncher\logs`.
+---
 
-**Settings → Diagnostics** checks the selected osu! install and write access, the macOS Wine
-prefix/runtime/version and (for the experimental patcher stream) its .NET 8 runtime, the FFmpeg
-theme-video transcoder, osu-winello/wmctrl on Linux, and whether the patcher is present. It can
-copy a plain-text support report or reopen the setup wizard for a guided repair.
+### 🐧 Linux (Partially Supported)
+
+Linux support is functional but partial, relying on external community tools rather than built-in prefix management:
+
+- **External Tooling Requirements**:
+  - **[`osu-winello`](https://github.com/NelloKudo/osu-winello)**: osu! must be installed and managed through osu-winello. EZPPLauncher detects the `osu-wine` binary in standard search locations (`/usr/bin`, `/usr/local/bin`, and `~/.local/bin`).
+  - **`wmctrl`**: Required for game process discovery and active window title detection under X11 and XWayland (`sudo pacman -S wmctrl` on Arch or `sudo apt install wmctrl` on Debian/Ubuntu).
+- **Feature Limitations**:
+  - **OpenTabletDriver**: Automated daemon start/stop is Windows-only. On Linux, run OpenTabletDriver as a user systemd service (`systemctl --user enable --now opentabletdriver.service`).
+  - **Patcher Stream**: Linux is constrained to the **stable** patcher stream. The experimental stream (.NET 8 runtime) is not supported on Linux.
+  - **Theme Streaming via Loopback**: Tauri uses WebKit2GTK on Linux, which does not support byte-range streaming over custom application URI schemes. EZPPLauncher automatically spins up an internal loopback HTTP server to stream large video/audio theme assets with low memory overhead.
+
+---
+
+## 🎮 Discord Rich Presence Studio
+
+The launcher features an interactive Discord Rich Presence editor accessible from **Settings → Discord Presence**:
+
+- **Live Profile Mockup**: Visualizes your presence card exactly as it appears inside Discord.
+- **Stat Placeholders**: Insert live interpolated values:
+  - `{username}`: Player display name
+  - `{rank}`: Current global rank
+  - `{pp}`: Total performance points
+  - `{accuracy}`: Overall hit accuracy percentage
+  - `{playcount}`: Account playcount
+  - `{version}`: Active launcher version
+- **Custom Buttons**: Add interactive links (e.g. your EZPPFarm profile or twitch stream).
+- **Presence Presets**: One-click presets for default launcher idle, grinding, competitive matches, and relax sessions.
+
+---
+
+## 🎨 Launcher Theming
+
+The launcher supports two theme generations:
+
+- **Theme API 2.0 (Recommended)**: A declarative format described in `theme.json` with assets, audio, Lottie animations, and layered elements.
+  - Can be built and edited visually with the **in-app Theme Editor**.
+  - Supports custom **Svelte 5 component layers** with Monaco editor integration for rich interactive widgets.
+  - Features visual WHEN/IF/THEN rule building or sandboxed JavaScript scripting.
+  - Exported as shareable `.ezpplauncher-theme` zip archives.
+- **Theme API 1.0**: Standalone bundled Svelte themes compiled via the CLI.
+
+For detailed documentation, schemas, and packaging guides, refer to [THEME_API_V2.md](THEME_API_V2.md).
+
+---
+
+## 🪵 Logs & Diagnostics
+
+Output from the launcher, osu!, and the patcher is organized under `.ezpplauncher/logs` in your user home directory (`%USERPROFILE%\.ezpplauncher\logs` on Windows, `~/.ezpplauncher/logs` on macOS and Linux):
+
+| File           | Source                                                                    |
+| -------------- | ------------------------------------------------------------------------- |
+| `launcher.log` | Launcher lifecycle, backend commands, webview console and uncaught errors |
+| `osu.log`      | osu! game client and updater stdout/stderr                                |
+| `patcher.log`  | Patcher stdout/stderr and injection diagnostic messages                   |
+
+- **Session Archiving**: When a new session begins or when any active log file reaches 5 MiB, the active logs are bundled into a compressed `logs_<date>_<time>.zip` archive. The 5 most recent archives are retained.
+- **Built-in Log Viewer**: Browse, search, and filter session logs in real time from **Settings → Logging**.
+- **System Diagnostics**: Open **Settings → Diagnostics** to run an automated check on your osu! installation, folder permissions, Wine prefix configuration, .NET runtimes, FFmpeg transcoder, and patcher files, with one-click report copying for troubleshooting.
 
 ---
 
 ## 🛠 Build From Source
 
-### Requirements
+### Prerequisites
 
-- **Rust** (installed via [rustup](https://rustup.rs/) – recommended for Windows)
-- **Cargo** (comes with rustup)
+- **[Rust & Cargo](https://rustup.rs/)** (Rust 2024 edition)
+- **[Bun](https://bun.sh/)** (JavaScript runtime and package manager)
 - **[CMake](https://cmake.org/download/)**
-- **[Bun](https://bun.sh/)** (JavaScript runtime)
-- On macOS: **Xcode Command Line Tools** (`xcode-select --install`)
+- Platform tooling:
+  - **Windows**: Visual Studio C++ Build Tools
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+  - **Linux**: WebKit2GTK, libsoup, and standard build-essential packages
 
-### Steps
+### Build Steps
 
 ```bash
-# Install all dependencies
-bun i
+# 1. Clone the repository
+git clone https://git.ez-pp.farm/EZPPFarm/EZPPLauncher.git
+cd EZPPLauncher
 
-# Build the project
+# 2. Install dependencies
+bun install
+
+# 3. Type check and verify
+bun run check
+
+# 4. Build the release binaries
 bun run build
 ```
 
-After building, the launcher executable will be located at:
+The compiled release packages will be generated at:
 
 ```
 # Windows
@@ -116,50 +175,45 @@ src-tauri/target/release/ezpplauncher.exe
 # macOS
 src-tauri/target/release/bundle/macos/EZPPLauncher.app
 src-tauri/target/release/bundle/dmg/EZPPLauncher_*.dmg
+
+# Linux
+src-tauri/target/release/bundle/deb/
+src-tauri/target/release/bundle/appimage/
 ```
 
 ---
 
-## 📁 Project Structure (Simplified)
+## 📁 Project Structure (Overview)
 
 ```
-├── src/                           # Frontend (Svelte)
-├── src-tauri/                     # Backend (Rust)
-│   ├── src/macos.rs               # Wine/Wineskin support for macOS
-│   ├── tauri.conf.json            # Tauri configuration
-│   └── tauri.macos.conf.json      # macOS bundle targets (app + dmg)
-├── package.json                   # Bun project config
+EZPPLauncher/
+├── src/                               # Frontend application (Svelte 5, Tailwind CSS)
+│   ├── lib/
+│   │   ├── components/
+│   │   │   ├── presence/              # Discord Rich Presence studio & preview
+│   │   │   ├── theme/                 # In-app Theme Editor & visual inspectors
+│   │   │   └── ui/                    # Reusable UI controls, cursor & dialogs
+│   │   ├── themeV2.ts                 # Theme API 2.0 runtime & parsing
+│   │   └── osuUtil.ts                 # Game folder detection & system utilities
+│   ├── routes/                        # SvelteKit routing & main app views
+│   └── screens/                       # Launcher dashboard, setup wizard & loading
+├── src-tauri/                         # Backend core (Rust, Tauri v2)
+│   ├── src/
+│   │   ├── commands.rs                # Tauri IPC invoke commands
+│   │   ├── logging.rs                 # Multi-stream rotating logger & zip bundler
+│   │   ├── macos.rs                   # macOS Wine/Wineskin runtime & font fixes
+│   │   ├── theme_server.rs            # Internal HTTP range server for theme media
+│   │   └── utils.rs                   # Patcher .NET 4.0 bytecode compatibility engine
+│   ├── Cargo.toml                     # Rust dependencies
+│   ├── tauri.conf.json                # Main Tauri configuration
+│   └── tauri.macos.conf.json          # macOS bundle configuration
+├── THEME_API_V2.md                    # Theme API 2.0 schema specification
+├── package.json                       # Bun project dependencies & scripts
 └── README.md
 ```
 
 ---
 
-## 🎨 Launcher Themes
+## 📄 License
 
-By default, the launcher includes several downloadable themes. Themes can be created
-in two ways:
-
-- Use the built-in **advanced editor** on the Themes screen. It opens in its own
-  resizable window with a full launcher home canvas, freeform text/image/video/shape
-  layers, custom Svelte 5 components with a Monaco editor, rich text effects
-  (gradient fills, outlines, shadows, decoration and case), WebM support,
-  `@fontsource` fonts and custom font imports. Themes can switch the launcher
-  chrome between the bundled Lucide, Phosphor and Tabler icon families. Hover a
-  layer and click a crumb in its group path (or double-click it), then use the
-  on-canvas frame or the inspector to move, rotate, scale or skew the group.
-  Logic rules can be linked to layers or groups and edited from their inspectors.
-  Any rule can switch from the visual builder to a sandboxed JavaScript script
-  with variables, expressions, `if/else`, `for`/`while`, visibility actions and
-  navigation; scripts open in a Monaco editor with syntax highlighting,
-  completion, hover docs and inline errors, and can expand to fullscreen. Text
-  layers can display live variables with `{name}` placeholders and theme-defined
-  starting values, plus read-only clock values such as `{time}` and `{hour}` that
-  refresh every second. Scripts are compiled into a safe instruction set and run by
-  the launcher without `eval`.
-  It creates API 2.0 themes and can export them as shareable
-  `.ezpplauncher-theme` files.
-- Use the [create-ezpplauncher-theme](https://git.ez-pp.farm/EZPPFarm/create-ezpplauncher-theme)
-  CLI. It supports both API 1.0 Svelte themes and API 2.0 declarative themes.
-
-See [THEME_API_V2.md](THEME_API_V2.md) for the full API 2.0 schema, limits and packaging
-layout. API 1.0 themes continue to load unchanged.
+This project is licensed under the [GNU General Public License v3.0](LICENSE.md).
