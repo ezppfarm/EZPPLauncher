@@ -2231,7 +2231,7 @@
               element.widget = val as ThemeV2WidgetKind;
               if (val === 'player-card') {
                 element.width = 380;
-                element.height = 180;
+                element.height = 220;
               } else if (val === 'avatar') {
                 element.width = 72;
                 element.height = 72;
@@ -2296,12 +2296,18 @@
                 if (val === 'minimal') {
                   element.width = 280;
                   element.height = 64;
+                } else if (val === 'banner') {
+                  element.width = 340;
+                  element.height = 76;
+                  element.showStats = false;
                 } else if (val === 'compact') {
                   element.width = 340;
-                  element.height = 120;
+                  element.height = 140;
+                  element.showStats = true;
                 } else if (val === 'full') {
                   element.width = 380;
-                  element.height = 200;
+                  element.height = 220;
+                  element.showStats = true;
                 }
               } else if (element.widget === 'recent-activity') {
                 if (val === 'minimal') {
@@ -2356,6 +2362,14 @@
                 : element.variant === 'icon-only'
                   ? 'Icon-Only (Circle)'
                   : 'Primary (Capsule)'}
+            {:else if element.widget === 'player-card'}
+              {element.variant === 'compact'
+                ? 'Compact (2 Stats)'
+                : element.variant === 'minimal'
+                  ? 'Minimal (Pill)'
+                  : element.variant === 'banner'
+                    ? 'Banner (Profile & Level Only)'
+                    : 'Full (4 Stats)'}
             {:else}
               {element.variant === 'compact'
                 ? 'Compact'
@@ -2373,6 +2387,11 @@
               <Select.Item value="primary" label="Primary (Capsule)" />
               <Select.Item value="compact" label="Compact (Pill)" />
               <Select.Item value="icon-only" label="Icon-Only (Circle)" />
+            {:else if element.widget === 'player-card'}
+              <Select.Item value="full" label="Full (4 Stats)" />
+              <Select.Item value="compact" label="Compact (2 Stats)" />
+              <Select.Item value="banner" label="Banner (Profile & Level Only)" />
+              <Select.Item value="minimal" label="Minimal (Pill)" />
             {:else}
               <Select.Item value="full" label="Full" />
               <Select.Item value="compact" label="Compact" />
@@ -2381,6 +2400,33 @@
           </Select.Content>
         </Select.Root>
       </div>
+
+      {#if element.widget === 'player-card' && element.variant !== 'minimal'}
+        <div class="space-y-2 border-t border-theme-800 pt-2">
+          <Label class={label}>Player Card Options</Label>
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="element-player-stats"
+                checked={element.showStats !== false && element.variant !== 'banner'}
+                onCheckedChange={(checked) => {
+                  element.showStats = checked === true;
+                  if (!checked) {
+                    element.variant = 'banner';
+                    element.height = Math.min(element.height, 80);
+                  } else {
+                    element.variant = 'full';
+                    element.height = Math.max(element.height, 220);
+                  }
+                }}
+              />
+              <Label for="element-player-stats" class="text-xs text-theme-100 cursor-pointer">
+                Show stats grid (rank, pp, accuracy, plays)
+              </Label>
+            </div>
+          </div>
+        </div>
+      {/if}
 
       {#if element.widget === 'avatar'}
         <div class="space-y-2 border-t border-theme-800 pt-2">

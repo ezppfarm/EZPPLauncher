@@ -534,7 +534,8 @@ export type ThemeV2WidgetVariant =
   | 'icon-only'
   | 'circle'
   | 'rounded'
-  | 'square';
+  | 'square'
+  | 'banner';
 
 export type ThemeV2WidgetElement = ThemeV2ElementBase & {
   type: 'widget';
@@ -543,6 +544,7 @@ export type ThemeV2WidgetElement = ThemeV2ElementBase & {
   showCountry?: boolean;
   showLevel?: boolean;
   showOnlineRing?: boolean;
+  showStats?: boolean;
 };
 
 export type ThemeV2Element =
@@ -1262,6 +1264,7 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
         'circle',
         'rounded',
         'square',
+        'banner',
       ] as const,
       widget === 'launch-button' ? 'primary' : widget === 'avatar' ? 'circle' : 'full'
     );
@@ -1269,6 +1272,7 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
     const showLevel = typeof source.showLevel === 'boolean' ? source.showLevel : false;
     const showOnlineRing =
       typeof source.showOnlineRing === 'boolean' ? source.showOnlineRing : true;
+    const showStats = typeof source.showStats === 'boolean' ? source.showStats : true;
     return {
       ...base,
       type,
@@ -1277,6 +1281,7 @@ const normalizeElement = (raw: unknown, index: number): ThemeV2Element | undefin
       showCountry,
       showLevel,
       showOnlineRing,
+      showStats,
     };
   }
 

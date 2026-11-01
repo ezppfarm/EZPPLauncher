@@ -1662,7 +1662,7 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
       ctx.fillText(plays, cell2X + cellW - 8, bottomY + 14);
       ctx.restore();
     } else {
-      // full
+      // full or banner
       fillRoundedRect(
         ctx,
         element.x,
@@ -1683,9 +1683,12 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
         1
       );
 
-      const avatarSize = 48;
+      const showStats =
+        element.variant !== 'banner' && element.showStats !== false && element.height >= 140;
+      const isBanner = element.variant === 'banner' || !showStats;
+      const avatarSize = isBanner ? Math.min(48, Math.max(32, element.height - 24)) : 48;
       const avatarX = element.x + 16;
-      const avatarY = element.y + 16;
+      const avatarY = isBanner ? element.y + (element.height - avatarSize) / 2 : element.y + 16;
       fillRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 12, 'rgba(20, 20, 28, 0.9)');
       strokeRoundedRect(
         ctx,
@@ -1730,42 +1733,44 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
       ctx.font = '500 10px monospace';
       ctx.fillText(`${levelProgress}%`, barX + barW + 8, barY - 2);
 
-      const divY = avatarY + avatarSize + 16;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.beginPath();
-      ctx.moveTo(element.x + 16, divY);
-      ctx.lineTo(element.x + element.width - 16, divY);
-      ctx.stroke();
+      if (showStats) {
+        const divY = avatarY + avatarSize + 16;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.beginPath();
+        ctx.moveTo(element.x + 16, divY);
+        ctx.lineTo(element.x + element.width - 16, divY);
+        ctx.stroke();
 
-      const gridY = divY + 12;
-      const gap = 8;
-      const cellW = (element.width - 32 - gap) / 2;
-      const cellH = Math.max(34, (element.height - (gridY - element.y) - 14 - gap) / 2);
+        const gridY = divY + 12;
+        const gap = 8;
+        const cellW = (element.width - 32 - gap) / 2;
+        const cellH = Math.max(34, (element.height - (gridY - element.y) - 14 - gap) / 2);
 
-      const stats = [
-        { label: 'Rank', value: rank, valueColor: '#ffffff' },
-        { label: 'Performance', value: pp, valueColor: accent },
-        { label: 'Accuracy', value: acc, valueColor: '#ffffff' },
-        { label: 'Plays', value: plays, valueColor: '#ffffff' },
-      ];
+        const stats = [
+          { label: 'Rank', value: rank, valueColor: '#ffffff' },
+          { label: 'Performance', value: pp, valueColor: accent },
+          { label: 'Accuracy', value: acc, valueColor: '#ffffff' },
+          { label: 'Plays', value: plays, valueColor: '#ffffff' },
+        ];
 
-      stats.forEach((st, idx) => {
-        const col = idx % 2;
-        const row = Math.floor(idx / 2);
-        const cx = element.x + 16 + col * (cellW + gap);
-        const cy = gridY + row * (cellH + gap);
+        stats.forEach((st, idx) => {
+          const col = idx % 2;
+          const row = Math.floor(idx / 2);
+          const cx = element.x + 16 + col * (cellW + gap);
+          const cy = gridY + row * (cellH + gap);
 
-        fillRoundedRect(ctx, cx, cy, cellW, cellH, 10, 'rgba(255, 255, 255, 0.05)');
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = canvasFont(context, bodyFont, 9, 500);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(st.label, cx + 10, cy + 6);
+          fillRoundedRect(ctx, cx, cy, cellW, cellH, 10, 'rgba(255, 255, 255, 0.05)');
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.font = canvasFont(context, bodyFont, 9, 500);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText(st.label, cx + 10, cy + 6);
 
-        ctx.fillStyle = st.valueColor;
-        ctx.font = canvasFont(context, bodyFont, 12, 700);
-        ctx.fillText(st.value, cx + 10, cy + cellH - 18);
-      });
+          ctx.fillStyle = st.valueColor;
+          ctx.font = canvasFont(context, bodyFont, 12, 700);
+          ctx.fillText(st.value, cx + 10, cy + cellH - 18);
+        });
+      }
       ctx.restore();
     }
   } else if (element.widget === 'recent-activity') {

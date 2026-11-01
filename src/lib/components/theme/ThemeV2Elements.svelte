@@ -2027,7 +2027,7 @@
 
               {#if element.variant === 'minimal'}
                 <div
-                  class="flex h-full w-full items-center gap-2.5 rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-theme-50 shadow-xl backdrop-blur-md"
+                  class="flex h-full w-full items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-black/55 px-3 py-2 text-theme-50 shadow-xl backdrop-blur-md"
                 >
                   <div class="relative shrink-0">
                     <Avatar.Root
@@ -2067,7 +2067,7 @@
                 </div>
               {:else if element.variant === 'compact'}
                 <div
-                  class="flex h-full w-full flex-col justify-between rounded-2xl border border-white/10 bg-black/55 p-3 text-theme-50 shadow-xl backdrop-blur-md"
+                  class="flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-3 text-theme-50 shadow-xl backdrop-blur-md"
                 >
                   <div class="flex items-center gap-3">
                     <div class="relative shrink-0">
@@ -2125,9 +2125,56 @@
                     </div>
                   </div>
                 </div>
+              {:else if element.variant === 'banner' || element.showStats === false || element.height < 140}
+                <div
+                  class="flex h-full w-full items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-3.5 text-theme-50 shadow-xl backdrop-blur-md"
+                >
+                  <div class="relative shrink-0">
+                    <Avatar.Root
+                      class="size-12 rounded-xl border border-white/15 bg-theme-900 shadow-md"
+                    >
+                      <Avatar.Image
+                        src="https://a.ez-pp.farm/{playerId}"
+                        alt={playerName}
+                        class="h-full w-full object-cover"
+                      />
+                      <Avatar.Fallback
+                        class="flex h-full w-full items-center justify-center bg-theme-900 text-primary"
+                      >
+                        <ThemeIcon name="user" set={iconSet} size={22} />
+                      </Avatar.Fallback>
+                    </Avatar.Root>
+                    {#if country}
+                      <span
+                        class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-md border border-white/20 bg-black/90 px-1 py-0.5 text-[10px] leading-none shadow"
+                        title={country.toUpperCase()}
+                      >
+                        {countryCodeToEmoji(country)}
+                      </span>
+                    {/if}
+                  </div>
+
+                  <div class="min-w-0 flex flex-col justify-center flex-1">
+                    <span class="block truncate text-sm font-bold text-white">{playerName}</span>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[11px] font-semibold text-white/80 shrink-0">
+                        Lv.{levelVal}
+                      </span>
+                      <div class="w-20 rounded-full bg-white/10 h-1.5 overflow-hidden">
+                        <div
+                          class="h-full bg-primary rounded-full transition-all"
+                          style="width: {levelProgress}%"
+                        ></div>
+                      </div>
+                      <span class="text-[10px] text-muted-foreground font-mono">
+                        {levelProgress}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
               {:else}
                 <div
-                  class="flex h-full w-full flex-col justify-between rounded-2xl border border-white/10 bg-black/55 p-3.5 text-theme-50 shadow-xl backdrop-blur-md"
+                  class="flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-black/55 p-3.5 text-theme-50 shadow-xl backdrop-blur-md"
                 >
                   <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3 min-w-0">
@@ -2514,7 +2561,21 @@
         <span
           class="absolute -top-7 left-0 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow"
         >
-          {element.type}
+          {element.type === 'widget'
+            ? element.widget === 'player-card'
+              ? 'Player Card'
+              : element.widget === 'recent-activity'
+                ? 'Recent Activity'
+                : element.widget === 'launch-button'
+                  ? 'Launch Button'
+                  : element.widget === 'telemetry'
+                    ? 'Telemetry Bar'
+                    : element.widget === 'header'
+                      ? 'Header Title'
+                      : element.widget === 'avatar'
+                        ? 'Player Avatar'
+                        : 'Widget'
+            : element.type}
         </span>
       {/if}
 
