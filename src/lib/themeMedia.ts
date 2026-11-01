@@ -66,13 +66,25 @@ const ensureStatusListener = async () => {
       } else if (stage === 'extract') {
         themeMediaStatus.set('Installing video engine…');
       } else if (stage === 'optimize') {
-        themeMediaStatus.set('Converting theme video for hardware playback…');
+        if (progress > 0) {
+          themeMediaStatus.set(`Converting theme video… ${Math.round(progress * 100)}%`);
+        } else {
+          themeMediaStatus.set('Converting theme video…');
+        }
       }
     });
   } catch (error) {
     console.warn('Could not listen for theme video preparation progress', error);
   }
 };
+
+export const initThemeMediaStatusListener = () => {
+  void ensureStatusListener();
+};
+
+if (typeof window !== 'undefined') {
+  void ensureStatusListener();
+}
 
 const blobUrlPromises = new Map<string, Promise<string>>();
 const optimizedUrlPromises = new Map<string, Promise<string>>();
@@ -108,7 +120,7 @@ const optimizedThemeMediaUrl = async (source: string, video: boolean): Promise<s
       }
 
       setPreparing(1);
-      themeMediaStatus.set('Preparing theme video for smooth playback…');
+      themeMediaStatus.set('Converting theme video…');
       await ensureStatusListener();
       try {
         const optimized = await invoke<string>('optimize_theme_media', {
@@ -181,6 +193,32 @@ export const clearThemeMediaCache = () => {
   objectUrls.clear();
 };
 
+const unmutingArmed = new WeakSet<HTMLMediaElement>();
+
+/** Restore full sound as soon as the user interacts with the launcher. */
+const armUnmuteOnInteraction = (node: HTMLMediaElement, targetVolume: number) => {
+  if (unmutingArmed.has(node)) return;
+  unmutingArmed.add(node);
+
+  const unmute = () => {
+    window.removeEventListener('pointerdown', unmute, true);
+    window.removeEventListener('keydown', unmute, true);
+    window.removeEventListener('click', unmute, true);
+    unmutingArmed.delete(node);
+    if (node.isConnected) {
+      node.muted = false;
+      node.volume = targetVolume;
+      if (node.paused) {
+        void node.play().catch(() => {});
+      }
+    }
+  };
+
+  window.addEventListener('pointerdown', unmute, true);
+  window.addEventListener('keydown', unmute, true);
+  window.addEventListener('click', unmute, true);
+};
+
 /** Retry playback on the first click or key press after an autoplay rejection. */
 const armAutoplayRetry = (node: HTMLMediaElement) => {
   if (autoplayArmed.has(node)) return;
@@ -189,15 +227,25 @@ const armAutoplayRetry = (node: HTMLMediaElement) => {
   const retry = () => {
     document.removeEventListener('pointerdown', retry, true);
     document.removeEventListener('keydown', retry, true);
+    document.removeEventListener('click', retry, true);
     autoplayArmed.delete(node);
     if (node.isConnected) void node.play().catch(() => {});
   };
 
   document.addEventListener('pointerdown', retry, true);
   document.addEventListener('keydown', retry, true);
+  document.addEventListener('click', retry, true);
 };
 
 export const playThemeMedia = (node: HTMLMediaElement) => {
+  if (node instanceof HTMLVideoElement) {
+    node.playsInline = true;
+    node.setAttribute('playsinline', '');
+    node.setAttribute('webkit-playsinline', '');
+    node.controls = false;
+    node.removeAttribute('controls');
+  }
+
   void node
     .play()
     .then(() => {
@@ -210,7 +258,25 @@ export const playThemeMedia = (node: HTMLMediaElement) => {
     })
     .catch((error) => {
       console.warn('Theme media autoplay was blocked', error);
-      armAutoplayRetry(node);
+      if (node instanceof HTMLVideoElement && !node.muted) {
+        // Fallback: Start muted immediately so the background video plays
+        // automatically without freezing or showing native play buttons,
+        // and unmute on the first user interaction.
+        const targetVolume = node.volume > 0 ? node.volume : 0.15;
+        node.muted = true;
+        void node
+          .play()
+          .then(() => {
+            console.debug('Theme video started playing muted after autoplay block');
+            armUnmuteOnInteraction(node, targetVolume);
+          })
+          .catch((mutedError) => {
+            console.warn('Theme video muted autoplay was also blocked', mutedError);
+            armAutoplayRetry(node);
+          });
+      } else {
+        armAutoplayRetry(node);
+      }
     });
 };
 
@@ -570,10 +636,23 @@ export function smoothThemeMedia(node: HTMLElement) {
   const videoLifecycles = new WeakMap<HTMLVideoElement, () => void>();
 
   const prepare = (media: HTMLMediaElement) => {
-    if (media instanceof HTMLVideoElement && !videoLifecycles.has(media)) {
-      const lifecycle = themeVideoLifecycle(media);
-      videoLifecycles.set(media, () => lifecycle.destroy());
+    if (media instanceof HTMLVideoElement) {
+      media.playsInline = true;
+      media.setAttribute('playsinline', '');
+      media.setAttribute('webkit-playsinline', '');
+      media.controls = false;
+      media.removeAttribute('controls');
+
+      if (!videoLifecycles.has(media)) {
+        const lifecycle = themeVideoLifecycle(media);
+        videoLifecycles.set(media, () => lifecycle.destroy());
+      }
+    } else {
+      media.controls = false;
+      media.removeAttribute('controls');
     }
+
+    playThemeMedia(media);
 
     const source =
       media.getAttribute('src') ??

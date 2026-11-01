@@ -1,5 +1,5 @@
 import { active_custom_theme, custom_theme_audio_playing, custom_themes } from './global';
-import { clearThemeMediaCache } from './themeMedia';
+import { clearThemeMediaCache, playThemeMedia } from './themeMedia';
 import { isThemeV2, normalizeThemeV2, type ThemeV2Asset, type ThemeV2Definition } from './themeV2';
 import { disableMediaControls, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
@@ -442,6 +442,11 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
   }
   setGlobalVolume(volume);
   disableMediaControls();
+
+  // Ensure all media elements mounted by v1 themes start playback automatically
+  themeContainer.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+    playThemeMedia(media);
+  });
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {

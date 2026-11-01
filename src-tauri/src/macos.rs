@@ -106,7 +106,9 @@ pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String>
             let configuration: *mut AnyObject = msg_send![webview, configuration];
             if configuration.is_null() {
                 return;
-            } // WKAudiovisualMediaTypesNone. This is a public WKWebView setting.
+            }
+
+            // WKAudiovisualMediaTypesNone. This is a public WKWebView setting.
             let _: () =
                 msg_send![configuration, setMediaTypesRequiringUserActionForPlayback: 0usize];
             let current: usize = msg_send![configuration, mediaTypesRequiringUserActionForPlayback];
@@ -114,6 +116,64 @@ pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String>
                 target: "launcher",
                 "Theme media autoplay policy: {current}"
             );
+
+            // Configure webpage preferences for unconditional media autoplay
+            let default_preferences: *mut AnyObject = msg_send![configuration, defaultWebpagePreferences];
+            if !default_preferences.is_null() {
+                let sel = objc2::sel!(_setAutoplayPolicy:);
+                let responds: bool = msg_send![default_preferences, respondsToSelector: sel];
+                if responds {
+                    // 1 = _WKWebsiteAutoplayPolicyAllow (allow autoplay unconditionally)
+                    let _: () = msg_send![default_preferences, _setAutoplayPolicy: 1isize];
+                    log::debug!(target: "launcher", "Set WKWebpagePreferences._setAutoplayPolicy to Allow (1)");
+                }
+            }
+
+            // Configure WKPreferences
+            let preferences: *mut AnyObject = msg_send![configuration, preferences];
+            if !preferences.is_null() {
+                let sel_audio = objc2::sel!(_setRequiresUserGestureForAudioPlayback:);
+                let responds: bool = msg_send![preferences, respondsToSelector: sel_audio];
+                if responds {
+                    let _: () = msg_send![preferences, _setRequiresUserGestureForAudioPlayback: false];
+                }
+
+                let sel_video = objc2::sel!(_setRequiresUserGestureForVideoPlayback:);
+                let responds: bool = msg_send![preferences, respondsToSelector: sel_video];
+                if responds {
+                    let _: () = msg_send![preferences, _setRequiresUserGestureForVideoPlayback: false];
+                }
+
+                let sel_inline = objc2::sel!(_setAllowsInlineMediaPlayback:);
+                let responds: bool = msg_send![preferences, respondsToSelector: sel_inline];
+                if responds {
+                    let _: () = msg_send![preferences, _setAllowsInlineMediaPlayback: true];
+                }
+
+                let sel_inline_req = objc2::sel!(_setInlineMediaPlaybackRequiresPlaysInlineAttribute:);
+                let responds: bool = msg_send![preferences, respondsToSelector: sel_inline_req];
+                if responds {
+                    let _: () = msg_send![preferences, _setInlineMediaPlaybackRequiresPlaysInlineAttribute: false];
+                }
+
+                let sel_invis = objc2::sel!(_setInvisibleMediaAutoplayNotPermitted:);
+                let responds: bool = msg_send![preferences, respondsToSelector: sel_invis];
+                if responds {
+                    let _: () = msg_send![preferences, _setInvisibleMediaAutoplayNotPermitted: false];
+                }
+            }
+
+            let sel_media_load = objc2::sel!(_setMediaDataLoadsAutomatically:);
+            let responds: bool = msg_send![configuration, respondsToSelector: sel_media_load];
+            if responds {
+                let _: () = msg_send![configuration, _setMediaDataLoadsAutomatically: true];
+            }
+
+            let sel_audio_action = objc2::sel!(_setRequiresUserActionForAudioPlayback:);
+            let responds: bool = msg_send![configuration, respondsToSelector: sel_audio_action];
+            if responds {
+                let _: () = msg_send![configuration, _setRequiresUserActionForAudioPlayback: false];
+            }
         })
         .map_err(|error| format!("Could not enable theme media autoplay: {error}"))
 }

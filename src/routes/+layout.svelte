@@ -38,6 +38,7 @@
   import { exit, getLauncherVersion, getPlatform, setLoggingEnabled } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
   import {
+    initThemeMediaStatusListener,
     smoothThemeMedia,
     themeMediaPreparing,
     themeMediaStatus,
@@ -148,6 +149,8 @@
   }
 
   onMount(async () => {
+    initThemeMediaStatusListener();
+
     try {
       const ver = await getLauncherVersion();
       if (ver) launcherVersion.set(ver);
@@ -528,7 +531,7 @@
     <div
       class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/10 bg-black/75 px-4 py-2 text-xs font-medium text-white/80 shadow-xl backdrop-blur animate-pulse"
     >
-      {$themeMediaStatus || 'Preparing theme video for smooth playback…'}
+      {$themeMediaStatus || 'Converting theme video…'}
     </div>
   {/if}
 {/if}

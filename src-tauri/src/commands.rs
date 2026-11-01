@@ -1788,17 +1788,20 @@ pub async fn optimize_theme_media(app: AppHandle, source_url: String) -> Result<
             }
         };
 
-        let _ = app.emit(
-            "theme-media-progress",
-            ThemeMediaProgress {
-                stage: "optimize".to_string(),
-                progress: 0.0,
-            },
-        );
-
         let original = source_url.clone();
+        let app_handle = app.clone();
+        let on_progress = move |progress: f64| {
+            let _ = app_handle.emit(
+                "theme-media-progress",
+                ThemeMediaProgress {
+                    stage: "optimize".to_string(),
+                    progress,
+                },
+            );
+        };
+
         tokio::task::spawn_blocking(move || {
-            optimize_theme_media_blocking(&ffmpeg, &source, &original, &cache_name, &destination)
+            optimize_theme_media_blocking(&ffmpeg, &source, &original, &cache_name, &destination, on_progress)
         })
         .await
         .map_err(|error| format!("Theme media optimizer thread failed: {error}"))?
@@ -2059,13 +2062,82 @@ fn find_media_binary(name: &str) -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "macos")]
-fn optimize_theme_media_blocking(
+fn run_ffmpeg_with_progress<F>(
+    mut command: std::process::Command,
+    duration_us: Option<u64>,
+    on_progress: &F,
+) -> Result<(bool, String), String>
+where
+    F: Fn(f64) + Send + Sync,
+{
+    use std::io::{BufRead, BufReader, Read};
+
+    command.args(["-progress", "pipe:1"]);
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Could not spawn ffmpeg: {error}"))?;
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let stderr_thread = std::thread::spawn(move || {
+        let mut err_str = String::new();
+        if let Some(mut err) = stderr {
+            let _ = err.read_to_string(&mut err_str);
+        }
+        err_str
+    });
+
+    if let Some(out) = stdout {
+        let reader = BufReader::new(out);
+        let mut last_progress = 0.0;
+        let mut last_emit = std::time::Instant::now();
+
+        for line in reader.lines() {
+            let Ok(line) = line else { break };
+            if let Some(val_str) = line.strip_prefix("out_time_us=") {
+                if let Ok(us) = val_str.trim().parse::<u64>()
+                    && let Some(total_us) = duration_us
+                    && total_us > 0
+                {
+                    let progress = (us as f64 / total_us as f64).clamp(0.0, 0.99);
+                    if (progress - last_progress) >= 0.01
+                        || last_emit.elapsed() >= std::time::Duration::from_millis(250)
+                    {
+                        last_progress = progress;
+                        last_emit = std::time::Instant::now();
+                        on_progress(progress);
+                    }
+                }
+            } else if line.starts_with("progress=end") {
+                on_progress(1.0);
+            }
+        }
+    }
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("Failed waiting for ffmpeg: {error}"))?;
+    let stderr_str = stderr_thread.join().unwrap_or_default();
+
+    Ok((status.success(), stderr_str))
+}
+
+#[cfg(target_os = "macos")]
+fn optimize_theme_media_blocking<F>(
     ffmpeg: &Path,
     source: &Path,
     source_url: &str,
     cache_name: &str,
     destination: &Path,
-) -> Result<String, String> {
+    on_progress: F,
+) -> Result<String, String>
+where
+    F: Fn(f64) + Send + Sync,
+{
     use std::process::Command;
 
     let probe = Command::new(ffmpeg)
@@ -2089,6 +2161,17 @@ fn optimize_theme_media_blocking(
         return Ok(source_url.to_string());
     }
 
+    let duration_us = probe_text.lines().find_map(|line| {
+        let index = line.find("Duration: ")?;
+        let time_str = line[index + 10..].split(',').next()?.trim();
+        let mut parts = time_str.split(':');
+        let hours: f64 = parts.next()?.parse().ok()?;
+        let minutes: f64 = parts.next()?.parse().ok()?;
+        let seconds: f64 = parts.next()?.parse().ok()?;
+        let total_secs = hours * 3600.0 + minutes * 60.0 + seconds;
+        Some((total_secs * 1_000_000.0) as u64)
+    });
+
     let temporary = destination.with_extension("mp4.tmp");
     let _ = std::fs::remove_file(&temporary);
 
@@ -2098,6 +2181,7 @@ fn optimize_theme_media_blocking(
         source.display()
     );
     let started = std::time::Instant::now();
+    on_progress(0.0);
 
     let mut command = Command::new(ffmpeg);
     command.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i"]);
@@ -2131,18 +2215,14 @@ fn optimize_theme_media_blocking(
         "mp4",
     ]);
     command.arg(&temporary);
-    let first = command.output();
 
-    let success = match first {
-        Ok(output) if output.status.success() => true,
-        Ok(output) => {
+    let success = match run_ffmpeg_with_progress(command, duration_us, &on_progress) {
+        Ok((true, _)) => true,
+        Ok((false, stderr)) => {
             log::warn!(
                 target: "launcher",
                 "Hardware theme video encode failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-                    .chars()
-                    .take(500)
-                    .collect::<String>()
+                stderr.chars().take(500).collect::<String>()
             );
             false
         }
@@ -2186,16 +2266,14 @@ fn optimize_theme_media_blocking(
             "mp4",
         ]);
         fallback.arg(&temporary);
-        match fallback.output() {
-            Ok(output) if output.status.success() => true,
-            Ok(output) => {
+
+        match run_ffmpeg_with_progress(fallback, duration_us, &on_progress) {
+            Ok((true, _)) => true,
+            Ok((false, stderr)) => {
                 log::warn!(
                     target: "launcher",
                     "Software theme video encode failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                        .chars()
-                        .take(500)
-                        .collect::<String>()
+                    stderr.chars().take(500).collect::<String>()
                 );
                 false
             }
@@ -2213,6 +2291,7 @@ fn optimize_theme_media_blocking(
 
     std::fs::rename(&temporary, destination)
         .map_err(|error| format!("Could not store the optimized theme video: {error}"))?;
+    on_progress(1.0);
     log::info!(
         target: "launcher",
         "Optimized theme video in {:.1}s: {}",
