@@ -11,21 +11,34 @@
   const SPEED_THRESHOLD = 9;
   const REQUIRED_CONSECUTIVE = 3;
 
-  let mouseX = $state(0);
-  let mouseY = $state(0);
+  let currentX = 0;
+  let currentY = 0;
+  let targetX = 0;
+  let targetY = 0;
+  let prevAppliedX = -1;
+  let prevAppliedY = -1;
+  let hasMoved = false;
+
   let lastMouseX = 0;
   let lastMouseY = 0;
-  let isMouseDown = $state(false);
-  let isHoveringInteractive = $state(false);
+  let isMouseDown = false;
+  let isHoveringInteractive = false;
   let dragStartX = 0;
   let dragStartY = 0;
-  let degrees = $state(0);
-  let applyRotation = $state(false);
+  let targetDegrees = 0;
+  let currentDegrees = 0;
+  let applyRotation = false;
 
   let lastVelocityTime = 0;
   let consecutiveHighSpeed = 0;
   let velocityAccumX = 0;
   let velocityAccumY = 0;
+  let rotateSpringAnim: ReturnType<typeof animate> | null = null;
+
+  let cursor: HTMLElement;
+  let cursorRotateWrapper: HTMLDivElement;
+  let cursorInner: HTMLImageElement;
+  let cursorAdditive: HTMLImageElement;
 
   function isInteractive(el: Element | null): boolean {
     while (el) {
@@ -44,15 +57,36 @@
     return false;
   }
 
+  function dampContinuously(current: number, target: number, halfLife: number, dt: number): number {
+    if (halfLife <= 0 || dt <= 0) return target;
+    return target + (current - target) * Math.pow(0.5, dt / halfLife);
+  }
+
   const handleMouseMove = (e: MouseEvent) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    targetX = e.clientX;
+    targetY = e.clientY;
 
-    const deltaX = e.pageX - window.pageXOffset - dragStartX;
-    const deltaY = e.pageY - window.pageYOffset - dragStartY;
+    if (!hasMoved) {
+      currentX = targetX;
+      currentY = targetY;
+      prevAppliedX = targetX;
+      prevAppliedY = targetY;
+      lastMouseX = targetX;
+      lastMouseY = targetY;
+      hasMoved = true;
+      if (cursor) {
+        cursor.style.opacity = '1';
+        cursor.style.transform = `translate3d(${targetX}px, ${targetY}px, 0)`;
+      }
+      return;
+    }
 
-    velocityAccumX += mouseX - lastMouseX;
-    velocityAccumY += mouseY - lastMouseY;
+    if (cursor) {
+      cursor.style.opacity = '1';
+    }
+
+    velocityAccumX += targetX - lastMouseX;
+    velocityAccumY += targetY - lastMouseY;
 
     const now = performance.now();
     const dt = now - lastVelocityTime;
@@ -74,48 +108,33 @@
       lastVelocityTime = now;
     }
 
-    let newDegrees = (Math.atan2(-deltaX, deltaY) * 180) / Math.PI + 24.3;
-
-    let diff = (newDegrees - degrees) % 360;
-    if (diff < -180) diff += 360;
-    if (diff > 180) diff -= 360;
-
     if (isMouseDown && applyRotation) {
-      degrees += diff;
-    } else {
-      degrees = 0;
+      const deltaX = targetX - dragStartX;
+      const deltaY = targetY - dragStartY;
+      const newDegrees = (Math.atan2(-deltaX, deltaY) * 180) / Math.PI + 24.3;
+
+      let diff = (newDegrees - targetDegrees) % 360;
+      if (diff < -180) diff += 360;
+      if (diff > 180) diff -= 360;
+
+      targetDegrees += diff;
     }
 
-    const el = document.elementFromPoint(mouseX, mouseY);
-    isHoveringInteractive = isInteractive(el);
-
-    if (!isMouseDown) {
-      animate(cursorAdditive, {
-        opacity: isHoveringInteractive ? 1 : 0,
-        duration: 800,
-        ease: (t: number) => (t - 1) ** 5 + 1,
-      });
+    const el = document.elementFromPoint(targetX, targetY);
+    const hovering = isInteractive(el);
+    if (hovering !== isHoveringInteractive) {
+      isHoveringInteractive = hovering;
+      if (!isMouseDown) {
+        animate(cursorAdditive, {
+          opacity: isHoveringInteractive ? 1 : 0,
+          duration: 800,
+          ease: (t: number) => (t - 1) ** 5 + 1,
+        });
+      }
     }
 
-    animate(cursor, {
-      duration: smoothCursor ? $cursorSmoothness : 0,
-      translateX: mouseX,
-      translateY: mouseY,
-      ease: (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
-    });
-
-    animate(cursor, {
-      duration: isMouseDown ? 200 : 1500,
-      rotate: degrees,
-      transformOrigin: '0px 0px 0',
-      ease: (t: number) =>
-        isMouseDown
-          ? (t - 1) ** 7 + 1
-          : Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
-    });
-
-    lastMouseX = mouseX;
-    lastMouseY = mouseY;
+    lastMouseX = targetX;
+    lastMouseY = targetY;
   };
 
   const handleMouseDown = (event: MouseEvent) => {
@@ -128,6 +147,12 @@
     lastVelocityTime = performance.now();
 
     isMouseDown = true;
+
+    if (rotateSpringAnim) {
+      rotateSpringAnim.pause();
+      rotateSpringAnim = null;
+    }
+
     animate(cursorInner, {
       scale: 0.9,
       duration: 800,
@@ -143,6 +168,7 @@
 
   const handleMouseUp = () => {
     isMouseDown = false;
+    const hadRotation = applyRotation || Math.abs(currentDegrees) > 0.1;
     applyRotation = false;
     consecutiveHighSpeed = 0;
     velocityAccumX = 0;
@@ -154,21 +180,86 @@
       ease: (t: number) => Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
     });
     animate(cursorAdditive, {
-      opacity: 0,
+      opacity: isHoveringInteractive ? 1 : 0,
       duration: 500,
       scale: 1,
       ease: (t: number) => (t - 1) ** 5 + 1,
     });
+
+    if (hadRotation && cursorRotateWrapper) {
+      rotateSpringAnim = animate(cursorRotateWrapper, {
+        rotate: 0,
+        duration: 1200,
+        ease: (t: number) => Math.pow(2, -10 * t) * Math.sin((t - 0.075) * 20.94) + 1 - 0.0005 * t,
+        onComplete: () => {
+          currentDegrees = 0;
+          targetDegrees = 0;
+          rotateSpringAnim = null;
+        },
+      });
+    }
   };
 
-  let cursor: HTMLElement;
-  let cursorInner: HTMLDivElement;
-  let cursorAdditive: HTMLImageElement;
+  const handleMouseLeave = () => {
+    if (cursor) cursor.style.opacity = '0';
+  };
+
+  const handleMouseEnter = () => {
+    if (cursor && hasMoved) cursor.style.opacity = '1';
+  };
 
   onMount(() => {
     document.documentElement.classList.add('hiddenCursor');
+    document.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseenter', handleMouseEnter);
+
+    let animationFrameId: number;
+    let lastFrameTime = performance.now();
+
+    const tick = (now: number) => {
+      const dt = Math.min(Math.max(now - lastFrameTime, 0), 64);
+      lastFrameTime = now;
+
+      if (hasMoved && cursor) {
+        if (!smoothCursor) {
+          currentX = targetX;
+          currentY = targetY;
+        } else {
+          // Continuous exponential damping half-life in ms (mathematically invariant across refresh rates).
+          const halfLife = $cursorSmoothness > 50 ? 14 : Math.max(1, $cursorSmoothness || 14);
+          currentX = dampContinuously(currentX, targetX, halfLife, dt);
+          currentY = dampContinuously(currentY, targetY, halfLife, dt);
+        }
+
+        if (Math.abs(targetX - currentX) < 0.05) currentX = targetX;
+        if (Math.abs(targetY - currentY) < 0.05) currentY = targetY;
+
+        if (currentX !== prevAppliedX || currentY !== prevAppliedY) {
+          cursor.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+          prevAppliedX = currentX;
+          prevAppliedY = currentY;
+        }
+
+        if (isMouseDown && applyRotation && cursorRotateWrapper) {
+          const rotFactor = 1 - Math.pow(0.5, dt / 25);
+          currentDegrees += (targetDegrees - currentDegrees) * rotFactor;
+          cursorRotateWrapper.style.transform = `rotate(${currentDegrees}deg)`;
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(tick);
+    };
+
+    animationFrameId = requestAnimationFrame(tick);
+
     return () => {
       document.documentElement.classList.remove('hiddenCursor');
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mouseenter', handleMouseEnter);
+      cancelAnimationFrame(animationFrameId);
+      if (rotateSpringAnim) {
+        rotateSpringAnim.pause();
+      }
     };
   });
 </script>
@@ -179,8 +270,8 @@
   onmouseup={handleMouseUp}
 />
 
-<div class="h-7 w-7 fixed pointer-events-none z-[9999]" bind:this={cursor}>
-  <div class="relative">
+<div class="h-7 w-7 fixed top-0 left-0 pointer-events-none z-[9999] opacity-0" bind:this={cursor}>
+  <div class="relative origin-top-left" bind:this={cursorRotateWrapper}>
     <img class="absolute top-0 left-0" src={cursor_default} bind:this={cursorInner} alt="cursor" />
     <img
       class="absolute top-0 left-0 opacity-0"

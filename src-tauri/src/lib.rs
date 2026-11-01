@@ -30,7 +30,7 @@ use crate::{
         open_url_in_browser, opened_urls, optimize_theme_media, pick_osu_installation,
         presence_connect, presence_disconnect, presence_is_connected, presence_update_activity,
         presence_update_button, presence_update_status, presence_update_user, read_theme_info, replace_ui_files,
-        resolve_osu_folder, restore_theme_backup, run_open_tablet_driver, run_osu, run_osu_updater,
+        resolve_osu_folder, restore_theme_backup, reveal_window, run_open_tablet_driver, run_osu, run_osu_updater,
         save_theme_project, set_logging_enabled, set_osu_config_values, set_osu_user_config_values,
         stop_open_tablet_driver, theme_asset_base, theme_editor_context, theme_preview_url,
         valid_osu_folder,
@@ -212,6 +212,7 @@ pub fn run() {
             log_frontend,
             set_logging_enabled,
             open_logs_folder,
+            reveal_window,
             logging::list_log_bundles,
             logging::read_log_bundle
         ])

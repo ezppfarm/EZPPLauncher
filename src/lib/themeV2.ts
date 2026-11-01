@@ -1664,8 +1664,8 @@ export const createThemeV2Element = (type: ThemeV2Element['type'], index = 0): T
         ...base,
         type,
         widget: 'launch-button',
-        width: 220,
-        height: 60,
+        width: 256,
+        height: 48,
       },
       index
     )! as ThemeV2WidgetElement;

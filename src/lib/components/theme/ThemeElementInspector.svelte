@@ -2322,7 +2322,7 @@
                   element.width = 140;
                   element.height = 42;
                 } else if (val === 'primary') {
-                  element.width = 210;
+                  element.width = 256;
                   element.height = 48;
                 }
               } else if (element.widget === 'header') {

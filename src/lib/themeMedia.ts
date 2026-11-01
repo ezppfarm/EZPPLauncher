@@ -197,7 +197,7 @@ const armAutoplayRetry = (node: HTMLMediaElement) => {
   document.addEventListener('keydown', retry, true);
 };
 
-const playThemeMedia = (node: HTMLMediaElement) => {
+export const playThemeMedia = (node: HTMLMediaElement) => {
   void node
     .play()
     .then(() => {
@@ -498,10 +498,10 @@ export function themeMediaSuspension(node: HTMLElement) {
 }
 
 /**
- * Pause background videos while the launcher is hidden or unfocused, then
- * resume only the videos this helper paused itself. This keeps muted theme
- * videos from decoding in the background and prevents surprise audio when the
- * window comes back.
+ * Manage background video playback across document visibility changes.
+ * Videos continue playing when the launcher window loses focus. Muted background
+ * videos pause only when the document is hidden/minimized to save GPU decoding
+ * cycles without interrupting theme music or audio.
  */
 export function themeVideoLifecycle(node: HTMLVideoElement) {
   let pausedByLifecycle = false;
@@ -513,26 +513,29 @@ export function themeVideoLifecycle(node: HTMLVideoElement) {
   };
 
   const resume = () => {
-    if (!pausedByLifecycle) return;
+    if (!pausedByLifecycle && !node.autoplay && !node.loop) return;
     pausedByLifecycle = false;
     playThemeMedia(node);
   };
 
   const sync = () => {
-    if (document.visibilityState === 'visible' && document.hasFocus()) resume();
-    else pause();
+    if (!node.isConnected) {
+      document.removeEventListener('visibilitychange', sync);
+      return;
+    }
+    if (document.visibilityState === 'visible') {
+      resume();
+    } else if (node.muted || node.volume === 0) {
+      pause();
+    }
   };
 
   document.addEventListener('visibilitychange', sync);
-  window.addEventListener('focus', sync);
-  window.addEventListener('blur', sync);
   sync();
 
   return {
     destroy() {
       document.removeEventListener('visibilitychange', sync);
-      window.removeEventListener('focus', sync);
-      window.removeEventListener('blur', sync);
     },
   };
 }
@@ -564,8 +567,14 @@ export function themeMediaSource(node: HTMLMediaElement, source: string) {
  */
 export function smoothThemeMedia(node: HTMLElement) {
   const lastSource = new WeakMap<HTMLMediaElement, string>();
+  const videoLifecycles = new WeakMap<HTMLVideoElement, () => void>();
 
   const prepare = (media: HTMLMediaElement) => {
+    if (media instanceof HTMLVideoElement && !videoLifecycles.has(media)) {
+      const lifecycle = themeVideoLifecycle(media);
+      videoLifecycles.set(media, () => lifecycle.destroy());
+    }
+
     const source =
       media.getAttribute('src') ??
       media.querySelector<HTMLSourceElement>('source[src]')?.getAttribute('src') ??
@@ -594,6 +603,18 @@ export function smoothThemeMedia(node: HTMLElement) {
 
       for (const added of mutation.addedNodes) {
         if (added instanceof HTMLElement) scan(added);
+      }
+
+      for (const removed of mutation.removedNodes) {
+        if (removed instanceof HTMLVideoElement) {
+          videoLifecycles.get(removed)?.();
+          videoLifecycles.delete(removed);
+        } else if (removed instanceof HTMLElement) {
+          removed.querySelectorAll?.<HTMLVideoElement>('video').forEach((video) => {
+            videoLifecycles.get(video)?.();
+            videoLifecycles.delete(video);
+          });
+        }
       }
     }
   });

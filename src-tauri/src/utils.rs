@@ -353,8 +353,197 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
 }
 
 #[cfg(target_os = "macos")]
-pub fn get_window_title_by_pid(_pid: Pid) -> String {
-    String::new()
+pub fn get_window_title_by_pid(target_pid: Pid) -> String {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use std::ffi::CStr;
+
+    #[repr(C)]
+    struct CGPoint {
+        x: f64,
+        y: f64,
+    }
+
+    #[repr(C)]
+    struct CGSize {
+        width: f64,
+        height: f64,
+    }
+
+    #[repr(C)]
+    struct CGRect {
+        origin: CGPoint,
+        size: CGSize,
+    }
+
+    unsafe extern "C" {
+        fn CGWindowListCopyWindowInfo(option: u32, relative_to_window: u32) -> *mut AnyObject;
+        fn CGRectMakeWithDictionaryRepresentation(
+            dict: *const AnyObject,
+            rect: *mut CGRect,
+        ) -> bool;
+    }
+
+    unsafe {
+        // kCGWindowListOptionAll = 0, kCGNullWindowID = 0
+        let window_list: *mut AnyObject = CGWindowListCopyWindowInfo(0, 0);
+        if window_list.is_null() {
+            return String::new();
+        }
+
+        let count: usize = msg_send![window_list, count];
+        let pid_key: *mut AnyObject = msg_send![
+            objc2::class!(NSString),
+            stringWithUTF8String: c"kCGWindowOwnerPID".as_ptr()
+        ];
+        let name_key: *mut AnyObject = msg_send![
+            objc2::class!(NSString),
+            stringWithUTF8String: c"kCGWindowName".as_ptr()
+        ];
+        let owner_key: *mut AnyObject = msg_send![
+            objc2::class!(NSString),
+            stringWithUTF8String: c"kCGWindowOwnerName".as_ptr()
+        ];
+        let bounds_key: *mut AnyObject = msg_send![
+            objc2::class!(NSString),
+            stringWithUTF8String: c"kCGWindowBounds".as_ptr()
+        ];
+        let layer_key: *mut AnyObject = msg_send![
+            objc2::class!(NSString),
+            stringWithUTF8String: c"kCGWindowLayer".as_ptr()
+        ];
+
+        let target_u32 = target_pid.as_u32();
+
+        // Pass 1: Try exact target_pid match.
+        // Pass 2: If target_pid produced no onscreen windows, check Wine/osu! owner windows
+        // (handles Wine 32-on-64 architecture where wine32on64 delegates window creation to wine64-preloader).
+        for fallback_pass in [false, true] {
+            let mut found_game_title = String::new();
+            let mut found_updater_title = String::new();
+            let mut has_game_window = false;
+            let mut has_updater_window = false;
+
+            for i in 0..count {
+                let dict: *mut AnyObject = msg_send![window_list, objectAtIndex: i];
+                if dict.is_null() {
+                    continue;
+                }
+
+                let pid_num: *mut AnyObject = msg_send![dict, objectForKey: pid_key];
+                if pid_num.is_null() {
+                    continue;
+                }
+                let pid_val: u32 = msg_send![pid_num, unsignedIntValue];
+
+                let is_match = if !fallback_pass {
+                    target_u32 != 0 && pid_val == target_u32
+                } else {
+                    let owner_str: *mut AnyObject = msg_send![dict, objectForKey: owner_key];
+                    if !owner_str.is_null() {
+                        let utf8: *const std::ffi::c_char = msg_send![owner_str, UTF8String];
+                        if !utf8.is_null() {
+                            if let Ok(owner) = CStr::from_ptr(utf8).to_str() {
+                                let lower = owner.to_lowercase();
+                                lower.contains("wine") || lower.contains("osu")
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                };
+
+                if !is_match {
+                    continue;
+                }
+
+                // Check layer: valid application window layers are 0..=50
+                // (e.g. 0 for normal windows, 3 for floating/focused, 27 for Wine fullscreen/borderless shields)
+                let layer_num: *mut AnyObject = msg_send![dict, objectForKey: layer_key];
+                let layer: i32 = if !layer_num.is_null() {
+                    msg_send![layer_num, intValue]
+                } else {
+                    0
+                };
+                if layer < 0 || layer > 50 {
+                    continue;
+                }
+
+                // 1. Check kCGWindowName if available
+                let name_str: *mut AnyObject = msg_send![dict, objectForKey: name_key];
+                if !name_str.is_null() {
+                    let utf8: *const std::ffi::c_char = msg_send![name_str, UTF8String];
+                    if !utf8.is_null() {
+                        if let Ok(s) = CStr::from_ptr(utf8).to_str() {
+                            let trimmed = s.trim();
+                            if !trimmed.is_empty() {
+                                if trimmed.to_lowercase().contains("updater") {
+                                    found_updater_title = trimmed.to_string();
+                                } else {
+                                    found_game_title = trimmed.to_string();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Check window bounds
+                let bounds_dict: *mut AnyObject = msg_send![dict, objectForKey: bounds_key];
+                if !bounds_dict.is_null() {
+                    let mut rect = CGRect {
+                        origin: CGPoint { x: 0.0, y: 0.0 },
+                        size: CGSize {
+                            width: 0.0,
+                            height: 0.0,
+                        },
+                    };
+                    if CGRectMakeWithDictionaryRepresentation(bounds_dict, &mut rect) {
+                        // Ignore menu bar overlays (height <= 50) and tiny dummy windows (<= 100x100)
+                        if rect.size.height > 50.0 && rect.size.width > 100.0 {
+                            // Ignore Wine's default 500x500 dummy desktop surface
+                            let is_wine_default_desktop = (rect.size.width - 500.0).abs() < 2.0
+                                && (rect.size.height - 500.0).abs() < 2.0;
+
+                            if !is_wine_default_desktop {
+                                if rect.size.width >= 640.0 && rect.size.height >= 480.0 {
+                                    has_game_window = true;
+                                    break;
+                                } else if rect.size.width >= 200.0 && rect.size.height >= 80.0 {
+                                    has_updater_window = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let has_result = !found_game_title.is_empty()
+                || has_game_window
+                || !found_updater_title.is_empty()
+                || has_updater_window;
+
+            if has_result {
+                let _: () = msg_send![window_list, release];
+                if !found_game_title.is_empty() {
+                    return found_game_title;
+                } else if has_game_window {
+                    return "osu!".to_string();
+                } else if !found_updater_title.is_empty() {
+                    return found_updater_title;
+                } else {
+                    return "osu! updater".to_string();
+                }
+            }
+        }
+
+        let _: () = msg_send![window_list, release];
+        String::new()
+    }
 }
 
 #[cfg(windows)]
@@ -512,4 +701,210 @@ pub fn encrypt_password(password: &str, entropy: &str) -> Result<String, String>
     let base64_string = general_purpose::STANDARD.encode(&encrypted_data);
 
     Ok(base64_string)
+}
+
+/// Check if the patcher binary has already been patched for .NET 4.0 compatibility under Wine.
+pub fn is_compatible_patcher(data: &[u8]) -> bool {
+    let has_pbi_patch = data
+        .windows(6)
+        .any(|w| w == [0x1f, 0x18, 0x00, 0x00, 0x00, 0x00]);
+    let has_devserver_patch = data
+        .windows(7)
+        .any(|w| w == [0x26, 0x26, 0x2b, 0x0e, 0x00, 0x00, 0x00]);
+    has_pbi_patch && has_devserver_patch
+}
+
+/// Ensure `osu!.patcher.exe` is compatible with .NET Framework 4.0 runtime (used by Wine).
+///
+/// In .NET 4.0 (the runtime provided by Wine prefixes for osu! stable), generic `Marshal.SizeOf<T>()`
+/// does not exist (added in .NET 4.5.1), causing a `MissingMethodException` when `GetCommandLine()`
+/// queries `PROCESS_BASIC_INFORMATION`. Additionally:
+/// 1. `Console.ReadKey()` crashes with `InvalidOperationException` when stdio is redirected without a console.
+/// 2. `GetOsuPid()` checks for `" -devserver "` via PEB reading, which fails or is unreliable under Wine.
+/// 3. Costura embeds `ManagedInjector.Lib` which also calls generic `Marshal.SizeOf<Native.ModuleEntry32>()`
+///    and parses remote PE export tables through generic marshal APIs.
+/// This function patches the binary in-place so it runs reliably under Wine.
+pub fn ensure_patcher_compatibility(patcher_exe: &Path) -> Result<bool, String> {
+    if !patcher_exe.is_file() {
+        return Ok(false);
+    }
+
+    // Clean up loose ManagedInjector.Lib.dll if present, as CLR loads loose assemblies before Costura resources.
+    if let Some(parent) = patcher_exe.parent() {
+        let loose = parent.join("ManagedInjector.Lib.dll");
+        if loose.is_file() {
+            let _ = fs::remove_file(&loose);
+        }
+    }
+
+    let mut data = fs::read(patcher_exe)
+        .map_err(|e| format!("Failed to read {}: {e}", patcher_exe.display()))?;
+    let mut modified = false;
+
+    // Pattern 1 in GetCommandLine: ldloc.0, ldc.i4.0, ldloca.s 1, ldloc.1, call Marshal.SizeOf<PBI>
+    // [0x06, 0x16, 0x12, 0x01, 0x07, 0x28, 0x01, 0x00, 0x00, 0x2b]
+    let sizeof_pattern = [0x06, 0x16, 0x12, 0x01, 0x07, 0x28, 0x01, 0x00, 0x00, 0x2b];
+    if let Some(pos) = data
+        .windows(sizeof_pattern.len())
+        .position(|w| w == sizeof_pattern)
+    {
+        // Replace ldloc.1 (0x07) and call Marshal.SizeOf<PBI> (0x28, 0x01, 0x00, 0x00, 0x2b) with ldc.i4.s 24 (0x1f, 0x18) + 4 nops
+        let target = pos + 4;
+        data[target..target + 6].copy_from_slice(&[0x1f, 0x18, 0x00, 0x00, 0x00, 0x00]);
+        modified = true;
+    }
+
+    // Pattern 2 in Main catch handler: call Console.Write, call Console.ReadKey, pop, leave.s
+    // [0x28, 0x12, 0x00, 0x00, 0x0a, 0x28, 0x13, 0x00, 0x00, 0x0a, 0x26, 0xde]
+    let readkey_pattern = [
+        0x28, 0x12, 0x00, 0x00, 0x0a, 0x28, 0x13, 0x00, 0x00, 0x0a, 0x26, 0xde,
+    ];
+    if let Some(pos) = data
+        .windows(readkey_pattern.len())
+        .position(|w| w == readkey_pattern)
+    {
+        // Replace call Console.ReadKey() (5 bytes) + pop (1 byte) with 6 nops
+        let target = pos + 5;
+        data[target..target + 6].copy_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        modified = true;
+    }
+
+    // Pattern 3 in GetOsuPid: devserver check bypass
+    // [0x72, 0x95, 0x01, 0x00, 0x70, 0x6f, 0x15, 0x00, 0x00, 0x0a, 0x2d, 0x0b]
+    let dev_pattern = [
+        0x72, 0x95, 0x01, 0x00, 0x70, 0x6f, 0x15, 0x00, 0x00, 0x0a, 0x2d, 0x0b,
+    ];
+    if let Some(pos) = data
+        .windows(dev_pattern.len())
+        .position(|w| w == dev_pattern)
+    {
+        // Replace callvirt Contains + brtrue.s with pop, pop, br.s + 3 nops
+        let target = pos + 5;
+        data[target..target + 7].copy_from_slice(&[0x26, 0x26, 0x2b, 0x0e, 0x00, 0x00, 0x00]);
+        modified = true;
+    }
+
+    // Pattern 4: Costura embedded ManagedInjector.Lib resource at offset 0x1f00 (length 10020)
+    if data.len() >= 0x1f00 + 10020 && data.get(0x1efc..0x1f00) == Some(&[0x24, 0x27, 0x00, 0x00]) {
+        use flate2::read::DeflateDecoder;
+        use flate2::write::DeflateEncoder;
+        use flate2::Compression;
+        use std::io::{Read, Write};
+
+        let stream = &data[0x1f00..0x1f00 + 10020];
+        let mut decoder = DeflateDecoder::new(stream);
+        let mut decomp = Vec::new();
+        if decoder.read_to_end(&mut decomp).is_ok() {
+            let mut inner_modified = false;
+
+            // 4a. NativeHelper.GetModules: Marshal.SizeOf<ModuleEntry32>() -> ldc.i4 548
+            let module_pattern = [0x12, 0x04, 0x28, 0x08, 0x00, 0x00, 0x2b];
+            if let Some(pos) = decomp.windows(module_pattern.len()).position(|w| w == module_pattern) {
+                decomp[pos + 2..pos + 7].copy_from_slice(&[0x20, 0x24, 0x02, 0x00, 0x00]);
+                inner_modified = true;
+            }
+
+            // 4b. InjectableProcess.GetArchitecture: return NetFrameworkV4 (2) immediately
+            let arch_pattern = [
+                0x02, 0x7b, 0x0a, 0x00, 0x00, 0x04, 0x2c, 0x07, 0x02, 0x7b, 0x0a, 0x00, 0x00,
+                0x04, 0x2a,
+            ];
+            if let Some(pos) = decomp.windows(arch_pattern.len()).position(|w| w == arch_pattern) {
+                decomp[pos..pos + 2].copy_from_slice(&[0x18, 0x2a]); // ldc.i4.2, ret
+                decomp[pos + 2..pos + 15].fill(0x00); // 13 nops
+                inner_modified = true;
+            }
+
+            // 4c. FrameworkInjectorBase.GetCorBindToRuntimeExAddress: return 0x17b55 directly without remote PE parsing
+            let corbind_pattern = [
+                0x03, 0x06, 0x7b, 0x65, 0x00, 0x00, 0x0a, 0x72, 0x3d, 0x03, 0x00, 0x70, 0x04,
+                0x28, 0x08, 0x00, 0x00, 0x06, 0x0b,
+            ];
+            if let Some(pos) = decomp.windows(corbind_pattern.len()).position(|w| w == corbind_pattern) {
+                decomp[pos..pos + 6].copy_from_slice(&[0x20, 0x55, 0x7b, 0x01, 0x00, 0x0b]); // ldc.i4 0x17b55, stloc.1
+                decomp[pos + 6..pos + 19].fill(0x00); // 13 nops
+                inner_modified = true;
+            }
+
+            if inner_modified {
+                let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+                if encoder.write_all(&decomp).is_ok() {
+                    if let Ok(mut compressed) = encoder.finish() {
+                        if compressed.len() <= 10020 - 5 {
+                            let remaining = 10020 - compressed.len();
+                            let length = (remaining - 5) as u16;
+                            let nlen = !length;
+                            compressed.push(0x01); // BFINAL = 1, BTYPE = 00
+                            compressed.push((length & 0xff) as u8);
+                            compressed.push((length >> 8) as u8);
+                            compressed.push((nlen & 0xff) as u8);
+                            compressed.push((nlen >> 8) as u8);
+                            compressed.extend(std::iter::repeat(0x00).take(length as usize));
+                            if compressed.len() == 10020 {
+                                data[0x1f00..0x1f00 + 10020].copy_from_slice(&compressed);
+                                modified = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if modified {
+        fs::write(patcher_exe, &data)
+            .map_err(|e| format!("Failed to write {}: {e}", patcher_exe.display()))?;
+        log::info!(
+            target: "patcher",
+            "Applied .NET 4.0 compatibility patch to {}",
+            patcher_exe.display()
+        );
+    }
+
+    Ok(modified)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_patcher_compatibility_patch() {
+        let mut fake_binary = vec![0x90; 0x3000];
+        let pbi = [0x06, 0x16, 0x12, 0x01, 0x07, 0x28, 0x01, 0x00, 0x00, 0x2b];
+        fake_binary[10..10 + pbi.len()].copy_from_slice(&pbi);
+        let readkey = [
+            0x28, 0x12, 0x00, 0x00, 0x0a, 0x28, 0x13, 0x00, 0x00, 0x0a, 0x26, 0xde,
+        ];
+        fake_binary[30..30 + readkey.len()].copy_from_slice(&readkey);
+        let devserver = [
+            0x72, 0x95, 0x01, 0x00, 0x70, 0x6f, 0x15, 0x00, 0x00, 0x0a, 0x2d, 0x0b,
+        ];
+        fake_binary[50..50 + devserver.len()].copy_from_slice(&devserver);
+
+        let temp_file = std::env::temp_dir().join("test_patcher_compat.exe");
+        std::fs::write(&temp_file, &fake_binary).unwrap();
+        let modified = ensure_patcher_compatibility(&temp_file).unwrap();
+        assert!(modified);
+        let patched_data = std::fs::read(&temp_file).unwrap();
+        assert!(is_compatible_patcher(&patched_data));
+        let _ = std::fs::remove_file(temp_file);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_get_window_title_macos() {
+        let _ = get_window_title_by_pid(Pid::from_u32(0));
+    }
+
+    #[test]
+    fn test_patcher_compatibility_real_patcher() {
+        let real_patcher = Path::new("/Applications/osu!(stable).app/Contents/Resources/drive_c/osu!/EZPPLauncher/patcher/osu!.patcher.exe");
+        if real_patcher.is_file() {
+            let res = ensure_patcher_compatibility(real_patcher);
+            assert!(res.is_ok());
+            let data = std::fs::read(real_patcher).unwrap();
+            assert!(is_compatible_patcher(&data));
+        }
+    }
 }

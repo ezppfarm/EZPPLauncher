@@ -1296,8 +1296,9 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
       fillRoundedRect(ctx, element.x, element.y, element.width, element.height, radius, accent);
       ctx.restore();
 
-      const circleR = Math.max(12, element.height * 0.32);
-      const circleX = element.x + circleR + 10;
+      const baseDim = Math.min(element.width, element.height);
+      const circleR = Math.round(baseDim * 0.35);
+      const circleX = element.x + baseDim / 2;
       ctx.beginPath();
       ctx.arc(circleX, centerY, circleR, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -1307,7 +1308,12 @@ const drawWidgetElement = async (context: PreviewContext, element: ThemeV2Widget
 
       ctx.save();
       ctx.fillStyle = accentText;
-      ctx.font = canvasFont(context, bodyFont, Math.min(14, element.height * 0.33), 700);
+      const availableTextW = Math.max(50, element.width - baseDim);
+      const textFontSize = Math.max(
+        10,
+        Math.min(Math.round(baseDim * 0.32), Math.round((availableTextW * 0.85) / 6))
+      );
+      ctx.font = canvasFont(context, bodyFont, textFontSize, 700);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const textCenterX = circleX + circleR + (element.x + element.width - (circleX + circleR)) / 2;

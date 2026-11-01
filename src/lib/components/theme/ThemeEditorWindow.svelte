@@ -2238,7 +2238,7 @@
         element.width = 340;
         element.height = 64;
       } else if (widgetKind === 'launch-button') {
-        element.width = 210;
+        element.width = 256;
         element.height = 48;
       }
     }
@@ -2290,9 +2290,9 @@
         ) as ThemeV2WidgetElement;
         launchBtn.widget = 'launch-button';
         launchBtn.name = 'Launch Button';
-        launchBtn.x = 740;
+        launchBtn.x = 720;
         launchBtn.y = 575;
-        launchBtn.width = 210;
+        launchBtn.width = 256;
         launchBtn.height = 48;
         newElements.push(launchBtn);
         existing = launchBtn;

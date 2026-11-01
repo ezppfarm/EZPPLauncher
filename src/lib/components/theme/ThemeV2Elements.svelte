@@ -3,6 +3,7 @@
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeLottieLayer from '$lib/components/theme/ThemeLottieLayer.svelte';
   import * as Avatar from '$lib/components/ui/avatar';
+  import DownloadButton from '$lib/components/ui/download-button/DownloadButton.svelte';
   import { currentUserInfo } from '$lib/data';
   import { launching as launchingStore } from '$lib/global';
   import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
@@ -70,6 +71,7 @@
     launching = undefined,
     launchProgress = -1,
     launchText = 'Launch',
+    launchSubtext = undefined,
     launchDisabled = false,
     oninteraction,
     onselect,
@@ -103,6 +105,7 @@
     launching?: boolean;
     launchProgress?: number;
     launchText?: string;
+    launchSubtext?: string;
     launchDisabled?: boolean;
     oninteraction?: (id: string, type: 'click' | 'hover' | 'leave') => void;
     onselect?: (id: string | undefined, additive?: boolean) => void;
@@ -1613,14 +1616,25 @@
             }}
           >
             {#if isActionLaunch && isLaunching}
-              <ThemeIcon name="loader" set={iconSet} size="1.1em" class="animate-spin" />
+              {#if launchProgress >= 0}
+                <span class="text-[11px] font-bold">{Math.round(launchProgress)}%</span>
+              {:else}
+                <ThemeIcon name="loader" set={iconSet} size="1.1em" class="animate-spin" />
+              {/if}
             {:else if element.icon}
               <ThemeIcon name={element.icon} set={iconSet} size="1.1em" />
             {/if}
             {#if isActionLaunch && isLaunching}
-              <span class="truncate">
-                {launchProgress > 0 ? `${launchText} (${Math.round(launchProgress)}%)` : launchText}
-              </span>
+              <div class="flex flex-col items-center justify-center min-w-0">
+                <span class="truncate">
+                  {launchProgress >= 0
+                    ? `${launchText} (${Math.round(launchProgress)}%)`
+                    : launchText}
+                </span>
+                {#if launchSubtext}
+                  <span class="text-[10px] opacity-75 truncate max-w-[140px]">{launchSubtext}</span>
+                {/if}
+              </div>
             {:else if isMorphEnabled(element)}
               <TextMorph
                 text={String(interpolateThemeText(element.label, variables) ?? '')}
@@ -1852,7 +1866,7 @@
                 )}
                 {@const btnCircumference = 2 * Math.PI * btnRadius}
                 {@const strokeOffset =
-                  launchProgress === -1
+                  launchProgress < 0
                     ? btnCircumference * 0.7
                     : btnCircumference -
                       (Math.max(0, Math.min(100, launchProgress)) / 100) * btnCircumference}
@@ -1870,12 +1884,16 @@
                       onbuttonaction?.({ type: 'launch' });
                     }
                   }}
-                  title={isLaunching ? launchText : 'Launch osu!'}
+                  title={isLaunching
+                    ? launchSubtext
+                      ? `${launchText} - ${launchSubtext}`
+                      : launchText
+                    : 'Launch osu!'}
                 >
                   {#if isLaunching}
                     <!-- Rotating progress ring SVG -->
                     <svg
-                      class="absolute inset-0 h-full w-full {launchProgress === -1
+                      class="absolute inset-0 h-full w-full {launchProgress < 0
                         ? 'animate-spin'
                         : '-rotate-90'}"
                       viewBox="0 0 {element.width} {element.height}"
@@ -1902,7 +1920,7 @@
                       />
                     </svg>
 
-                    {#if launchProgress > 0}
+                    {#if launchProgress >= 0}
                       <span
                         class="relative z-10 text-[11px] font-black tracking-tight text-primary-foreground"
                       >
@@ -1910,9 +1928,9 @@
                       </span>
                     {:else}
                       <ThemeIcon
-                        name="loader"
+                        name="ellipsis"
                         set={iconSet}
-                        class="relative z-10 size-6 animate-spin text-primary-foreground"
+                        class="relative z-10 size-4 animate-pulse text-primary-foreground"
                       />
                     {/if}
                   {:else}
@@ -1934,61 +1952,53 @@
                       onbuttonaction?.({ type: 'launch' });
                     }
                   }}
-                  title={isLaunching ? launchText : 'Launch osu!'}
+                  title={isLaunching
+                    ? launchSubtext
+                      ? `${launchText} - ${launchSubtext}`
+                      : launchText
+                    : 'Launch osu!'}
                 >
                   {#if isLaunching}
-                    <ThemeIcon
-                      name="loader"
-                      set={iconSet}
-                      class="size-3.5 animate-spin fill-current"
-                    />
-                    <span>{launchProgress > 0 ? `${Math.round(launchProgress)}%` : launchText}</span
-                    >
+                    {#if launchProgress >= 0}
+                      <span class="text-[11px] font-black">{Math.round(launchProgress)}%</span>
+                    {:else}
+                      <ThemeIcon
+                        name="loader"
+                        set={iconSet}
+                        class="size-3.5 animate-spin fill-current"
+                      />
+                    {/if}
+                    <div class="flex flex-col items-center justify-center min-w-0">
+                      <span class="truncate">{launchText}</span>
+                      {#if launchSubtext}
+                        <span class="text-[9px] opacity-75 truncate max-w-[140px]"
+                          >{launchSubtext}</span
+                        >
+                      {/if}
+                    </div>
                   {:else}
                     <ThemeIcon name="launch" set={iconSet} class="size-3.5 fill-current" />
                     <span>Launch</span>
                   {/if}
                 </button>
               {:else}
-                <button
-                  type="button"
-                  class="relative flex h-full w-full items-center justify-center gap-2.5 rounded-full bg-primary px-5 font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-all {isLaunching
-                    ? 'cursor-wait brightness-95'
-                    : launchDisabled
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer hover:brightness-110 active:scale-[0.98]'}"
-                  disabled={launchDisabled || isLaunching}
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    if (!launchDisabled && !isLaunching) {
-                      onbuttonaction?.({ type: 'launch' });
-                    }
-                  }}
-                  title={isLaunching ? launchText : 'Launch osu!'}
-                >
-                  <div class="flex size-7 items-center justify-center rounded-full bg-black/20">
-                    {#if isLaunching}
-                      <ThemeIcon
-                        name="loader"
-                        set={iconSet}
-                        class="size-3.5 animate-spin text-primary-foreground"
-                      />
-                    {:else}
-                      <ThemeIcon
-                        name="launch"
-                        set={iconSet}
-                        class="ml-0.5 size-3.5 fill-current text-primary-foreground"
-                      />
-                    {/if}
-                  </div>
-                  <span class="text-sm font-bold tracking-wide">
-                    {isLaunching
-                      ? launchProgress > 0
-                        ? `${launchText} (${Math.round(launchProgress)}%)`
-                        : launchText
-                      : 'Launch'}
-                  </span>
-                </button>
+                <div class="flex h-full w-full items-center justify-center">
+                  <DownloadButton
+                    downloading={isLaunching}
+                    progress={launchProgress}
+                    text={isLaunching ? launchText : 'Launch'}
+                    subtext={launchSubtext}
+                    disabled={launchDisabled}
+                    {iconSet}
+                    class="h-full w-full justify-center"
+                    onClick={() => {
+                      if (interactive) return;
+                      if (!launchDisabled && !isLaunching) {
+                        onbuttonaction?.({ type: 'launch' });
+                      }
+                    }}
+                  />
+                </div>
               {/if}
             {:else if element.widget === 'player-card'}
               {@const playerStats =

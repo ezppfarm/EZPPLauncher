@@ -4,7 +4,6 @@
   import { git } from '$lib/api/git';
   import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
-  import { estimateFrameRate } from '$lib/displayUtils';
   import {
     beatmapSets,
     currentLoadingInfo,
@@ -30,12 +29,7 @@
   } from '$lib/osuUtil';
   import type { EZPPUser } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
-  import {
-    cursorSmoothness,
-    osuInstallationPath,
-    preferredMode,
-    preferredType,
-  } from '$lib/userSettings';
+  import { osuInstallationPath, preferredMode, preferredType } from '$lib/userSettings';
   import Launch from './Launch.svelte';
   import SetupWizard from './SetupWizard.svelte';
   import { animate, utils } from 'animejs';
@@ -65,21 +59,7 @@
     }, 450);
   };
 
-  const calculateCursorSmoothness = async () => {
-    const refreshRate = await estimateFrameRate();
-    const hzMin = 60;
-    const hzMax = 500;
-    const durationMin = 350;
-    const durationMax = 600;
-    const clamped = Math.min(Math.max(refreshRate, hzMin), hzMax);
-    const duration =
-      durationMin + ((clamped - hzMin) / (hzMax - hzMin)) * (durationMax - durationMin);
-    cursorSmoothness.set(Math.round(duration));
-  };
-
   const prepare = async () => {
-    await calculateCursorSmoothness();
-
     const username = await config.value<string>('username').get('');
     const password = await config.value<string>('password').get('');
 

@@ -742,7 +742,9 @@ pub async fn get_ezpp_launcher_update_files(
         if file_path.exists() {
             let data = fs::read(&file_path).await.map_err(|e| e.to_string())?;
             let hash = format!("{:x}", md5::compute(&data));
-            if hash.to_lowercase() != file.md5.to_lowercase() {
+            let matches = hash.eq_ignore_ascii_case(&file.md5)
+                || (file.name == "osu!.patcher.exe" && crate::utils::is_compatible_patcher(&data));
+            if !matches {
                 files_to_download.push(file.clone());
             }
         } else {
@@ -832,6 +834,11 @@ pub async fn download_ezpp_launcher_update_files(
             )
             .unwrap_or_default();
         }
+    }
+
+    let patcher_exe = osu_path.join("EZPPLauncher").join("patcher").join("osu!.patcher.exe");
+    if patcher_exe.is_file() {
+        let _ = crate::utils::ensure_patcher_compatibility(&patcher_exe);
     }
 
     Ok(())
@@ -2910,4 +2917,30 @@ pub fn config_clear(state: State<AppState>) -> Result<(), ConfigError> {
 #[tauri::command]
 pub fn config_all(state: State<AppState>) -> Result<Vec<(String, Value)>, ConfigError> {
     state.config.lock().unwrap().all()
+}
+
+#[tauri::command]
+pub async fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let win = window.clone();
+    window
+        .run_on_main_thread(move || {
+            let _ = win.show();
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+
+            #[cfg(target_os = "macos")]
+            {
+                let res = crate::macos::activate_and_focus_window(&win);
+                let _ = tx.send(res);
+                return;
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            let _ = tx.send(Ok(()));
+        })
+        .map_err(|e| e.to_string())?;
+
+    rx.await
+        .map_err(|_| "Main thread channel closed".to_string())?
 }

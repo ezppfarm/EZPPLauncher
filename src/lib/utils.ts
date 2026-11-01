@@ -1,4 +1,5 @@
 import { custom_theme_audio_playing } from './global';
+import { playThemeMedia } from './themeMedia';
 import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import * as crypto from 'crypto-js';
@@ -149,50 +150,116 @@ export function setGlobalVolume(volume: number) {
   });
 }
 
+let activeFadeCancel: (() => void) | undefined = undefined;
+
 export function fadeGlobalVolume(
   volumeFrom: number,
   volumeTo: number,
   duration: number,
   onDone?: () => void
-) {
-  const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
-
-  const startTime = performance.now();
-
-  function animate() {
-    const currentTime = performance.now();
-    const elapsedTime = currentTime - startTime;
-    const progress = Math.min(elapsedTime / duration, 1);
-
-    const interpolatedVolume = volumeFrom + (volumeTo - volumeFrom) * progress;
-
-    mediaElements.forEach((element) => {
-      element.volume = interpolatedVolume;
-    });
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      if (onDone) onDone();
-    }
+): Promise<void> {
+  if (activeFadeCancel) {
+    activeFadeCancel();
+    activeFadeCancel = undefined;
   }
 
-  animate();
+  return new Promise((resolve) => {
+    const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
+    if (mediaElements.length === 0 || duration <= 0) {
+      if (mediaElements.length > 0) {
+        mediaElements.forEach((element) => {
+          element.volume = Math.min(1, Math.max(0, volumeTo));
+        });
+      }
+      if (onDone) onDone();
+      resolve();
+      return;
+    }
+
+    let cancelled = false;
+    let animationFrameId: number;
+
+    activeFadeCancel = () => {
+      cancelled = true;
+      cancelAnimationFrame(animationFrameId);
+    };
+
+    const startTime = performance.now();
+
+    function animate() {
+      if (cancelled) {
+        resolve();
+        return;
+      }
+
+      const currentTime = performance.now();
+      const elapsedTime = currentTime - startTime;
+      const progress = Math.min(elapsedTime / duration, 1);
+
+      const interpolatedVolume = Math.min(
+        1,
+        Math.max(0, volumeFrom + (volumeTo - volumeFrom) * progress)
+      );
+
+      mediaElements.forEach((element) => {
+        element.volume = interpolatedVolume;
+      });
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        activeFadeCancel = undefined;
+        if (onDone) onDone();
+        resolve();
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(animate);
+  });
 }
 
 export const pauseGlobalMedia = () => {
+  if (activeFadeCancel) {
+    activeFadeCancel();
+    activeFadeCancel = undefined;
+  }
   const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
-  mediaElements.forEach((element) => element.pause());
+  mediaElements.forEach((element) => {
+    try {
+      element.pause();
+    } catch {
+      // ignore
+    }
+  });
 };
 
 export const resumeGlobalMedia = () => {
   const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
-  mediaElements.forEach((element) => element.play());
+  mediaElements.forEach((element) => {
+    try {
+      if (element instanceof HTMLVideoElement && element.error) {
+        element.load();
+      }
+      playThemeMedia(element);
+    } catch (err) {
+      console.warn('Could not resume global media:', err);
+    }
+  });
 };
 
 export const setCurrentTimeGlobalMedia = (time: number) => {
   const mediaElements: NodeListOf<HTMLMediaElement> = document.querySelectorAll('audio, video');
-  mediaElements.forEach((element) => (element.currentTime = time));
+  mediaElements.forEach((element) => {
+    try {
+      if (Number.isFinite(element.duration) && element.duration > 0) {
+        element.currentTime = Math.min(Math.max(0, time), element.duration);
+      } else {
+        element.currentTime = Math.max(0, time);
+      }
+    } catch {
+      // ignore if media is not seekable
+    }
+  });
 };
 
 export function trackMediaContainer(node: HTMLElement) {

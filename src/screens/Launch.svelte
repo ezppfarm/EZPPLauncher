@@ -832,6 +832,16 @@
     }
   };
 
+  const revealLauncherWindow = async () => {
+    try {
+      await invoke('reveal_window');
+    } catch {
+      await getCurrentWindow().show();
+      await getCurrentWindow().unminimize();
+      await getCurrentWindow().setFocus();
+    }
+  };
+
   const launch = async (skipUpdateCheck = false) => {
     if ($launching) return;
     launchInfo = 'Checking if osu! is already running...';
@@ -1084,10 +1094,9 @@
       await new Promise((res) => setTimeout(res, 1500));
       launchInfo = 'Launching osu!...';
 
-      fadeGlobalVolume($custom_theme_volume, 0, 2000, pauseGlobalMedia);
-
-      /* await replaceUIFiles(osuPath, false); */
-      await new Promise((res) => setTimeout(res, 1000));
+      await fadeGlobalVolume($custom_theme_volume, 0, 800);
+      pauseGlobalMedia();
+      await new Promise((res) => setTimeout(res, 200));
       await getCurrentWindow().hide();
 
       let presenceUpdater: number | undefined = undefined;
@@ -1199,11 +1208,12 @@
 
       if (otd_run) await stopOpenTabletDriver();
 
+      await revealLauncherWindow();
+      await new Promise((res) => setTimeout(res, 100));
+
       setCurrentTimeGlobalMedia(0);
       resumeGlobalMedia();
-      fadeGlobalVolume(0, $custom_theme_volume, 2000);
-
-      await getCurrentWindow().show();
+      fadeGlobalVolume(0, $custom_theme_volume, 1500);
       if (presenceUpdater) {
         window.clearInterval(presenceUpdater);
         try {
@@ -1245,7 +1255,9 @@
     } catch (err) {
       cleanup = false;
       const error = err as Error;
-      await getCurrentWindow().show();
+      await revealLauncherWindow();
+      resumeGlobalMedia();
+      fadeGlobalVolume(0, $custom_theme_volume, 1000);
       if (error.name === 'AbortError') {
         sileo.error({
           title: 'Hmmm...',
@@ -4036,7 +4048,14 @@
               : $osuInstallationPath === ''
                 ? 'No osu! path'
                 : 'Launch'}
-          launchDisabled={$osuInstallationPath === '' || $serverConnectionFails > 1 || $launching}
+          launchSubtext={$launching && !cleanup
+            ? launchInfo
+            : $osuInstallationPath === ''
+              ? 'osu! path is not set!'
+              : $serverConnectionFails > 1
+                ? 'No connection...'
+                : undefined}
+          launchDisabled={$osuInstallationPath === '' || $serverConnectionFails > 1}
           oninteraction={triggerThemeScriptElement}
           onbuttonaction={handleThemeButtonAction}
         />

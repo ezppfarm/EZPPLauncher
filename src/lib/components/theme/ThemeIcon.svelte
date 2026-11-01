@@ -7,11 +7,13 @@
     set = DEFAULT_THEME_ICON_SET,
     size = '1em',
     class: className = '',
+    style = '',
   }: {
     name: ThemeIconName;
     set?: ThemeIconSet;
     size?: number | string;
     class?: string;
+    style?: string;
   } = $props();
 
   const icon = $derived(getThemeIconBody(name, set));
@@ -23,6 +25,7 @@
   width={size}
   height={size}
   class={className}
+  {style}
   aria-hidden="true"
   focusable="false"
 >
