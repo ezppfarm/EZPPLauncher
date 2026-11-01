@@ -28,7 +28,7 @@
     Sparkles,
     Tag,
   } from '@lucide/svelte';
-  import DefaultThemePreview from '$assets/img/default-theme.png';
+  import DefaultThemePreview from '$assets/default_preview.png';
 
   let {
     onApplyTheme,
