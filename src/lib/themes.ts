@@ -233,7 +233,7 @@ export const getThemes = async (): Promise<Theme[]> => {
     author: 'EZPPFarm',
     name: 'Default',
     version: '1.0.0',
-    apiVersion: '1.0',
+    apiVersion: '',
     description: 'The default EZPPLauncher look.',
     nsfw: false,
     scriptUrl: '',

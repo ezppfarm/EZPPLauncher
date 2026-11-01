@@ -345,7 +345,8 @@
       if (themeFilter === 'updates' && !theme.updateAvailable) return false;
       if (!query) return true;
 
-      return `${theme.name} ${theme.author} ${theme.description} ${theme.apiVersion}`
+      const apiPart = theme.name === 'Default' ? '' : theme.apiVersion;
+      return `${theme.name} ${theme.author} ${theme.description} ${apiPart}`
         .toLowerCase()
         .includes(query);
     });
@@ -3778,12 +3779,14 @@
                             {#if isActive}
                               <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
                             {/if}
-                            <Badge
-                              variant="secondary"
-                              class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
-                            >
-                              API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
-                            </Badge>
+                            {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
+                              <Badge
+                                variant="secondary"
+                                class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
+                              >
+                                API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
+                              </Badge>
+                            {/if}
                             {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
                               <button
                                 type="button"
