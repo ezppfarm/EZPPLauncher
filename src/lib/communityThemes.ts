@@ -46,6 +46,28 @@ export async function getThemesServiceUrl(): Promise<string> {
   return customUrl.trim().length > 0 ? customUrl.trim().replace(/\/+$/, '') : DEFAULT_THEMES_SERVICE_URL;
 }
 
+/**
+ * Returns authentication headers using stored username and password,
+ * plus session token if available.
+ */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  const username = await config.value<string>('username').get('');
+  const password = await config.value<string>('password').get('');
+
+  if (username.length > 0 && password.length > 0) {
+    headers['X-Username'] = username;
+    headers['X-Password'] = password;
+  }
+
+  const token = await getThemesAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 export async function getThemesAuthToken(forceRefresh = false): Promise<string | null> {
   if (!forceRefresh && cachedSessionToken) {
     return cachedSessionToken;
@@ -95,7 +117,7 @@ export async function fetchCommunityThemes(options?: {
   limit?: number;
 }): Promise<CommunityThemesResponse> {
   const baseUrl = await getThemesServiceUrl();
-  const token = await getThemesAuthToken();
+  const headers = await getAuthHeaders();
 
   const url = new URL(`${baseUrl}/v1/themes`);
   if (options?.q) url.searchParams.set('q', options.q);
@@ -105,16 +127,12 @@ export async function fetchCommunityThemes(options?: {
   if (options?.page) url.searchParams.set('page', String(options.page));
   if (options?.limit) url.searchParams.set('limit', String(options.limit));
 
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
     throw new Error(`Failed to load themes (HTTP ${res.status})`);
   }
 
   const data = (await res.json()) as CommunityThemesResponse;
-  // Ensure absolute preview and download URLs
   for (const item of data.items) {
     if (item.previewUrl && !item.previewUrl.startsWith('http')) {
       item.previewUrl = `${baseUrl}${item.previewUrl}`;
@@ -128,10 +146,7 @@ export async function fetchCommunityThemes(options?: {
 
 export async function fetchCommunityThemeDetails(themeId: string): Promise<CommunityTheme> {
   const baseUrl = await getThemesServiceUrl();
-  const token = await getThemesAuthToken();
-
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const headers = await getAuthHeaders();
 
   const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}`, { headers });
   if (!res.ok) {
@@ -150,15 +165,15 @@ export async function fetchCommunityThemeDetails(themeId: string): Promise<Commu
 
 export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked: boolean; likeCount: number }> {
   const baseUrl = await getThemesServiceUrl();
-  const token = await getThemesAuthToken();
+  const headers = await getAuthHeaders();
 
-  if (!token) {
+  if (!headers['X-Username'] && !headers['Authorization']) {
     throw new Error('Please log in to like community themes.');
   }
 
   const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/like`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
   });
 
   if (!res.ok) {
@@ -171,15 +186,15 @@ export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked
 
 export async function deleteCommunityTheme(themeId: string): Promise<void> {
   const baseUrl = await getThemesServiceUrl();
-  const token = await getThemesAuthToken();
+  const headers = await getAuthHeaders();
 
-  if (!token) {
+  if (!headers['X-Username'] && !headers['Authorization']) {
     throw new Error('Please log in to manage your community themes.');
   }
 
   const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
   });
 
   if (!res.ok) {
@@ -204,9 +219,9 @@ export async function publishThemeToWorkshop(options: {
 }): Promise<{ success: boolean; theme: any }> {
   const { onProgress = () => {} } = options;
   const baseUrl = await getThemesServiceUrl();
-  const token = await getThemesAuthToken();
+  const authHeaders = await getAuthHeaders();
 
-  if (!token) {
+  if (!authHeaders['X-Username'] && !authHeaders['Authorization']) {
     throw new Error('You must be logged in to EZPPFarm to publish themes.');
   }
 
@@ -246,7 +261,7 @@ export async function publishThemeToWorkshop(options: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...authHeaders,
       },
       body: JSON.stringify({
         themeId: options.themeId,
@@ -288,7 +303,7 @@ export async function publishThemeToWorkshop(options: {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/octet-stream',
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
         body: chunkData,
       });
@@ -306,7 +321,7 @@ export async function publishThemeToWorkshop(options: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...authHeaders,
       },
       body: JSON.stringify({
         previewImageBase64: options.previewImageBase64,
