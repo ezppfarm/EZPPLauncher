@@ -42,7 +42,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'execution_clap',
     name: 'Execution Clap',
-    description: 'High-energy animated music video theme featuring Trap Chick\'s "Execution Clap" with background video playback and intense beats.',
+    description: '',
     version: '1.0.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
@@ -66,7 +66,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'dance',
     name: 'Dance',
-    description: 'Vibrant and rhythmic animated theme featuring the viral Dance animation with synchronized soundtrack.',
+    description: '',
     version: '1.0.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
@@ -90,7 +90,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'lagtrain',
     name: 'Lagtrain',
-    description: 'The iconic monochrome animated theme featuring inabakumori\'s "Lagtrain" (ラグトレイン) with Kaai Yuki vocals.',
+    description: '',
     version: '1.1.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
@@ -114,7 +114,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'looping_the_rooms',
     name: 'Looping the Rooms',
-    description: 'Aesthetic, hypnotic looping room transitions with chill background audio.',
+    description: '',
     version: '1.0.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
@@ -138,7 +138,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'daidaidaidaidaikirai',
     name: 'Daidaidaidaidaikirai',
-    description: 'Animated music video theme featuring "Daidaidaidaidaikirai" (ダイダイダイダイダイキライ) with animated visuals and audio playback.',
+    description: '',
     version: '1.1.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
@@ -162,7 +162,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'teto_the_31st',
     name: 'Teto the 31st',
-    description: 'Kasane Teto tribute theme celebrating Teto the 31st with vibrant animated video and vocaloid audio.',
+    description: '',
     version: '1.1.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
