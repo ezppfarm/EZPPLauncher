@@ -32,6 +32,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -46,6 +61,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -60,6 +90,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -74,6 +119,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -88,6 +148,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -102,6 +177,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -116,6 +206,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -130,6 +235,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     },
@@ -144,6 +264,21 @@
         },
         {
           "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        },
+        {
+          "path": "$TEMP"
+        },
+        {
+          "path": "$TEMP/*"
+        },
+        {
+          "path": "$TEMP/**/*"
         }
       ]
     }

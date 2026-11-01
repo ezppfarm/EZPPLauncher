@@ -19,7 +19,7 @@ pub mod utils;
 use crate::{
     commands::{
         backup_theme_folder, check_for_corruption, close_presence_editor, close_theme_editor, config_all, config_clear, config_delete,
-        config_exists, config_get, config_set, download_and_extract_theme,
+        config_exists, config_get, config_set, download_and_extract_community_theme, download_and_extract_theme,
         download_ezpp_launcher_update, download_ezpp_launcher_update_files, encrypt_string, exit,
         export_theme, extract_theme, file_size, find_osu_installation, focus_presence_editor, focus_theme_editor, get_beatmapsets_count,
         get_ezpp_launcher_update_files, get_hwid, get_launcher_version, get_osu_release_stream,
@@ -192,6 +192,7 @@ pub fn run() {
             restore_theme_backup,
             extract_theme,
             download_and_extract_theme,
+            download_and_extract_community_theme,
             save_theme_project,
             export_theme,
             hash_file_sha256,

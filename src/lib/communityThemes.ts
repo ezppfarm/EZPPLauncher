@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
 import { config } from './config';
@@ -424,7 +425,7 @@ export async function publishThemeToWorkshop(options: {
   onProgress('Packaging theme archive...', 5);
 
   const baseThemesDir = await themesDirectory();
-  const tmpDir = await path.join(baseThemesDir, '.tmp');
+  const tmpDir = await path.join(baseThemesDir, 'export_temp');
   if (!(await fs.exists(tmpDir))) {
     await fs.mkdir(tmpDir, { recursive: true });
   }
@@ -555,52 +556,40 @@ export async function downloadAndInstallCommunityTheme(
 
   reportProgress('Downloading theme package...', 10);
 
-  let res: Response;
-  try {
-    res = await fetch(theme.downloadUrl);
-    if (!res.ok && (theme.apiVersion === '1.0' || theme.tags?.includes('legacy'))) {
-      res = await fetch(
-        `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${theme.id}.ezpplauncher-theme`,
-        { headers: { 'User-Agent': 'EZPPLauncher' } }
-      );
+  const unlistenDownload = await listen<{ received: number; total: number; progress: number }>(
+    'download_progress',
+    (event) => {
+      reportProgress('Downloading theme package...', Math.round(10 + event.payload.progress * 50));
     }
-  } catch (err) {
-    if (theme.apiVersion === '1.0' || theme.tags?.includes('legacy')) {
-      res = await fetch(
-        `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${theme.id}.ezpplauncher-theme`,
-        { headers: { 'User-Agent': 'EZPPLauncher' } }
-      );
-    } else {
-      throw err;
+  );
+
+  const unlistenExtract = await listen<{ extracted: number; total: number; progress: number }>(
+    'extract_progress',
+    (event) => {
+      reportProgress('Extracting theme files...', Math.round(60 + event.payload.progress * 38));
     }
-  }
-
-  if (!res.ok) {
-    throw new Error(`Download failed (HTTP ${res.status})`);
-  }
-
-  const tmpDir = await path.join(baseThemesDir, '.tmp');
-  if (!(await fs.exists(tmpDir))) {
-    await fs.mkdir(tmpDir, { recursive: true });
-  }
-
-  const tempFile = await path.join(tmpDir, `${folderName}_download.ezpplauncher-theme`);
+  );
 
   try {
-    const arrayBuffer = await res.arrayBuffer();
-    await fs.writeFile(tempFile, new Uint8Array(arrayBuffer));
-
-    reportProgress('Extracting theme files...', 70);
-
-    if (!(await fs.exists(targetFolder))) {
-      await fs.mkdir(targetFolder, { recursive: true });
+    try {
+      await invoke('download_and_extract_community_theme', {
+        downloadUrl: theme.downloadUrl,
+        themeFolder: targetFolder,
+        themeName: theme.name,
+      });
+    } catch (err) {
+      // Fallback for legacy themes directly to git repo
+      if (theme.apiVersion === '1.0' || theme.tags?.includes('legacy')) {
+        const fallbackUrl = `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${theme.id}.ezpplauncher-theme`;
+        await invoke('download_and_extract_community_theme', {
+          downloadUrl: fallbackUrl,
+          themeFolder: targetFolder,
+          themeName: theme.name,
+        });
+      } else {
+        throw err;
+      }
     }
-
-    await invoke('extract_theme', {
-      filePath: tempFile,
-      themeFolder: targetFolder,
-      themeName: theme.name,
-    });
 
     reportProgress('Theme installed!', 100);
 
@@ -609,8 +598,7 @@ export async function downloadAndInstallCommunityTheme(
 
     return { success: true, folderName };
   } finally {
-    if (await fs.exists(tempFile)) {
-      await fs.remove(tempFile).catch(() => {});
-    }
+    unlistenDownload();
+    unlistenExtract();
   }
 }
