@@ -76,6 +76,7 @@
     themeAssetName,
     themeHasLaunchButton,
     type ThemeV2Asset,
+    type ThemeV2Audio,
     type ThemeV2Background,
     type ThemeV2BehaviorTarget,
     type ThemeV2ButtonAction,
@@ -252,6 +253,7 @@
   let lastGradientBackground = $state<Extract<ThemeV2Background, { type: 'gradient' }> | undefined>(
     undefined
   );
+  let lastAudio = $state<ThemeV2Audio | undefined>(undefined);
   let assetBase = $state('');
   let savedFolder = $state<string | undefined>(undefined);
   let editorFolderPath = $state<string | undefined>(undefined);
@@ -1803,6 +1805,7 @@
         ? normalizeThemeV2(JSON.parse(context.themeJson) as Partial<ThemeV2Definition>)
         : createDefaultThemeV2();
       definition = ensureDefaults(parsed);
+      lastAudio = parsed.audio ? { ...parsed.audio } : undefined;
       savedFolder = context.folderName ?? undefined;
       editorFolderPath = context.folderPath ?? undefined;
       const httpBase = await themeAssetBase();
@@ -1992,6 +1995,9 @@
         color: current.type === 'color' ? current.color : (lastColorBackground?.color ?? '#181825'),
         opacity: lastColorBackground?.opacity ?? opacity,
       };
+      if (!definition.audio && lastAudio) {
+        definition.audio = { ...lastAudio };
+      }
     } else if (type === 'gradient') {
       definition.background = {
         type: 'gradient',
@@ -2004,6 +2010,9 @@
             : (lastGradientBackground?.angle ?? 135),
         opacity: lastGradientBackground?.opacity ?? opacity,
       };
+      if (!definition.audio && lastAudio) {
+        definition.audio = { ...lastAudio };
+      }
     } else if (type === 'video') {
       const candidateVideo =
         current.type === 'video' && current.src
@@ -2024,6 +2033,9 @@
       if (candidateVideo) {
         lastVideoBackground = { ...definition.background };
       }
+      if (definition.audio) {
+        lastAudio = { ...definition.audio };
+      }
       definition.audio = undefined;
     } else {
       const candidateImage =
@@ -2042,6 +2054,9 @@
       };
       if (candidateImage) {
         lastImageBackground = { ...definition.background };
+      }
+      if (!definition.audio && lastAudio) {
+        definition.audio = { ...lastAudio };
       }
     }
   }
@@ -2086,6 +2101,7 @@
     const asset = await chooseAsset('audio');
     if (!asset) return;
     definition.audio = { src: asset.name, loop: definition.audio?.loop !== false };
+    lastAudio = { ...definition.audio };
   }
 
   function uniqueFamily(label: string) {
@@ -5622,7 +5638,10 @@
                     size="icon"
                     class="size-8 text-muted-foreground"
                     title="Remove music"
-                    onclick={() => (definition.audio = undefined)}
+                    onclick={() => {
+                      definition.audio = undefined;
+                      lastAudio = undefined;
+                    }}
                   >
                     <X class="size-3.5" />
                   </Button>

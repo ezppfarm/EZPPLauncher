@@ -1,6 +1,6 @@
 <script lang="ts">
   import { custom_theme_volume } from '$lib/global';
-  import { themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
+  import { playThemeMedia, themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
   import type { ThemeV2Definition } from '$lib/themeV2';
   import { themeAssetUrl } from '$lib/themeV2';
   import { reduceAnimations } from '$lib/userSettings';
@@ -64,6 +64,14 @@
     if (animFrame !== undefined) {
       cancelAnimationFrame(animFrame);
     }
+    if (audioElement) {
+      try {
+        audioElement.pause();
+        audioElement.src = '';
+      } catch {
+        // ignore
+      }
+    }
   });
 
   const assetUrl = (path: string | undefined) => {
@@ -126,10 +134,8 @@
   $effect(() => {
     if (!audioElement || !definition.audio) return;
     audioElement.volume = $custom_theme_volume;
-    if (!preview) {
-      audioElement.play().catch(() => {
-        // Autoplay can be rejected until the window has been interacted with.
-      });
+    if (!preview && audioElement.paused) {
+      playThemeMedia(audioElement);
     }
   });
 </script>
@@ -225,6 +231,8 @@
       use:themeMediaSource={assetUrl(definition.audio.src)}
       loop={definition.audio.loop !== false}
       autoplay
+      preload="auto"
+      playsinline
     ></audio>
   {/if}
 </div>

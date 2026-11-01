@@ -208,7 +208,7 @@ const armAutoplayRetry = (node: HTMLMediaElement) => {
     if (node.isConnected) {
       node.muted = false;
       const targetVolume = get(custom_theme_volume);
-      if (targetVolume > 0) node.volume = targetVolume;
+      if (targetVolume >= 0) node.volume = targetVolume;
       void node.play().catch(() => {});
     }
   };
@@ -230,7 +230,7 @@ export const playThemeMedia = (node: HTMLMediaElement) => {
 
   node.muted = false;
   const currentVolume = get(custom_theme_volume);
-  if (node.volume === 0 && currentVolume > 0) {
+  if (currentVolume >= 0) {
     node.volume = currentVolume;
   }
 

@@ -434,6 +434,7 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
   if (theme.definition) {
     setGlobalVolume(volume);
     disableMediaControls();
+    void invoke('unlock_media_autoplay').catch(() => {});
     return;
   }
   if (theme.scriptUrl.length > 0) {
