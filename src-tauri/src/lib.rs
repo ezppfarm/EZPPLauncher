@@ -227,8 +227,8 @@ pub fn run() {
         // The content view can be replaced again while the webview is being
         // built, so re-apply the corner mask once the app is ready.
         #[cfg(target_os = "macos")]
-        if let tauri::RunEvent::Ready = &event {
-            if let Some(window) = app.get_webview_window("main") {
+        if let tauri::RunEvent::Ready = &event
+            && let Some(window) = app.get_webview_window("main") {
                 if let Err(error) = macos::round_window(&window, 12.0) {
                     log::warn!(target: "launcher", "Could not round the launcher window: {error}");
                 }
@@ -236,7 +236,6 @@ pub fn run() {
                     log::warn!(target: "launcher", "{error}");
                 }
             }
-        }
 
         presence::handle_run_event(app, &event);
     });

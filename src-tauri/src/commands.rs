@@ -90,7 +90,6 @@ pub fn file_size(path: String) -> Option<u64> {
 pub fn get_hwid() -> String {
     get_id()
         .unwrap_or("recorderinsandybridge".to_string())
-        .into()
 }
 
 /// Show the native macOS picker, which can select `osu!.app` bundles as files.
@@ -374,8 +373,8 @@ pub async fn get_skins_count(folder: String) -> Option<u64> {
     let mut count = 0;
     if let Ok(mut entries) = fs::read_dir(skins_folder).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Ok(ft) = entry.file_type().await {
-                if ft.is_dir() {
+            if let Ok(ft) = entry.file_type().await
+                && ft.is_dir() {
                     let dir_path = entry.path();
                     let has_ini = tokio::fs::try_exists(dir_path.join("skin.ini"))
                         .await
@@ -387,7 +386,6 @@ pub async fn get_skins_count(folder: String) -> Option<u64> {
                         count += 1;
                     }
                 }
-            }
         }
     }
     Some(count)
@@ -1596,8 +1594,8 @@ pub(crate) fn theme_root() -> Result<PathBuf, String> {
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn loopback_theme_asset_base() -> String {
-    if crate::theme_server::base_url().is_none() {
-        if let Ok(root) = theme_root() {
+    if crate::theme_server::base_url().is_none()
+        && let Ok(root) = theme_root() {
             match crate::theme_server::media_root() {
                 Ok(media) => {
                     if let Err(error) = crate::theme_server::start(root, media) {
@@ -1609,7 +1607,6 @@ fn loopback_theme_asset_base() -> String {
                 }
             }
         }
-    }
     crate::theme_server::base_url().unwrap_or_default()
 }
 
@@ -1617,7 +1614,7 @@ fn loopback_theme_asset_base() -> String {
 pub fn theme_asset_base() -> String {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        return loopback_theme_asset_base();
+        loopback_theme_asset_base()
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -1631,7 +1628,7 @@ pub fn theme_preview_url(path: String) -> Result<String, String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         let _ = loopback_theme_asset_base();
-        return crate::theme_server::preview_url(Path::new(&path));
+        crate::theme_server::preview_url(Path::new(&path))
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -1915,9 +1912,8 @@ async fn download_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
             .await
             .map_err(|error| format!("Could not write the FFmpeg archive: {error}"))?;
 
-        if total > 0 {
-            let percent = ((received.min(total) * 100) / total) as u8;
-            if percent != last_percent {
+        if let Some(percent) = (received.min(total) * 100).checked_div(total).map(|v| v as u8)
+            && percent != last_percent {
                 last_percent = percent;
                 let _ = app.emit(
                     "theme-media-progress",
@@ -1927,7 +1923,6 @@ async fn download_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
                     },
                 );
             }
-        }
     }
 
     file.flush()
@@ -2035,7 +2030,7 @@ fn optimize_theme_media_blocking(
     let codec = probe_text.lines().find_map(|line| {
         let index = line.find("Video: ")?;
         line[index + 7..]
-            .split(|character: char| character == ',' || character == ' ')
+            .split([',', ' '])
             .next()
             .map(str::to_ascii_lowercase)
     });
@@ -2518,7 +2513,7 @@ pub async fn list_theme_backups(theme_folder: String) -> Result<Vec<ThemeBackupI
             .map_err(|error| format!("Failed to read theme backups: {error}"))?
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
-            .filter_map(|entry| {
+            .map(|entry| {
                 let path = entry.path();
                 let created_at = entry
                     .metadata()
@@ -2527,16 +2522,16 @@ pub async fn list_theme_backups(theme_folder: String) -> Result<Vec<ThemeBackupI
                     .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|duration| duration.as_millis() as u64)
                     .unwrap_or(0);
-                Some(ThemeBackupInfo {
+                ThemeBackupInfo {
                     label: entry.file_name().to_string_lossy().into_owned(),
                     path: path.to_string_lossy().into_owned(),
                     created_at,
                     size: directory_size(&path),
-                })
+                }
             })
             .collect::<Vec<_>>();
 
-        backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        backups.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(backups)
     })
     .await
@@ -2699,13 +2694,11 @@ fn collect_theme_asset_refs(value: &Value, assets: &mut HashSet<String>) {
     match value {
         Value::Object(object) => {
             for (key, value) in object {
-                if key == "src" || key == "preview" {
-                    if let Some(src) = value.as_str() {
-                        if let Some(path) = theme_asset_reference(src) {
+                if (key == "src" || key == "preview")
+                    && let Some(src) = value.as_str()
+                        && let Some(path) = theme_asset_reference(src) {
                             assets.insert(path);
                         }
-                    }
-                }
                 collect_theme_asset_refs(value, assets);
             }
         }
@@ -2816,14 +2809,13 @@ fn add_theme_folder_to_zip(
             continue;
         }
 
-        if let Some(filter) = asset_filter {
-            if let Ok(asset_path) = entry_path.strip_prefix(&assets_root) {
+        if let Some(filter) = asset_filter
+            && let Ok(asset_path) = entry_path.strip_prefix(&assets_root) {
                 let key = asset_path.to_string_lossy().replace('\\', "/");
                 if !filter.contains(&key) {
                     continue;
                 }
             }
-        }
 
         let relative = entry_path
             .strip_prefix(root)
@@ -2938,7 +2930,6 @@ pub async fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
             {
                 let res = crate::macos::activate_and_focus_window(&win);
                 let _ = tx.send(res);
-                return;
             }
 
             #[cfg(not(target_os = "macos"))]

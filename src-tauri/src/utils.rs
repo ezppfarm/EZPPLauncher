@@ -40,15 +40,14 @@ pub fn is_osu_process(process: &sysinfo::Process) -> bool {
         return true;
     }
 
-    if let Some(exe) = process.exe() {
-        if exe
+    if let Some(exe) = process.exe()
+        && exe
             .file_name()
             .map(|file_name| file_name.to_string_lossy().to_ascii_lowercase() == "osu!.exe")
             .unwrap_or(false)
         {
             return true;
         }
-    }
 
     process.cmd().iter().any(|arg| {
         arg.to_string_lossy()
@@ -103,7 +102,7 @@ fn find_osu_user_config_path<P: AsRef<Path>>(folder_path: P) -> Option<PathBuf> 
         })
         .collect::<Vec<_>>();
 
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
+    candidates.sort_by_key(|b| std::cmp::Reverse(b.0));
     candidates.into_iter().next().map(|(_, path)| path)
 }
 
@@ -261,7 +260,7 @@ pub fn get_osu_config<P: AsRef<Path>>(
         }
     }
 
-    return Some(config_map);
+    Some(config_map)
 }
 
 #[cfg(target_os = "linux")]
@@ -469,7 +468,7 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
                 } else {
                     0
                 };
-                if layer < 0 || layer > 50 {
+                if !(0..=50).contains(&layer) {
                     continue;
                 }
 
@@ -477,8 +476,8 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
                 let name_str: *mut AnyObject = msg_send![dict, objectForKey: name_key];
                 if !name_str.is_null() {
                     let utf8: *const std::ffi::c_char = msg_send![name_str, UTF8String];
-                    if !utf8.is_null() {
-                        if let Ok(s) = CStr::from_ptr(utf8).to_str() {
+                    if !utf8.is_null()
+                        && let Ok(s) = CStr::from_ptr(utf8).to_str() {
                             let trimmed = s.trim();
                             if !trimmed.is_empty() {
                                 if trimmed.to_lowercase().contains("updater") {
@@ -489,7 +488,6 @@ pub fn get_window_title_by_pid(target_pid: Pid) -> String {
                                 }
                             }
                         }
-                    }
                 }
 
                 // 2. Check window bounds
@@ -723,6 +721,7 @@ pub fn is_compatible_patcher(data: &[u8]) -> bool {
 /// 2. `GetOsuPid()` checks for `" -devserver "` via PEB reading, which fails or is unreliable under Wine.
 /// 3. Costura embeds `ManagedInjector.Lib` which also calls generic `Marshal.SizeOf<Native.ModuleEntry32>()`
 ///    and parses remote PE export tables through generic marshal APIs.
+///
 /// This function patches the binary in-place so it runs reliably under Wine.
 pub fn ensure_patcher_compatibility(patcher_exe: &Path) -> Result<bool, String> {
     if !patcher_exe.is_file() {
@@ -828,9 +827,9 @@ pub fn ensure_patcher_compatibility(patcher_exe: &Path) -> Result<bool, String> 
 
             if inner_modified {
                 let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
-                if encoder.write_all(&decomp).is_ok() {
-                    if let Ok(mut compressed) = encoder.finish() {
-                        if compressed.len() <= 10020 - 5 {
+                if encoder.write_all(&decomp).is_ok()
+                    && let Ok(mut compressed) = encoder.finish()
+                        && compressed.len() <= 10020 - 5 {
                             let remaining = 10020 - compressed.len();
                             let length = (remaining - 5) as u16;
                             let nlen = !length;
@@ -839,14 +838,12 @@ pub fn ensure_patcher_compatibility(patcher_exe: &Path) -> Result<bool, String> 
                             compressed.push((length >> 8) as u8);
                             compressed.push((nlen & 0xff) as u8);
                             compressed.push((nlen >> 8) as u8);
-                            compressed.extend(std::iter::repeat(0x00).take(length as usize));
+                            compressed.extend(std::iter::repeat_n(0x00, length as usize));
                             if compressed.len() == 10020 {
                                 data[0x1f00..0x1f00 + 10020].copy_from_slice(&compressed);
                                 modified = true;
                             }
                         }
-                    }
-                }
             }
         }
     }

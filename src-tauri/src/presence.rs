@@ -53,12 +53,12 @@ impl Default for PresenceData {
 enum PresenceCommand {
     Connect(oneshot::Sender<bool>),
     Disconnect(oneshot::Sender<()>),
-    UpdateData(PresenceData),
+    UpdateData(Box<PresenceData>),
     IsConnected(oneshot::Sender<bool>),
 }
 
 enum ReconnectResult {
-    Connected(AsyncDiscordIpcClient),
+    Connected(Box<AsyncDiscordIpcClient>),
     Failed,
 }
 
@@ -103,7 +103,7 @@ impl PresenceActor {
                         PresenceCommand::Connect(resp) => self.cmd_connect(resp).await,
                         PresenceCommand::Disconnect(resp) => self.cmd_disconnect(resp).await,
                         PresenceCommand::UpdateData(data) => {
-                            self.data = data;
+                            self.data = *data;
                             self.push_presence().await;
                         }
                         PresenceCommand::IsConnected(resp) => {
@@ -117,7 +117,7 @@ impl PresenceActor {
                     match result {
                         ReconnectResult::Connected(client) => {
                             log::info!(target: "launcher", "Presence: reconnect succeeded");
-                            self.client = Some(client);
+                            self.client = Some(*client);
                             self.push_presence().await;
                         }
                         ReconnectResult::Failed => {
@@ -188,16 +188,14 @@ impl PresenceActor {
             builder = builder.small_text(text);
         }
 
-        if let Some(btn) = &self.data.dynamic_button {
-            if !btn.label.trim().is_empty() && !btn.url.trim().is_empty() {
+        if let Some(btn) = &self.data.dynamic_button
+            && !btn.label.trim().is_empty() && !btn.url.trim().is_empty() {
                 builder = builder.button(&btn.label, &btn.url);
             }
-        }
-        if let Some(btn2) = &self.data.secondary_button {
-            if !btn2.label.trim().is_empty() && !btn2.url.trim().is_empty() {
+        if let Some(btn2) = &self.data.secondary_button
+            && !btn2.label.trim().is_empty() && !btn2.url.trim().is_empty() {
                 builder = builder.button(&btn2.label, &btn2.url);
             }
-        }
 
         let activity = builder.build();
 
@@ -233,7 +231,7 @@ impl PresenceActor {
                 tokio::time::sleep(delay).await;
 
                 if let Some(client) = try_connect_once().await {
-                    let _ = tx.send(ReconnectResult::Connected(client)).await;
+                    let _ = tx.send(ReconnectResult::Connected(Box::new(client))).await;
                     return;
                 }
             }
@@ -302,6 +300,7 @@ pub async fn has_presence() -> bool {
     false
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_activity(
     state: Option<&str>,
     details: Option<&str>,
@@ -347,7 +346,7 @@ pub fn update_activity(
 
     let tx = PRESENCE_TX.clone();
     tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+        let _ = tx.send(PresenceCommand::UpdateData(Box::new(data))).await;
     });
 }
 
@@ -368,7 +367,7 @@ pub fn update_status(state: Option<&str>, details: Option<&str>, large_image_key
 
     let tx = PRESENCE_TX.clone();
     tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+        let _ = tx.send(PresenceCommand::UpdateData(Box::new(data))).await;
     });
 }
 
@@ -382,7 +381,7 @@ pub fn update_user(username: Option<&str>, id: Option<&str>) {
 
     let tx = PRESENCE_TX.clone();
     tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+        let _ = tx.send(PresenceCommand::UpdateData(Box::new(data))).await;
     });
 }
 
@@ -398,7 +397,7 @@ pub fn set_button(label: &str, url: &str) {
 
     let tx = PRESENCE_TX.clone();
     tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+        let _ = tx.send(PresenceCommand::UpdateData(Box::new(data))).await;
     });
 }
 
@@ -411,7 +410,7 @@ pub fn clear_button() {
 
     let tx = PRESENCE_TX.clone();
     tokio::spawn(async move {
-        let _ = tx.send(PresenceCommand::UpdateData(data)).await;
+        let _ = tx.send(PresenceCommand::UpdateData(Box::new(data))).await;
     });
 }
 

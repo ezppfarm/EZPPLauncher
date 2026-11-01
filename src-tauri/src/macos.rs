@@ -291,17 +291,15 @@ impl WineRuntime {
         if let Ok(rel) = canon_path.strip_prefix(&canon_drive_c) {
             return format!("C:\\{}", rel.display()).replace('/', "\\");
         }
-        if let Ok(rel) = path.strip_prefix(&self.prefix.join("drive_c")) {
+        if let Ok(rel) = path.strip_prefix(self.prefix.join("drive_c")) {
             return format!("C:\\{}", rel.display()).replace('/', "\\");
         }
         if let Some(drive_c_ancestor) = canon_path
             .ancestors()
             .find(|a| a.file_name() == Some(OsStr::new("drive_c")))
-        {
-            if let Ok(rel) = canon_path.strip_prefix(drive_c_ancestor) {
+            && let Ok(rel) = canon_path.strip_prefix(drive_c_ancestor) {
                 return format!("C:\\{}", rel.display()).replace('/', "\\");
             }
-        }
 
         // If outside drive_c, Wine maps the Unix root filesystem to Z:\
         let path_display = canon_path.display().to_string();
@@ -521,9 +519,9 @@ pub async fn prepare_osu_environment(folder: &Path, runtime: &WineRuntime) {
 
     // 3. Reset update fail count in osu!.cfg
     let cfg_path = folder.join("osu!.cfg");
-    if cfg_path.is_file() {
-        if let Ok(content) = fs::read_to_string(&cfg_path) {
-            if content.contains("_UpdateFailCount") {
+    if cfg_path.is_file()
+        && let Ok(content) = fs::read_to_string(&cfg_path)
+            && content.contains("_UpdateFailCount") {
                 let updated = content
                     .lines()
                     .map(|line| {
@@ -537,42 +535,36 @@ pub async fn prepare_osu_environment(folder: &Path, runtime: &WineRuntime) {
                     .join("\n");
                 let _ = fs::write(&cfg_path, updated);
             }
-        }
-    }
 
     // 4. Update execute.bat if present to use ez-pp.farm
     let bat_path = folder.join("execute.bat");
-    if bat_path.is_file() {
-        if let Ok(content) = fs::read_to_string(&bat_path) {
-            if content.contains("lucoa.best") {
+    if bat_path.is_file()
+        && let Ok(content) = fs::read_to_string(&bat_path)
+            && content.contains("lucoa.best") {
                 let updated = content.replace("lucoa.best", "ez-pp.farm");
                 let _ = fs::write(&bat_path, updated);
             }
-        }
-    }
 }
 
 async fn clean_wine_font_registry(runtime: &WineRuntime) {
     let mut needs_clean = false;
     for reg_name in &["user.reg", "system.reg"] {
         let reg_path = runtime.prefix.join(reg_name);
-        if reg_path.is_file() {
-            if let Ok(content) = fs::read_to_string(&reg_path) {
-                if content.contains("Apple Braille") {
+        if reg_path.is_file()
+            && let Ok(content) = fs::read_to_string(&reg_path)
+                && content.contains("Apple Braille") {
                     needs_clean = true;
                     break;
                 }
-            }
-        }
     }
 
     if needs_clean {
         runtime.kill_prefix().await;
         for reg_name in &["user.reg", "system.reg"] {
             let reg_path = runtime.prefix.join(reg_name);
-            if reg_path.is_file() {
-                if let Ok(content) = fs::read_to_string(&reg_path) {
-                    if content.contains("Apple Braille") {
+            if reg_path.is_file()
+                && let Ok(content) = fs::read_to_string(&reg_path)
+                    && content.contains("Apple Braille") {
                         let cleaned: String = content
                             .lines()
                             .filter(|line| !line.contains("Apple Braille"))
@@ -585,8 +577,6 @@ async fn clean_wine_font_registry(runtime: &WineRuntime) {
                             reg_path.display()
                         );
                     }
-                }
-            }
         }
     }
 }
@@ -660,8 +650,8 @@ pub async fn run_osu(osu_folder: &str, patch: bool) -> Result<(), String> {
     let start_time = Instant::now();
     let mut wait_result = game.wait().await;
 
-    if let Ok(status) = &wait_result {
-        if status.code() == Some(5) && start_time.elapsed() < StdDuration::from_secs(6) {
+    if let Ok(status) = &wait_result
+        && status.code() == Some(5) && start_time.elapsed() < StdDuration::from_secs(6) {
             log::warn!(
                 target: "osu",
                 "osu! exited early with status 5 during Wine cold start; retrying now that Wine runtime is initialized..."
@@ -683,7 +673,6 @@ pub async fn run_osu(osu_folder: &str, patch: bool) -> Result<(), String> {
 
             wait_result = retry_game.wait().await;
         }
-    }
 
     match &wait_result {
         Ok(status) => log::info!(target: "osu", "osu! loader exited with {status}"),
@@ -836,7 +825,7 @@ async fn wait_for_osu_game() -> bool {
 
         sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
-        for (_pid, process) in sys.processes() {
+        for process in sys.processes().values() {
             if crate::utils::is_osu_process(process) || process.name() == "osu!.exe" {
                 let pid = process.pid();
                 let title = crate::utils::get_window_title_by_pid(pid);
@@ -932,17 +921,15 @@ pub fn resolve_osu_folder(folder: &Path) -> Option<PathBuf> {
 
     let mut prefixes = Vec::new();
 
-    if folder.file_name() == Some(OsStr::new("drive_c")) {
-        if let Some(parent) = canonical_prefix(folder) {
+    if folder.file_name() == Some(OsStr::new("drive_c"))
+        && let Some(parent) = canonical_prefix(folder) {
             prefixes.push(parent);
         }
-    }
 
-    if folder.join("drive_c").is_dir() {
-        if let Some(parent) = canonical_prefix(&folder.join("drive_c")) {
+    if folder.join("drive_c").is_dir()
+        && let Some(parent) = canonical_prefix(&folder.join("drive_c")) {
             prefixes.push(parent);
         }
-    }
 
     if folder.extension() == Some(OsStr::new("app")) || folder.join("Contents").is_dir() {
         for drive_c in [
@@ -950,11 +937,10 @@ pub fn resolve_osu_folder(folder: &Path) -> Option<PathBuf> {
             folder.join("Contents/SharedSupport/drive_c"),
             folder.join("Contents/SharedSupport/prefix/drive_c"),
         ] {
-            if drive_c.is_dir() {
-                if let Some(parent) = canonical_prefix(&drive_c) {
+            if drive_c.is_dir()
+                && let Some(parent) = canonical_prefix(&drive_c) {
                     prefixes.push(parent);
                 }
-            }
         }
 
         let mut drive_dirs = Vec::new();
@@ -1093,11 +1079,10 @@ fn find_drive_c_dirs(dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
             // Wineskin wrappers often add a convenience drive_c symlink at
             // the app root. Resolve it to the real prefix so WINEPREFIX points
             // at Contents/Resources instead of the bundle itself.
-            if path.file_name() == Some(OsStr::new("drive_c")) {
-                if let Ok(canonical) = fs::canonicalize(&path) {
+            if path.file_name() == Some(OsStr::new("drive_c"))
+                && let Ok(canonical) = fs::canonicalize(&path) {
                     out.push(canonical);
                 }
-            }
             continue;
         }
 
@@ -1246,12 +1231,11 @@ fn find_wine_bin(prefix: &Path, app: Option<&Path>) -> Option<(PathBuf, Option<P
     }
 
     for binary in ["wine64", "wine32on64", "wine"] {
-        if let Some(path) = find_in_path(binary) {
-            if let Some(bin) = path.parent() {
+        if let Some(path) = find_in_path(binary)
+            && let Some(bin) = path.parent() {
                 candidates.push((bin.to_path_buf(), None));
                 break;
             }
-        }
     }
 
     candidates.into_iter().find(|(bin, _)| has_wine_loader(bin))
