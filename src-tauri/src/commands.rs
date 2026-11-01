@@ -86,6 +86,53 @@ pub fn file_size(path: String) -> Option<u64> {
     metadata.is_file().then_some(metadata.len())
 }
 
+/// Calculate the SHA-256 checksum of a file on disk.
+#[tauri::command]
+pub async fn hash_file_sha256(path: String) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    tokio::task::spawn_blocking(move || {
+        let mut file = std::fs::File::open(&path)
+            .map_err(|e| format!("Failed to open file for hashing: {e}"))?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        loop {
+            let bytes_read = file
+                .read(&mut buffer)
+                .map_err(|e| format!("Failed to read file for hashing: {e}"))?;
+            if bytes_read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..bytes_read]);
+        }
+        Ok::<_, String>(hex::encode(hasher.finalize()))
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))?
+}
+
+/// Read a chunk of a file on disk starting at `offset` for `length` bytes.
+#[tauri::command]
+pub async fn read_file_chunk(path: String, offset: u64, length: u64) -> Result<Vec<u8>, String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    tokio::task::spawn_blocking(move || {
+        let mut file = std::fs::File::open(&path)
+            .map_err(|e| format!("Failed to open file for chunk read: {e}"))?;
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|e| format!("Failed to seek to offset {offset}: {e}"))?;
+        let mut buffer = vec![0u8; length as usize];
+        let bytes_read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("Failed to read chunk bytes: {e}"))?;
+        buffer.truncate(bytes_read);
+        Ok::<_, String>(buffer)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))?
+}
+
 #[tauri::command]
 pub fn get_hwid() -> String {
     get_id()

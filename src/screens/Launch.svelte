@@ -19,6 +19,7 @@
   import Progress from '$lib/components/ui/progress/progress.svelte';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '$lib/components/ui/select';
+  import CommunityWorkshopView from '$lib/components/theme/CommunityWorkshopView.svelte';
   import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
   import {
@@ -156,6 +157,7 @@
     ChevronRight,
     Clock,
     ExternalLink,
+    Globe,
     Medal,
     TrendingDown,
     TrendingUp,
@@ -281,6 +283,7 @@
   >(undefined);
   let themeInstalling = $state(false);
   let themeSearch = $state('');
+  let activeThemesTab = $state<'library' | 'workshop'>('library');
   let themeSavedUnlisten: (() => void) | undefined;
   let refreshingThemes = $state(false);
   let reloadingActiveTheme = $state(false);
@@ -3613,17 +3616,40 @@
           >
             <header class="shrink-0 border-b border-theme-800/50 px-5 pt-4 pb-3">
               <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="flex items-baseline gap-2">
-                    <h1 class="text-lg font-semibold tracking-tight">Themes</h1>
-                    <span
-                      class="rounded-full bg-theme-900/70 px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground/70"
-                      title="Themes in your library"
-                    >
-                      {$custom_themes.length}
-                    </span>
+                <div class="flex min-w-0 items-center gap-4">
+                  <div class="min-w-0">
+                    <div class="flex items-baseline gap-2">
+                      <h1 class="text-lg font-semibold tracking-tight">Themes</h1>
+                    </div>
+                    <p class="mt-0.5 text-[11px] text-muted-foreground">Make it feel like yours.</p>
                   </div>
-                  <p class="mt-0.5 text-[11px] text-muted-foreground">Make it feel like yours.</p>
+
+                  <!-- Tab Switcher: Installed vs Community Workshop -->
+                  <div class="flex items-center rounded-lg border border-theme-800/60 bg-theme-900/50 p-0.5">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab === 'library'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-white'}"
+                      onclick={() => (activeThemesTab = 'library')}
+                    >
+                      <ThemeIcon name="library" set={iconSet} class="size-3.5" />
+                      <span>Installed</span>
+                      <span class="rounded-full bg-black/30 px-1.5 py-0.2 text-[9px] tabular-nums">
+                        {$custom_themes.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab === 'workshop'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-white'}"
+                      onclick={() => (activeThemesTab = 'workshop')}
+                    >
+                      <Globe class="size-3.5" />
+                      <span>Community Workshop</span>
+                    </button>
+                  </div>
                 </div>
                 <div class="flex shrink-0 items-center gap-1.5">
                   <Button
@@ -3682,40 +3708,48 @@
                 </div>
               </div>
 
-              <div class="mt-3 flex items-center justify-between gap-3">
-                <nav class="flex min-w-0 items-center gap-0.5" aria-label="Theme filters">
-                  {#each themeFilterOptions as option (option.id)}
-                    <button
-                      type="button"
-                      class={themeFilterClass(option.id)}
-                      aria-current={themeFilter === option.id ? 'page' : undefined}
-                      onclick={() => (themeFilter = option.id)}
-                    >
-                      <ThemeIcon name={option.icon} set={iconSet} class="size-3.5 shrink-0" />
-                      <span>{option.label}</span>
-                      <span class="text-[8px] tabular-nums text-muted-foreground/60">
-                        {themeCounts[option.id]}
-                      </span>
-                    </button>
-                  {/each}
-                </nav>
-                <div class="relative w-44 shrink-0">
-                  <ThemeIcon
-                    name="search"
-                    set={iconSet}
-                    class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    class="h-8 border-theme-800 bg-theme-950/80 pl-7 text-[11px]"
-                    placeholder="Search themes..."
-                    bind:value={themeSearch}
-                  />
+              {#if activeThemesTab === 'library'}
+                <div class="mt-3 flex items-center justify-between gap-3">
+                  <nav class="flex min-w-0 items-center gap-0.5" aria-label="Theme filters">
+                    {#each themeFilterOptions as option (option.id)}
+                      <button
+                        type="button"
+                        class={themeFilterClass(option.id)}
+                        aria-current={themeFilter === option.id ? 'page' : undefined}
+                        onclick={() => (themeFilter = option.id)}
+                      >
+                        <ThemeIcon name={option.icon} set={iconSet} class="size-3.5 shrink-0" />
+                        <span>{option.label}</span>
+                        <span class="text-[8px] tabular-nums text-muted-foreground/60">
+                          {themeCounts[option.id]}
+                        </span>
+                      </button>
+                    {/each}
+                  </nav>
+                  <div class="relative w-44 shrink-0">
+                    <ThemeIcon
+                      name="search"
+                      set={iconSet}
+                      class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      class="h-8 border-theme-800 bg-theme-950/80 pl-7 text-[11px]"
+                      placeholder="Search themes..."
+                      bind:value={themeSearch}
+                    />
+                  </div>
                 </div>
-              </div>
+              {/if}
             </header>
 
             <div class="min-h-0 flex-1 px-5 pt-4 pb-1">
-              <ScrollContainer class="pr-2">
+              {#if activeThemesTab === 'workshop'}
+                <CommunityWorkshopView
+                  onApplyTheme={applyInstalledTheme}
+                  onRequestTrust={(theme) => requestThemeTrust(theme, false)}
+                />
+              {:else}
+                <ScrollContainer class="pr-2">
                 {#if filteredThemes.length > 0}
                   {#key themeFilter}
                     <div class="grid grid-cols-3 gap-3 pb-4 pr-1">
@@ -4028,7 +4062,8 @@
                   </div>
                 {/if}
               </ScrollContainer>
-            </div>
+            {/if}
+          </div>
           </div>
         </div>
       </div>

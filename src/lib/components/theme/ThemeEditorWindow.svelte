@@ -100,6 +100,7 @@
     themesDirectory,
     toSafeName,
   } from '$lib/themes';
+  import { publishThemeToWorkshop } from '$lib/communityThemes';
   import type { EZPPUser, EZPPUserInfo } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import { osuInstallationPath } from '$lib/userSettings';
@@ -126,6 +127,7 @@
     EyeOff,
     Film,
     Gauge,
+    Globe,
     GripVertical,
     Hand,
     Image as ImageIcon,
@@ -3329,6 +3331,100 @@
     }
   }
 
+  let publishModalOpen = $state(false);
+  let publishThemeId = $state('');
+  let publishName = $state('');
+  let publishDescription = $state('');
+  let publishVersion = $state('1.0.0');
+  let publishTags = $state('anime, video');
+  let publishing = $state(false);
+  let publishStatusMessage = $state('');
+  let publishProgress = $state(0);
+
+  async function openPublishDialog() {
+    if (exporting || saving || publishing) return;
+
+    if (!$currentUser) {
+      sileo.error({
+        title: 'Authentication Required',
+        description:
+          'You must be logged in to your EZPPFarm account to publish themes to the workshop.',
+      });
+      return;
+    }
+
+    const report = await validateTheme();
+    validationReport = report;
+    const errors = report.issues.some((issue) => issue.level === 'error');
+    if (errors) {
+      validationOpen = true;
+      exportAfterValidation = false;
+      return;
+    }
+
+    if (dirty) {
+      await saveTheme({ notify: false });
+    }
+
+    publishThemeId = savedFolder || toSafeName(definition.name);
+    publishName = definition.name || 'My Theme';
+    publishDescription = definition.description || '';
+    publishVersion = definition.version || '1.0.0';
+    publishTags = 'workshop, v2';
+    publishProgress = 0;
+    publishStatusMessage = '';
+    publishModalOpen = true;
+  }
+
+  async function handlePublishToWorkshop() {
+    if (publishing) return;
+    if (!savedFolder) {
+      await saveTheme({ notify: false });
+      if (!savedFolder) return;
+    }
+
+    publishing = true;
+    publishProgress = 5;
+    publishStatusMessage = 'Packaging theme archive...';
+
+    try {
+      const baseThemesDir = await themesDirectory();
+      const themeFolder = await path.join(baseThemesDir, savedFolder);
+
+      await publishThemeToWorkshop({
+        themeFolder,
+        themeId: publishThemeId,
+        name: publishName,
+        description: publishDescription,
+        version: publishVersion,
+        apiVersion: definition.apiVersion || '2.0.0',
+        tags: publishTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        onProgress: (msg, pct) => {
+          publishStatusMessage = msg;
+          publishProgress = pct;
+        },
+      });
+
+      sileo.success({
+        title: 'Published to Workshop!',
+        description: `"${publishName}" is now live in the Community Themes Workshop.`,
+      });
+
+      publishModalOpen = false;
+    } catch (err) {
+      console.error(err);
+      sileo.error({
+        title: 'Publish Failed',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      publishing = false;
+    }
+  }
+
   async function closeEditor() {
     if (saving) return;
     if (dirty) {
@@ -3751,7 +3847,7 @@
         variant="secondary"
         size="sm"
         onclick={() => exportCurrentTheme()}
-        disabled={exporting || saving}
+        disabled={exporting || saving || publishing}
       >
         {#if exporting}
           <LoaderCircle class="animate-spin" />
@@ -3759,6 +3855,20 @@
           <Download />
         {/if}
         Export
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={openPublishDialog}
+        disabled={exporting || saving || publishing}
+        class="border-cyan-500/30 bg-cyan-950/20 text-cyan-300 hover:bg-cyan-950/40 hover:text-cyan-200"
+      >
+        {#if publishing}
+          <LoaderCircle class="animate-spin" />
+        {:else}
+          <Globe class="size-4" />
+        {/if}
+        Publish
       </Button>
       <Button size="sm" onclick={() => saveTheme()} disabled={saving || loading}>
         {#if saving}
@@ -6626,6 +6736,169 @@
           <Button variant="destructive" size="sm" onclick={confirmGroupDelete}>
             <Trash2 class="size-3.5" />
             Delete group
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if publishModalOpen}
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-6 backdrop-blur-md"
+      role="presentation"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-theme-800 bg-theme-950 p-6 shadow-2xl"
+        role="dialog"
+        aria-labelledby="publish-dialog-title"
+      >
+        <div class="flex items-center justify-between border-b border-theme-800/60 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="rounded-lg bg-cyan-500/10 p-2 text-cyan-400">
+              <Globe class="size-5" />
+            </div>
+            <div>
+              <h2 id="publish-dialog-title" class="text-base font-semibold text-white">
+                Publish to Community Workshop
+              </h2>
+              <p class="text-[11px] text-muted-foreground">
+                Share your theme with the EZPPFarm community.
+              </p>
+            </div>
+          </div>
+          {#if !publishing}
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-7 text-muted-foreground hover:text-white"
+              onclick={() => (publishModalOpen = false)}
+            >
+              <X class="size-4" />
+            </Button>
+          {/if}
+        </div>
+
+        {#if $currentUser}
+          <div class="mt-4 flex items-center justify-between rounded-xl border border-theme-800/70 bg-theme-900/40 px-3.5 py-2.5">
+            <div class="flex items-center gap-2.5">
+              <img
+                src={`https://a.ez-pp.farm/${$currentUser.id}`}
+                alt={$currentUser.name}
+                class="size-8 rounded-full border border-white/20 bg-theme-800 object-cover"
+                onerror={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-semibold text-white">{$currentUser.name}</span>
+                  {#if $currentUser.donor}
+                    <span class="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-300 border border-amber-500/30">
+                      Supporter
+                    </span>
+                  {/if}
+                </div>
+                <span class="text-[10px] text-muted-foreground">Creator & Publisher</span>
+              </div>
+            </div>
+            <span class="text-[10px] text-emerald-400 font-medium">Verified Account</span>
+          </div>
+        {/if}
+
+        <div class="mt-4 flex flex-col gap-3">
+          <div>
+            <Label class="text-[11px] text-muted-foreground">Workshop Identifier (Slug)</Label>
+            <Input
+              class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs font-mono"
+              bind:value={publishThemeId}
+              placeholder="e.g. lucoa-theme"
+              disabled={publishing}
+            />
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-2">
+              <Label class="text-[11px] text-muted-foreground">Theme Name</Label>
+              <Input
+                class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs"
+                bind:value={publishName}
+                placeholder="My Awesome Theme"
+                disabled={publishing}
+              />
+            </div>
+            <div>
+              <Label class="text-[11px] text-muted-foreground">Version</Label>
+              <Input
+                class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs font-mono"
+                bind:value={publishVersion}
+                placeholder="1.0.0"
+                disabled={publishing}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label class="text-[11px] text-muted-foreground">Description</Label>
+            <Textarea
+              class="mt-1 border-theme-800 bg-theme-900/50 text-xs leading-relaxed"
+              rows={2}
+              bind:value={publishDescription}
+              placeholder="Tell others about your theme..."
+              disabled={publishing}
+            />
+          </div>
+
+          <div>
+            <Label class="text-[11px] text-muted-foreground">Tags (comma-separated)</Label>
+            <Input
+              class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs"
+              bind:value={publishTags}
+              placeholder="anime, video, clean"
+              disabled={publishing}
+            />
+          </div>
+        </div>
+
+        {#if publishing}
+          <div class="mt-4 rounded-xl border border-cyan-500/20 bg-cyan-950/20 p-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="flex items-center gap-1.5 text-cyan-300 font-medium">
+                <LoaderCircle class="size-3.5 animate-spin" />
+                {publishStatusMessage}
+              </span>
+              <span class="font-mono text-cyan-400 font-bold tabular-nums">{publishProgress}%</span>
+            </div>
+            <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-theme-900">
+              <div
+                class="h-full bg-cyan-400 transition-all duration-300"
+                style="width: {publishProgress}%"
+              ></div>
+            </div>
+          </div>
+        {/if}
+
+        <div class="mt-5 flex justify-end gap-2 border-t border-theme-800/60 pt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onclick={() => (publishModalOpen = false)}
+            disabled={publishing}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium gap-1.5"
+            onclick={handlePublishToWorkshop}
+            disabled={publishing || publishThemeId.trim().length < 2 || publishName.trim().length === 0}
+          >
+            {#if publishing}
+              <LoaderCircle class="size-3.5 animate-spin" />
+              Publishing...
+            {:else}
+              <Globe class="size-3.5" />
+              Publish to Workshop
+            {/if}
           </Button>
         </div>
       </div>
