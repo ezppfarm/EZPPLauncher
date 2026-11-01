@@ -5,6 +5,7 @@
   import { themeAssetUrl } from '$lib/themeV2';
   import { reduceAnimations } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
+  import { onDestroy } from 'svelte';
 
   let {
     definition,
@@ -19,6 +20,51 @@
   } = $props();
 
   let audioElement = $state<HTMLAudioElement | undefined>(undefined);
+  let mousePx = $state(0);
+  let mousePy = $state(0);
+  let targetPx = 0;
+  let targetPy = 0;
+  let animFrame: number | undefined;
+
+  function onWindowMouseMove(e: MouseEvent) {
+    if ($reduceAnimations || !definition.parallax?.enabled) return;
+    const intensity = definition.parallax.intensity ?? 0.25;
+    const w = window.innerWidth || 1000;
+    const h = window.innerHeight || 650;
+    targetPx = (e.clientX / w - 0.5) * 2 * intensity;
+    targetPy = (e.clientY / h - 0.5) * 2 * intensity;
+    if (animFrame === undefined) {
+      animFrame = requestAnimationFrame(updateParallax);
+    }
+  }
+
+  function updateParallax() {
+    animFrame = undefined;
+    mousePx += (targetPx - mousePx) * 0.12;
+    mousePy += (targetPy - mousePy) * 0.12;
+    if (Math.abs(targetPx - mousePx) > 0.001 || Math.abs(targetPy - mousePy) > 0.001) {
+      animFrame = requestAnimationFrame(updateParallax);
+    }
+  }
+
+  $effect(() => {
+    if (!definition.parallax?.enabled) {
+      mousePx = 0;
+      mousePy = 0;
+      targetPx = 0;
+      targetPy = 0;
+      if (animFrame !== undefined) {
+        cancelAnimationFrame(animFrame);
+        animFrame = undefined;
+      }
+    }
+  });
+
+  onDestroy(() => {
+    if (animFrame !== undefined) {
+      cancelAnimationFrame(animFrame);
+    }
+  });
 
   const assetUrl = (path: string | undefined) => {
     if (!path) return '';
@@ -43,17 +89,19 @@
     return Array.from({ length: count }, (_, index) => {
       const value = (offset: number) => random(index + 1 + offset);
       const isStar = effects.type === 'stars';
-      const size = isStar ? 1 + value(1) * 2.5 : 4 + value(1) * 7;
-      const duration = (isStar ? 2 + value(2) * 3 : 9 + value(2) * 11) / speed;
+      const isEmber = effects.type === 'embers';
+      const size = isStar ? 1 + value(1) * 2.5 : isEmber ? 2.5 + value(1) * 4.5 : 4 + value(1) * 7;
+      const duration =
+        (isStar ? 2 + value(2) * 3 : isEmber ? 5 + value(2) * 6 : 9 + value(2) * 11) / speed;
       return {
         id: index,
         left: value(3) * 100,
-        top: isStar ? value(4) * 100 : value(4) * 15,
+        top: isStar ? value(4) * 100 : isEmber ? 88 + value(4) * 16 : value(4) * 15,
         size,
         duration,
         delay: value(5) * duration,
-        drift: -90 + value(6) * 180,
-        opacity: 0.25 + value(7) * 0.65,
+        drift: isEmber ? -50 + value(6) * 100 : -90 + value(6) * 180,
+        opacity: isEmber ? 0.35 + value(7) * 0.65 : 0.25 + value(7) * 0.65,
         rotate: value(8) * 360,
       };
     });
@@ -86,7 +134,13 @@
   });
 </script>
 
-<div class="theme-v2 absolute inset-0 overflow-hidden" use:trackMedia>
+<svelte:window onmousemove={onWindowMouseMove} />
+
+<div
+  class="theme-v2 absolute inset-0 overflow-hidden"
+  use:trackMedia
+  style="--mouse-px:{mousePx};--mouse-py:{mousePy};"
+>
   {#if background.type === 'color'}
     <div
       class="absolute inset-0"
@@ -108,7 +162,11 @@
         style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
           1};filter:{background.blur
           ? `blur(${background.blur}px)`
-          : 'none'};transform:{background.blur ? 'scale(1.05)' : 'none'};"
+          : 'none'};transform:{background.blur
+          ? 'scale(1.08)'
+          : definition.parallax?.enabled
+            ? 'scale(1.06)'
+            : 'none'} translate3d({mousePx * -18}px, {mousePy * -18}px, 0);"
       />
     {/if}
   {:else if background.type === 'video'}
@@ -126,7 +184,11 @@
         style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
           1};filter:{background.blur
           ? `blur(${background.blur}px)`
-          : 'none'};transform:{background.blur ? 'scale(1.05)' : 'none'};"
+          : 'none'};transform:{background.blur
+          ? 'scale(1.08)'
+          : definition.parallax?.enabled
+            ? 'scale(1.06)'
+            : 'none'} translate3d({mousePx * -18}px, {mousePy * -18}px, 0);"
       ></video>
     {/if}
   {/if}
@@ -203,6 +265,33 @@
       box-shadow: 0 0 6px var(--particle-color);
       animation-name: v2-stars;
       animation-timing-function: ease-in-out;
+    }
+
+    &.embers {
+      border-radius: 9999px;
+      box-shadow:
+        0 0 6px var(--particle-color),
+        0 0 12px var(--particle-color);
+      animation-name: v2-embers;
+      animation-timing-function: ease-out;
+    }
+  }
+
+  @keyframes v2-embers {
+    0% {
+      transform: translate3d(0, 0, 0) scale(0.6);
+      opacity: 0.1;
+    }
+    20% {
+      opacity: 0.95;
+    }
+    80% {
+      opacity: 0.8;
+      transform: translate3d(calc(var(--particle-drift) * 0.65), -85vh, 0) scale(1.1);
+    }
+    100% {
+      transform: translate3d(var(--particle-drift), -115vh, 0) scale(0.3);
+      opacity: 0;
     }
   }
 

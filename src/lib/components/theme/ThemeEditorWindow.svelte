@@ -700,6 +700,7 @@
     { value: 'snow', label: 'Snow' },
     { value: 'petals', label: 'Petals' },
     { value: 'bubbles', label: 'Bubbles' },
+    { value: 'embers', label: 'Floating Embers' },
   ] as const;
 
   const notifyError = (description: string) => sileo.error({ title: 'Theme editor', description });
@@ -5390,6 +5391,48 @@
                 </div>
               </div>
             {/if}
+
+            <div class="space-y-2 border-t border-theme-800/60 pt-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <Label class={labelClass}>Mouse parallax</Label>
+                  <p class="text-[10px] text-muted-foreground">
+                    3D depth perspective on mouse move
+                  </p>
+                </div>
+                <Checkbox
+                  checked={definition.parallax?.enabled ?? false}
+                  onCheckedChange={(checked) => {
+                    if (!definition.parallax) {
+                      definition.parallax = { enabled: false, intensity: 0.25 };
+                    }
+                    definition.parallax.enabled = checked;
+                  }}
+                />
+              </div>
+              {#if definition.parallax?.enabled}
+                <div class="space-y-1.5 pt-1">
+                  <div class="flex items-center justify-between">
+                    <Label class={labelClass}>Parallax intensity</Label>
+                    <span class="font-mono text-xs text-muted-foreground">
+                      {Math.round((definition.parallax.intensity ?? 0.25) * 100)}%
+                    </span>
+                  </div>
+                  <Slider
+                    min={0.05}
+                    max={1}
+                    step={0.05}
+                    value={definition.parallax.intensity ?? 0.25}
+                    onValueChange={(val) => {
+                      if (!definition.parallax) {
+                        definition.parallax = { enabled: true, intensity: 0.25 };
+                      }
+                      definition.parallax.intensity = val;
+                    }}
+                  />
+                </div>
+              {/if}
+            </div>
           </ThemeSection>
 
           <ThemeSection title="Typography" icon={Type} open={false} contentClass="space-y-3 pt-2.5">

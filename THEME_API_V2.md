@@ -196,11 +196,23 @@ clamped to `0`–`1`.
 { "type": "stars", "density": 40, "speed": 1, "color": "#ffd6f2" }
 ```
 
-Supported types: `none`, `stars`, `snow`, `petals`, `bubbles`.
+Supported types: `none`, `stars`, `snow`, `petals`, `bubbles`, `embers`.
 
 - `density` is clamped to `0`–`120` particles.
 - `speed` is clamped to `0.2`–`3`.
 - Effects are disabled when the user turns on **Reduce animations**.
+
+### Parallax
+
+Themes can enable subtle 3D cursor parallax on the background and freeform layers:
+
+```json
+"parallax": { "enabled": true, "intensity": 0.25 }
+```
+
+- `intensity` is clamped to `0.05`–`1.0` (defaults to `0.25`).
+- Individual layers and groups can define their own `parallax` depth factor from `-2.0` to `+2.0` in the inspector (where negative shifts with background and positive shifts with foreground).
+- Parallax is automatically disabled when the user turns on **Reduce animations**.
 
 ### Audio
 

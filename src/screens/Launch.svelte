@@ -131,6 +131,7 @@
   import {
     cursorSmoothening,
     customCursor,
+    gameOptimization,
     loggingEnabled,
     osuInstallationPath,
     patch,
@@ -1201,7 +1202,7 @@
         }, 1000 * 2);
       }
 
-      await runOsu(osuPath, $patch);
+      await runOsu(osuPath, $patch, $gameOptimization);
       if ($trackingEnabled) umami.track('app_exit_osu');
       cleanup = true;
       launchInfo = 'Cleaning up...';
@@ -3188,6 +3189,27 @@
                                     checked={$reduceAnimations}
                                     onCheckedChange={async (e) => {
                                       reduceAnimations.set(e);
+                                    }}
+                                    class="mt-0.5"
+                                  />
+                                </div>
+
+                                <div class="flex items-start justify-between gap-8 py-3">
+                                  <div class="min-w-0">
+                                    <Label class="text-sm" for="setting-game-optimization"
+                                      >Game optimization & low latency</Label
+                                    >
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                      Boosts osu! process priority to High and requests maximum
+                                      sub-millisecond Windows timer resolution (1ms) during gameplay
+                                      to reduce input latency.
+                                    </p>
+                                  </div>
+                                  <Checkbox
+                                    id="setting-game-optimization"
+                                    checked={$gameOptimization}
+                                    onCheckedChange={async (e) => {
+                                      gameOptimization.set(e);
                                     }}
                                     class="mt-0.5"
                                   />

@@ -88,8 +88,8 @@ export const getSkin = async (folder: string) => {
 };
 
 export const runUpdater = async (folder: string) => await invoke('run_osu_updater', { folder });
-export const runOsu = async (folder: string, patch: boolean) =>
-  await invoke('run_osu', { folder, patch });
+export const runOsu = async (folder: string, patch: boolean, gameOptimization: boolean = false) =>
+  await invoke('run_osu', { folder, patch, gameOptimization });
 
 export const getEZPPLauncherStreams = async () => {
   const resp = await betterFetch<{ streams: string[] }>(updateUrl, {

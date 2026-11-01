@@ -699,6 +699,12 @@ const drawParticles = (context: PreviewContext) => {
       ctx.beginPath();
       ctx.arc(x, y, size / 2, 0, Math.PI * 2);
       ctx.stroke();
+    } else if (effects.type === 'embers') {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(x, y, size / 2.2, 0, Math.PI * 2);
+      ctx.fill();
     } else if (effects.type === 'petals') {
       ctx.translate(x, y);
       ctx.rotate(value(8) * Math.PI * 2);

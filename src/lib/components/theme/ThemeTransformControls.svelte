@@ -34,6 +34,7 @@
       (transform.skewY ?? 0) === 0 &&
       !transform.flipX &&
       !transform.flipY &&
+      (transform.parallax ?? 0) === 0 &&
       (!includeTranslate || ((transform.offsetX ?? 0) === 0 && (transform.offsetY ?? 0) === 0))
   );
 
@@ -87,6 +88,7 @@
       skewY: 0,
       flipX: false,
       flipY: false,
+      parallax: 0,
       ...(includeTranslate ? { offsetX: 0, offsetY: 0 } : {}),
     });
   }
@@ -255,6 +257,27 @@
       >
         <RotateCw class="size-3.5" />
       </Button>
+    </div>
+  </div>
+
+  <div class="mt-2.5 flex items-center justify-between border-t border-theme-800/40 pt-2">
+    <div class="flex flex-col">
+      <span class={label}>Parallax depth</span>
+      <span class="text-[9px] text-muted-foreground">3D cursor perspective</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <input
+        type="range"
+        min="-1"
+        max="1"
+        step="0.05"
+        value={transform.parallax ?? 0}
+        oninput={(e) => onchange({ parallax: Number((e.target as HTMLInputElement).value) })}
+        class="h-1.5 w-24 cursor-pointer appearance-none rounded-lg bg-theme-800 accent-primary"
+      />
+      <span class="w-8 font-mono text-[10px] text-right text-muted-foreground">
+        {Math.round((transform.parallax ?? 0) * 100)}%
+      </span>
     </div>
   </div>
 </ThemeSection>

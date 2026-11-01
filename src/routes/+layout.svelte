@@ -51,6 +51,7 @@
   import {
     cursorSmoothening,
     customCursor,
+    gameOptimization,
     loggingEnabled,
     patch,
     reduceAnimations,
@@ -260,6 +261,7 @@
     const config_custom_cursor = config.value<boolean>('custom_cursor');
     const config_cursor_smoothening = config.value<boolean>('cursor_smoothening');
     const config_reduce_animations = config.value<boolean>('reduce_animations');
+    const config_game_optimization = config.value<boolean>('game_optimization');
     const config_logging_enabled = config.value<boolean>('logging_enabled');
     const config_discord_presence = config.value<boolean>('discord_presence');
     const config_tracking_enabled = config.value<boolean>('tracking_consent');
@@ -291,6 +293,7 @@
     customCursor.set(await config_custom_cursor.get(true));
     cursorSmoothening.set(await config_cursor_smoothening.get(true));
     reduceAnimations.set(await config_reduce_animations.get(false));
+    gameOptimization.set(await config_game_optimization.get(false));
     loggingEnabled.set(await config_logging_enabled.get(true));
     discordPresence.set(await config_discord_presence.get(true));
     openTabletDriverEnabled.set(await config_otd_enabled.get(false));
@@ -303,6 +306,7 @@
     customCursor.subscribe(async (val) => await config_custom_cursor.set(val));
     cursorSmoothening.subscribe(async (val) => await config_cursor_smoothening.set(val));
     reduceAnimations.subscribe(async (val) => await config_reduce_animations.set(val));
+    gameOptimization.subscribe(async (val) => await config_game_optimization.set(val));
     loggingEnabled.subscribe(async (val) => {
       await config_logging_enabled.set(val);
       await setLoggingEnabled(val);

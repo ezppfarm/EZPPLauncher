@@ -559,12 +559,17 @@ pub async fn run_osu_updater(folder: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
-    log::info!(target: "osu", "Launching osu! from {folder} (patch={patch})");
+pub async fn run_osu(
+    folder: String,
+    patch: bool,
+    game_optimization: Option<bool>,
+) -> Result<(), String> {
+    let optimize = game_optimization.unwrap_or(false);
+    log::info!(target: "osu", "Launching osu! from {folder} (patch={patch}, optimize={optimize})");
 
     #[cfg(target_os = "macos")]
     {
-        return crate::macos::run_osu(&folder, patch).await;
+        return crate::macos::run_osu(&folder, patch, optimize).await;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -573,6 +578,18 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
         const DETACHED_PROCESS: u32 = 0x00000008;
         #[cfg(windows)]
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+
+        #[cfg(windows)]
+        if optimize {
+            #[link(name = "winmm")]
+            extern "system" {
+                fn timeBeginPeriod(uPeriod: u32) -> u32;
+            }
+            unsafe {
+                timeBeginPeriod(1);
+            }
+            log::info!(target: "osu", "Game optimization: requested 1ms timer resolution");
+        }
 
         let mut game_process = {
             #[cfg(windows)]
@@ -611,6 +628,22 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
 
         if let Some(pid) = game_process.id() {
             log::info!(target: "osu", "osu! started (pid {pid})");
+
+            #[cfg(windows)]
+            if optimize {
+                unsafe {
+                    use winapi::um::processthreadsapi::{OpenProcess, SetPriorityClass};
+                    use winapi::um::winbase::HIGH_PRIORITY_CLASS;
+                    use winapi::um::winnt::PROCESS_SET_INFORMATION;
+                    let handle = OpenProcess(PROCESS_SET_INFORMATION, 0, pid);
+                    if !handle.is_null() {
+                        if SetPriorityClass(handle, HIGH_PRIORITY_CLASS) != 0 {
+                            log::info!(target: "osu", "Game optimization: boosted osu! process priority to High (pid {pid})");
+                        }
+                        winapi::um::handleapi::CloseHandle(handle);
+                    }
+                }
+            }
         }
         crate::logging::capture_osu_output(&mut game_process);
 
@@ -691,7 +724,21 @@ pub async fn run_osu(folder: String, patch: bool) -> Result<(), String> {
             }
         }
 
-        match game_process.wait().await {
+        let wait_res = game_process.wait().await;
+
+        #[cfg(windows)]
+        if optimize {
+            #[link(name = "winmm")]
+            extern "system" {
+                fn timeEndPeriod(uPeriod: u32) -> u32;
+            }
+            unsafe {
+                timeEndPeriod(1);
+            }
+            log::info!(target: "osu", "Game optimization: restored timer resolution");
+        }
+
+        match wait_res {
             Ok(status) => log::info!(target: "osu", "osu! exited with {status}"),
             Err(error) => {
                 log::warn!(target: "osu", "Could not wait for osu!: {error}");

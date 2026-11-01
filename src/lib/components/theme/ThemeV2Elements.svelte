@@ -1227,7 +1227,9 @@
         element,
         elements,
         groups
-      )};transform-origin:0 0;touch-action:none;outline:{selected
+      )}{element.parallax
+        ? ` translate3d(calc(var(--mouse-px, 0) * ${element.parallax * 30}px), calc(var(--mouse-py, 0) * ${element.parallax * 30}px), 0)`
+        : ''};transform-origin:0 0;touch-action:none;outline:{selected
         ? `${selectedIds.length > 1 ? 1 : 2}px solid #ff006e`
         : 'none'};outline-offset:2px;"
       role={interactive || element.interactive ? 'button' : undefined}

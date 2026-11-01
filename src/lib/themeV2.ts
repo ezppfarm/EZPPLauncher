@@ -48,7 +48,13 @@ export type ThemeV2Background =
       muted?: boolean;
     };
 
-export type ThemeV2EffectType = 'none' | 'snow' | 'stars' | 'petals' | 'bubbles';
+export type ThemeV2EffectType = 'none' | 'snow' | 'stars' | 'petals' | 'bubbles' | 'embers';
+
+export type ThemeV2Parallax = {
+  enabled?: boolean;
+  /** Intensity multiplier from 0.05 to 1.0, defaults to 0.25 */
+  intensity?: number;
+};
 
 export type ThemeV2Effects = {
   type: ThemeV2EffectType;
@@ -121,6 +127,8 @@ export type ThemeV2Transform = {
   skewY?: number;
   flipX?: boolean;
   flipY?: boolean;
+  /** Parallax depth multiplier (-2 to 2); when parallax is enabled, offsets layer based on cursor. */
+  parallax?: number;
 };
 
 /** A group in the layer list. Groups may be nested through `parentId`. */
@@ -644,6 +652,7 @@ export type ThemeV2Definition = {
   background: ThemeV2Background;
   overlay: ThemeV2Overlay;
   effects: ThemeV2Effects;
+  parallax?: ThemeV2Parallax;
   audio?: ThemeV2Audio;
   /** Theme-wide fonts and freeform layers rendered over the launcher UI. */
   typography: ThemeV2Typography;
@@ -789,6 +798,9 @@ const normalizeTransform = (source: Record<string, unknown>): ThemeV2Transform =
     skewY: clamp(source.skewY, 0, -89, 89),
     flipX: source.flipX === true,
     flipY: source.flipY === true,
+    ...(typeof source.parallax === 'number' && Number.isFinite(source.parallax)
+      ? { parallax: clamp(source.parallax, 0, -2, 2) }
+      : {}),
   };
 };
 
@@ -1756,6 +1768,10 @@ export const createDefaultThemeV2 = (): ThemeV2Definition => ({
     speed: 1,
     color: '#ffffff',
   },
+  parallax: {
+    enabled: false,
+    intensity: 0.25,
+  },
   typography: {
     body: 'Sora Variable',
     heading: 'Sora Variable',
@@ -1830,11 +1846,17 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
   }
 
   const sourceEffects = (raw.effects ?? {}) as Record<string, unknown>;
-  const effectType = ['none', 'snow', 'stars', 'petals', 'bubbles'].includes(
+  const effectType = ['none', 'snow', 'stars', 'petals', 'bubbles', 'embers'].includes(
     String(sourceEffects.type)
   )
     ? (String(sourceEffects.type) as ThemeV2EffectType)
     : 'none';
+
+  const sourceParallax = (raw.parallax ?? {}) as Record<string, unknown>;
+  const parallax: ThemeV2Parallax = {
+    enabled: sourceParallax.enabled === true,
+    intensity: clamp(sourceParallax.intensity, 0.25, 0.05, 1),
+  };
 
   const sourceOverlay = (raw.overlay ?? {}) as Record<string, unknown>;
   const sourceAudio = raw.audio as Record<string, unknown> | undefined;
@@ -1868,6 +1890,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
       speed: clamp(sourceEffects.speed, 1, 0.2, 3),
       color: color(sourceEffects.color, '#ffffff'),
     },
+    parallax,
     // A video background owns the soundtrack; combining it with theme music
     // would play two sources at once.
     audio:

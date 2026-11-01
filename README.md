@@ -21,6 +21,7 @@ It enhances the osu! experience with quality-of-life features, advanced launcher
 - [x] **Live Player Stats**: Displays rank, PP, accuracy, playcount, and server latency directly on the launcher dashboard.
 - [x] **Library Indexing**: Automatically counts imported beatmapsets and skins.
 - [x] **OpenTabletDriver Integration**: Automatically starts and stops the OpenTabletDriver daemon on launch/exit (Windows only).
+- [x] **Competitive Game Optimization Mode**: Optional low-latency engine setting that boosts osu! process priority to High and requests sub-millisecond Windows timer resolution (1ms) during gameplay.
 - [x] **Performance Display Overlay**: In-game HUD overlay (available in the experimental patcher stream).
 
 ### Visual Theme Engine v2 & In-App Studio
@@ -32,6 +33,7 @@ It enhances the osu! experience with quality-of-life features, advanced launcher
 - [x] **Logic & Scripting System**: Visual WHEN/IF/THEN rule builder and sandboxed rule scripting (expressions, branches, loops, visibility toggles) without `eval`.
 - [x] **Dynamic Placeholders & Clock Expressions**: Real-time variables (`{username}`, `{rank}`, `{pp}`) and second-accurate clock variables (`{time}`, `{hour}`, `{minute}`).
 - [x] **Typography & Icon Families**: Gradient fills, outlines, drop shadows, custom `@fontsource` webfonts, and bundled Lucide, Phosphor, and Tabler icon catalogs.
+- [x] **Dynamic Particle Emitters & 3D Cursor Parallax**: Configurable background particles (snow, stars, petals, bubbles, and floating embers) plus smooth cursor-driven 3D parallax depth for layers and backgrounds.
 - [x] **Backup & Rollback System**: Automatic versioned theme snapshots with one-click restoration, plus security trust prompts for executable components.
 
 ### Discord Rich Presence Studio

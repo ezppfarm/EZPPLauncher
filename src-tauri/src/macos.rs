@@ -582,7 +582,14 @@ async fn clean_wine_font_registry(runtime: &WineRuntime) {
 }
 
 /// Run osu! (`-devserver ez-pp.farm`) and wait until the game exits.
-pub async fn run_osu(osu_folder: &str, patch: bool) -> Result<(), String> {
+pub async fn run_osu(
+    osu_folder: &str,
+    patch: bool,
+    game_optimization: bool,
+) -> Result<(), String> {
+    if game_optimization {
+        log::info!(target: "osu", "Game optimization active on macOS");
+    }
     let folder = Path::new(osu_folder);
     let runtime = WineRuntime::for_osu_folder(folder).map_err(|error| {
         log::error!(target: "osu", "Could not prepare the Wine runtime: {error}");
