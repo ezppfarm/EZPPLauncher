@@ -743,7 +743,9 @@ pub async fn get_ezpp_launcher_update_files(
             let data = fs::read(&file_path).await.map_err(|e| e.to_string())?;
             let hash = format!("{:x}", md5::compute(&data));
             let matches = hash.eq_ignore_ascii_case(&file.md5)
-                || (file.name == "osu!.patcher.exe" && crate::utils::is_compatible_patcher(&data));
+                || (cfg!(target_os = "macos")
+                    && file.name == "osu!.patcher.exe"
+                    && crate::utils::is_compatible_patcher(&data));
             if !matches {
                 files_to_download.push(file.clone());
             }
@@ -836,9 +838,12 @@ pub async fn download_ezpp_launcher_update_files(
         }
     }
 
-    let patcher_exe = osu_path.join("EZPPLauncher").join("patcher").join("osu!.patcher.exe");
-    if patcher_exe.is_file() {
-        let _ = crate::utils::ensure_patcher_compatibility(&patcher_exe);
+    #[cfg(target_os = "macos")]
+    {
+        let patcher_exe = osu_path.join("EZPPLauncher").join("patcher").join("osu!.patcher.exe");
+        if patcher_exe.is_file() {
+            let _ = crate::utils::ensure_patcher_compatibility(&patcher_exe);
+        }
     }
 
     Ok(())
