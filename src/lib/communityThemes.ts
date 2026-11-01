@@ -42,7 +42,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   {
     id: 'execution_clap',
     name: 'Execution Clap',
-    description: 'High-energy animated music video theme featuring Camellia\'s "Execution Clap" with background video playback and intense beats.',
+    description: 'High-energy animated music video theme featuring Trap Chick\'s "Execution Clap" with background video playback and intense beats.',
     version: '1.0.0',
     apiVersion: '1.0',
     hasExecutableCode: true,
