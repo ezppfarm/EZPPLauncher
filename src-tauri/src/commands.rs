@@ -3055,6 +3055,7 @@ pub async fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
             #[cfg(target_os = "macos")]
             {
                 let res = crate::macos::activate_and_focus_window(&win);
+                let _ = crate::macos::unlock_media_autoplay(&win);
                 let _ = tx.send(res);
             }
 
@@ -3065,4 +3066,17 @@ pub async fn reveal_window(window: tauri::WebviewWindow) -> Result<(), String> {
 
     rx.await
         .map_err(|_| "Main thread channel closed".to_string())?
+}
+
+#[tauri::command]
+pub async fn unlock_media_autoplay(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::macos::unlock_media_autoplay(&window)?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+    }
+    Ok(())
 }

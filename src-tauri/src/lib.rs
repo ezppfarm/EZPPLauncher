@@ -33,7 +33,7 @@ use crate::{
         resolve_osu_folder, restore_theme_backup, reveal_window, run_open_tablet_driver, run_osu, run_osu_updater,
         save_theme_project, set_logging_enabled, set_osu_config_values, set_osu_user_config_values,
         stop_open_tablet_driver, theme_asset_base, theme_editor_context, theme_preview_url,
-        valid_osu_folder,
+        unlock_media_autoplay, valid_osu_folder,
     },
     state::AppState,
 };
@@ -136,6 +136,9 @@ pub fn run() {
                 if let Err(error) = macos::allow_media_autoplay(&window) {
                     log::warn!(target: "launcher", "{error}");
                 }
+                if let Err(error) = macos::unlock_media_autoplay(&window) {
+                    log::warn!(target: "launcher", "{error}");
+                }
                 if let Err(error) = macos::activate_and_focus_window(&window) {
                     log::warn!(target: "launcher", "Could not focus launcher window on startup: {error}");
                 }
@@ -216,6 +219,7 @@ pub fn run() {
             set_logging_enabled,
             open_logs_folder,
             reveal_window,
+            unlock_media_autoplay,
             logging::list_log_bundles,
             logging::read_log_bundle
         ])
@@ -236,6 +240,9 @@ pub fn run() {
                     log::warn!(target: "launcher", "Could not round the launcher window: {error}");
                 }
                 if let Err(error) = macos::allow_media_autoplay(&window) {
+                    log::warn!(target: "launcher", "{error}");
+                }
+                if let Err(error) = macos::unlock_media_autoplay(&window) {
                     log::warn!(target: "launcher", "{error}");
                 }
                 if let Err(error) = macos::activate_and_focus_window(&window) {

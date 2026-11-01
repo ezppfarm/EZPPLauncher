@@ -248,6 +248,7 @@ export const playThemeMedia = (node: HTMLMediaElement) => {
       .catch((error) => {
         console.warn('Theme media autoplay was blocked', error);
         armAutoplayRetry(node);
+        void invoke('unlock_media_autoplay').catch(() => {});
       });
   }
 };

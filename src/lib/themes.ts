@@ -449,6 +449,8 @@ export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volum
     media.volume = volume;
     playThemeMedia(media);
   });
+
+  void invoke('unlock_media_autoplay').catch(() => {});
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {

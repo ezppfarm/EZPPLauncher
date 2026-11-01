@@ -197,6 +197,70 @@ pub fn allow_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String>
         .map_err(|error| format!("Could not enable theme media autoplay: {error}"))
 }
 
+/// Programmatically unlock media autoplay with unmuted sound using WebKit's
+/// user gesture SPI and media resumption APIs.
+pub fn unlock_media_autoplay(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    use std::ffi::CString;
+
+    window
+        .with_webview(|webview| unsafe {
+            let webview = webview.inner() as *mut AnyObject;
+            if webview.is_null() {
+                return;
+            }
+
+            // 1. Resume all media playback
+            let sel_resume = objc2::sel!(_resumeAllMediaPlayback);
+            if msg_send![webview, respondsToSelector: sel_resume] {
+                let _: () = msg_send![webview, _resumeAllMediaPlayback];
+            } else {
+                let sel_resume_pub = objc2::sel!(resumeAllMediaPlayback:);
+                if msg_send![webview, respondsToSelector: sel_resume_pub] {
+                    let _: () = msg_send![
+                        webview,
+                        resumeAllMediaPlayback: std::ptr::null_mut::<AnyObject>()
+                    ];
+                }
+            }
+
+            // 2. Evaluate unmuted media play script with explicit user gesture SPI
+            let sel_eval = objc2::sel!(
+                _evaluateJavaScript:withSourceURL:inFrame:inContentWorld:withUserGesture:completionHandler:
+            );
+            if msg_send![webview, respondsToSelector: sel_eval] {
+                let script_str = match CString::new(
+                    "document.querySelectorAll('video, audio').forEach(function(el) { \
+                        el.muted = false; \
+                        var p = el.play(); \
+                        if (p !== undefined) p.catch(function() {}); \
+                    });",
+                ) {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+
+                let ns_script: *mut AnyObject =
+                    msg_send![objc2::class!(NSString), stringWithUTF8String: script_str.as_ptr()];
+                let page_world: *mut AnyObject =
+                    msg_send![objc2::class!(WKContentWorld), pageWorld];
+
+                let _: () = msg_send![
+                    webview,
+                    _evaluateJavaScript: ns_script,
+                    withSourceURL: std::ptr::null_mut::<AnyObject>(),
+                    inFrame: std::ptr::null_mut::<AnyObject>(),
+                    inContentWorld: page_world,
+                    withUserGesture: true,
+                    completionHandler: std::ptr::null_mut::<AnyObject>()
+                ];
+                log::debug!(target: "launcher", "Unlocked theme media autoplay with user gesture SPI");
+            }
+        })
+        .map_err(|error| format!("Could not unlock theme media autoplay: {error}"))
+}
+
 /// Show a native open panel that accepts `.app` bundles as well as folders.
 ///
 /// AppKit treats application bundles as packages (directories) by default, so a
