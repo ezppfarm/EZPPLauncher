@@ -51,7 +51,7 @@
   let downloadProgress = $state(0);
   let downloadStatus = $state('');
 
-  const TAGS = ['all', 'anime', 'minimal', 'video', 'audio', 'game', 'dark', 'clean'];
+  const TAGS = ['all', 'legacy', 'anime', 'minimal', 'video', 'audio', 'game', 'dark', 'clean'];
 
   const localThemeMap = $derived.by(() => {
     const map = new Map<string, Theme>();
@@ -312,7 +312,15 @@
 
                 <!-- Top Left: Trust Badge -->
                 <div class="absolute top-2 left-2 flex items-center gap-1.5">
-                  {#if !theme.hasExecutableCode}
+                  {#if theme.apiVersion === '1.0' || theme.tags?.includes('legacy')}
+                    <span
+                      class="flex items-center gap-1 rounded-md border border-purple-500/40 bg-purple-950/80 px-1.5 py-0.5 text-[9px] font-medium text-purple-300 backdrop-blur-sm"
+                      title="Legacy v1 theme: video/audio playback"
+                    >
+                      <Sparkles class="size-3 text-purple-300" />
+                      Legacy v1
+                    </span>
+                  {:else if !theme.hasExecutableCode}
                     <span
                       class="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-950/80 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300 backdrop-blur-sm"
                       title="Sandboxed Declarative Theme: pure styles, no executable JS code"

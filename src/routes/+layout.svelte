@@ -47,7 +47,7 @@
   } from '$lib/themeMedia';
   import { isThemeTrusted } from '$lib/themeTrust';
   import { themeV2Css } from '$lib/themeV2';
-  import { getDownloadableThemes, getThemes, loadTheme } from '$lib/themes';
+  import { getThemes, loadTheme } from '$lib/themes';
   import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothening,
@@ -65,7 +65,6 @@
   import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { Buffer } from 'buffer';
-  import { SemVer } from 'semver';
   import { sileo } from 'sileo';
   import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
@@ -348,31 +347,13 @@
 
     try {
       currentLoadingInfo.set('Loading themes...');
-      const downloadableThemes = await getDownloadableThemes();
-      const combinedThemes = [...localThemes];
-      for (const theme of downloadableThemes) {
-        if (!combinedThemes.find((t) => t.name === theme.name)) combinedThemes.push(theme);
-        const installedTheme = localThemes.find((t) => t.name === theme.name);
-        if (installedTheme) {
-          const installedThemeVersion = new SemVer(installedTheme.version);
-          const downloadableThemeVersion = new SemVer(theme.version);
-          if (downloadableThemeVersion.compare(installedThemeVersion) > 0) {
-            installedTheme.updateAvailable = true;
-            const index = combinedThemes.findIndex((t) => t.name === theme.name);
-            combinedThemes[index] = installedTheme;
-          }
-        }
-      }
-
-      combinedThemes.sort((a, b) => {
+      localThemes.sort((a, b) => {
         if (a.name === 'Default') return -1;
         if (b.name === 'Default') return 1;
-        if (a.status === 'installed' && b.status !== 'installed') return -1;
-        if (a.status !== 'installed' && b.status === 'installed') return 1;
         return a.name.localeCompare(b.name);
       });
 
-      custom_themes.set(combinedThemes);
+      custom_themes.set(localThemes);
     } catch (err) {
       console.log(err);
       sileo.error({

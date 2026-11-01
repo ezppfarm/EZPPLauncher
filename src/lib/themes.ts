@@ -7,7 +7,6 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
-import { SemVer } from 'semver';
 
 export type Theme = {
   folder_name: string;
@@ -102,51 +101,12 @@ const patchTheme = (name: string, patch: (theme: Theme) => Theme) => {
   );
 };
 
-export const getDownloadableThemes = async () => {
-  const themes: Theme[] = [];
-
-  const downloadableThemes = await betterFetch<
-    {
-      name: string;
-      version: string;
-      author: string;
-      apiVersion?: string;
-      description?: string;
-      nsfw?: boolean;
-    }[]
-  >(`${THEME_REPOSITORY}/raw/branch/main/themes.json`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-    },
-  });
-  if (downloadableThemes.data) {
-    for (const theme of downloadableThemes.data) {
-      themes.push({
-        folder_name: `${toSafeName(theme.name)}-${generateRandomString(16)}`,
-        name: theme.name,
-        version: theme.version,
-        apiVersion: theme.apiVersion ?? '1.0',
-        author: theme.author,
-        description: theme.description ?? '',
-        nsfw: theme.nsfw === true,
-        scriptUrl: '',
-        assets: '',
-        preview: `${THEME_REPOSITORY}/raw/branch/main/previews/${toSafeName(theme.name)}.png`,
-        status: 'not-installed',
-        progress: 0,
-        updateAvailable: false,
-        cssStyle: '',
-      });
-    }
-  } else {
-    console.error('Failed to fetch downloadable themes');
-    console.error(downloadableThemes.error);
-  }
-  return themes;
+/**
+ * Legacy API v1 remote repository loading has been moved to the Community Themes Workshop.
+ * @deprecated Browse and download themes through the Community Themes Workshop instead.
+ */
+export const getDownloadableThemes = async (): Promise<Theme[]> => {
+  return [];
 };
 
 const themeFromFolder = async (
@@ -534,78 +494,53 @@ export const importThemeFromFile = async (themeName: string, filePath: string) =
 };
 
 export const reloadThemes = async () => {
-  const [downloadableThemes, installedThemes] = await Promise.all([
-    getDownloadableThemes(),
-    getThemes(),
-  ]);
-
+  const installedThemes = await getThemes();
   const installedMap = new Map(installedThemes.map((t) => [t.name, t]));
-  const combinedMap = new Map(installedThemes.map((t) => [t.name, { ...t }]));
-
-  for (const downloadable of downloadableThemes) {
-    const installed = installedMap.get(downloadable.name);
-
-    if (installed) {
-      try {
-        if (new SemVer(downloadable.version).compare(new SemVer(installed.version)) > 0) {
-          const installedTheme = combinedMap.get(downloadable.name)!;
-          installedTheme.updateAvailable = true;
-          installedTheme.availableVersion = downloadable.version;
-        }
-      } catch {
-        // Ignore malformed versions instead of breaking the whole theme list.
-      }
-    } else {
-      combinedMap.set(downloadable.name, downloadable);
-    }
-  }
-
-  const combinedThemes = [...combinedMap.values()];
 
   custom_themes.update((storeThemes) => {
     const storeMap = new Map(storeThemes.map((t) => [t.name, t]));
     const ACTIVE_STATUSES = new Set(['downloading', 'extracting', 'deleting']);
 
-    const updatedThemes = storeThemes.map((storeTheme) => {
-      if (ACTIVE_STATUSES.has(storeTheme.status)) return storeTheme;
-      const theme = combinedMap.get(storeTheme.name);
-      if (!theme) return storeTheme;
+    const updatedThemes = storeThemes
+      .filter((storeTheme) => installedMap.has(storeTheme.name) || ACTIVE_STATUSES.has(storeTheme.status))
+      .map((storeTheme) => {
+        if (ACTIVE_STATUSES.has(storeTheme.status)) return storeTheme;
+        const theme = installedMap.get(storeTheme.name);
+        if (!theme) return storeTheme;
 
-      // Replace the object rather than mutating it so the theme cards see the
-      // new values when the list is rendered from a filtered derived array.
-      return {
-        ...storeTheme,
-        scriptUrl: theme.scriptUrl,
-        assets: theme.assets,
-        preview: theme.preview,
-        version: theme.version,
-        author: theme.author,
-        apiVersion: theme.apiVersion,
-        description: theme.description,
-        nsfw: theme.nsfw,
-        definition: theme.definition,
-        updateAvailable: theme.updateAvailable,
-        availableVersion: theme.availableVersion,
-        cssStyle: theme.cssStyle,
-        backups: theme.backups ?? storeTheme.backups,
-      };
-    });
+        // Replace the object rather than mutating it so the theme cards see the
+        // new values when the list is rendered from a filtered derived array.
+        return {
+          ...storeTheme,
+          scriptUrl: theme.scriptUrl,
+          assets: theme.assets,
+          preview: theme.preview,
+          version: theme.version,
+          author: theme.author,
+          apiVersion: theme.apiVersion,
+          description: theme.description,
+          nsfw: theme.nsfw,
+          definition: theme.definition,
+          updateAvailable: theme.updateAvailable,
+          availableVersion: theme.availableVersion,
+          cssStyle: theme.cssStyle,
+          backups: theme.backups ?? storeTheme.backups,
+        };
+      });
 
-    const newThemes = combinedThemes.filter((t) => !storeMap.has(t.name));
+    const newThemes = installedThemes.filter((t) => !storeMap.has(t.name));
     const merged = [...updatedThemes, ...newThemes];
 
     return merged.sort((a, b) => {
       if (a.name === 'Default') return -1;
       if (b.name === 'Default') return 1;
-      if (a.status === 'installed' && b.status !== 'installed') return -1;
-      if (a.status !== 'installed' && b.status === 'installed') return 1;
       return a.name.localeCompare(b.name);
     });
   });
 
   active_custom_theme.update((active) => {
     if (!active) return active;
-    const updated = combinedMap.get(active.name);
+    const updated = installedMap.get(active.name);
     return updated ? { ...active, ...updated } : active;
   });
 };

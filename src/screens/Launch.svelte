@@ -306,8 +306,6 @@
 
   const themeFilterOptions = [
     { id: 'all', label: 'All themes', icon: 'all-themes' },
-    { id: 'installed', label: 'Installed', icon: 'installed' },
-    { id: 'available', label: 'Available', icon: 'available' },
     { id: 'updates', label: 'Updates', icon: 'updates' },
   ] as const;
   type ThemeFilter = (typeof themeFilterOptions)[number]['id'];
@@ -321,21 +319,8 @@
         : 'text-muted-foreground hover:bg-theme-900/60 hover:text-theme-100'
     }`;
 
-  /** A theme is local while installed, being removed, or updating in place. */
-  const themeIsInstalled = (theme: Theme) =>
-    theme.status === 'installed' ||
-    theme.status === 'deleting' ||
-    ((theme.status === 'downloading' || theme.status === 'extracting') && theme.updateAvailable);
-
-  /** Keep a fresh download visible in the gallery while it progresses. */
-  const themeIsAvailable = (theme: Theme) =>
-    theme.status === 'not-installed' ||
-    ((theme.status === 'downloading' || theme.status === 'extracting') && !theme.updateAvailable);
-
   const themeCounts = $derived({
     all: $custom_themes.length,
-    installed: $custom_themes.filter(themeIsInstalled).length,
-    available: $custom_themes.filter(themeIsAvailable).length,
     updates: $custom_themes.filter((theme) => theme.updateAvailable).length,
   });
 
@@ -343,8 +328,6 @@
     const query = themeSearch.trim().toLowerCase();
 
     return $custom_themes.filter((theme) => {
-      if (themeFilter === 'installed' && !themeIsInstalled(theme)) return false;
-      if (themeFilter === 'available' && !themeIsAvailable(theme)) return false;
       if (themeFilter === 'updates' && !theme.updateAvailable) return false;
       if (!query) return true;
 
@@ -4025,10 +4008,6 @@
                         No themes match "{themeSearch}"
                       {:else if themeFilter === 'updates'}
                         Everything is up to date
-                      {:else if themeFilter === 'available'}
-                        No themes left to install
-                      {:else if themeFilter === 'installed'}
-                        No installed themes yet
                       {:else}
                         No themes found
                       {/if}
@@ -4038,12 +4017,8 @@
                         Try a different name, author or API version.
                       {:else if themeFilter === 'updates'}
                         You are running the latest version of every installed theme.
-                      {:else if themeFilter === 'available'}
-                        Every gallery theme is already installed.
-                      {:else if themeFilter === 'installed'}
-                        Download a theme from the gallery to get started.
                       {:else}
-                        Try refreshing the gallery, or create a new API 2.0 theme.
+                        Discover themes in the Community Workshop or create a new API 2.0 theme.
                       {/if}
                     </p>
                     {#if themeSearch || themeFilter !== 'all'}

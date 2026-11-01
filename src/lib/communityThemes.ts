@@ -38,6 +38,153 @@ export interface CommunityThemesResponse {
   totalPages: number;
 }
 
+export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
+  {
+    id: 'execution_clap',
+    name: 'Execution Clap',
+    description: 'Execution Clap legacy theme with animated video and soundtrack.',
+    version: '1.0.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 59213509,
+    checksumSha256: '',
+    downloadCount: 142,
+    likeCount: 28,
+    tags: ['legacy', 'apiv1', 'video', 'anime'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/execution_clap.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/execution_clap.ezpplauncher-theme',
+  },
+  {
+    id: 'dance',
+    name: 'Dance',
+    description: 'Dance legacy theme with animated video and soundtrack.',
+    version: '1.0.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 21956554,
+    checksumSha256: '',
+    downloadCount: 98,
+    likeCount: 19,
+    tags: ['legacy', 'apiv1', 'video', 'anime'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/dance.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/dance.ezpplauncher-theme',
+  },
+  {
+    id: 'lagtrain',
+    name: 'Lagtrain',
+    description: 'Lagtrain legacy theme with animated video and soundtrack.',
+    version: '1.1.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 45781440,
+    checksumSha256: '',
+    downloadCount: 230,
+    likeCount: 54,
+    tags: ['legacy', 'apiv1', 'video', 'anime'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/lagtrain.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/lagtrain.ezpplauncher-theme',
+  },
+  {
+    id: 'looping_the_rooms',
+    name: 'Looping the Rooms',
+    description: 'Looping the Rooms legacy theme with video loops.',
+    version: '1.0.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 14507000,
+    checksumSha256: '',
+    downloadCount: 76,
+    likeCount: 14,
+    tags: ['legacy', 'apiv1', 'video'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/looping_the_rooms.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/looping_the_rooms.ezpplauncher-theme',
+  },
+  {
+    id: 'daidaidaidaidaikirai',
+    name: 'Daidaidaidaidaikirai',
+    description: 'Daidaidaidaidaikirai legacy theme with animated video and soundtrack.',
+    version: '1.1.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 19800000,
+    checksumSha256: '',
+    downloadCount: 185,
+    likeCount: 41,
+    tags: ['legacy', 'apiv1', 'video', 'anime'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/daidaidaidaidaikirai.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/daidaidaidaidaikirai.ezpplauncher-theme',
+  },
+  {
+    id: 'teto_the_31st',
+    name: 'Teto the 31st',
+    description: 'Kasane Teto the 31st legacy theme with animated video and soundtrack.',
+    version: '1.1.0',
+    apiVersion: '1.0',
+    hasExecutableCode: true,
+    fileSize: 23400000,
+    checksumSha256: '',
+    downloadCount: 310,
+    likeCount: 82,
+    tags: ['legacy', 'apiv1', 'video', 'anime'],
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    author: {
+      id: 1,
+      name: 'HorizonCode',
+      donor: true,
+      avatarUrl: 'https://a.ez-pp.farm/1',
+    },
+    isLiked: false,
+    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/teto_the_31st.png',
+    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/teto_the_31st.ezpplauncher-theme',
+  },
+];
+
 const DEFAULT_THEMES_SERVICE_URL = 'http://127.0.0.1:3000';
 let cachedSessionToken: string | null = null;
 
@@ -116,51 +263,100 @@ export async function fetchCommunityThemes(options?: {
   page?: number;
   limit?: number;
 }): Promise<CommunityThemesResponse> {
-  const baseUrl = await getThemesServiceUrl();
-  const headers = await getAuthHeaders();
+  let remoteData: CommunityThemesResponse | null = null;
+  let remoteError: Error | null = null;
 
-  const url = new URL(`${baseUrl}/v1/themes`);
-  if (options?.q) url.searchParams.set('q', options.q);
-  if (options?.tag) url.searchParams.set('tag', options.tag);
-  if (options?.authorId) url.searchParams.set('authorId', String(options.authorId));
-  if (options?.sort) url.searchParams.set('sort', options.sort);
-  if (options?.page) url.searchParams.set('page', String(options.page));
-  if (options?.limit) url.searchParams.set('limit', String(options.limit));
+  try {
+    const baseUrl = await getThemesServiceUrl();
+    const headers = await getAuthHeaders();
 
-  const res = await fetch(url.toString(), { headers });
-  if (!res.ok) {
-    throw new Error(`Failed to load themes (HTTP ${res.status})`);
+    const url = new URL(`${baseUrl}/v1/themes`);
+    if (options?.q) url.searchParams.set('q', options.q);
+    if (options?.tag) url.searchParams.set('tag', options.tag);
+    if (options?.authorId) url.searchParams.set('authorId', String(options.authorId));
+    if (options?.sort) url.searchParams.set('sort', options.sort);
+    if (options?.page) url.searchParams.set('page', String(options.page));
+    if (options?.limit) url.searchParams.set('limit', String(options.limit));
+
+    const res = await fetch(url.toString(), { headers });
+    if (res.ok) {
+      remoteData = (await res.json()) as CommunityThemesResponse;
+      for (const item of remoteData.items) {
+        if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+          item.previewUrl = `${baseUrl}${item.previewUrl}`;
+        }
+        if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+          item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+        }
+      }
+    } else {
+      remoteError = new Error(`Failed to load themes (HTTP ${res.status})`);
+    }
+  } catch (err) {
+    remoteError = err instanceof Error ? err : new Error(String(err));
+    console.warn('[CommunityThemes] Microservice unavailable, falling back to legacy catalogue:', err);
   }
 
-  const data = (await res.json()) as CommunityThemesResponse;
-  for (const item of data.items) {
-    if (item.previewUrl && !item.previewUrl.startsWith('http')) {
-      item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  // Filter legacy themes based on options
+  const matchingLegacy = LEGACY_COMMUNITY_THEMES.filter((item) => {
+    if (options?.authorId && options.authorId !== item.author.id) return false;
+    if (options?.tag && options.tag !== 'all' && !item.tags.includes(options.tag.toLowerCase())) return false;
+    if (options?.q && options.q.trim().length > 0) {
+      const q = options.q.trim().toLowerCase();
+      const text = `${item.name} ${item.description} ${item.id}`.toLowerCase();
+      if (!text.includes(q)) return false;
     }
-    if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
-      item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+    return true;
+  });
+
+  if (!remoteData) {
+    if (matchingLegacy.length > 0 || !remoteError) {
+      return {
+        items: matchingLegacy,
+        total: matchingLegacy.length,
+        page: 1,
+        totalPages: 1,
+      };
     }
+    throw remoteError;
   }
-  return data;
+
+  // If remoteData returned, merge legacy themes if not already present in the list
+  const existingIds = new Set(remoteData.items.map((i) => i.id.toLowerCase()));
+  const missingLegacy = matchingLegacy.filter((l) => !existingIds.has(l.id.toLowerCase()));
+
+  const allItems = [...remoteData.items, ...missingLegacy];
+  return {
+    items: allItems,
+    total: remoteData.total + missingLegacy.length,
+    page: remoteData.page,
+    totalPages: Math.ceil((remoteData.total + missingLegacy.length) / (options?.limit || 24)) || 1,
+  };
 }
 
 export async function fetchCommunityThemeDetails(themeId: string): Promise<CommunityTheme> {
-  const baseUrl = await getThemesServiceUrl();
-  const headers = await getAuthHeaders();
+  const cleanId = themeId.trim().toLowerCase();
+  try {
+    const baseUrl = await getThemesServiceUrl();
+    const headers = await getAuthHeaders();
 
-  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}`, { headers });
-  if (!res.ok) {
-    throw new Error(`Theme not found (HTTP ${res.status})`);
-  }
+    const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(cleanId)}`, { headers });
+    if (res.ok) {
+      const item = (await res.json()) as CommunityTheme;
+      if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+        item.previewUrl = `${baseUrl}${item.previewUrl}`;
+      }
+      if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+        item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+      }
+      return item;
+    }
+  } catch {}
 
-  const item = (await res.json()) as CommunityTheme;
-  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
-    item.previewUrl = `${baseUrl}${item.previewUrl}`;
-  }
-  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
-    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
-  }
-  return item;
+  const legacy = LEGACY_COMMUNITY_THEMES.find((t) => t.id === cleanId);
+  if (legacy) return legacy;
+
+  throw new Error('Theme not found.');
 }
 
 export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked: boolean; likeCount: number }> {
@@ -359,7 +555,26 @@ export async function downloadAndInstallCommunityTheme(
 
   reportProgress('Downloading theme package...', 10);
 
-  const res = await fetch(theme.downloadUrl);
+  let res: Response;
+  try {
+    res = await fetch(theme.downloadUrl);
+    if (!res.ok && (theme.apiVersion === '1.0' || theme.tags?.includes('legacy'))) {
+      res = await fetch(
+        `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${theme.id}.ezpplauncher-theme`,
+        { headers: { 'User-Agent': 'EZPPLauncher' } }
+      );
+    }
+  } catch (err) {
+    if (theme.apiVersion === '1.0' || theme.tags?.includes('legacy')) {
+      res = await fetch(
+        `https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/${theme.id}.ezpplauncher-theme`,
+        { headers: { 'User-Agent': 'EZPPLauncher' } }
+      );
+    } else {
+      throw err;
+    }
+  }
+
   if (!res.ok) {
     throw new Error(`Download failed (HTTP ${res.status})`);
   }
