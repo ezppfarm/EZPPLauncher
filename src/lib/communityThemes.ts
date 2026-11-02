@@ -186,7 +186,7 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
   },
 ];
 
-const DEFAULT_THEMES_SERVICE_URL = 'http://127.0.0.1:3000';
+const DEFAULT_THEMES_SERVICE_URL = 'https://themes.ez-pp.farm';
 
 export async function getThemesServiceUrl(): Promise<string> {
   const customUrl = await config.value<string>('themes_service_url').get('');
