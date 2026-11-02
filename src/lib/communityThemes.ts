@@ -187,7 +187,6 @@ export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
 ];
 
 const DEFAULT_THEMES_SERVICE_URL = 'http://127.0.0.1:3000';
-let cachedSessionToken: string | null = null;
 
 export async function getThemesServiceUrl(): Promise<string> {
   const customUrl = await config.value<string>('themes_service_url').get('');
@@ -195,8 +194,7 @@ export async function getThemesServiceUrl(): Promise<string> {
 }
 
 /**
- * Returns authentication headers using stored username and password,
- * plus session token if available.
+ * Returns authentication headers using stored username and password.
  */
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
@@ -208,52 +206,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
     headers['X-Password'] = password;
   }
 
-  const token = await getThemesAuthToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   return headers;
-}
-
-export async function getThemesAuthToken(forceRefresh = false): Promise<string | null> {
-  if (!forceRefresh && cachedSessionToken) {
-    return cachedSessionToken;
-  }
-
-  const storedToken = await config.value<string>('themes_auth_token').get('');
-  if (!forceRefresh && storedToken.trim().length > 0) {
-    cachedSessionToken = storedToken.trim();
-    return cachedSessionToken;
-  }
-
-  // Attempt automatic login using saved username & password
-  const username = await config.value<string>('username').get('');
-  const password = await config.value<string>('password').get('');
-
-  if (username.length > 0 && password.length > 0) {
-    try {
-      const baseUrl = await getThemesServiceUrl();
-      const res = await fetch(`${baseUrl}/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as { token: string };
-        if (data.token) {
-          cachedSessionToken = data.token;
-          await config.value<string>('themes_auth_token').set(data.token);
-          return cachedSessionToken;
-        }
-      }
-    } catch (err) {
-      console.warn('[CommunityThemes] Auto-login failed:', err);
-    }
-  }
-
-  return null;
 }
 
 export async function fetchCommunityThemes(options?: {
@@ -364,7 +317,7 @@ export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked
   const baseUrl = await getThemesServiceUrl();
   const headers = await getAuthHeaders();
 
-  if (!headers['X-Username'] && !headers['Authorization']) {
+  if (!headers['X-Username'] || !headers['X-Password']) {
     throw new Error('Please log in to like community themes.');
   }
 
@@ -385,7 +338,7 @@ export async function deleteCommunityTheme(themeId: string): Promise<void> {
   const baseUrl = await getThemesServiceUrl();
   const headers = await getAuthHeaders();
 
-  if (!headers['X-Username'] && !headers['Authorization']) {
+  if (!headers['X-Username'] || !headers['X-Password']) {
     throw new Error('Please log in to manage your community themes.');
   }
 
@@ -418,7 +371,7 @@ export async function publishThemeToWorkshop(options: {
   const baseUrl = await getThemesServiceUrl();
   const authHeaders = await getAuthHeaders();
 
-  if (!authHeaders['X-Username'] && !authHeaders['Authorization']) {
+  if (!authHeaders['X-Username'] || !authHeaders['X-Password']) {
     throw new Error('You must be logged in to EZPPFarm to publish themes.');
   }
 
