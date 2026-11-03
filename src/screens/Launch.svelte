@@ -2,11 +2,16 @@
   import DefaultThemePreview from '$assets/default_preview.png';
   import Logo from '$assets/logo.png';
   import { ezppfarm } from '$lib/api/ezpp';
+  import {
+    fetchCommunityThemeDetails,
+    type CommunityTheme,
+  } from '$lib/communityThemes';
   import DiagnosticsPanel from '$lib/components/diagnostics/DiagnosticsPanel.svelte';
   import LogViewer from '$lib/components/logs/LogViewer.svelte';
   import NotificationHub from '$lib/components/notifications/NotificationHub.svelte';
   import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
+  import ThemeReportDialog from '$lib/components/theme/ThemeReportDialog.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import * as Avatar from '$lib/components/ui/avatar';
@@ -158,6 +163,7 @@
     ChevronRight,
     Clock,
     ExternalLink,
+    Flag,
     Globe,
     Medal,
     TrendingDown,
@@ -302,6 +308,9 @@
   };
   let restoreCandidate = $state<{ theme: Theme; backup: ThemeBackup } | undefined>(undefined);
   let restoringTheme = $state(false);
+  let installedReportOpen = $state(false);
+  let installedReportTarget = $state<CommunityTheme | null>(null);
+  let installedReportLoading = $state(false);
   let logViewerOpen = $state(false);
   let presenceEditorOpen = $state(false);
 
@@ -338,6 +347,12 @@
         .includes(query);
     });
   });
+
+  const isOwnInstalledTheme = (theme: Theme) =>
+    Boolean(
+      $currentUser &&
+        theme.author.trim().toLowerCase() === $currentUser.name.trim().toLowerCase()
+    );
 
   const themeButtonLabel = (theme: Theme, activeFolder: string | undefined) => {
     if (activeFolder === theme.folder_name) return 'Theme in use';
@@ -430,6 +445,38 @@
       title: 'Yaay!',
       description: 'Theme updated successfully!',
     });
+  };
+
+  const openInstalledReport = async (theme: Theme) => {
+    if (!$currentUser) {
+      sileo.error({
+        title: 'Login required',
+        description: 'Log in to EZPPFarm to report a community theme.',
+      });
+      return;
+    }
+    if (installedReportLoading) return;
+
+    installedReportLoading = true;
+    try {
+      const target = await fetchCommunityThemeDetails(theme.folder_name);
+      if (target.isOwner) {
+        sileo.error({
+          title: 'You cannot report your own theme',
+          description: 'Reporting is available for themes created by other users.',
+        });
+        return;
+      }
+      installedReportTarget = target;
+      installedReportOpen = true;
+    } catch (err) {
+      sileo.error({
+        title: 'Theme not available in the workshop',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      installedReportLoading = false;
+    }
   };
 
   const requestThemeApply = async (theme: Theme) => {
@@ -1971,6 +2018,8 @@
     </div>
   </AlertDialog.Content>
 </AlertDialog.Root>
+
+<ThemeReportDialog bind:open={installedReportOpen} theme={installedReportTarget} />
 
 <div class="grid grid-cols-[0.085fr_1fr] h-screen relative" bind:this={dragAndDrop.ref}>
   {#if dragAndDrop.isDraggingOverApp && !droppedTheme}
@@ -3991,6 +4040,19 @@
                                   {:else}
                                     <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
                                   {/if}
+                                </Button>
+                              {/if}
+                              {#if $currentUser && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  class="size-7 shrink-0 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-300"
+                                  title="Report theme"
+                                  aria-label={`Report ${theme.name}`}
+                                  disabled={installedReportLoading}
+                                  onclick={() => void openInstalledReport(theme)}
+                                >
+                                  <Flag class="size-3.5" />
                                 </Button>
                               {/if}
                             </div>

@@ -18,6 +18,8 @@
     contentClass = '',
     open = $bindable(false),
     id = undefined,
+    ariaLabel = undefined,
+    onValueChange = undefined,
   }: {
     value?: string;
     withTime?: boolean;
@@ -29,6 +31,8 @@
     contentClass?: string;
     open?: boolean;
     id?: string;
+    ariaLabel?: string;
+    onValueChange?: (value: string) => void;
   } = $props();
 
   let calendarValue = $state<DateValue | undefined>(undefined);
@@ -70,6 +74,7 @@
     if (!calendarValue) {
       lastEmittedValue = '';
       value = '';
+      onValueChange?.('');
       return;
     }
 
@@ -91,6 +96,7 @@
 
     lastEmittedValue = next;
     value = next;
+    onValueChange?.(next);
   }
 
   function handleDateChange(newDate: DateValue | undefined) {
@@ -147,6 +153,7 @@
     <Popover.Trigger
       {id}
       {disabled}
+      aria-label={ariaLabel}
       class={cn(
         'flex h-8 w-full items-center justify-start gap-2 rounded-md border border-input bg-background px-3 text-xs font-normal text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ring-offset-background',
         !formattedDisplay && 'text-muted-foreground',

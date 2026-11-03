@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Bell, CheckCheck, LoaderCircle, Megaphone, RefreshCw, ShieldAlert, X } from '@lucide/svelte';
+  import { Portal } from 'bits-ui';
   import { Button } from '$lib/components/ui/button';
   import { currentUser } from '$lib/userAuthentication';
   import {
@@ -147,6 +148,7 @@
 </button>
 
 {#if open}
+  <Portal>
   <button
     type="button"
     class="fixed inset-0 z-[80] cursor-default bg-black/30 backdrop-blur-[1px]"
@@ -300,4 +302,5 @@
       {/if}
     </div>
   </div>
+  </Portal>
 {/if}

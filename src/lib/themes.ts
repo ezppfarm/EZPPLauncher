@@ -10,6 +10,8 @@ import * as fs from '@tauri-apps/plugin-fs';
 
 export type Theme = {
   folder_name: string;
+  /** Server-assigned workshop ID, when this theme has been published. */
+  workshopId?: string;
   name: string;
   version: string;
   apiVersion: string;
@@ -40,6 +42,7 @@ export type ThemeInfo = {
   name: string;
   version?: string;
   apiVersion?: string;
+  workshopId?: string;
   author?: string;
   description?: string;
   nsfw?: boolean;
@@ -165,6 +168,7 @@ const themeFromFolder = async (
 
     return {
       folder_name: folderName,
+      workshopId: typeof parsed.workshopId === 'string' ? parsed.workshopId : undefined,
       name: parsed.name,
       version: parsed.version ?? '1.0.0',
       apiVersion,
@@ -558,6 +562,43 @@ export const saveThemeProject = async (
   });
   return themeFolder;
 };
+
+const updateInstalledThemeManifest = async (
+  folderName: string,
+  patch: Record<string, unknown>
+) => {
+  const themeFolder = await path.join(await themesDirectory(), folderName);
+  const configPath = await path.join(themeFolder, 'theme.json');
+  if (!(await fs.exists(configPath))) {
+    throw new Error('The installed theme.json file was not found.');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await fs.readTextFile(configPath));
+  } catch {
+    throw new Error('The installed theme.json file is not valid JSON.');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('The installed theme.json file is not a valid theme manifest.');
+  }
+
+  const updated = { ...(parsed as Record<string, unknown>), ...patch };
+  await fs.writeFile(
+    configPath,
+    new TextEncoder().encode(`${JSON.stringify(updated, null, 2)}\n`)
+  );
+};
+
+/** Write workshop tags into an installed theme's manifest without dropping other fields. */
+export const updateInstalledThemeTags = async (folderName: string, tags: string[]) =>
+  updateInstalledThemeManifest(folderName, { tags });
+
+/** Remember the server-assigned workshop ID so later publishes update the same theme. */
+export const updateInstalledThemeWorkshopId = async (
+  folderName: string,
+  workshopId: string
+) => updateInstalledThemeManifest(folderName, { workshopId });
 
 export const exportThemeFolder = async (folderName: string, destinationPath: string) => {
   const themeFolder = await path.join(await themesDirectory(), folderName);

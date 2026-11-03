@@ -100,6 +100,7 @@
     themeAssetBase,
     themesDirectory,
     toSafeName,
+    updateInstalledThemeWorkshopId,
   } from '$lib/themes';
   import { publishThemeToWorkshop } from '$lib/communityThemes';
   import type { EZPPUser, EZPPUserInfo } from '$lib/types';
@@ -3364,7 +3365,7 @@
       await saveTheme({ notify: false });
     }
 
-    publishThemeId = savedFolder || toSafeName(definition.name);
+    publishThemeId = definition.workshopId ?? '';
     publishProgress = 0;
     publishStatusMessage = '';
     publishModalOpen = true;
@@ -3412,9 +3413,10 @@
       const themeFolder = await path.join(baseThemesDir, savedFolder);
       const themeId = savedFolder || toSafeName(definition.name);
 
-      await publishThemeToWorkshop({
+      const result = await publishThemeToWorkshop({
         themeFolder,
         themeId,
+        workshopId: definition.workshopId,
         name: definition.name,
         description: definition.description || '',
         version: definition.version || '1.0.0',
@@ -3425,6 +3427,19 @@
           publishProgress = pct;
         },
       });
+
+      if (result.themeId) {
+        // Persist the server-assigned ID so the next publish updates this
+        // workshop record instead of creating another one.
+        definition.workshopId = result.themeId;
+        publishThemeId = result.themeId;
+        try {
+          await updateInstalledThemeWorkshopId(savedFolder, result.themeId);
+          lastSavedKey = snapshotKey(captureSnapshot());
+        } catch (err) {
+          console.warn('[Workshop] Could not store the theme ID in theme.json:', err);
+        }
+      }
 
       sileo.success({
         title: 'Published to Workshop!',
@@ -6904,7 +6919,11 @@
               <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Workshop ID
               </span>
-              <p class="mt-1 truncate font-mono text-[11px] text-theme-100">{publishThemeId}</p>
+              {#if publishThemeId}
+                <p class="mt-1 truncate font-mono text-[11px] text-theme-100">{publishThemeId}</p>
+              {:else}
+                <p class="mt-1 text-[11px] text-muted-foreground">Assigned by EZPPFarm on publish</p>
+              {/if}
             </div>
             <div>
               <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -6959,7 +6978,7 @@
             size="sm"
             class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium gap-1.5"
             onclick={handlePublishToWorkshop}
-            disabled={publishing || publishThemeId.trim().length < 2 || definition.name.trim().length === 0}
+            disabled={publishing || definition.name.trim().length === 0}
           >
             {#if publishing}
               <LoaderCircle class="size-3.5 animate-spin" />

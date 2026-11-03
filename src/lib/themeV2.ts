@@ -649,6 +649,8 @@ export type ThemeV2Definition = {
   description?: string;
   /** Workshop discovery tags for this theme. */
   tags?: string[];
+  /** Server-assigned workshop ID, stored so republishing updates the same theme. */
+  workshopId?: string;
   /** Marks the theme as adult content in the theme manager. */
   nsfw?: boolean;
   /** Optional preview image, relative to the theme's assets folder. */
@@ -740,6 +742,15 @@ export const normalizeThemeTags = (raw: unknown): string[] => {
     if (tags.length === 10) break;
   }
   return tags;
+};
+
+const WORKSHOP_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** Keep a server-assigned workshop ID while preserving legacy slug IDs. */
+const normalizeWorkshopId = (raw: unknown): string | undefined => {
+  if (typeof raw !== 'string') return undefined;
+  const id = raw.trim().toLowerCase();
+  return WORKSHOP_ID_PATTERN.test(id) ? id : undefined;
 };
 
 const clampInteger = (value: unknown, fallback: number, min: number, max: number) =>
@@ -1901,6 +1912,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
     author: text(raw.author, 'Unknown'),
     description: text(raw.description),
     tags: normalizeThemeTags(raw.tags),
+    workshopId: normalizeWorkshopId(raw.workshopId),
     nsfw: raw.nsfw === true,
     preview: text(raw.preview),
     background,

@@ -3,7 +3,12 @@ import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
 import { config } from './config';
-import { reloadThemes, themesDirectory } from './themes';
+import {
+  reloadThemes,
+  themesDirectory,
+  updateInstalledThemeTags,
+  updateInstalledThemeWorkshopId,
+} from './themes';
 
 export interface CommunityThemeAuthor {
   id: number;
@@ -644,6 +649,8 @@ export async function setCommunityThemeVisibility(
 export async function publishThemeToWorkshop(options: {
   themeFolder: string;
   themeId: string;
+  /** Existing server-assigned ID when updating an already-published theme. */
+  workshopId?: string;
   name: string;
   description?: string;
   version?: string;
@@ -651,7 +658,7 @@ export async function publishThemeToWorkshop(options: {
   tags?: string[];
   previewImageBase64?: string;
   onProgress?: (status: string, percentage: number) => void;
-}): Promise<{ success: boolean; theme: unknown }> {
+}): Promise<{ success: boolean; themeId: string; theme: unknown }> {
   const { onProgress = () => {} } = options;
   const baseUrl = await getThemesServiceUrl();
   const authHeaders = await getAuthHeaders();
@@ -699,7 +706,9 @@ export async function publishThemeToWorkshop(options: {
         ...authHeaders,
       },
       body: JSON.stringify({
-        themeId: options.themeId,
+        // The service uses this only when it belongs to an existing theme owned
+        // by the caller. Otherwise it assigns a fresh UUID and ignores it.
+        themeId: options.workshopId || options.themeId,
         name: options.name,
         description: options.description || '',
         version: options.version || '1.0.0',
@@ -768,10 +777,16 @@ export async function publishThemeToWorkshop(options: {
       throw new Error(errData.error || `Finalizing upload failed (HTTP ${completeRes.status})`);
     }
 
-    const completeData = await completeRes.json();
+    const completeData = (await completeRes.json()) as Record<string, unknown> & {
+      themeId?: unknown;
+    };
     onProgress('Theme published successfully!', 100);
 
-    return { success: true, theme: completeData };
+    return {
+      success: true,
+      themeId: typeof completeData.themeId === 'string' ? completeData.themeId : '',
+      theme: completeData,
+    };
   } finally {
     // Clean up temporary local zip
     if (await fs.exists(destinationZip)) {
@@ -827,6 +842,14 @@ export async function downloadAndInstallCommunityTheme(
       } else {
         throw err;
       }
+    }
+
+    try {
+      // Keep the installed manifest aligned with the workshop record.
+      await updateInstalledThemeTags(folderName, theme.tags);
+      await updateInstalledThemeWorkshopId(folderName, theme.id);
+    } catch (err) {
+      console.warn('[Workshop] Could not write workshop metadata into the installed theme:', err);
     }
 
     reportProgress('Theme installed!', 100);

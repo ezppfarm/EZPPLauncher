@@ -30,12 +30,18 @@
   import { reduceAnimations } from '$lib/userSettings';
   import { currentUser } from '$lib/userAuthentication';
   import { isThemeTrusted } from '$lib/themeTrust';
-  import type { Theme } from '$lib/themes';
+  import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/themes';
+  import { normalizeThemeTags } from '$lib/themeV2';
+  import Badge from '$lib/components/ui/badge/badge.svelte';
   import { Button } from '$lib/components/ui/button';
+  import { Checkbox } from '$lib/components/ui/checkbox';
+  import DatePicker from '$lib/components/ui/date-picker/date-picker.svelte';
+  import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Input } from '$lib/components/ui/input';
-  import Badge from '$lib/components/ui/badge/badge.svelte';
+  import { Label } from '$lib/components/ui/label';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
+  import * as Select from '$lib/components/ui/select';
   import { sileo } from 'sileo';
   import { sendSystemAnnouncement } from '$lib/notifications';
   import * as Tooltip from '$lib/components/ui/tooltip';
@@ -61,6 +67,7 @@
     LoaderCircle,
     Megaphone,
     Pencil,
+    Plus,
     RefreshCw,
     RotateCcw,
     Search,
@@ -133,7 +140,12 @@
   let exportingReports = $state(false);
   let exportingEvents = $state(false);
   let quarantineId = $state<string | null>(null);
-  let tagEditingId = $state<string | null>(null);
+
+  let tagEditorTarget = $state<CommunityTheme | null>(null);
+  let tagEditorTags = $state<string[]>([]);
+  let tagEditorInput = $state('');
+  let tagEditorError = $state<string | null>(null);
+  let tagSaving = $state(false);
 
   let announcementOpen = $state(false);
   let announcementTitle = $state('');
@@ -162,6 +174,9 @@
   let sourceError = $state<string | null>(null);
 
   const TAGS = ['all', 'legacy', 'anime', 'minimal', 'video', 'audio', 'game', 'dark', 'clean'];
+  const filterTags = $derived(
+    selectedTag !== 'all' && !TAGS.includes(selectedTag) ? [...TAGS, selectedTag] : TAGS
+  );
   const REPORT_CATEGORIES: Array<{ id: ThemeReportCategory; label: string }> = [
     { id: 'spam', label: 'Spam / advertising' },
     { id: 'harassment', label: 'Harassment / hate' },
@@ -169,6 +184,12 @@
     { id: 'copyright', label: 'Copyright / stolen content' },
     { id: 'broken', label: 'Broken / unusable' },
     { id: 'other', label: 'Other' },
+  ];
+  const REPORT_STATUS_OPTIONS: Array<{ id: ThemeReportStatus | 'all'; label: string }> = [
+    { id: 'open', label: 'Open reports' },
+    { id: 'resolved', label: 'Resolved reports' },
+    { id: 'dismissed', label: 'Dismissed reports' },
+    { id: 'all', label: 'All reports' },
   ];
   const MODERATION_ACTIONS: Record<string, string> = {
     hide: 'Hidden from the workshop',
@@ -524,37 +545,121 @@
     }
   }
 
-  async function handleEditTags(theme: CommunityTheme) {
-    if (tagEditingId || theme.deletedAt) return;
-    const raw = window.prompt(
-      `Tags for "${theme.name}" (comma-separated, up to 10):`,
-      theme.tags.join(', ')
-    );
-    if (raw === null) return;
+  function openTagEditor(theme: CommunityTheme) {
+    if (theme.deletedAt) return;
+    tagEditorTarget = theme;
+    tagEditorTags = normalizeThemeTags(theme.tags);
+    tagEditorInput = '';
+    tagEditorError = null;
+  }
 
-    const tags = raw
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+  function addTagEditorTag() {
+    const value = tagEditorInput.trim().toLowerCase();
+    if (!value) return;
+    if (tagEditorTags.includes(value)) {
+      tagEditorError = 'That tag is already added.';
+      return;
+    }
+    if (tagEditorTags.length >= 10) {
+      tagEditorError = 'A theme may have at most 10 tags.';
+      return;
+    }
 
-    tagEditingId = theme.id;
+    const tags = normalizeThemeTags([...tagEditorTags, value]);
+    if (!tags.includes(value)) {
+      tagEditorError =
+        'Tags may contain lowercase letters, numbers, dashes and underscores (max 24 characters).';
+      return;
+    }
+
+    tagEditorTags = tags;
+    tagEditorInput = '';
+    tagEditorError = null;
+  }
+
+  function removeTagEditorTag(tag: string) {
+    tagEditorTags = tagEditorTags.filter((candidate) => candidate !== tag);
+    tagEditorError = null;
+  }
+
+  function closeTagEditor() {
+    if (tagSaving) return;
+    tagEditorTarget = null;
+    tagEditorTags = [];
+    tagEditorInput = '';
+    tagEditorError = null;
+  }
+
+  async function saveTagEditor() {
+    const target = tagEditorTarget;
+    if (!target || tagSaving) return;
+
+    const pending = tagEditorInput.trim().toLowerCase();
+    if (pending) {
+      if (tagEditorTags.includes(pending)) {
+        tagEditorError = 'That tag is already added.';
+        return;
+      }
+      if (tagEditorTags.length >= 10) {
+        tagEditorError = 'A theme may have at most 10 tags.';
+        return;
+      }
+      const withPending = normalizeThemeTags([...tagEditorTags, pending]);
+      if (!withPending.includes(pending)) {
+        tagEditorError =
+          'Tags may contain lowercase letters, numbers, dashes and underscores (max 24 characters).';
+        return;
+      }
+      tagEditorTags = withPending;
+      tagEditorInput = '';
+    }
+
+    const tags = normalizeThemeTags(tagEditorTags);
+    tagSaving = true;
+    tagEditorError = null;
     try {
-      const updated = await setCommunityThemeTags(theme.id, tags);
+      const updated = await setCommunityThemeTags(target.id, tags);
       themes = themes.map((item) => (item.id === updated.id ? updated : item));
-      sileo.success({
-        title: 'Theme tags updated',
-        description: updated.tags.length > 0
-          ? `Tags: ${updated.tags.map((tag) => `#${tag}`).join(', ')}`
-          : 'All tags were removed.',
-      });
+
+      const installed =
+        localThemeMap.get(target.id.toLowerCase()) ||
+        localThemeMap.get(target.name.toLowerCase());
+      let localSyncError: string | null = null;
+      if (installed) {
+        try {
+          await updateInstalledThemeTags(installed.folder_name, updated.tags);
+          await reloadThemes();
+        } catch (err) {
+          localSyncError = err instanceof Error ? err.message : String(err);
+        }
+      }
+
+      if (localSyncError) {
+        sileo.warning({
+          title: 'Workshop tags updated',
+          description: `The installed theme.json could not be updated: ${localSyncError}`,
+        });
+      } else {
+        const tagSummary =
+          updated.tags.length > 0
+            ? `Tags: ${updated.tags.map((tag) => `#${tag}`).join(', ')}`
+            : 'All tags were removed.';
+        sileo.success({
+          title: 'Theme tags updated',
+          description: installed
+            ? `Workshop and installed theme.json tags updated. ${tagSummary}`
+            : `Workshop tags updated. ${tagSummary} They will be written into theme.json when the theme is installed.`,
+        });
+      }
+
+      tagEditorTarget = null;
+      tagEditorTags = [];
+      tagEditorInput = '';
       await loadWorkshopThemes();
     } catch (err) {
-      sileo.error({
-        title: 'Could not update tags',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      tagEditorError = err instanceof Error ? err.message : String(err);
     } finally {
-      tagEditingId = null;
+      tagSaving = false;
     }
   }
 
@@ -850,6 +955,8 @@
   }
 
   function openAnnouncementComposer() {
+    // The moderation panel is a modal Dialog; close it before opening another overlay.
+    showModerationPanel = false;
     announcementOpen = true;
     announcementTitle = '';
     announcementMessage = '';
@@ -1008,6 +1115,8 @@
   }
 
   async function openThemeHistory(themeId: string, themeName: string) {
+    // A custom modal cannot stack reliably over a portaled modal Dialog.
+    showModerationPanel = false;
     historyOpen = true;
     historyTarget = { id: themeId, name: themeName };
     historyEvents = [];
@@ -1108,7 +1217,7 @@
             Your trash
           </span>
         {:else}
-          {#each TAGS as tag}
+          {#each filterTags as tag (tag)}
             <button
               type="button"
               class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {selectedTag === tag
@@ -1260,11 +1369,10 @@
             {@const owned = isOwnedByCurrentUser(theme)}
             {@const isLegacy =
               theme.apiVersion === '1.0' || Boolean(theme.tags?.includes('legacy'))}
-            {@const showOverflowMenu =
-              !isDeleted &&
-              (owned ||
-                canModerate ||
-                Boolean($currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined))}
+            {@const canReport =
+              Boolean($currentUser) && !owned && !theme.isHidden && !theme.isQuarantined}
+            {@const canFork = canReport && !isLegacy}
+            {@const showOverflowMenu = !isDeleted && (owned || canModerate || canReport)}
 
             <div
               class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
@@ -1473,10 +1581,23 @@
 
                   {#if theme.tags && theme.tags.length > 0}
                     <div class="mt-2 flex flex-wrap gap-1">
-                      {#each theme.tags.slice(0, 3) as tag}
-                        <span class="rounded bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      {#each theme.tags.slice(0, 3) as tag (tag)}
+                        <button
+                          type="button"
+                          class="cursor-pointer rounded px-1.5 py-0.5 text-[9px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 {selectedTag ===
+                          tag
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-theme-800/50 text-muted-foreground hover:bg-theme-800 hover:text-white'}"
+                          title={`Filter workshop by #${tag}`}
+                          aria-label={`Filter workshop by #${tag}`}
+                          aria-pressed={selectedTag === tag}
+                          onclick={(event) => {
+                            event.stopPropagation();
+                            handleTagClick(tag);
+                          }}
+                        >
                           #{tag}
-                        </span>
+                        </button>
                       {/each}
                     </div>
                   {/if}
@@ -1689,16 +1810,10 @@
                             {#if owned}
                               <DropdownMenu.Item
                                 class="gap-2 text-[11px]"
-                                onclick={() => void handleEditTags(theme)}
-                                disabled={tagEditingId === theme.id}
+                                onclick={() => openTagEditor(theme)}
                               >
-                                {#if tagEditingId === theme.id}
-                                  <LoaderCircle class="size-3.5 animate-spin" />
-                                  Saving tags...
-                                {:else}
-                                  <Tag class="size-3.5" />
-                                  Edit tags
-                                {/if}
+                                <Tag class="size-3.5" />
+                                Edit tags
                               </DropdownMenu.Item>
                               {#if !isLegacy && isInstalled && hasUpdate}
                                 <DropdownMenu.Item
@@ -1709,25 +1824,29 @@
                                   Refresh installed copy
                                 </DropdownMenu.Item>
                               {/if}
-                            {:else if $currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined}
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px]"
-                                onclick={() => openReportDialog(theme)}
-                              >
-                                <Flag class="size-3.5" />
-                                Report theme
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px]"
-                                onclick={() => handleForkTheme(theme)}
-                              >
-                                <CopyPlus class="size-3.5" />
-                                Fork theme
-                              </DropdownMenu.Item>
+                            {:else if canReport || canFork}
+                              {#if canReport}
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => openReportDialog(theme)}
+                                >
+                                  <Flag class="size-3.5" />
+                                  Report theme
+                                </DropdownMenu.Item>
+                              {/if}
+                              {#if canFork}
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => handleForkTheme(theme)}
+                                >
+                                  <CopyPlus class="size-3.5" />
+                                  Fork theme
+                                </DropdownMenu.Item>
+                              {/if}
                             {/if}
 
                             {#if canModerate}
-                              {#if owned || ($currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined)}
+                              {#if owned || canReport}
                                 <DropdownMenu.Separator class="my-1 bg-theme-800" />
                               {/if}
                               {#if !isLegacy}
@@ -1810,28 +1929,20 @@
   </div>
 </div>
 
-{#if showModerationPanel}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close moderation panel"
-      onclick={() => (showModerationPanel = false)}
-    ></button>
-    <div
-      class="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="moderation-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div>
-          <h2 id="moderation-title" class="flex items-center gap-2 text-sm font-semibold text-white">
-            <Flag class="size-4 text-amber-300" />
-            Moderation
-          </h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">Open reports and recent staff activity.</p>
-        </div>
+<Dialog.Root bind:open={showModerationPanel}>
+  <Dialog.Content
+    class="top-12 bottom-4 flex h-auto w-[calc(100%_-_2rem)] max-w-6xl translate-y-0 flex-col gap-0 overflow-hidden rounded-xl border-theme-800 bg-theme-950 p-0 text-white shadow-2xl sm:rounded-xl"
+  >
+    <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+      <div>
+        <Dialog.Title class="flex items-center gap-2 text-sm font-semibold text-white">
+          <Flag class="size-4 text-amber-300" />
+          Moderation
+        </Dialog.Title>
+        <Dialog.Description class="mt-1 text-[11px] text-muted-foreground">
+          Open reports and recent staff activity.
+        </Dialog.Description>
+      </div>
         <div class="flex items-center gap-1">
           <WorkshopTooltip content="Send a system announcement">
             {#snippet trigger(props)}
@@ -1841,6 +1952,7 @@
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-cyan-300"
                 onclick={openAnnouncementComposer}
+                aria-label="Send a system announcement"
               >
                 <Megaphone class="size-3.5" />
               </Button>
@@ -1855,6 +1967,7 @@
                 class="size-7 text-muted-foreground hover:text-white"
                 onclick={() => void loadModerationPanel()}
                 disabled={moderationLoading}
+                aria-label="Refresh moderation data"
               >
                 <RefreshCw class="size-3.5 {moderationLoading ? 'animate-spin' : ''}" />
               </Button>
@@ -1868,6 +1981,7 @@
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-white"
                 onclick={() => (showModerationPanel = false)}
+                aria-label="Close moderation panel"
               >
                 <X class="size-4" />
               </Button>
@@ -1885,28 +1999,51 @@
 
         <div class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-2.5">
           <div class="grid gap-2 sm:grid-cols-2">
-            <select
-              class="h-8 rounded-md border border-theme-800 bg-theme-950/80 px-2 text-[11px] text-muted-foreground outline-none focus:border-primary/50"
-              bind:value={moderationStatus}
-              onchange={handleModerationFilterChange}
-              aria-label="Report status filter"
+            <Select.Root
+              type="single"
+              value={moderationStatus}
+              onValueChange={(value) => {
+                if (!value) return;
+                moderationStatus = value as ThemeReportStatus | 'all';
+                handleModerationFilterChange();
+              }}
             >
-              <option value="open">Open reports</option>
-              <option value="resolved">Resolved reports</option>
-              <option value="dismissed">Dismissed reports</option>
-              <option value="all">All reports</option>
-            </select>
-            <select
-              class="h-8 rounded-md border border-theme-800 bg-theme-950/80 px-2 text-[11px] text-muted-foreground outline-none focus:border-primary/50"
-              bind:value={moderationCategory}
-              onchange={handleModerationFilterChange}
-              aria-label="Report category filter"
+              <Select.Trigger
+                class="h-8 border-theme-800 bg-theme-950/80 text-[11px] text-muted-foreground"
+                aria-label="Report status filter"
+              >
+                {REPORT_STATUS_OPTIONS.find((option) => option.id === moderationStatus)?.label ??
+                  'Open reports'}
+              </Select.Trigger>
+              <Select.Content class="border-theme-800 bg-theme-950">
+                {#each REPORT_STATUS_OPTIONS as option (option.id)}
+                  <Select.Item value={option.id} label={option.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            <Select.Root
+              type="single"
+              value={moderationCategory}
+              onValueChange={(value) => {
+                if (!value) return;
+                moderationCategory = value as ThemeReportCategory | 'all';
+                handleModerationFilterChange();
+              }}
             >
-              <option value="all">All categories</option>
-              {#each REPORT_CATEGORIES as category}
-                <option value={category.id}>{category.label}</option>
-              {/each}
-            </select>
+              <Select.Trigger
+                class="h-8 border-theme-800 bg-theme-950/80 text-[11px] text-muted-foreground"
+                aria-label="Report category filter"
+              >
+                {REPORT_CATEGORIES.find((category) => category.id === moderationCategory)?.label ??
+                  'All categories'}
+              </Select.Trigger>
+              <Select.Content class="border-theme-800 bg-theme-950">
+                <Select.Item value="all" label="All categories" />
+                {#each REPORT_CATEGORIES as category (category.id)}
+                  <Select.Item value={category.id} label={category.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
             <Input
               class="h-8 border-theme-800 bg-theme-950/80 text-[11px]"
               placeholder="Filter by reason or theme..."
@@ -1923,19 +2060,29 @@
                 if (event.key === 'Enter') handleModerationFilterChange();
               }}
             />
-            <Input
-              type="date"
-              class="h-8 border-theme-800 bg-theme-950/80 text-[11px]"
-              bind:value={moderationFrom}
-              onchange={handleModerationFilterChange}
-              aria-label="Reports from date"
+            <DatePicker
+              value={moderationFrom}
+              placeholder="From date"
+              ariaLabel="Reports from date"
+              contentClass="border-theme-800 bg-theme-950"
+              class="h-8 border-theme-800 bg-theme-950/80 text-[11px] text-muted-foreground"
+              onValueChange={(value) => {
+                if (moderationFrom === value) return;
+                moderationFrom = value;
+                handleModerationFilterChange();
+              }}
             />
-            <Input
-              type="date"
-              class="h-8 border-theme-800 bg-theme-950/80 text-[11px]"
-              bind:value={moderationTo}
-              onchange={handleModerationFilterChange}
-              aria-label="Reports to date"
+            <DatePicker
+              value={moderationTo}
+              placeholder="To date"
+              ariaLabel="Reports to date"
+              contentClass="border-theme-800 bg-theme-950"
+              class="h-8 border-theme-800 bg-theme-950/80 text-[11px] text-muted-foreground"
+              onValueChange={(value) => {
+                if (moderationTo === value) return;
+                moderationTo = value;
+                handleModerationFilterChange();
+              }}
             />
           </div>
           <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -2011,22 +2158,23 @@
             <h3 class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase">
               <Flag class="size-3.5 text-amber-300" />
               Reports
-              <span class="rounded-full bg-theme-800 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <Badge
+                variant="secondary"
+                class="bg-theme-800 px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground"
+              >
                 {moderationTotal}
-              </span>
+              </Badge>
             </h3>
             {#if selectableReports.length > 0}
-              <label
-                class="mt-2 flex w-fit cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground"
+              <Label
+                class="mt-2 flex w-fit cursor-pointer items-center gap-1.5 text-[10px] font-normal text-muted-foreground"
               >
-                <input
-                  type="checkbox"
-                  class="size-3 accent-primary"
+                <Checkbox
                   checked={allSelectableReportsSelected}
-                  onchange={toggleAllReports}
+                  onCheckedChange={() => toggleAllReports()}
                 />
                 Select all visible open reports
-              </label>
+              </Label>
             {/if}
             {#if moderationReports.length === 0}
               <p class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground">
@@ -2038,11 +2186,10 @@
                   <div class="rounded-lg border border-theme-800/70 bg-theme-900/30 p-3">
                     <div class="flex items-start gap-2">
                       {#if report.status === 'open' && !report.themeDeleted}
-                        <input
-                          type="checkbox"
-                          class="mt-0.5 size-3.5 shrink-0 accent-primary"
+                        <Checkbox
+                          class="mt-0.5 shrink-0"
                           checked={selectedReportIds.includes(report.id)}
-                          onchange={() => toggleReportSelection(report.id)}
+                          onCheckedChange={() => toggleReportSelection(report.id)}
                           aria-label={`Select report for ${report.themeName}`}
                         />
                       {/if}
@@ -2051,19 +2198,26 @@
                           <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-1.5">
                               <p class="truncate text-xs font-semibold text-white">{report.themeName}</p>
-                              <span
-                                class="rounded-full border border-theme-700/70 bg-theme-800/60 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                              <Badge
+                                variant="outline"
+                                class="border-theme-700/70 bg-theme-800/60 px-1.5 py-0.5 text-[9px] text-muted-foreground"
                               >
                                 {reportCategoryLabel(report.category)}
-                              </span>
+                              </Badge>
                               {#if report.themeHidden}
-                                <span class="text-[9px] text-red-300">Hidden</span>
+                                <Badge variant="destructive" class="px-1.5 py-0 text-[9px]">
+                                  Hidden
+                                </Badge>
                               {/if}
                               {#if report.themeQuarantined}
-                                <span class="text-[9px] text-red-300">Taken down</span>
+                                <Badge variant="destructive" class="px-1.5 py-0 text-[9px]">
+                                  Taken down
+                                </Badge>
                               {/if}
                               {#if report.themeDeleted}
-                                <span class="text-[9px] text-red-300">Trash</span>
+                                <Badge variant="destructive" class="px-1.5 py-0 text-[9px]">
+                                  Trash
+                                </Badge>
                               {/if}
                             </div>
                             <p class="mt-0.5 text-[10px] text-muted-foreground">
@@ -2178,16 +2332,28 @@
               </Button>
             </div>
             <div class="mt-2 flex flex-wrap gap-1.5">
-              <select
-                class="h-7 rounded-md border border-theme-800 bg-theme-950/80 px-2 text-[10px] text-muted-foreground outline-none focus:border-primary/50"
-                bind:value={moderationEventAction}
-                onchange={handleAuditFilterChange}
-                aria-label="Audit action filter"
+              <Select.Root
+                type="single"
+                value={moderationEventAction}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  moderationEventAction = value;
+                  handleAuditFilterChange();
+                }}
               >
-                {#each AUDIT_ACTIONS as action}
-                  <option value={action.id}>{action.label}</option>
-                {/each}
-              </select>
+                <Select.Trigger
+                  class="h-7 w-auto min-w-36 border-theme-800 bg-theme-950/80 text-[10px] text-muted-foreground"
+                  aria-label="Audit action filter"
+                >
+                  {AUDIT_ACTIONS.find((action) => action.id === moderationEventAction)?.label ??
+                    'All actions'}
+                </Select.Trigger>
+                <Select.Content class="border-theme-800 bg-theme-950">
+                  {#each AUDIT_ACTIONS as action (action.id)}
+                    <Select.Item value={action.id} label={action.label} />
+                  {/each}
+                </Select.Content>
+              </Select.Root>
               <Input
                 class="h-7 w-36 border-theme-800 bg-theme-950/80 text-[10px]"
                 placeholder="Filter by staff..."
@@ -2254,9 +2420,8 @@
           </section>
         {/if}
       </div>
-    </div>
-  </div>
-{/if}
+  </Dialog.Content>
+</Dialog.Root>
 
 {#if announcementOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2447,6 +2612,140 @@
             This fork keeps a snapshot of the source at fork time. The original may have changed since.
           </p>
         {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if tagEditorTarget}
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <button
+      type="button"
+      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+      aria-label="Close tag editor"
+      onclick={closeTagEditor}
+    ></button>
+    <div
+      class="relative w-full max-w-md overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="theme-tags-title"
+    >
+      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+        <div class="min-w-0">
+          <h2
+            id="theme-tags-title"
+            class="flex items-center gap-2 text-sm font-semibold text-white"
+          >
+            <Tag class="size-4 text-cyan-300" /> Edit theme tags
+          </h2>
+          <p class="mt-1 truncate text-[11px] text-muted-foreground">{tagEditorTarget.name}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="size-7 text-muted-foreground hover:text-white"
+          onclick={closeTagEditor}
+          disabled={tagSaving}
+          aria-label="Close tag editor"
+        >
+          <X class="size-4" />
+        </Button>
+      </div>
+
+      <div class="space-y-3 p-4">
+        <p class="text-[11px] leading-relaxed text-muted-foreground">
+          Tags are saved to the workshop and to the installed theme.json.
+        </p>
+        <div class="flex gap-2">
+          <Input
+            class="h-8 border-theme-800 bg-theme-900/60 text-[11px]"
+            bind:value={tagEditorInput}
+            placeholder="anime, dark, minimal"
+            maxlength={24}
+            disabled={tagSaving}
+            oninput={() => (tagEditorError = null)}
+            onkeydown={(event) => {
+              if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault();
+                addTagEditorTag();
+              }
+            }}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            class="h-8 shrink-0 gap-1 text-xs"
+            onclick={addTagEditorTag}
+            disabled={tagSaving || !tagEditorInput.trim()}
+          >
+            <Plus class="size-3" /> Add
+          </Button>
+        </div>
+
+        {#if tagEditorTags.length > 0}
+          <div class="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+            {#each tagEditorTags as tag (tag)}
+              <span
+                class="inline-flex items-center gap-1 rounded-full border border-theme-700 bg-theme-900 px-2 py-1 text-[10px] text-theme-100"
+              >
+                #{tag}
+                <button
+                  type="button"
+                  class="rounded-full text-muted-foreground transition-colors hover:text-white disabled:opacity-50"
+                  aria-label={`Remove ${tag} tag`}
+                  onclick={() => removeTagEditorTag(tag)}
+                  disabled={tagSaving}
+                >
+                  <X class="size-3" />
+                </button>
+              </span>
+            {/each}
+          </div>
+        {:else}
+          <p
+            class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+          >
+            No tags yet. Add a few so people can find this theme.
+          </p>
+        {/if}
+
+        <div class="flex items-center justify-between gap-3 text-[9px] text-muted-foreground">
+          <span>Lowercase letters, numbers, dashes, underscores · max 24</span>
+          <span class="shrink-0 tabular-nums">{tagEditorTags.length}/10</span>
+        </div>
+
+        {#if tagEditorError}
+          <p
+            class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+          >
+            {tagEditorError}
+          </p>
+        {/if}
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 text-xs"
+          onclick={closeTagEditor}
+          disabled={tagSaving}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          class="h-8 gap-1 text-xs"
+          onclick={() => void saveTagEditor()}
+          disabled={tagSaving}
+        >
+          {#if tagSaving}
+            <LoaderCircle class="size-3 animate-spin" /> Saving...
+          {:else}
+            <Tag class="size-3" /> Save tags
+          {/if}
+        </Button>
       </div>
     </div>
   </div>

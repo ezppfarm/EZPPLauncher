@@ -81,6 +81,51 @@
     unlistenPresenceEditorState?.();
   });
 
+  // macOS WKWebView enables autocorrect, capitalization and spell checking
+  // for editable fields by default. Disable them across the launcher so
+  // usernames, search fields and theme text are not rewritten while typing.
+  const disableTextAssistance = (element: Element) => {
+    if (
+      !(element instanceof HTMLInputElement) &&
+      !(element instanceof HTMLTextAreaElement) &&
+      !(element instanceof HTMLElement && element.isContentEditable)
+    ) {
+      return;
+    }
+
+    element.spellcheck = false;
+    element.setAttribute('autocorrect', 'off');
+    element.setAttribute('autocapitalize', 'none');
+  };
+
+  const disableTextAssistanceIn = (root: ParentNode) => {
+    if (root instanceof Element) disableTextAssistance(root);
+    root.querySelectorAll('input, textarea, [contenteditable]').forEach(disableTextAssistance);
+  };
+
+  onMount(() => {
+    disableTextAssistanceIn(document);
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof Element) disableTextAssistanceIn(node);
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const handleFocus = (event: FocusEvent) => {
+      if (event.target instanceof Element) disableTextAssistance(event.target);
+    };
+    document.addEventListener('focusin', handleFocus, true);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('focusin', handleFocus, true);
+    };
+  });
+
   if (browser) initLogging();
 
   const editorWindow = (() => {
