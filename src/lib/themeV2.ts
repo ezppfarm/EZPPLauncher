@@ -653,6 +653,8 @@ export type ThemeV2Definition = {
   workshopId?: string;
   /** Marks the theme as adult content in the theme manager. */
   nsfw?: boolean;
+  /** Whether other creators may fork this theme from the workshop. */
+  allowForking?: boolean;
   /** Optional preview image, relative to the theme's assets folder. */
   preview?: string;
   background: ThemeV2Background;
@@ -1785,6 +1787,7 @@ export const createDefaultThemeV2 = (): ThemeV2Definition => ({
   description: '',
   tags: [],
   nsfw: false,
+  allowForking: true,
   background: {
     type: 'gradient',
     from: '#181825',
@@ -1914,6 +1917,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
     tags: normalizeThemeTags(raw.tags),
     workshopId: normalizeWorkshopId(raw.workshopId),
     nsfw: raw.nsfw === true,
+    allowForking: raw.allowForking !== false,
     preview: text(raw.preview),
     background,
     overlay: {

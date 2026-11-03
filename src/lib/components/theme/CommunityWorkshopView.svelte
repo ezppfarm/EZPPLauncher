@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    fetchCommunityTags,
     fetchCommunityThemes,
     fetchCommunityThemeDetails,
     toggleCommunityThemeLike,
@@ -18,6 +19,7 @@
     downloadThemeReportsCsv,
     downloadModerationEventsCsv,
     fetchModerationEvents,
+    type CommunityTagSummary,
     type CommunityTheme,
     type ModerationEvent,
     type ModerationEventQuery,
@@ -39,6 +41,7 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Input } from '$lib/components/ui/input';
+  import * as Popover from '$lib/components/ui/popover';
   import { Label } from '$lib/components/ui/label';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '$lib/components/ui/select';
@@ -94,6 +97,11 @@
 
   let searchQuery = $state('');
   let selectedTag = $state('all');
+  let tagFilterOpen = $state(false);
+  let tagSearch = $state('');
+  let communityTags = $state<CommunityTagSummary[]>([]);
+  let tagsLoading = $state(false);
+  let tagsRequestId = 0;
   let selectedSort = $state<WorkshopSort>('relevance');
   let selectedView = $state<WorkshopView>('workshop');
   let showHiddenOnly = $state(false);
@@ -173,10 +181,6 @@
   let sourceLoading = $state(false);
   let sourceError = $state<string | null>(null);
 
-  const TAGS = ['all', 'legacy', 'anime', 'minimal', 'video', 'audio', 'game', 'dark', 'clean'];
-  const filterTags = $derived(
-    selectedTag !== 'all' && !TAGS.includes(selectedTag) ? [...TAGS, selectedTag] : TAGS
-  );
   const REPORT_CATEGORIES: Array<{ id: ThemeReportCategory; label: string }> = [
     { id: 'spam', label: 'Spam / advertising' },
     { id: 'harassment', label: 'Harassment / hate' },
@@ -224,6 +228,31 @@
     return map;
   });
 
+  const tagOptions = $derived.by(() => {
+    const counts = new Map<string, number>();
+
+    // The service returns every used tag. While it is unavailable or loading,
+    // fall back to tags visible on the current page so filtering still works.
+    if (communityTags.length > 0) {
+      for (const item of communityTags) counts.set(item.tag, item.count);
+    } else {
+      for (const theme of themes) {
+        for (const tag of theme.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+
+    if (selectedTag !== 'all' && !counts.has(selectedTag)) counts.set(selectedTag, 0);
+
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  });
+
+  const filteredTagOptions = $derived.by(() => {
+    const query = tagSearch.trim().toLowerCase();
+    return query ? tagOptions.filter((option) => option.tag.includes(query)) : tagOptions;
+  });
+
   const isOwnedByCurrentUser = (theme: CommunityTheme) =>
     theme.isOwner || ($currentUser !== undefined && theme.author.id === $currentUser.id);
 
@@ -234,6 +263,19 @@
     selectableReports.length > 0 &&
       selectableReports.every((report) => selectedReportIds.includes(report.id))
   );
+
+  async function loadWorkshopTags() {
+    const requestId = ++tagsRequestId;
+    tagsLoading = true;
+    try {
+      const tags = await fetchCommunityTags();
+      if (requestId === tagsRequestId) communityTags = tags;
+    } catch (err) {
+      console.warn('[Workshop] Failed to load tag list:', err);
+    } finally {
+      if (requestId === tagsRequestId) tagsLoading = false;
+    }
+  }
 
   async function loadWorkshopThemes(options: { append?: boolean } = {}) {
     const append = options.append === true;
@@ -292,6 +334,8 @@
   }
 
   function handleTagClick(tag: string) {
+    tagFilterOpen = false;
+    tagSearch = '';
     if (selectedTag === tag && selectedView === 'workshop') return;
     selectedView = 'workshop';
     selectedTag = tag;
@@ -656,6 +700,7 @@
       tagEditorTags = [];
       tagEditorInput = '';
       await loadWorkshopThemes();
+      void loadWorkshopTags();
     } catch (err) {
       tagEditorError = err instanceof Error ? err.message : String(err);
     } finally {
@@ -664,7 +709,16 @@
   }
 
   async function handleForkTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || theme.isHidden || downloadingId || forkingId || deletingId || moderatingId) return;
+    if (
+      theme.deletedAt ||
+      theme.isHidden ||
+      theme.allowForking === false ||
+      downloadingId ||
+      forkingId ||
+      deletingId ||
+      moderatingId
+    )
+      return;
     if (!$currentUser) {
       sileo.error({
         title: 'Login required',
@@ -1182,10 +1236,6 @@
     return REPORT_CATEGORIES.find((item) => item.id === category)?.label ?? category;
   }
 
-  function searchMatchLabel(field: 'id' | 'name' | 'tag' | 'author' | 'description'): string {
-    return field === 'id' ? 'ID' : field === 'name' ? 'Name' : field === 'tag' ? 'Tag' : field === 'author' ? 'Author' : 'Description';
-  }
-
   function formatModerationDate(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
@@ -1200,7 +1250,8 @@
   }
 
   onMount(() => {
-    loadWorkshopThemes();
+    void loadWorkshopThemes();
+    void loadWorkshopTags();
   });
 </script>
 
@@ -1217,17 +1268,110 @@
             Your trash
           </span>
         {:else}
-          {#each filterTags as tag (tag)}
-            <button
-              type="button"
-              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {selectedTag === tag
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
-              onclick={() => handleTagClick(tag)}
+          <button
+            type="button"
+            class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {selectedTag === 'all'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+            onclick={() => handleTagClick('all')}
+          >
+            All Tags
+          </button>
+
+          <Popover.Root bind:open={tagFilterOpen}>
+            <Popover.Trigger
+              class="flex h-7 max-w-44 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors {selectedTag ===
+              'all'
+                ? 'border-theme-800 bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'
+                : 'border-primary/40 bg-primary/15 text-primary'}"
+              aria-label="Filter workshop by tag"
             >
-              {tag === 'all' ? 'All Tags' : `#${tag}`}
-            </button>
-          {/each}
+              <Tag class="size-3 shrink-0" />
+              <span class="truncate">
+                {selectedTag === 'all' ? 'Filter by tag' : `#${selectedTag}`}
+              </span>
+              {#if tagOptions.length > 0}
+                <span
+                  class="shrink-0 rounded bg-theme-800/80 px-1 text-[9px] tabular-nums text-muted-foreground"
+                >
+                  {tagOptions.length}
+                </span>
+              {/if}
+              {#if tagsLoading}
+                <LoaderCircle class="size-3 shrink-0 animate-spin" />
+              {:else}
+                <ChevronDown class="size-3 shrink-0 opacity-60" />
+              {/if}
+            </Popover.Trigger>
+
+            <Popover.Content
+              align="start"
+              class="w-72 border-theme-800 bg-theme-950 p-0 text-theme-50 shadow-2xl"
+            >
+              <div class="border-b border-theme-800/70 p-2">
+                <div class="relative">
+                  <Search
+                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    bind:value={tagSearch}
+                    class="h-8 border-theme-800 bg-theme-900/60 pr-8 pl-8 text-[11px]"
+                    placeholder="Search used tags..."
+                    autofocus
+                  />
+                  {#if tagSearch}
+                    <button
+                      type="button"
+                      class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-white"
+                      aria-label="Clear tag search"
+                      onclick={() => (tagSearch = '')}
+                    >
+                      <X class="size-3.5" />
+                    </button>
+                  {/if}
+                </div>
+              </div>
+
+              <div class="max-h-64 overflow-y-auto p-1">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
+                  'all'
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+                  onclick={() => handleTagClick('all')}
+                >
+                  <span class="flex items-center gap-2"><Tag class="size-3" /> All tags</span>
+                  {#if selectedTag === 'all'}<Check class="size-3" />{/if}
+                </button>
+
+                {#if filteredTagOptions.length === 0}
+                  <p class="px-2 py-4 text-center text-[10px] text-muted-foreground">
+                    {tagOptions.length === 0
+                      ? 'No tags are in use yet.'
+                      : 'No tags match your search.'}
+                  </p>
+                {:else}
+                  {#each filteredTagOptions as option (option.tag)}
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
+                      option.tag
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+                      onclick={() => handleTagClick(option.tag)}
+                    >
+                      <span class="truncate">#{option.tag}</span>
+                      <span class="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                        {option.count}
+                      </span>
+                    </button>
+                  {/each}
+                {/if}
+              </div>
+            </Popover.Content>
+          </Popover.Root>
+
           {#if canModerate}
             <WorkshopTooltip content="Show only hidden themes">
               {#snippet trigger(props)}
@@ -1317,7 +1461,10 @@
               variant="ghost"
               size="icon"
               class="size-7.5 text-muted-foreground hover:text-white"
-              onclick={() => void loadWorkshopThemes()}
+              onclick={() => {
+                void loadWorkshopThemes();
+                void loadWorkshopTags();
+              }}
               disabled={loading}
             >
               <RefreshCw class="size-3.5 {loading ? 'animate-spin' : ''}" />
@@ -1371,7 +1518,7 @@
               theme.apiVersion === '1.0' || Boolean(theme.tags?.includes('legacy'))}
             {@const canReport =
               Boolean($currentUser) && !owned && !theme.isHidden && !theme.isQuarantined}
-            {@const canFork = canReport && !isLegacy}
+            {@const canFork = canReport && !isLegacy && theme.allowForking !== false}
             {@const showOverflowMenu = !isDeleted && (owned || canModerate || canReport)}
 
             <div
@@ -1600,27 +1747,6 @@
                         </button>
                       {/each}
                     </div>
-                  {/if}
-
-                  {#if theme.searchMatch}
-                    {@const searchMatch = theme.searchMatch}
-                    <WorkshopTooltip
-                      content={`Matched ${searchMatchLabel(searchMatch.field)}: ${searchMatch.value}`}
-                    >
-                      {#snippet trigger(props)}
-                        <div
-                          {...props}
-                          tabindex="-1"
-                          class="mt-2 flex max-w-full items-center gap-1 rounded border border-cyan-900/40 bg-cyan-950/20 px-1.5 py-1 text-[9px] text-cyan-200/80"
-                        >
-                          <Search class="size-3 shrink-0" />
-                          <span class="truncate">
-                            Matched {searchMatchLabel(searchMatch.field).toLowerCase()}:
-                            {searchMatch.value}
-                          </span>
-                        </div>
-                      {/snippet}
-                    </WorkshopTooltip>
                   {/if}
 
                   {#if theme.isHidden || theme.isQuarantined}

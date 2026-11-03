@@ -524,6 +524,7 @@ export const reloadThemes = async () => {
           apiVersion: theme.apiVersion,
           description: theme.description,
           nsfw: theme.nsfw,
+          workshopId: theme.workshopId,
           definition: theme.definition,
           updateAvailable: theme.updateAvailable,
           availableVersion: theme.availableVersion,

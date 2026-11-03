@@ -3422,6 +3422,7 @@
         version: definition.version || '1.0.0',
         apiVersion: definition.apiVersion || '2.0.0',
         tags: definition.tags ?? [],
+        allowForking: definition.allowForking !== false,
         onProgress: (msg, pct) => {
           publishStatusMessage = msg;
           publishProgress = pct;
@@ -3439,6 +3440,15 @@
         } catch (err) {
           console.warn('[Workshop] Could not store the theme ID in theme.json:', err);
         }
+
+        // The launcher window owns the installed-theme list. Tell it about the
+        // new workshop ID so reporting is hidden immediately after publishing.
+        await emit('theme-published', {
+          themeId: result.themeId,
+          name: definition.name,
+        }).catch((err) => {
+          console.warn('[Workshop] Could not notify the launcher about the published theme:', err);
+        });
       }
 
       sileo.success({
@@ -5070,6 +5080,27 @@
                 checked={definition.nsfw === true}
                 onCheckedChange={(checked) => {
                   definition.nsfw = checked === true;
+                }}
+              />
+            </div>
+            <div
+              class="flex items-start justify-between gap-3 rounded-md border border-theme-800 bg-theme-950 px-3 py-2.5"
+            >
+              <div class="space-y-0.5">
+                <Label for="theme-allow-forking" class="text-xs font-medium text-theme-100">
+                  Allow forking
+                </Label>
+                <p class="text-[10px] leading-relaxed text-muted-foreground">
+                  Let other creators fork this theme from the workshop. Takes effect when you publish
+                  or update it; existing forks are not affected.
+                </p>
+              </div>
+              <Checkbox
+                id="theme-allow-forking"
+                class="mt-0.5"
+                checked={definition.allowForking !== false}
+                onCheckedChange={(checked) => {
+                  definition.allowForking = checked === true;
                 }}
               />
             </div>

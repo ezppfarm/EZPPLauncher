@@ -4,6 +4,7 @@
   import { ezppfarm } from '$lib/api/ezpp';
   import {
     fetchCommunityThemeDetails,
+    fetchCommunityThemes,
     type CommunityTheme,
   } from '$lib/communityThemes';
   import DiagnosticsPanel from '$lib/components/diagnostics/DiagnosticsPanel.svelte';
@@ -292,6 +293,7 @@
   let themeSearch = $state('');
   let activeThemesTab = $state<'library' | 'workshop'>('library');
   let themeSavedUnlisten: (() => void) | undefined;
+  let themePublishedUnlisten: (() => void) | undefined;
   let refreshingThemes = $state(false);
   let reloadingActiveTheme = $state(false);
   let revealedNsfw = $state<string[]>([]);
@@ -311,6 +313,10 @@
   let installedReportOpen = $state(false);
   let installedReportTarget = $state<CommunityTheme | null>(null);
   let installedReportLoading = $state(false);
+  let ownedWorkshopThemeIds = $state<string[]>([]);
+  let ownedWorkshopThemeNames = $state<string[]>([]);
+  let ownedWorkshopLoaded = $state(false);
+  let ownedThemesRequestId = 0;
   let logViewerOpen = $state(false);
   let presenceEditorOpen = $state(false);
 
@@ -348,11 +354,90 @@
     });
   });
 
-  const isOwnInstalledTheme = (theme: Theme) =>
-    Boolean(
-      $currentUser &&
-        theme.author.trim().toLowerCase() === $currentUser.name.trim().toLowerCase()
-    );
+  const currentUserAliases = $derived.by(() => {
+    const aliases = new Set<string>();
+    const add = (value: string | undefined) => {
+      const normalized = value?.trim().toLowerCase();
+      if (normalized) aliases.add(normalized);
+    };
+
+    add($currentUser?.name);
+    add($currentUserInfo?.info.name);
+    add($currentUserInfo?.info.safe_name);
+    for (const name of $currentUserInfo?.info.username_history ?? []) add(name);
+    return aliases;
+  });
+
+  const loadOwnedWorkshopThemes = async (userId: number) => {
+    const requestId = ++ownedThemesRequestId;
+    ownedWorkshopLoaded = false;
+    const ids = new Set<string>();
+    const names = new Set<string>();
+
+    try {
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const response = await fetchCommunityThemes({ authorId: userId, page, limit: 100 });
+        if (requestId !== ownedThemesRequestId) return;
+
+        for (const item of response.items) {
+          ids.add(item.id.trim().toLowerCase());
+          names.add(item.name.trim().toLowerCase());
+        }
+        totalPages = response.totalPages;
+        page += 1;
+      } while (page <= totalPages && page <= 20);
+    } catch (err) {
+      console.warn('[Themes] Could not load owned workshop themes:', err);
+    } finally {
+      if (requestId === ownedThemesRequestId) {
+        // Merge instead of replacing so a theme published while this request
+        // was in flight is not lost from the ownership cache.
+        ownedWorkshopThemeIds = [...new Set([...ownedWorkshopThemeIds, ...ids])];
+        ownedWorkshopThemeNames = [...new Set([...ownedWorkshopThemeNames, ...names])];
+        ownedWorkshopLoaded = true;
+      }
+    }
+  };
+
+  const isOwnInstalledTheme = (theme: Theme) => {
+    if (!$currentUser) return false;
+
+    const folderName = theme.folder_name.trim().toLowerCase();
+    const workshopId = theme.workshopId?.trim().toLowerCase();
+    if (
+      ownedWorkshopThemeIds.includes(folderName) ||
+      (workshopId !== undefined && ownedWorkshopThemeIds.includes(workshopId))
+    ) {
+      return true;
+    }
+
+    if (currentUserAliases.has(theme.author.trim().toLowerCase())) return true;
+
+    // Older installs do not have a workshopId, so fall back to the name of a
+    // theme already published by this account.
+    return ownedWorkshopThemeNames.includes(theme.name.trim().toLowerCase());
+  };
+
+  onMount(() => {
+    let loadedUserId: number | undefined;
+    return currentUser.subscribe((user) => {
+      if (!user) {
+        loadedUserId = undefined;
+        ownedThemesRequestId += 1;
+        ownedWorkshopThemeIds = [];
+        ownedWorkshopThemeNames = [];
+        ownedWorkshopLoaded = false;
+        return;
+      }
+      if (loadedUserId === user.id) return;
+      loadedUserId = user.id;
+      ownedWorkshopThemeIds = [];
+      ownedWorkshopThemeNames = [];
+      void loadOwnedWorkshopThemes(user.id);
+    });
+  });
 
   const themeButtonLabel = (theme: Theme, activeFolder: string | undefined) => {
     if (activeFolder === theme.folder_name) return 'Theme in use';
@@ -459,7 +544,7 @@
 
     installedReportLoading = true;
     try {
-      const target = await fetchCommunityThemeDetails(theme.folder_name);
+      const target = await fetchCommunityThemeDetails(theme.workshopId ?? theme.folder_name);
       if (target.isOwner) {
         sileo.error({
           title: 'You cannot report your own theme',
@@ -1582,9 +1667,30 @@
       }
     }).then((unlisten) => (themeSavedUnlisten = unlisten));
 
+    listen<{ themeId?: string; name?: string }>('theme-published', async (event) => {
+      if (!$currentUser) return;
+
+      const themeId = event.payload.themeId?.trim().toLowerCase();
+      const themeName = event.payload.name?.trim().toLowerCase();
+      if (themeId) {
+        ownedWorkshopThemeIds = [...new Set([...ownedWorkshopThemeIds, themeId])];
+      }
+      if (themeName) {
+        ownedWorkshopThemeNames = [...new Set([...ownedWorkshopThemeNames, themeName])];
+      }
+      if (themeId || themeName) ownedWorkshopLoaded = true;
+
+      try {
+        await reloadThemes();
+      } catch (error) {
+        console.error(error);
+      }
+    }).then((unlisten) => (themePublishedUnlisten = unlisten));
+
     return () => {
       window.clearInterval(animateInterval);
       themeSavedUnlisten?.();
+      themePublishedUnlisten?.();
       stopThemeScript();
     };
   });
@@ -4042,7 +4148,7 @@
                                   {/if}
                                 </Button>
                               {/if}
-                              {#if $currentUser && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
+                              {#if $currentUser && ownedWorkshopLoaded && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
                                 <Button
                                   variant="secondary"
                                   size="icon"

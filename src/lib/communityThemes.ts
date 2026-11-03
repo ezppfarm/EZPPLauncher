@@ -44,6 +44,7 @@ export interface CommunityTheme {
   downloadCount: number;
   likeCount: number;
   tags: string[];
+  allowForking: boolean;
   createdAt: string;
   updatedAt: string;
   author: CommunityThemeAuthor;
@@ -72,6 +73,11 @@ export interface CommunityThemesResponse {
   page: number;
   totalPages: number;
   canModerate: boolean;
+}
+
+export interface CommunityTagSummary {
+  tag: string;
+  count: number;
 }
 
 export type ThemeReportStatus = 'open' | 'resolved' | 'dismissed';
@@ -222,6 +228,29 @@ export async function fetchCommunityThemes(options?: {
       : Math.ceil(Number(remoteData.total || 0) / Math.max(1, options?.limit || 24)) || 1,
     canModerate: remoteData.canModerate ?? false,
   };
+}
+
+export async function fetchCommunityTags(): Promise<CommunityTagSummary[]> {
+  const baseUrl = await getThemesServiceUrl();
+  const res = await fetch(`${baseUrl}/v1/themes/tags`);
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to load tags (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as { tags?: unknown };
+  if (!Array.isArray(data.tags)) return [];
+
+  const tags: CommunityTagSummary[] = [];
+  for (const item of data.tags) {
+    if (!item || typeof item !== 'object') continue;
+    const candidate = item as { tag?: unknown; count?: unknown };
+    if (typeof candidate.tag !== 'string' || typeof candidate.count !== 'number') continue;
+    const tag = candidate.tag.trim().toLowerCase();
+    if (!tag) continue;
+    tags.push({ tag, count: candidate.count });
+  }
+  return tags;
 }
 
 export async function fetchCommunityThemeDetails(themeId: string): Promise<CommunityTheme> {
@@ -656,6 +685,7 @@ export async function publishThemeToWorkshop(options: {
   version?: string;
   apiVersion?: string;
   tags?: string[];
+  allowForking?: boolean;
   previewImageBase64?: string;
   onProgress?: (status: string, percentage: number) => void;
 }): Promise<{ success: boolean; themeId: string; theme: unknown }> {
@@ -717,6 +747,7 @@ export async function publishThemeToWorkshop(options: {
         totalChunks,
         sha256,
         tags: options.tags || [],
+        allowForking: options.allowForking,
       }),
     });
 
