@@ -4012,17 +4012,37 @@
                               <div
                                 class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/75 via-transparent to-transparent"
                               ></div>
-                              {#if isActive}
-                                <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
-                              {/if}
-                              {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
-                                <Badge
-                                  variant="secondary"
-                                  class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
+                              <div
+                                class="absolute top-1.5 left-1.5 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-1"
+                              >
+                                {#if isActive}
+                                  <Badge class="text-[9px]">In use</Badge>
+                                {/if}
+                                {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
+                                  <Badge
+                                    variant="secondary"
+                                    class="bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
+                                  >
+                                    API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
+                                  </Badge>
+                                {/if}
+                              </div>
+                              <div class="absolute top-1.5 right-1.5 flex items-center gap-1">
+                                {#if theme.nsfw}
+                                  <Badge
+                                    variant="destructive"
+                                    class="px-1.5 py-0 text-[9px]"
+                                    title="Adult content"
+                                  >
+                                    18+
+                                  </Badge>
+                                {/if}
+                                <span
+                                  class="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm"
                                 >
-                                  API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
-                                </Badge>
-                              {/if}
+                                  v{theme.version}
+                                </span>
+                              </div>
                               {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
                                 <button
                                   type="button"
@@ -4038,194 +4058,204 @@
                               {:else if theme.nsfw}
                                 <button
                                   type="button"
-                                  class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
+                                  class="absolute right-1.5 bottom-10 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
                                   onclick={() => toggleNsfwPreview(theme.name)}
                                 >
                                   <ThemeIcon name="eye-off" set={iconSet} class="size-3" />
                                   Hide preview
                                 </button>
                               {/if}
-                              {#if theme.nsfw}
-                                <Badge
-                                  variant="destructive"
-                                  class="absolute right-1.5 bottom-1.5 px-1.5 py-0 text-[9px]"
-                                  title="Adult content"
-                                >
-                                  18+
-                                </Badge>
-                              {/if}
-                            </div>
-                            <div class="flex flex-1 flex-col gap-1.5 p-2.5">
-                              <div class="flex items-start justify-between gap-1.5">
-                                <div class="min-w-0">
+                              <div
+                                class="absolute right-2 bottom-2 left-2 flex items-center justify-between gap-2"
+                              >
+                                <div class="flex min-w-0 items-center gap-1.5">
                                   <span
-                                    class="block truncate text-[13px] leading-tight font-semibold"
+                                    class="flex size-5 shrink-0 items-center justify-center rounded-full border border-white/20 bg-theme-800 text-[9px] font-bold text-white/80 uppercase"
                                   >
-                                    {theme.name}
+                                    {theme.author.trim().charAt(0) || '?'}
                                   </span>
                                   <span
-                                    class="mt-0.5 block truncate text-[10px] text-muted-foreground"
+                                    class="truncate text-[11px] font-semibold text-white/95 drop-shadow-sm"
                                   >
-                                    by {theme.author}
+                                    {theme.author || 'Unknown author'}
                                   </span>
                                 </div>
                                 <span
-                                  class="shrink-0 rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] whitespace-nowrap tabular-nums text-muted-foreground"
+                                  class="shrink-0 text-[9px] {theme.updateAvailable
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground/90'}"
                                 >
-                                  {#if theme.updateAvailable && theme.availableVersion}
-                                    v{theme.version} <span class="text-primary">→</span>
-                                    v{theme.availableVersion}
-                                  {:else}
-                                    v{theme.version}
-                                  {/if}
+                                  {theme.updateAvailable ? 'Update available' : 'Installed'}
                                 </span>
                               </div>
-                              <p
-                                class="min-h-8 line-clamp-2 text-[10px] leading-snug text-muted-foreground"
-                              >
-                                {theme.description}
-                              </p>
-                              <div class="mt-auto flex items-center gap-1 pt-0.5">
-                                <Button
-                                  class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
-                                    'downloading' || theme.status === 'extracting'
-                                    ? 'disabled:bg-primary disabled:opacity-100'
-                                    : ''}"
-                                  size="sm"
-                                  aria-busy={theme.status === 'downloading' ||
-                                    theme.status === 'extracting'}
-                                  disabled={isActive ||
-                                    theme.status === 'downloading' ||
-                                    theme.status === 'extracting' ||
-                                    theme.status === 'deleting'}
-                                  onclick={() => requestThemeApply(theme)}
+                            </div>
+                            <div class="flex flex-1 flex-col gap-2 p-3">
+                              <h3 class="truncate text-[13px] font-bold text-theme-50">
+                                {theme.name}
+                              </h3>
+                              {#if theme.description}
+                                <p
+                                  class="line-clamp-2 text-[10px] leading-relaxed text-muted-foreground"
                                 >
-                                  {#if theme.status === 'downloading' || theme.status === 'extracting'}
-                                    <span
-                                      class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
-                                      style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
-                                    ></span>
-                                    {#if !$reduceAnimations}
-                                      <span
-                                        class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
-                                      ></span>
-                                    {/if}
-                                  {/if}
-                                  <span
-                                    class="relative z-10 flex items-center justify-center gap-2"
-                                  >
-                                    {#if theme.status === 'extracting'}
-                                      <ThemeIcon
-                                        name="loader"
-                                        set={iconSet}
-                                        class="size-4 animate-spin"
-                                      />
-                                    {/if}
-                                    <TextMorph
-                                      text={themeButtonLabel(
-                                        theme,
-                                        $active_custom_theme?.folder_name
-                                      )}
-                                      duration={260}
-                                      ease="cubic-bezier(0.19, 1, 0.22, 1)"
-                                      disabled={$reduceAnimations}
-                                      class="whitespace-nowrap"
-                                    />
-                                  </span>
-                                </Button>
-                                {#if hasThemeMenu}
-                                  <DropdownMenu.Root>
-                                    <DropdownMenu.Trigger>
-                                      {#snippet child({ props })}
-                                        <Button
-                                          {...props}
-                                          variant="secondary"
-                                          size="icon"
-                                          class="size-7 shrink-0 text-muted-foreground hover:text-white"
-                                          title="More theme actions"
-                                          aria-label={`More actions for ${theme.name}`}
-                                        >
-                                          <Ellipsis class="size-3.5" />
-                                        </Button>
-                                      {/snippet}
-                                    </DropdownMenu.Trigger>
-                                    <DropdownMenu.Content
-                                      align="end"
-                                      class="w-48 border-theme-700 bg-theme-950 text-theme-50"
+                                  {theme.description}
+                                </p>
+                              {/if}
+                              <div
+                                class="mt-auto flex items-center justify-between gap-2 border-t border-theme-800/40 pt-2.5"
+                              >
+                                <span class="min-w-0 truncate text-[9px] text-muted-foreground">
+                                  {#if theme.updateAvailable && theme.availableVersion}
+                                    <span class="text-primary"
+                                      >v{theme.availableVersion} available</span
                                     >
-                                      {#if canEditTheme}
-                                        <DropdownMenu.Item
-                                          class="gap-2 text-[11px]"
-                                          onclick={() => openThemeEditor(theme)}
-                                        >
-                                          <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
-                                          Edit theme
-                                        </DropdownMenu.Item>
+                                  {:else if isActive}
+                                    Active theme
+                                  {:else}
+                                    Installed
+                                  {/if}
+                                </span>
+                                <div class="flex shrink-0 items-center gap-1">
+                                  <Button
+                                    class="relative h-7 min-w-0 max-w-44 overflow-hidden px-2.5 text-xs {theme.status ===
+                                      'downloading' || theme.status === 'extracting'
+                                      ? 'disabled:bg-primary disabled:opacity-100'
+                                      : ''}"
+                                    size="sm"
+                                    aria-busy={theme.status === 'downloading' ||
+                                      theme.status === 'extracting'}
+                                    disabled={isActive ||
+                                      theme.status === 'downloading' ||
+                                      theme.status === 'extracting' ||
+                                      theme.status === 'deleting'}
+                                    onclick={() => requestThemeApply(theme)}
+                                  >
+                                    {#if theme.status === 'downloading' || theme.status === 'extracting'}
+                                      <span
+                                        class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
+                                        style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
+                                      ></span>
+                                      {#if !$reduceAnimations}
+                                        <span
+                                          class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                                        ></span>
                                       {/if}
-                                      {#if canRestoreTheme}
-                                        <DropdownMenu.Item
-                                          class="gap-2 text-[11px]"
-                                          onclick={() =>
-                                            requestThemeRestore(theme, theme.backups![0])}
-                                        >
-                                          <ThemeIcon
-                                            name="history"
-                                            set={iconSet}
-                                            class="size-3.5"
-                                          />
-                                          Restore previous version
-                                        </DropdownMenu.Item>
+                                    {/if}
+                                    <span
+                                      class="relative z-10 flex items-center justify-center gap-2"
+                                    >
+                                      {#if theme.status === 'extracting'}
+                                        <ThemeIcon
+                                          name="loader"
+                                          set={iconSet}
+                                          class="size-4 animate-spin"
+                                        />
                                       {/if}
-                                      {#if canUpdateTheme}
-                                        <DropdownMenu.Item
-                                          class="gap-2 text-[11px]"
-                                          onclick={() => updateInstalledTheme(theme)}
-                                        >
-                                          <ThemeIcon
-                                            name="download"
-                                            set={iconSet}
-                                            class="size-3.5"
-                                          />
-                                          Update theme
-                                        </DropdownMenu.Item>
-                                      {/if}
-                                      {#if canReportTheme}
-                                        <DropdownMenu.Item
-                                          class="gap-2 text-[11px]"
-                                          disabled={installedReportLoading}
-                                          onclick={() => void openInstalledReport(theme)}
-                                        >
-                                          <Flag class="size-3.5" />
-                                          Report theme
-                                        </DropdownMenu.Item>
-                                      {/if}
-                                      {#if canUninstallTheme}
-                                        <DropdownMenu.Separator class="my-1 bg-theme-800" />
-                                        <DropdownMenu.Item
-                                          class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
-                                          disabled={theme.status !== 'installed'}
-                                          onclick={() => void uninstallInstalledTheme(theme)}
-                                        >
-                                          {#if theme.status === 'deleting'}
+                                      <TextMorph
+                                        text={themeButtonLabel(
+                                          theme,
+                                          $active_custom_theme?.folder_name
+                                        )}
+                                        duration={260}
+                                        ease="cubic-bezier(0.19, 1, 0.22, 1)"
+                                        disabled={$reduceAnimations}
+                                        class="whitespace-nowrap"
+                                      />
+                                    </span>
+                                  </Button>
+                                  {#if hasThemeMenu}
+                                    <DropdownMenu.Root>
+                                      <DropdownMenu.Trigger>
+                                        {#snippet child({ props })}
+                                          <Button
+                                            {...props}
+                                            variant="secondary"
+                                            size="icon"
+                                            class="size-7 shrink-0 text-muted-foreground hover:text-white"
+                                            title="More theme actions"
+                                            aria-label={`More actions for ${theme.name}`}
+                                          >
+                                            <Ellipsis class="size-3.5" />
+                                          </Button>
+                                        {/snippet}
+                                      </DropdownMenu.Trigger>
+                                      <DropdownMenu.Content
+                                        align="end"
+                                        class="w-48 border-theme-700 bg-theme-950 text-theme-50"
+                                      >
+                                        {#if canEditTheme}
+                                          <DropdownMenu.Item
+                                            class="gap-2 text-[11px]"
+                                            onclick={() => openThemeEditor(theme)}
+                                          >
+                                            <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
+                                            Edit theme
+                                          </DropdownMenu.Item>
+                                        {/if}
+                                        {#if canRestoreTheme}
+                                          <DropdownMenu.Item
+                                            class="gap-2 text-[11px]"
+                                            onclick={() =>
+                                              requestThemeRestore(theme, theme.backups![0])}
+                                          >
                                             <ThemeIcon
-                                              name="loader"
-                                              set={iconSet}
-                                              class="size-3.5 animate-spin"
-                                            />
-                                            Uninstalling...
-                                          {:else}
-                                            <ThemeIcon
-                                              name="trash"
+                                              name="history"
                                               set={iconSet}
                                               class="size-3.5"
                                             />
-                                            Uninstall theme
-                                          {/if}
-                                        </DropdownMenu.Item>
-                                      {/if}
-                                    </DropdownMenu.Content>
-                                  </DropdownMenu.Root>
-                                {/if}
+                                            Restore previous version
+                                          </DropdownMenu.Item>
+                                        {/if}
+                                        {#if canUpdateTheme}
+                                          <DropdownMenu.Item
+                                            class="gap-2 text-[11px]"
+                                            onclick={() => updateInstalledTheme(theme)}
+                                          >
+                                            <ThemeIcon
+                                              name="download"
+                                              set={iconSet}
+                                              class="size-3.5"
+                                            />
+                                            Update theme
+                                          </DropdownMenu.Item>
+                                        {/if}
+                                        {#if canReportTheme}
+                                          <DropdownMenu.Item
+                                            class="gap-2 text-[11px]"
+                                            disabled={installedReportLoading}
+                                            onclick={() => void openInstalledReport(theme)}
+                                          >
+                                            <Flag class="size-3.5" />
+                                            Report theme
+                                          </DropdownMenu.Item>
+                                        {/if}
+                                        {#if canUninstallTheme}
+                                          <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                          <DropdownMenu.Item
+                                            class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
+                                            disabled={theme.status !== 'installed'}
+                                            onclick={() => void uninstallInstalledTheme(theme)}
+                                          >
+                                            {#if theme.status === 'deleting'}
+                                              <ThemeIcon
+                                                name="loader"
+                                                set={iconSet}
+                                                class="size-3.5 animate-spin"
+                                              />
+                                              Uninstalling...
+                                            {:else}
+                                              <ThemeIcon
+                                                name="trash"
+                                                set={iconSet}
+                                                class="size-3.5"
+                                              />
+                                              Uninstall theme
+                                            {/if}
+                                          </DropdownMenu.Item>
+                                        {/if}
+                                      </DropdownMenu.Content>
+                                    </DropdownMenu.Root>
+                                  {/if}
+                                </div>
                               </div>
                             </div>
                           </div>
