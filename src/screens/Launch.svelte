@@ -422,6 +422,14 @@
     return ownedWorkshopThemeNames.includes(theme.name.trim().toLowerCase());
   };
 
+  const themeAuthorAvatarUrl = (theme: Theme) => {
+    if (theme.authorId && theme.authorId > 0) {
+      return `https://a.ez-pp.farm/${theme.authorId}`;
+    }
+    const author = theme.author.trim();
+    return author ? `https://a.ez-pp.farm/${encodeURIComponent(author)}` : undefined;
+  };
+
   onMount(() => {
     let loadedUserId: number | undefined;
     return currentUser.subscribe((user) => {
@@ -4073,9 +4081,7 @@
                                     class="size-5 shrink-0 border border-white/20 bg-theme-800"
                                   >
                                     <Avatar.Image
-                                      src={theme.author.trim()
-                                        ? `https://a.ez-pp.farm/${encodeURIComponent(theme.author.trim())}`
-                                        : undefined}
+                                      src={themeAuthorAvatarUrl(theme)}
                                       alt={theme.author || 'Unknown author'}
                                       class="object-cover"
                                     />

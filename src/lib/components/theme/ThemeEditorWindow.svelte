@@ -3343,7 +3343,8 @@
   async function openPublishDialog() {
     if (exporting || saving || publishing) return;
 
-    if (!$currentUser) {
+    const user = $currentUser;
+    if (!user) {
       sileo.error({
         title: 'Authentication Required',
         description:
@@ -3361,8 +3362,12 @@
       return;
     }
 
-    if (dirty) {
-      await saveTheme({ notify: false });
+    const authorIdChanged = definition.authorId !== user.id;
+    if (authorIdChanged) definition.authorId = user.id;
+
+    if (dirty || authorIdChanged) {
+      const saved = await saveTheme({ notify: false });
+      if (!saved) return;
     }
 
     publishThemeId = definition.workshopId ?? '';

@@ -16,6 +16,8 @@ export type Theme = {
   version: string;
   apiVersion: string;
   author: string;
+  /** EZPPFarm user ID stored in the manifest when the theme is published. */
+  authorId?: number;
   description: string;
   nsfw: boolean;
   scriptUrl: string;
@@ -44,6 +46,7 @@ export type ThemeInfo = {
   apiVersion?: string;
   workshopId?: string;
   author?: string;
+  authorId?: number;
   description?: string;
   nsfw?: boolean;
   entry?: string;
@@ -173,6 +176,12 @@ const themeFromFolder = async (
       version: parsed.version ?? '1.0.0',
       apiVersion,
       author: parsed.author ?? 'Unknown',
+      authorId:
+        typeof parsed.authorId === 'number' &&
+        Number.isSafeInteger(parsed.authorId) &&
+        parsed.authorId > 0
+          ? parsed.authorId
+          : undefined,
       description: parsed.description ?? '',
       nsfw: parsed.nsfw === true,
       scriptUrl,
@@ -523,6 +532,7 @@ export const reloadThemes = async () => {
           preview: theme.preview,
           version: theme.version,
           author: theme.author,
+          authorId: theme.authorId,
           apiVersion: theme.apiVersion,
           description: theme.description,
           nsfw: theme.nsfw,

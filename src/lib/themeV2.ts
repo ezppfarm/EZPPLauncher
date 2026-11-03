@@ -646,6 +646,8 @@ export type ThemeV2Definition = {
   version: string;
   apiVersion: '2.0';
   author: string;
+  /** EZPPFarm user ID of the publisher, written when the theme is published. */
+  authorId?: number;
   description?: string;
   /** Workshop discovery tags for this theme. */
   tags?: string[];
@@ -753,6 +755,11 @@ const normalizeWorkshopId = (raw: unknown): string | undefined => {
   if (typeof raw !== 'string') return undefined;
   const id = raw.trim().toLowerCase();
   return WORKSHOP_ID_PATTERN.test(id) ? id : undefined;
+};
+
+const normalizeAuthorId = (raw: unknown): number | undefined => {
+  if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw <= 0) return undefined;
+  return raw;
 };
 
 const clampInteger = (value: unknown, fallback: number, min: number, max: number) =>
@@ -1913,6 +1920,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
     version: text(raw.version, '1.0.0'),
     apiVersion: '2.0',
     author: text(raw.author, 'Unknown'),
+    authorId: normalizeAuthorId(raw.authorId),
     description: text(raw.description),
     tags: normalizeThemeTags(raw.tags),
     workshopId: normalizeWorkshopId(raw.workshopId),
