@@ -1,5 +1,6 @@
 <script lang="ts">
   import DefaultThemePreview from '$assets/default_preview.png';
+  import { activeThemeDownloads, themeDownloadProgress } from '$lib/communityThemeDownloads';
   import {
     fetchCommunityTags,
     fetchCommunityThemes,
@@ -84,7 +85,7 @@
   } from '@lucide/svelte';
   import { sileo } from 'sileo';
   import { onMount } from 'svelte';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap } from 'svelte/reactivity';
 
   let {
     onApplyTheme,
@@ -119,8 +120,6 @@
   let error = $state<string | null>(null);
   let latestRequestId = 0;
 
-  let downloadingIds = new SvelteSet<string>();
-  let downloadProgressById = new SvelteMap<string, number>();
   let forkingId = $state<string | null>(null);
   let deletingId = $state<string | null>(null);
   let moderatingId = $state<string | null>(null);
@@ -415,14 +414,14 @@
   }
 
   async function handleDownloadTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || downloadingIds.has(theme.id)) return;
+    if (theme.deletedAt || activeThemeDownloads.has(theme.id)) return;
 
-    downloadingIds.add(theme.id);
-    downloadProgressById.set(theme.id, 10);
+    activeThemeDownloads.add(theme.id);
+    themeDownloadProgress.set(theme.id, 10);
 
     try {
       await downloadAndInstallCommunityTheme(theme, (_status, progress) => {
-        downloadProgressById.set(theme.id, progress);
+        themeDownloadProgress.set(theme.id, progress);
       });
 
       sileo.success({
@@ -436,8 +435,8 @@
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      downloadingIds.delete(theme.id);
-      downloadProgressById.delete(theme.id);
+      activeThemeDownloads.delete(theme.id);
+      themeDownloadProgress.delete(theme.id);
     }
   }
 
@@ -458,18 +457,24 @@
   }
 
   async function handleEditTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || downloadingIds.has(theme.id) || forkingId || deletingId || moderatingId)
+    if (
+      theme.deletedAt ||
+      activeThemeDownloads.has(theme.id) ||
+      forkingId ||
+      deletingId ||
+      moderatingId
+    )
       return;
 
     let installed =
       localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
 
     if (!installed) {
-      downloadingIds.add(theme.id);
-      downloadProgressById.set(theme.id, 10);
+      activeThemeDownloads.add(theme.id);
+      themeDownloadProgress.set(theme.id, 10);
       try {
         await downloadAndInstallCommunityTheme(theme, (_status, progress) => {
-          downloadProgressById.set(theme.id, progress);
+          themeDownloadProgress.set(theme.id, progress);
         });
         installed = $custom_themes.find(
           (candidate) => candidate.folder_name.toLowerCase() === theme.id.toLowerCase()
@@ -481,8 +486,8 @@
         });
         return;
       } finally {
-        downloadingIds.delete(theme.id);
-        downloadProgressById.delete(theme.id);
+        activeThemeDownloads.delete(theme.id);
+        themeDownloadProgress.delete(theme.id);
       }
     }
 
@@ -492,7 +497,13 @@
   }
 
   async function handleRefreshOwnedTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || downloadingIds.has(theme.id) || forkingId || deletingId || moderatingId)
+    if (
+      theme.deletedAt ||
+      activeThemeDownloads.has(theme.id) ||
+      forkingId ||
+      deletingId ||
+      moderatingId
+    )
       return;
 
     const installed =
@@ -511,11 +522,11 @@
     );
     if (!confirmed) return;
 
-    downloadingIds.add(theme.id);
-    downloadProgressById.set(theme.id, 10);
+    activeThemeDownloads.add(theme.id);
+    themeDownloadProgress.set(theme.id, 10);
     try {
       const res = await downloadAndInstallCommunityTheme(theme, (_status, progress) => {
-        downloadProgressById.set(theme.id, progress);
+        themeDownloadProgress.set(theme.id, progress);
       });
       const refreshed = $custom_themes.find(
         (candidate) => candidate.folder_name.toLowerCase() === res.folderName.toLowerCase()
@@ -534,8 +545,8 @@
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      downloadingIds.delete(theme.id);
-      downloadProgressById.delete(theme.id);
+      activeThemeDownloads.delete(theme.id);
+      themeDownloadProgress.delete(theme.id);
     }
   }
 
@@ -732,10 +743,10 @@
     let installed: Theme | undefined;
     try {
       await loadWorkshopThemes();
-      downloadingIds.add(fork.id);
-      downloadProgressById.set(fork.id, 10);
+      activeThemeDownloads.add(fork.id);
+      themeDownloadProgress.set(fork.id, 10);
       const res = await downloadAndInstallCommunityTheme(fork, (_status, progress) => {
-        downloadProgressById.set(fork.id, progress);
+        themeDownloadProgress.set(fork.id, progress);
       });
       installed = $custom_themes.find(
         (candidate) => candidate.folder_name.toLowerCase() === res.folderName.toLowerCase()
@@ -746,8 +757,8 @@
         description: `${err instanceof Error ? err.message : String(err)} You can download it from the workshop.`,
       });
     } finally {
-      downloadingIds.delete(fork.id);
-      downloadProgressById.delete(fork.id);
+      activeThemeDownloads.delete(fork.id);
+      themeDownloadProgress.delete(fork.id);
     }
 
     if (installed) {
@@ -1600,8 +1611,8 @@
               {@const isActive = Boolean(
                 localTheme && $active_custom_theme?.folder_name === localTheme.folder_name
               )}
-              {@const isDownloading = downloadingIds.has(theme.id)}
-              {@const downloadPercent = downloadProgressById.get(theme.id) ?? 0}
+              {@const isDownloading = activeThemeDownloads.has(theme.id)}
+              {@const downloadPercent = themeDownloadProgress.get(theme.id) ?? 0}
               {@const isDeleted = Boolean(theme.deletedAt)}
               {@const hasUpdate = Boolean(
                 !isDeleted && localTheme && localTheme.version !== theme.version
