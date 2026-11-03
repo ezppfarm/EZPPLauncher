@@ -119,6 +119,14 @@
 
   let downloadingId = $state<string | null>(null);
   let downloadProgress = $state(0);
+  let selectionMode = $state(false);
+  let selectedThemeIds = $state<string[]>([]);
+  let bulkDownload = $state<{
+    current: number;
+    total: number;
+    name: string;
+    progress: number;
+  } | null>(null);
   let forkingId = $state<string | null>(null);
   let deletingId = $state<string | null>(null);
   let moderatingId = $state<string | null>(null);
@@ -235,6 +243,15 @@
     return map;
   });
 
+  function findInstalledTheme(theme: CommunityTheme): Theme | undefined {
+    return localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
+  }
+
+  const selectedThemes = $derived(themes.filter((theme) => selectedThemeIds.includes(theme.id)));
+  const downloadableSelectedThemes = $derived(
+    selectedThemes.filter((theme) => !theme.deletedAt && !findInstalledTheme(theme))
+  );
+
   const tagOptions = $derived.by(() => {
     const counts = new SvelteMap<string, number>();
 
@@ -315,6 +332,7 @@
         themes = [...themes, ...res.items.filter((theme) => !knownIds.has(theme.id))];
       } else {
         themes = res.items;
+        selectedThemeIds = [];
       }
       totalThemes = res.total;
       page = res.page;
@@ -354,6 +372,8 @@
     selectedView = view;
     selectedTag = 'all';
     showHiddenOnly = false;
+    selectionMode = false;
+    selectedThemeIds = [];
     void loadWorkshopThemes();
   }
 
@@ -406,7 +426,7 @@
   }
 
   async function handleDownloadAndApply(theme: CommunityTheme) {
-    if (downloadingId || theme.deletedAt) return;
+    if (downloadingId || bulkDownload || theme.deletedAt) return;
 
     downloadingId = theme.id;
     downloadProgress = 10;
@@ -445,6 +465,102 @@
     }
   }
 
+  function toggleSelectionMode() {
+    if (bulkDownload) return;
+    selectionMode = !selectionMode;
+    if (!selectionMode) selectedThemeIds = [];
+  }
+
+  function toggleThemeSelection(themeId: string) {
+    selectedThemeIds = selectedThemeIds.includes(themeId)
+      ? selectedThemeIds.filter((id) => id !== themeId)
+      : [...selectedThemeIds, themeId];
+  }
+
+  function clearThemeSelection() {
+    selectedThemeIds = [];
+  }
+
+  function selectAllDownloadableThemes() {
+    selectedThemeIds = themes
+      .filter((theme) => !theme.deletedAt && !findInstalledTheme(theme))
+      .map((theme) => theme.id);
+  }
+
+  async function handleBulkDownload() {
+    if (bulkDownload || downloadingId) return;
+
+    const selected = themes.filter(
+      (theme) => selectedThemeIds.includes(theme.id) && !theme.deletedAt
+    );
+    const installable = selected.filter((theme) => !findInstalledTheme(theme));
+    const skipped = selected.length - installable.length;
+
+    if (installable.length === 0) {
+      sileo.info({
+        title: 'Nothing to download',
+        description:
+          selected.length === 0
+            ? 'Select at least one theme first.'
+            : 'The selected themes are already installed.',
+      });
+      return;
+    }
+
+    // Installs run one after another because the download/extract progress events are global,
+    // so concurrent installs would report each other's progress.
+    const failures: string[] = [];
+    let installed = 0;
+
+    try {
+      for (let index = 0; index < installable.length; index += 1) {
+        const theme = installable[index];
+        bulkDownload = {
+          current: index + 1,
+          total: installable.length,
+          name: theme.name,
+          progress: 5,
+        };
+
+        try {
+          await downloadAndInstallCommunityTheme(theme, (_status, progress) => {
+            if (!bulkDownload) return;
+            bulkDownload = { ...bulkDownload, progress };
+          });
+          installed += 1;
+        } catch (err) {
+          console.error(`[Workshop] Could not download "${theme.name}":`, err);
+          failures.push(theme.name);
+        }
+      }
+    } finally {
+      bulkDownload = null;
+    }
+
+    if (installed > 0) {
+      sileo.success({
+        title: installed === 1 ? 'Theme installed' : `${installed} themes installed`,
+        description:
+          skipped > 0
+            ? `${skipped} already-installed theme${skipped === 1 ? ' was' : 's were'} skipped.`
+            : 'Open the library to apply them.',
+      });
+    }
+
+    if (failures.length > 0) {
+      sileo.error({
+        title:
+          failures.length === 1
+            ? 'Could not install 1 theme'
+            : `Could not install ${failures.length} themes`,
+        description: failures.join(', '),
+      });
+    }
+
+    selectedThemeIds = [];
+    selectionMode = false;
+  }
+
   async function handleApplyExisting(theme: CommunityTheme) {
     if (theme.deletedAt) return;
     const installed =
@@ -462,7 +578,8 @@
   }
 
   async function handleEditTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || downloadingId || forkingId || deletingId || moderatingId) return;
+    if (theme.deletedAt || downloadingId || bulkDownload || forkingId || deletingId || moderatingId)
+      return;
 
     let installed =
       localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
@@ -495,7 +612,8 @@
   }
 
   async function handleRefreshOwnedTheme(theme: CommunityTheme) {
-    if (theme.deletedAt || downloadingId || forkingId || deletingId || moderatingId) return;
+    if (theme.deletedAt || downloadingId || bulkDownload || forkingId || deletingId || moderatingId)
+      return;
 
     const installed =
       localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
@@ -1486,6 +1604,28 @@
             </WorkshopTooltip>
           {/if}
 
+          {#if selectedView === 'workshop'}
+            <WorkshopTooltip
+              content={selectionMode ? 'Exit download selection' : 'Select themes to download'}
+            >
+              {#snippet trigger(props)}
+                <Button
+                  {...props}
+                  variant={selectionMode ? 'secondary' : 'ghost'}
+                  size="icon"
+                  class="size-7.5 text-muted-foreground hover:text-white"
+                  onclick={toggleSelectionMode}
+                  aria-label={selectionMode
+                    ? 'Exit download selection'
+                    : 'Select themes to download'}
+                  aria-pressed={selectionMode}
+                >
+                  <Check class="size-3.5" />
+                </Button>
+              {/snippet}
+            </WorkshopTooltip>
+          {/if}
+
           {#if $currentUser}
             <WorkshopTooltip content={selectedView === 'trash' ? 'Back to workshop' : 'Open trash'}>
               {#snippet trigger(props)}
@@ -1522,6 +1662,76 @@
         </div>
       </div>
     </div>
+
+    {#if selectionMode && selectedView === 'workshop'}
+      <div
+        class="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2"
+      >
+        <div class="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-theme-100">
+          <span class="font-medium">{selectedThemes.length} selected</span>
+          {#if selectedThemes.length > downloadableSelectedThemes.length}
+            <span class="text-muted-foreground">
+              {selectedThemes.length - downloadableSelectedThemes.length} already installed
+            </span>
+          {/if}
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-white"
+            onclick={selectAllDownloadableThemes}
+            disabled={Boolean(bulkDownload) || themes.length === 0}
+          >
+            Select all
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-white"
+            onclick={clearThemeSelection}
+            disabled={Boolean(bulkDownload) || selectedThemes.length === 0}
+          >
+            Clear
+          </Button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          {#if bulkDownload}
+            <div class="flex items-center gap-2 text-[10px] text-primary tabular-nums">
+              <LoaderCircle class="size-3 animate-spin" />
+              <span class="max-w-48 truncate">
+                {bulkDownload.current}/{bulkDownload.total} · {bulkDownload.name}
+              </span>
+              <div class="h-1.5 w-20 overflow-hidden rounded-full bg-theme-800">
+                <div
+                  class="h-full bg-primary transition-all duration-200"
+                  style="width: {bulkDownload.progress}%"
+                ></div>
+              </div>
+              <span>{bulkDownload.progress}%</span>
+            </div>
+          {/if}
+          <Button
+            size="sm"
+            class="h-7 gap-1 text-xs"
+            onclick={() => void handleBulkDownload()}
+            disabled={Boolean(bulkDownload) || downloadableSelectedThemes.length === 0}
+          >
+            <Download class="size-3" />
+            Download selected
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 text-muted-foreground hover:text-white"
+            onclick={toggleSelectionMode}
+            disabled={Boolean(bulkDownload)}
+            aria-label="Exit download selection"
+          >
+            <X class="size-3.5" />
+          </Button>
+        </div>
+      </div>
+    {/if}
 
     <!-- Content Grid / Status -->
     <div class="min-h-0 flex-1 pt-1">
@@ -1568,6 +1778,7 @@
                 localTheme && $active_custom_theme?.folder_name === localTheme.folder_name
               )}
               {@const isDownloading = downloadingId === theme.id}
+              {@const isSelected = selectionMode && selectedThemeIds.includes(theme.id)}
               {@const isDeleted = Boolean(theme.deletedAt)}
               {@const hasUpdate = Boolean(
                 !isDeleted && localTheme && localTheme.version !== theme.version
@@ -1581,9 +1792,11 @@
               {@const showOverflowMenu = !isDeleted && (owned || canModerate || canReport)}
 
               <div
-                class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
-                  ? 'border-primary/60 ring-1 ring-primary/20'
-                  : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
+                class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isSelected
+                  ? 'border-primary/70 ring-1 ring-primary/30'
+                  : isActive
+                    ? 'border-primary/60 ring-1 ring-primary/20'
+                    : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
               >
                 <!-- 16:9 Thumbnail -->
                 <div class="relative aspect-video w-full shrink-0 overflow-hidden bg-theme-950/70">
@@ -1757,11 +1970,21 @@
                 <div class="flex flex-1 flex-col justify-between gap-2 p-3">
                   <div class="min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                      <h3
-                        class="truncate text-[13px] font-bold text-white group-hover:text-primary transition-colors"
-                      >
-                        {theme.name}
-                      </h3>
+                      <div class="flex min-w-0 items-center gap-2">
+                        {#if selectionMode && !isDeleted}
+                          <Checkbox
+                            class="shrink-0"
+                            checked={selectedThemeIds.includes(theme.id)}
+                            onCheckedChange={() => toggleThemeSelection(theme.id)}
+                            aria-label={`Select ${theme.name} for download`}
+                          />
+                        {/if}
+                        <h3
+                          class="truncate text-[13px] font-bold text-white group-hover:text-primary transition-colors"
+                        >
+                          {theme.name}
+                        </h3>
+                      </div>
 
                       <!-- Interactive Like Button -->
                       {#if isDeleted}
