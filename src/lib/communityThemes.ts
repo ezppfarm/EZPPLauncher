@@ -863,19 +863,27 @@ export async function downloadAndInstallCommunityTheme(
 
   reportProgress('Downloading theme package...', 10);
 
-  const unlistenDownload = await listen<{ received: number; total: number; progress: number }>(
-    'download_progress',
-    (event) => {
-      reportProgress('Downloading theme package...', Math.round(10 + event.payload.progress * 50));
-    }
-  );
+  // Progress events are global, so ignore those belonging to other themes that are
+  // downloading at the same time.
+  const unlistenDownload = await listen<{
+    theme_name: string;
+    received: number;
+    total: number;
+    progress: number;
+  }>('download_progress', (event) => {
+    if (event.payload.theme_name !== theme.name) return;
+    reportProgress('Downloading theme package...', Math.round(10 + event.payload.progress * 50));
+  });
 
-  const unlistenExtract = await listen<{ extracted: number; total: number; progress: number }>(
-    'extract_progress',
-    (event) => {
-      reportProgress('Extracting theme files...', Math.round(60 + event.payload.progress * 38));
-    }
-  );
+  const unlistenExtract = await listen<{
+    theme_name: string;
+    extracted: number;
+    total: number;
+    progress: number;
+  }>('extract_progress', (event) => {
+    if (event.payload.theme_name !== theme.name) return;
+    reportProgress('Extracting theme files...', Math.round(60 + event.payload.progress * 38));
+  });
 
   try {
     try {
