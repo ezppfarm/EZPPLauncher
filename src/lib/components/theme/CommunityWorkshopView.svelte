@@ -81,11 +81,12 @@
     Sparkles,
     Tag,
     Trash2,
+    TriangleAlert,
     X,
   } from '@lucide/svelte';
   import { sileo } from 'sileo';
-  import { onMount } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { onDestroy, onMount } from 'svelte';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   let {
     onApplyTheme,
@@ -99,6 +100,29 @@
 
   type WorkshopSort = 'relevance' | 'popular' | 'recent' | 'likes' | 'downloads';
   type WorkshopView = 'workshop' | 'trash';
+
+  type PendingAction =
+    | { kind: 'refresh'; theme: CommunityTheme }
+    | { kind: 'hide'; theme: CommunityTheme }
+    | { kind: 'unhide'; theme: CommunityTheme }
+    | { kind: 'delete'; theme: CommunityTheme }
+    | { kind: 'review-approve'; theme: CommunityTheme }
+    | { kind: 'review-reject'; theme: CommunityTheme }
+    | { kind: 'bulk-reports'; action: 'hide' | 'resolved' | 'dismissed'; reportIds: number[] }
+    | { kind: 'report-hide'; report: ThemeReport }
+    | { kind: 'report-dismiss'; report: ThemeReport };
+
+  type ActionDialogConfig = {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    destructive?: boolean;
+    note?: {
+      label: string;
+      placeholder: string;
+      maxLength: number;
+    };
+  };
 
   let searchQuery = $state('');
   let selectedTag = $state('all');
@@ -129,6 +153,7 @@
   let purgeTarget = $state<CommunityTheme | null>(null);
   let trashActionError = $state<string | null>(null);
   let canModerate = $state(false);
+  const likePending = new SvelteSet<string>();
 
   let showModerationPanel = $state(false);
   let moderationReports = $state<ThemeReport[]>([]);
@@ -148,8 +173,13 @@
   let moderationEventActor = $state('');
   let moderationEventsPage = $state(1);
   let moderationEventsTotalPages = $state(1);
+  let moderationRequestId = 0;
+  let eventsLoadingMore = $state(false);
   let reviewQueue = $state<CommunityTheme[]>([]);
   let reviewTotal = $state(0);
+  let reviewPage = $state(1);
+  let reviewTotalPages = $state(1);
+  let reviewLoadingMore = $state(false);
   let reviewActionId = $state<string | null>(null);
   let selectedReportIds = $state<number[]>([]);
   let reportActionId = $state<number | null>(null);
@@ -187,12 +217,20 @@
   let historyPage = $state(1);
   let historyTotalPages = $state(1);
   let historyLoading = $state(false);
+  let historyLoadingMore = $state(false);
+  let historyRequestId = 0;
   let historyError = $state<string | null>(null);
 
   let sourceDialogOpen = $state(false);
   let sourceTheme = $state<CommunityTheme | null>(null);
   let sourceLoading = $state(false);
   let sourceError = $state<string | null>(null);
+
+  let pendingAction = $state<PendingAction | null>(null);
+  let actionNote = $state('');
+  let actionError = $state<string | null>(null);
+  let actionBusy = $state(false);
+  let actionDialogContent = $state<HTMLElement | null>(null);
 
   const REPORT_CATEGORIES: Array<{ id: ThemeReportCategory; label: string }> = [
     { id: 'spam', label: 'Spam / advertising' },
@@ -254,6 +292,189 @@
     return map;
   });
 
+  const actionDialog = $derived.by((): ActionDialogConfig | null => {
+    const action = pendingAction;
+    if (!action) return null;
+
+    switch (action.kind) {
+      case 'refresh': {
+        const installed =
+          localThemeMap.get(action.theme.id.toLowerCase()) ??
+          localThemeMap.get(action.theme.name.toLowerCase());
+        return {
+          title: `Refresh "${action.theme.name}"?`,
+          description: installed
+            ? `This replaces your installed v${installed.version} with workshop v${action.theme.version}. Any local edits will be lost.`
+            : `This replaces your installed copy with workshop v${action.theme.version}.`,
+          confirmLabel: 'Refresh installed copy',
+        };
+      }
+      case 'hide':
+        return {
+          title: `Hide "${action.theme.name}"?`,
+          description:
+            'The theme will disappear from public search, previews, downloads and updates until you restore it.',
+          confirmLabel: 'Hide theme',
+          destructive: true,
+          note: {
+            label: 'Reason (optional)',
+            placeholder: 'Explain why the theme is being hidden...',
+            maxLength: 255,
+          },
+        };
+      case 'unhide':
+        return {
+          title: `Restore "${action.theme.name}"?`,
+          description:
+            'The theme will become publicly visible again unless it is still awaiting review or taken down.',
+          confirmLabel: 'Restore visibility',
+        };
+      case 'delete':
+        return {
+          title: `Move "${action.theme.name}" to trash?`,
+          description:
+            'You can restore it from the Trash view later. Installed copies on computers are not affected.',
+          confirmLabel: 'Move to trash',
+          destructive: true,
+        };
+      case 'review-approve':
+        return {
+          title: `Approve "${action.theme.name}"?`,
+          description: 'The theme will be listed publicly in the Community Workshop.',
+          confirmLabel: 'Approve theme',
+        };
+      case 'review-reject':
+        return {
+          title: `Reject "${action.theme.name}"?`,
+          description:
+            'The theme stays hidden until the creator republishes it. Your note is included in their notification.',
+          confirmLabel: 'Reject theme',
+          destructive: true,
+          note: {
+            label: 'Note for the creator (optional)',
+            placeholder: 'What should the creator change before republishing?',
+            maxLength: 500,
+          },
+        };
+      case 'bulk-reports': {
+        const count = action.reportIds.length;
+        const label = `${count} report${count === 1 ? '' : 's'}`;
+        return action.action === 'hide'
+          ? {
+              title: `Hide themes for ${label}?`,
+              description:
+                'Every affected theme will be hidden from the workshop and the selected reports will be resolved.',
+              confirmLabel: 'Hide themes',
+              destructive: true,
+              note: {
+                label: 'Note for owners and reporters (optional)',
+                placeholder: 'Add context for the audit log and notifications...',
+                maxLength: 500,
+              },
+            }
+          : {
+              title: `Dismiss ${label}?`,
+              description: 'The reports will be dismissed without changing the themes.',
+              confirmLabel: 'Dismiss reports',
+              note: {
+                label: 'Note for reporters (optional)',
+                placeholder: 'Add context for the audit log and notifications...',
+                maxLength: 500,
+              },
+            };
+      }
+      case 'report-hide':
+        return {
+          title: `Hide "${action.report.themeName}"?`,
+          description:
+            'The theme will be hidden from the workshop and this report will be resolved.',
+          confirmLabel: 'Hide theme',
+          destructive: true,
+          note: {
+            label: 'Note for the reporter and audit log (optional)',
+            placeholder: 'Add context for the resolution...',
+            maxLength: 500,
+          },
+        };
+      case 'report-dismiss':
+        return {
+          title: `Dismiss the report on "${action.report.themeName}"?`,
+          description: 'The theme will stay visible and the reporter will be notified.',
+          confirmLabel: 'Dismiss report',
+          note: {
+            label: 'Note for the reporter (optional)',
+            placeholder: 'Explain why no action was taken...',
+            maxLength: 500,
+          },
+        };
+    }
+
+    return null;
+  });
+
+  function openPendingAction(action: PendingAction, note = '') {
+    if (actionBusy) return;
+    pendingAction = action;
+    actionNote = note;
+    actionError = null;
+  }
+
+  function closePendingAction() {
+    if (actionBusy) return;
+    pendingAction = null;
+    actionNote = '';
+    actionError = null;
+  }
+
+  async function confirmPendingAction() {
+    const action = pendingAction;
+    if (!action || actionBusy) return;
+
+    actionBusy = true;
+    actionError = null;
+    try {
+      switch (action.kind) {
+        case 'refresh':
+          await performRefreshOwnedTheme(action.theme);
+          break;
+        case 'hide':
+          await applyVisibilityChange(action.theme, actionNote.trim() || undefined);
+          break;
+        case 'unhide':
+          await applyVisibilityChange(action.theme);
+          break;
+        case 'delete':
+          await applyDeleteTheme(action.theme);
+          break;
+        case 'review-approve':
+          await performThemeReview(action.theme, 'approved');
+          break;
+        case 'review-reject':
+          await performThemeReview(action.theme, 'rejected', actionNote.trim() || undefined);
+          break;
+        case 'bulk-reports':
+          await applyBulkReportAction(
+            action.action,
+            actionNote.trim() || undefined,
+            action.reportIds
+          );
+          break;
+        case 'report-hide':
+          await applyReportHide(action.report, actionNote.trim() || undefined);
+          break;
+        case 'report-dismiss':
+          await applyReportDismiss(action.report, actionNote.trim() || undefined);
+          break;
+      }
+      pendingAction = null;
+      actionNote = '';
+    } catch (err) {
+      actionError = err instanceof Error ? err.message : String(err);
+    } finally {
+      actionBusy = false;
+    }
+  }
+
   const tagOptions = $derived.by(() => {
     const counts = new SvelteMap<string, number>();
 
@@ -303,9 +524,9 @@
     }
   }
 
-  async function loadWorkshopThemes(options: { append?: boolean } = {}) {
+  async function loadWorkshopThemes(options: { append?: boolean; page?: number } = {}) {
     const append = options.append === true;
-    const targetPage = append ? page + 1 : 1;
+    const targetPage = options.page ?? (append ? page + 1 : 1);
     const requestId = ++latestRequestId;
 
     if (append) {
@@ -376,6 +597,14 @@
     void loadWorkshopThemes();
   }
 
+  function clearWorkshopFilters() {
+    searchQuery = '';
+    selectedTag = 'all';
+    selectedView = 'workshop';
+    showHiddenOnly = false;
+    void loadWorkshopThemes();
+  }
+
   function handleHiddenFilter() {
     if (!canModerate || selectedView !== 'workshop') return;
     showHiddenOnly = !showHiddenOnly;
@@ -401,9 +630,18 @@
 
   async function handleLike(theme: CommunityTheme, event: MouseEvent) {
     event.stopPropagation();
-    if (theme.deletedAt) return;
+    if (theme.deletedAt || likePending.has(theme.id)) return;
+    if (!$currentUser) {
+      sileo.error({
+        title: 'Login required',
+        description: 'Log in to EZPPFarm to like community themes.',
+      });
+      return;
+    }
+
     const prevLiked = theme.isLiked;
     const prevCount = theme.likeCount;
+    likePending.add(theme.id);
 
     // Optimistic update
     theme.isLiked = !prevLiked;
@@ -421,6 +659,8 @@
         title: 'Could not like theme',
         description: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      likePending.delete(theme.id);
     }
   }
 
@@ -528,10 +768,15 @@
       return;
     }
 
-    const confirmed = window.confirm(
-      `Refresh "${theme.name}" from the workshop?\n\nLocal version: ${installed.version}\nWorkshop version: ${theme.version}\n\nYour local edits will be replaced by the workshop package.`
-    );
-    if (!confirmed) return;
+    openPendingAction({ kind: 'refresh', theme });
+  }
+
+  async function performRefreshOwnedTheme(theme: CommunityTheme) {
+    const installed =
+      localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
+    if (!installed) {
+      throw new Error('The installed copy could not be found.');
+    }
 
     activeThemeDownloads.add(theme.id);
     themeDownloadProgress.set(theme.id, 10);
@@ -550,36 +795,32 @@
         description: `"${theme.name}" is now at v${theme.version}.`,
       });
       await onEditTheme(refreshed);
-    } catch (err) {
-      sileo.error({
-        title: 'Refresh failed',
-        description: err instanceof Error ? err.message : String(err),
-      });
     } finally {
       activeThemeDownloads.delete(theme.id);
       themeDownloadProgress.delete(theme.id);
     }
   }
 
-  async function handleToggleVisibility(theme: CommunityTheme) {
+  function requestVisibilityChange(theme: CommunityTheme) {
+    if (!canModerate || moderatingId || forkingId || deletingId) return;
+    if (theme.isHidden) {
+      openPendingAction({ kind: 'unhide', theme });
+    } else {
+      openPendingAction({ kind: 'hide', theme }, theme.hiddenReason ?? '');
+    }
+  }
+
+  async function applyVisibilityChange(theme: CommunityTheme, reason?: string) {
     if (!canModerate || moderatingId || forkingId || deletingId) return;
 
     const hiding = !theme.isHidden;
-    let reason: string | undefined;
-    if (hiding) {
-      const answer = window.prompt(
-        `Hide "${theme.name}" from the Community Workshop?\n\nOptional reason (visible to moderators):`,
-        theme.hiddenReason ?? ''
-      );
-      if (answer === null) return;
-      reason = answer.trim().slice(0, 255) || undefined;
-    } else if (!window.confirm(`Restore "${theme.name}" to the Community Workshop?`)) {
-      return;
-    }
-
     moderatingId = theme.id;
     try {
-      const updated = await setCommunityThemeVisibility(theme.id, hiding, reason);
+      const updated = await setCommunityThemeVisibility(
+        theme.id,
+        hiding,
+        hiding ? reason?.trim().slice(0, 255) || undefined : undefined
+      );
       if (showHiddenOnly && !updated.isHidden) {
         themes = themes.filter((item) => item.id !== updated.id);
         totalThemes = Math.max(0, totalThemes - 1);
@@ -590,12 +831,8 @@
         title: hiding ? 'Theme hidden' : 'Theme restored',
         description: `"${theme.name}" is now ${hiding ? 'hidden from' : 'visible in'} the workshop.`,
       });
+      void loadWorkshopTags();
       if (showModerationPanel) void loadModerationPanel();
-    } catch (err) {
-      sileo.error({
-        title: 'Could not update visibility',
-        description: err instanceof Error ? err.message : String(err),
-      });
     } finally {
       moderatingId = null;
     }
@@ -710,7 +947,7 @@
       tagEditorTarget = null;
       tagEditorTags = [];
       tagEditorInput = '';
-      await loadWorkshopThemes();
+      await loadWorkshopThemes({ page });
       void loadWorkshopTags();
     } catch (err) {
       tagEditorError = err instanceof Error ? err.message : String(err);
@@ -781,13 +1018,12 @@
     }
   }
 
-  async function handleDeleteTheme(theme: CommunityTheme) {
+  function requestDeleteTheme(theme: CommunityTheme) {
     if (theme.deletedAt || deletingId || forkingId || moderatingId) return;
-    const confirmed = window.confirm(
-      `Move "${theme.name}" to the trash?\n\nYou can restore it from the Trash view later. Installed copies stay on your computer.`
-    );
-    if (!confirmed) return;
+    openPendingAction({ kind: 'delete', theme });
+  }
 
+  async function applyDeleteTheme(theme: CommunityTheme) {
     deletingId = theme.id;
     try {
       await deleteCommunityTheme(theme.id);
@@ -797,11 +1033,9 @@
         title: 'Moved to trash',
         description: `"${theme.name}" can be restored from the Trash view.`,
       });
-    } catch (err) {
-      sileo.error({
-        title: 'Could not delete theme',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const nextPage = themes.length === 0 && page > 1 ? page - 1 : page;
+      await loadWorkshopThemes({ page: nextPage });
+      void loadWorkshopTags();
     } finally {
       deletingId = null;
     }
@@ -848,7 +1082,7 @@
         title: 'Theme restored',
         description: `"${theme.name}" is back in the workshop.`,
       });
-      void loadWorkshopThemes();
+      await loadWorkshopThemes({ page: themes.length === 0 && page > 1 ? page - 1 : page });
       void loadWorkshopTags();
     } catch (err) {
       trashActionError = err instanceof Error ? err.message : String(err);
@@ -872,7 +1106,7 @@
         title: 'Theme permanently deleted',
         description: `"${theme.name}" and its server files were removed.`,
       });
-      void loadWorkshopThemes();
+      await loadWorkshopThemes({ page: themes.length === 0 && page > 1 ? page - 1 : page });
       void loadWorkshopTags();
     } catch (err) {
       trashActionError = err instanceof Error ? err.message : String(err);
@@ -895,6 +1129,10 @@
     reportCategory = 'other';
     reportDetails = '';
     reportError = null;
+  }
+
+  function closeReportDialog() {
+    if (!reportSubmitting) reportTarget = null;
   }
 
   async function submitReport() {
@@ -944,31 +1182,54 @@
     };
   }
 
+  function errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+  }
+
   async function loadModerationPanel(page = moderationPage) {
     if (!canModerate) return;
+    const requestId = ++moderationRequestId;
     moderationLoading = true;
     moderationError = null;
-    try {
-      const [reportsResult, eventsResult, reviewResult] = await Promise.all([
-        fetchThemeReports({ ...currentReportFilters(), page, limit: 50 }),
-        fetchModerationEvents({ ...currentEventFilters(), page: 1, limit: 50 }),
-        fetchThemeReviewQueue('pending', 1, 50),
-      ]);
-      moderationReports = reportsResult.reports;
-      reviewQueue = reviewResult.items;
-      reviewTotal = reviewResult.total;
-      moderationTotal = reportsResult.total;
-      moderationPage = reportsResult.page;
-      moderationTotalPages = reportsResult.totalPages;
-      moderationEvents = eventsResult.events;
-      moderationEventsPage = eventsResult.page;
-      moderationEventsTotalPages = eventsResult.totalPages;
+
+    const [reportsResult, eventsResult, reviewResult] = await Promise.allSettled([
+      fetchThemeReports({ ...currentReportFilters(), page, limit: 50 }),
+      fetchModerationEvents({ ...currentEventFilters(), page: 1, limit: 50 }),
+      fetchThemeReviewQueue('pending', 1, 50),
+    ]);
+
+    if (requestId !== moderationRequestId) return;
+
+    const errors: string[] = [];
+    if (reportsResult.status === 'fulfilled') {
+      moderationReports = reportsResult.value.reports;
+      moderationTotal = reportsResult.value.total;
+      moderationPage = reportsResult.value.page;
+      moderationTotalPages = reportsResult.value.totalPages;
       selectedReportIds = [];
-    } catch (err) {
-      moderationError = err instanceof Error ? err.message : String(err);
-    } finally {
-      moderationLoading = false;
+    } else {
+      errors.push(`Reports: ${errorMessage(reportsResult.reason)}`);
     }
+
+    if (eventsResult.status === 'fulfilled') {
+      moderationEvents = eventsResult.value.events;
+      moderationEventsPage = eventsResult.value.page;
+      moderationEventsTotalPages = eventsResult.value.totalPages;
+    } else {
+      errors.push(`Activity: ${errorMessage(eventsResult.reason)}`);
+    }
+
+    if (reviewResult.status === 'fulfilled') {
+      reviewQueue = reviewResult.value.items;
+      reviewTotal = reviewResult.value.total;
+      reviewPage = reviewResult.value.page;
+      reviewTotalPages = reviewResult.value.totalPages;
+    } else {
+      errors.push(`Review queue: ${errorMessage(reviewResult.reason)}`);
+    }
+
+    moderationError = errors.length > 0 ? errors.join(' · ') : null;
+    if (requestId === moderationRequestId) moderationLoading = false;
   }
 
   function openModerationPanel() {
@@ -983,22 +1244,20 @@
     void loadModerationPanel(1);
   }
 
-  async function handleReviewTheme(theme: CommunityTheme, status: 'approved' | 'rejected') {
+  function requestReviewTheme(theme: CommunityTheme, status: 'approved' | 'rejected') {
     if (reviewActionId) return;
+    openPendingAction({ kind: status === 'approved' ? 'review-approve' : 'review-reject', theme });
+  }
 
-    let note: string | undefined;
-    if (status === 'rejected') {
-      const answer = window.prompt(
-        `Reject "${theme.name}"? Add an optional note for the creator:`,
-        ''
-      );
-      if (answer === null) return;
-      note = answer.trim() || undefined;
-    }
-
+  async function performThemeReview(
+    theme: CommunityTheme,
+    status: 'approved' | 'rejected',
+    note?: string
+  ) {
+    if (reviewActionId) return;
     reviewActionId = theme.id;
     try {
-      await reviewCommunityTheme(theme.id, status, note);
+      await reviewCommunityTheme(theme.id, status, note?.trim() || undefined);
       sileo.success({
         title: status === 'approved' ? 'Theme approved' : 'Theme rejected',
         description:
@@ -1007,12 +1266,7 @@
             : `"${theme.name}" stays hidden until the creator republishes it.`,
       });
       await loadModerationPanel(moderationPage);
-      void loadWorkshopThemes();
-    } catch (err) {
-      sileo.error({
-        title: 'Could not review theme',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      void loadWorkshopThemes({ page });
     } finally {
       reviewActionId = null;
     }
@@ -1031,13 +1285,16 @@
   }
 
   async function loadOlderEvents() {
-    if (moderationEventsPage >= moderationEventsTotalPages) return;
+    if (eventsLoadingMore || moderationEventsPage >= moderationEventsTotalPages) return;
+    const requestId = moderationRequestId;
+    eventsLoadingMore = true;
     try {
       const result = await fetchModerationEvents({
         ...currentEventFilters(),
         page: moderationEventsPage + 1,
         limit: 50,
       });
+      if (requestId !== moderationRequestId) return;
       const known = new Set(moderationEvents.map((event) => event.id));
       moderationEvents = [
         ...moderationEvents,
@@ -1046,7 +1303,28 @@
       moderationEventsPage = result.page;
       moderationEventsTotalPages = result.totalPages;
     } catch (err) {
-      moderationError = err instanceof Error ? err.message : String(err);
+      moderationError = errorMessage(err);
+    } finally {
+      eventsLoadingMore = false;
+    }
+  }
+
+  async function loadMoreReviews() {
+    if (reviewLoadingMore || reviewPage >= reviewTotalPages) return;
+    const requestId = moderationRequestId;
+    reviewLoadingMore = true;
+    try {
+      const result = await fetchThemeReviewQueue('pending', reviewPage + 1, 50);
+      if (requestId !== moderationRequestId) return;
+      const known = new Set(reviewQueue.map((theme) => theme.id));
+      reviewQueue = [...reviewQueue, ...result.items.filter((theme) => !known.has(theme.id))];
+      reviewTotal = result.total;
+      reviewPage = result.page;
+      reviewTotalPages = result.totalPages;
+    } catch (err) {
+      moderationError = errorMessage(err);
+    } finally {
+      reviewLoadingMore = false;
     }
   }
 
@@ -1102,7 +1380,10 @@
       });
       quarantineTarget = null;
       quarantineReason = '';
-      await loadWorkshopThemes();
+      await loadWorkshopThemes({ page });
+      if (themes.length === 0 && page > 1) {
+        await loadWorkshopThemes({ page: page - 1 });
+      }
       if (showModerationPanel) await loadModerationPanel(moderationPage);
     } catch (err) {
       quarantineError = err instanceof Error ? err.message : String(err);
@@ -1119,6 +1400,10 @@
     announcementMessage = '';
     announcementAudience = 'all';
     announcementError = null;
+  }
+
+  function closeAnnouncementComposer() {
+    if (!announcementSending) announcementOpen = false;
   }
 
   async function submitAnnouncement() {
@@ -1168,35 +1453,35 @@
     }
   }
 
-  async function handleBulkReports(action: 'hide' | 'resolved' | 'dismissed') {
+  function requestBulkReports(action: 'hide' | 'resolved' | 'dismissed') {
     if (selectedReportIds.length === 0 || bulkAction) return;
-    const note = window.prompt(
-      action === 'hide'
-        ? 'Optional note for the theme owners and reporters:'
-        : 'Optional note for the reporters:',
-      ''
-    );
-    if (note === null) return;
+    openPendingAction({
+      kind: 'bulk-reports',
+      action,
+      reportIds: [...selectedReportIds],
+    });
+  }
+
+  async function applyBulkReportAction(
+    action: 'hide' | 'resolved' | 'dismissed',
+    note?: string,
+    reportIds: number[] = selectedReportIds
+  ) {
+    if (reportIds.length === 0 || bulkAction) return;
 
     bulkAction = action;
     try {
-      const result = await bulkResolveThemeReports(
-        selectedReportIds,
-        action,
-        note.trim() || undefined
-      );
+      const result = await bulkResolveThemeReports(reportIds, action, note);
       sileo.success({
         title: 'Reports updated',
         description: `${result.updated} report(s) processed across ${result.themes} theme(s).`,
       });
       selectedReportIds = [];
       await loadModerationPanel(1);
-      await loadWorkshopThemes();
-    } catch (err) {
-      sileo.error({
-        title: 'Could not update reports',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      await loadWorkshopThemes({ page });
+      if (themes.length === 0 && page > 1) {
+        await loadWorkshopThemes({ page: page - 1 });
+      }
     } finally {
       bulkAction = null;
     }
@@ -1223,54 +1508,56 @@
     }
   }
 
-  async function handleReportHide(report: ThemeReport) {
+  function requestReportHide(report: ThemeReport) {
     if (reportActionId !== null) return;
-    const note = window.prompt(
-      `Hide "${report.themeName}"?\n\nOptional note for the reporter and audit log:`,
-      report.reason.slice(0, 255)
-    );
-    if (note === null) return;
+    openPendingAction({ kind: 'report-hide', report }, report.reason.slice(0, 500));
+  }
 
+  async function applyReportHide(report: ThemeReport, note?: string) {
+    if (reportActionId !== null) return;
     reportActionId = report.id;
     try {
-      await setCommunityThemeVisibility(report.themeId, true, note.trim() || report.reason);
+      await setCommunityThemeVisibility(
+        report.themeId,
+        true,
+        (note || report.reason).slice(0, 255)
+      );
       sileo.success({
         title: 'Theme hidden',
         description: `"${report.themeName}" was hidden and the report was resolved.`,
       });
-      await loadModerationPanel();
-      await loadWorkshopThemes();
-    } catch (err) {
-      sileo.error({
-        title: 'Could not hide theme',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      await loadModerationPanel(moderationPage);
+      await loadWorkshopThemes({ page });
+      if (themes.length === 0 && page > 1) {
+        await loadWorkshopThemes({ page: page - 1 });
+      }
     } finally {
       reportActionId = null;
     }
   }
 
-  async function handleDismissReport(report: ThemeReport) {
+  function requestReportDismiss(report: ThemeReport) {
     if (reportActionId !== null) return;
-    const note = window.prompt(
-      `Dismiss the report on "${report.themeName}"?\n\nOptional note for the reporter:`,
-      ''
-    );
-    if (note === null) return;
+    openPendingAction({ kind: 'report-dismiss', report });
+  }
 
+  async function applyReportDismiss(report: ThemeReport, note?: string) {
+    if (reportActionId !== null) return;
     reportActionId = report.id;
     try {
-      await resolveThemeReport(report.id, 'dismissed', note.trim() || undefined);
+      await resolveThemeReport(report.id, 'dismissed', note);
       sileo.success({ title: 'Report dismissed' });
-      await loadModerationPanel(1);
-    } catch (err) {
-      sileo.error({
-        title: 'Could not dismiss report',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      await loadModerationPanel(moderationPage);
     } finally {
       reportActionId = null;
     }
+  }
+
+  function closeHistoryDialog() {
+    historyOpen = false;
+    historyRequestId += 1;
+    historyLoading = false;
+    historyLoadingMore = false;
   }
 
   async function openThemeHistory(themeId: string, themeName: string) {
@@ -1283,36 +1570,50 @@
     historyTotalPages = 1;
     historyError = null;
     historyLoading = true;
+    historyLoadingMore = false;
+    const requestId = ++historyRequestId;
     try {
       const result = await fetchModerationEvents({ themeId, page: 1, limit: 50 });
+      if (requestId !== historyRequestId) return;
       historyEvents = result.events;
       historyPage = result.page;
       historyTotalPages = result.totalPages;
     } catch (err) {
-      historyError = err instanceof Error ? err.message : String(err);
+      if (requestId === historyRequestId) historyError = errorMessage(err);
     } finally {
-      historyLoading = false;
+      if (requestId === historyRequestId) historyLoading = false;
     }
   }
 
   async function loadOlderHistory() {
-    if (!historyTarget || historyPage >= historyTotalPages) return;
-    historyLoading = true;
+    if (!historyOpen || !historyTarget || historyLoadingMore || historyPage >= historyTotalPages)
+      return;
+
+    const requestId = historyRequestId;
+    historyLoadingMore = true;
     try {
       const result = await fetchModerationEvents({
         themeId: historyTarget.id,
         page: historyPage + 1,
         limit: 50,
       });
+      if (requestId !== historyRequestId) return;
       const known = new Set(historyEvents.map((event) => event.id));
       historyEvents = [...historyEvents, ...result.events.filter((event) => !known.has(event.id))];
       historyPage = result.page;
       historyTotalPages = result.totalPages;
     } catch (err) {
-      historyError = err instanceof Error ? err.message : String(err);
+      sileo.error({
+        title: 'Could not load older history',
+        description: errorMessage(err),
+      });
     } finally {
-      historyLoading = false;
+      if (requestId === historyRequestId) historyLoadingMore = false;
     }
+  }
+
+  function closeSourceDialog() {
+    sourceDialogOpen = false;
   }
 
   async function handleOpenForkSource(theme: CommunityTheme) {
@@ -1351,9 +1652,65 @@
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   }
 
+  function modalFocus(node: HTMLElement, onClose: () => void) {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const selector =
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = () =>
+      [...node.querySelectorAll<HTMLElement>(selector)].filter(
+        (element) => element.getClientRects().length > 0
+      );
+
+    node.setAttribute('tabindex', '-1');
+    const preferred = node.querySelector<HTMLElement>('[data-autofocus]');
+    const initial = preferred ?? focusable()[0] ?? node;
+    requestAnimationFrame(() => initial.focus());
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const elements = focusable();
+      if (elements.length === 0) {
+        event.preventDefault();
+        node.focus();
+        return;
+      }
+
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === node)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    node.addEventListener('keydown', handleKeydown);
+    return {
+      destroy() {
+        node.removeEventListener('keydown', handleKeydown);
+        if (previous?.isConnected) previous.focus();
+      },
+    };
+  }
+
   onMount(() => {
     void loadWorkshopThemes();
     void loadWorkshopTags();
+  });
+
+  onDestroy(() => {
+    clearTimeout(searchDebounceTimeout);
+    moderationRequestId += 1;
+    historyRequestId += 1;
   });
 </script>
 
@@ -1361,7 +1718,7 @@
   <div class="flex h-full flex-col overflow-hidden">
     <!-- Workshop Filter & Search Toolbar -->
     <div class="flex flex-col gap-2.5 pb-3">
-      <div class="flex items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <!-- Tag Chips / Trash label -->
         <div class="flex min-w-0 flex-wrap items-center gap-1">
           {#if selectedView === 'trash'}
@@ -1498,7 +1855,7 @@
         </div>
 
         <!-- Controls Right: Sort, Search, Moderation, Trash & Refresh -->
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <Select.Root
             type="single"
             value={selectedSort}
@@ -1598,6 +1955,23 @@
     <!-- Content Grid / Status -->
     <div class="min-h-0 flex-1 pt-1">
       <ScrollContainer class="pr-2">
+        {#if error && themes.length > 0}
+          <div
+            class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100"
+          >
+            <TriangleAlert class="size-3.5 shrink-0 text-amber-300" />
+            <span class="min-w-0 flex-1">Showing the last loaded results. {error}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-6 px-2 text-[10px] text-amber-100 hover:bg-amber-500/15 hover:text-white"
+              onclick={() => void loadWorkshopThemes({ page })}
+            >
+              Retry
+            </Button>
+          </div>
+        {/if}
+
         {#if loading && themes.length === 0}
           <div class="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
             <LoaderCircle class="size-6 animate-spin text-primary" />
@@ -1609,10 +1983,12 @@
               <Globe class="size-6" />
             </div>
             <div class="max-w-md">
-              <p class="text-sm font-semibold text-white">Workshop Offline or Unreachable</p>
+              <p class="text-sm font-semibold text-white">Workshop unavailable</p>
               <p class="mt-1 text-xs text-muted-foreground">
-                {error}. Ensure the themes microservice container is running.
+                Check your connection and try again. If this keeps happening, the workshop may be
+                under maintenance.
               </p>
+              <p class="mt-2 text-[10px] text-muted-foreground/70">{error}</p>
             </div>
             <Button
               variant="secondary"
@@ -1625,9 +2001,29 @@
             </Button>
           </div>
         {:else if themes.length === 0}
-          <div class="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <div
+            class="flex h-64 flex-col items-center justify-center gap-2 text-center text-muted-foreground"
+          >
             <Globe class="size-8 opacity-40" />
-            <p class="text-xs">No community themes found matching your search.</p>
+            <p class="max-w-sm text-xs">
+              {#if selectedView === 'trash'}
+                Your trash is empty. Themes you delete will appear here.
+              {:else if searchQuery.trim() || selectedTag !== 'all'}
+                No themes match these filters.
+              {:else}
+                No community themes have been published yet.
+              {/if}
+            </p>
+            {#if selectedView === 'workshop' && (searchQuery.trim() || selectedTag !== 'all')}
+              <Button
+                variant="secondary"
+                size="sm"
+                class="mt-1 text-xs"
+                onclick={clearWorkshopFilters}
+              >
+                Clear filters
+              </Button>
+            {/if}
           </div>
         {:else}
           <div class="grid grid-cols-3 gap-3 pb-4">
@@ -1674,7 +2070,7 @@
                   ></div>
 
                   <!-- Top Left: Trust Badge -->
-                  <div class="absolute top-2 left-2 flex items-center gap-1.5">
+                  <div class="absolute top-2 right-14 left-2 flex flex-wrap items-center gap-1.5">
                     {#if theme.apiVersion === '1.0' || theme.tags?.includes('legacy')}
                       <WorkshopTooltip content="Legacy v1 theme: video/audio playback">
                         {#snippet trigger(props)}
@@ -1875,15 +2271,24 @@
                           <Trash2 class="size-3" /> Deleted
                         </span>
                       {:else}
-                        <WorkshopTooltip content={theme.isLiked ? 'Unlike' : 'Like'}>
+                        <WorkshopTooltip
+                          content={!$currentUser
+                            ? 'Log in to like themes'
+                            : theme.isLiked
+                              ? 'Unlike'
+                              : 'Like'}
+                        >
                           {#snippet trigger(props)}
                             <button
                               {...props}
                               type="button"
-                              class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors {theme.isLiked
+                              class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors disabled:cursor-wait disabled:opacity-60 {theme.isLiked
                                 ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
                                 : 'bg-theme-800/40 text-muted-foreground hover:bg-theme-800/80 hover:text-white'}"
                               onclick={(e) => handleLike(theme, e)}
+                              disabled={likePending.has(theme.id)}
+                              aria-label={`${theme.isLiked ? 'Unlike' : 'Like'} ${theme.name}`}
+                              aria-pressed={theme.isLiked}
                             >
                               <Heart
                                 class="size-3 {theme.isLiked ? 'fill-rose-400 text-rose-400' : ''}"
@@ -1923,6 +2328,30 @@
                             #{tag}
                           </button>
                         {/each}
+                      </div>
+                    {/if}
+
+                    {#if owned && theme.reviewStatus !== 'approved'}
+                      <div
+                        class="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-[9px] leading-relaxed"
+                      >
+                        {#if theme.reviewStatus === 'pending'}
+                          <p class="text-amber-200/90">
+                            <LoaderCircle class="mr-1 inline size-3 align-[-2px]" />
+                            Awaiting staff review. Submitted
+                            {formatModerationDate(theme.createdAt)}.
+                          </p>
+                        {:else}
+                          <p class="text-red-200/90">
+                            <X class="mr-1 inline size-3 align-[-2px]" />
+                            Not approved{theme.reviewedAt
+                              ? ` · ${formatModerationDate(theme.reviewedAt)}`
+                              : ''}.
+                          </p>
+                          {#if theme.reviewNote}
+                            <p class="mt-0.5 text-muted-foreground">{theme.reviewNote}</p>
+                          {/if}
+                        {/if}
                       </div>
                     {/if}
 
@@ -2174,7 +2603,7 @@
                                 {#if !isLegacy}
                                   <DropdownMenu.Item
                                     class="gap-2 text-[11px]"
-                                    onclick={() => handleToggleVisibility(theme)}
+                                    onclick={() => requestVisibilityChange(theme)}
                                   >
                                     {#if theme.isHidden}
                                       <Eye class="size-3.5" />
@@ -2211,7 +2640,7 @@
                                 <DropdownMenu.Separator class="my-1 bg-theme-800" />
                                 <DropdownMenu.Item
                                   class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
-                                  onclick={() => handleDeleteTheme(theme)}
+                                  onclick={() => requestDeleteTheme(theme)}
                                 >
                                   <Trash2 class="size-3.5" />
                                   Move to trash
@@ -2445,7 +2874,7 @@
                 variant="ghost"
                 size="sm"
                 class="h-7 text-[11px] text-amber-100 hover:text-white"
-                onclick={() => void handleBulkReports('dismissed')}
+                onclick={() => requestBulkReports('dismissed')}
                 disabled={bulkAction !== null}
               >
                 {#if bulkAction === 'dismissed'}
@@ -2457,7 +2886,7 @@
                 variant="secondary"
                 size="sm"
                 class="h-7 text-[11px]"
-                onclick={() => void handleBulkReports('hide')}
+                onclick={() => requestBulkReports('hide')}
                 disabled={bulkAction !== null}
               >
                 {#if bulkAction === 'hide'}
@@ -2499,28 +2928,51 @@
               <div class="mt-2 space-y-2">
                 {#each reviewQueue as theme (theme.id)}
                   <div
-                    class="flex items-start justify-between gap-3 rounded-lg border border-theme-800/70 bg-theme-900/30 p-3"
+                    class="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-theme-800/70 bg-theme-900/30 p-3"
                   >
-                    <div class="min-w-0">
-                      <p class="truncate text-xs font-semibold text-white">{theme.name}</p>
-                      <p class="mt-0.5 text-[10px] text-muted-foreground">
-                        by {theme.author.name} · v{theme.version} ·
-                        {formatModerationDate(theme.createdAt)}
-                      </p>
-                      {#if theme.description}
-                        <p
-                          class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground"
-                        >
-                          {theme.description}
+                    <div class="flex min-w-0 flex-1 items-start gap-2.5">
+                      <img
+                        src={theme.previewUrl}
+                        alt=""
+                        class="h-14 w-24 shrink-0 rounded-md border border-theme-800 object-cover"
+                        onerror={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
+                        }}
+                      />
+                      <div class="min-w-0">
+                        <p class="truncate text-xs font-semibold text-white">{theme.name}</p>
+                        <p class="mt-0.5 text-[10px] text-muted-foreground">
+                          by {theme.author.name} · v{theme.version} · {formatBytes(theme.fileSize)}
                         </p>
-                      {/if}
+                        <p class="mt-0.5 text-[10px] text-muted-foreground">
+                          Submitted {formatModerationDate(theme.createdAt)}
+                        </p>
+                        {#if theme.description}
+                          <p
+                            class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground"
+                          >
+                            {theme.description}
+                          </p>
+                        {/if}
+                        {#if theme.tags.length > 0}
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            {#each theme.tags.slice(0, 5) as tag (tag)}
+                              <span
+                                class="rounded bg-theme-800/60 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                              >
+                                #{tag}
+                              </span>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
                     </div>
                     <div class="flex shrink-0 items-center gap-1.5">
                       <Button
                         size="sm"
                         class="h-7 gap-1 text-xs"
-                        onclick={() => void handleReviewTheme(theme, 'approved')}
-                        disabled={reviewActionId === theme.id}
+                        onclick={() => requestReviewTheme(theme, 'approved')}
+                        disabled={reviewActionId !== null}
                       >
                         {#if reviewActionId === theme.id}
                           <LoaderCircle class="size-3 animate-spin" />
@@ -2533,16 +2985,37 @@
                         variant="ghost"
                         size="sm"
                         class="h-7 gap-1 text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"
-                        onclick={() => void handleReviewTheme(theme, 'rejected')}
-                        disabled={reviewActionId === theme.id}
+                        onclick={() => requestReviewTheme(theme, 'rejected')}
+                        disabled={reviewActionId !== null}
                       >
-                        <X class="size-3" />
+                        {#if reviewActionId === theme.id}
+                          <LoaderCircle class="size-3 animate-spin" />
+                        {:else}
+                          <X class="size-3" />
+                        {/if}
                         Reject
                       </Button>
                     </div>
                   </div>
                 {/each}
               </div>
+              {#if reviewPage < reviewTotalPages}
+                <div class="mt-2 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="h-7 text-[10px] text-muted-foreground hover:text-white"
+                    onclick={() => void loadMoreReviews()}
+                    disabled={reviewLoadingMore}
+                  >
+                    {#if reviewLoadingMore}
+                      <LoaderCircle class="mr-1 size-3 animate-spin" /> Loading...
+                    {:else}
+                      Load more reviews ({reviewQueue.length} of {reviewTotal})
+                    {/if}
+                  </Button>
+                </div>
+              {/if}
             {/if}
           </section>
 
@@ -2659,7 +3132,7 @@
                               variant="ghost"
                               size="sm"
                               class="h-7 text-xs"
-                              onclick={() => handleDismissReport(report)}
+                              onclick={() => requestReportDismiss(report)}
                               disabled={reportActionId !== null}
                             >
                               Dismiss
@@ -2668,7 +3141,7 @@
                               variant="secondary"
                               size="sm"
                               class="h-7 gap-1 text-xs"
-                              onclick={() => handleReportHide(report)}
+                              onclick={() => requestReportHide(report)}
                               disabled={reportActionId !== null || report.themeDeleted}
                             >
                               {#if reportActionId === report.id}
@@ -2820,9 +3293,13 @@
                     size="sm"
                     class="h-7 text-[10px] text-muted-foreground hover:text-white"
                     onclick={() => void loadOlderEvents()}
-                    disabled={moderationLoading}
+                    disabled={moderationLoading || eventsLoadingMore}
                   >
-                    Load older activity
+                    {#if eventsLoadingMore}
+                      <LoaderCircle class="mr-1 size-3 animate-spin" /> Loading...
+                    {:else}
+                      Load older activity
+                    {/if}
                   </Button>
                 </div>
               {/if}
@@ -2839,15 +3316,14 @@
         type="button"
         class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
         aria-label="Close announcement composer"
-        onclick={() => {
-          if (!announcementSending) announcementOpen = false;
-        }}
+        onclick={closeAnnouncementComposer}
       ></button>
       <div
         class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="announcement-title"
+        use:modalFocus={closeAnnouncementComposer}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div>
@@ -2868,9 +3344,7 @@
                 variant="ghost"
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-white"
-                onclick={() => {
-                  if (!announcementSending) announcementOpen = false;
-                }}
+                onclick={closeAnnouncementComposer}
               >
                 <X class="size-4" />
               </Button>
@@ -2887,6 +3361,7 @@
               maxlength={120}
               placeholder="Workshop maintenance tonight"
               bind:value={announcementTitle}
+              data-autofocus
             />
           </label>
           <label class="block space-y-1.5">
@@ -2941,7 +3416,7 @@
             variant="ghost"
             size="sm"
             class="h-8 text-xs"
-            onclick={() => (announcementOpen = false)}
+            onclick={closeAnnouncementComposer}
             disabled={announcementSending}
           >
             Cancel
@@ -2969,13 +3444,14 @@
         type="button"
         class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
         aria-label="Close fork origin"
-        onclick={() => (sourceDialogOpen = false)}
+        onclick={closeSourceDialog}
       ></button>
       <div
         class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="fork-source-title"
+        use:modalFocus={closeSourceDialog}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div>
@@ -2994,7 +3470,7 @@
                 variant="ghost"
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-white"
-                onclick={() => (sourceDialogOpen = false)}
+                onclick={closeSourceDialog}
               >
                 <X class="size-4" />
               </Button>
@@ -3071,6 +3547,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="theme-tags-title"
+        use:modalFocus={closeTagEditor}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div class="min-w-0">
@@ -3105,6 +3582,7 @@
               placeholder="anime, dark, minimal"
               maxlength={24}
               disabled={tagSaving}
+              data-autofocus
               oninput={() => (tagEditorError = null)}
               onkeydown={(event) => {
                 if (event.key === 'Enter' || event.key === ',') {
@@ -3205,6 +3683,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="quarantine-theme-title"
+        use:modalFocus={closeQuarantineDialog}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div>
@@ -3252,6 +3731,7 @@
               bind:value={quarantineReason}
               disabled={Boolean(quarantineId)}
               oninput={() => (quarantineError = null)}
+              data-autofocus
             ></textarea>
             <span class="block text-right text-[9px] text-muted-foreground">
               {quarantineReason.trim().length}/500
@@ -3301,15 +3781,14 @@
         type="button"
         class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
         aria-label="Close report form"
-        onclick={() => {
-          if (!reportSubmitting) reportTarget = null;
-        }}
+        onclick={closeReportDialog}
       ></button>
       <div
         class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="report-theme-title"
+        use:modalFocus={closeReportDialog}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div>
@@ -3331,9 +3810,7 @@
                 variant="ghost"
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-white"
-                onclick={() => {
-                  if (!reportSubmitting) reportTarget = null;
-                }}
+                onclick={closeReportDialog}
               >
                 <X class="size-4" />
               </Button>
@@ -3377,6 +3854,7 @@
               maxlength="500"
               placeholder="Describe what is wrong (at least 10 characters)..."
               bind:value={reportDetails}
+              data-autofocus
             ></textarea>
             <span class="block text-right text-[9px] text-muted-foreground">
               {reportDetails.trim().length}/500 · minimum 10
@@ -3395,7 +3873,7 @@
             variant="ghost"
             size="sm"
             class="h-8 text-xs"
-            onclick={() => (reportTarget = null)}
+            onclick={closeReportDialog}
             disabled={reportSubmitting}
           >
             Cancel
@@ -3423,13 +3901,14 @@
         type="button"
         class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
         aria-label="Close moderation history"
-        onclick={() => (historyOpen = false)}
+        onclick={closeHistoryDialog}
       ></button>
       <div
         class="relative flex max-h-[80vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="theme-history-title"
+        use:modalFocus={closeHistoryDialog}
       >
         <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
           <div>
@@ -3448,7 +3927,7 @@
                 variant="ghost"
                 size="icon"
                 class="size-7 text-muted-foreground hover:text-white"
-                onclick={() => (historyOpen = false)}
+                onclick={closeHistoryDialog}
               >
                 <X class="size-4" />
               </Button>
@@ -3456,7 +3935,7 @@
           </WorkshopTooltip>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto p-4">
-          {#if historyLoading}
+          {#if historyLoading && historyEvents.length === 0}
             <div class="flex h-32 items-center justify-center gap-2 text-xs text-muted-foreground">
               <LoaderCircle class="size-4 animate-spin text-primary" /> Loading history...
             </div>
@@ -3499,9 +3978,13 @@
                   size="sm"
                   class="h-7 text-[10px] text-muted-foreground hover:text-white"
                   onclick={() => void loadOlderHistory()}
-                  disabled={historyLoading}
+                  disabled={historyLoadingMore}
                 >
-                  Load older history
+                  {#if historyLoadingMore}
+                    <LoaderCircle class="mr-1 size-3 animate-spin" /> Loading...
+                  {:else}
+                    Load older history
+                  {/if}
                 </Button>
               </div>
             {/if}
@@ -3510,6 +3993,109 @@
       </div>
     </div>
   {/if}
+  <Dialog.Root
+    open={pendingAction !== null}
+    onOpenChange={(open) => {
+      if (!open) closePendingAction();
+    }}
+  >
+    <Dialog.Content
+      bind:ref={actionDialogContent}
+      class="flex w-[calc(100%_-_2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-xl border-theme-800 bg-theme-950 p-0 text-white shadow-2xl sm:rounded-xl"
+      onOpenAutoFocus={(event) => {
+        event.preventDefault();
+        requestAnimationFrame(() =>
+          actionDialogContent?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+        );
+      }}
+      onInteractOutside={(event) => {
+        if (actionBusy) event.preventDefault();
+      }}
+      onEscapeKeydown={(event) => {
+        if (actionBusy) event.preventDefault();
+      }}
+    >
+      {#if actionDialog}
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div class="min-w-0">
+            <Dialog.Title class="text-sm font-semibold text-white">
+              {actionDialog.title}
+            </Dialog.Title>
+            <Dialog.Description class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {actionDialog.description}
+            </Dialog.Description>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 shrink-0 text-muted-foreground hover:text-white"
+            onclick={closePendingAction}
+            disabled={actionBusy}
+            aria-label="Close confirmation"
+          >
+            <X class="size-4" />
+          </Button>
+        </div>
+
+        <div class="space-y-3 p-4">
+          {#if actionDialog.note}
+            <label class="block space-y-1.5">
+              <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">
+                {actionDialog.note.label}
+              </span>
+              <textarea
+                class="min-h-24 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50 disabled:opacity-60"
+                rows="4"
+                maxlength={actionDialog.note.maxLength}
+                placeholder={actionDialog.note.placeholder}
+                bind:value={actionNote}
+                disabled={actionBusy}
+                data-autofocus
+              ></textarea>
+              <span class="block text-right text-[9px] text-muted-foreground">
+                {actionNote.length}/{actionDialog.note.maxLength}
+              </span>
+            </label>
+          {/if}
+
+          {#if actionError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+            >
+              {actionError}
+            </p>
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 text-xs"
+            onclick={closePendingAction}
+            disabled={actionBusy}
+            data-autofocus
+          >
+            Cancel
+          </Button>
+          <Button
+            variant={actionDialog.destructive ? 'destructive' : 'default'}
+            size="sm"
+            class="h-8 gap-1 text-xs"
+            onclick={() => void confirmPendingAction()}
+            disabled={actionBusy}
+          >
+            {#if actionBusy}
+              <LoaderCircle class="size-3 animate-spin" /> Working...
+            {:else}
+              {actionDialog.confirmLabel}
+            {/if}
+          </Button>
+        </div>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
+
   <AlertDialog.Root
     open={restoreTarget !== null}
     onOpenChange={(open) => {
