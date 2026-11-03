@@ -3088,7 +3088,18 @@ fn add_theme_folder_to_zip(
         }
 
         let entry_path = entry.path();
+        let relative = entry_path
+            .strip_prefix(root)
+            .map_err(|e| format!("Failed to build archive path: {e}"))?
+            .to_string_lossy()
+            .replace('\\', "/");
+
         if file_type.is_dir() {
+            // API 2.0 packages are limited to theme.json and assets/. Do not
+            // copy README files, editor artifacts, or any other root folder.
+            if asset_filter.is_some() && directory == root && relative != "assets" {
+                continue;
+            }
             add_theme_folder_to_zip(zip, root, &entry_path, asset_filter, options)?;
             continue;
         }
@@ -3096,19 +3107,18 @@ fn add_theme_folder_to_zip(
             continue;
         }
 
-        if let Some(filter) = asset_filter
-            && let Ok(asset_path) = entry_path.strip_prefix(&assets_root) {
-                let key = asset_path.to_string_lossy().replace('\\', "/");
-                if !filter.contains(&key) {
-                    continue;
-                }
-            }
+        if asset_filter.is_some() && directory == root && relative != "theme.json" {
+            continue;
+        }
 
-        let relative = entry_path
-            .strip_prefix(root)
-            .map_err(|e| format!("Failed to build archive path: {e}"))?
-            .to_string_lossy()
-            .replace('\\', "/");
+        if let Some(filter) = asset_filter
+            && let Ok(asset_path) = entry_path.strip_prefix(&assets_root)
+        {
+            let key = asset_path.to_string_lossy().replace('\\', "/");
+            if !filter.contains(&key) {
+                continue;
+            }
+        }
 
         zip.start_file(relative, options)
             .map_err(|e| format!("Failed to add a file to the theme archive: {e}"))?;

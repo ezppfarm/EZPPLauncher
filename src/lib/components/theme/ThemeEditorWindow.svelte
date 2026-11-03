@@ -72,6 +72,7 @@
     createThemeV2Behavior,
     createThemeV2Element,
     normalizeChrome,
+    normalizeThemeTags,
     normalizeThemeV2,
     themeAssetName,
     themeHasLaunchButton,
@@ -3333,11 +3334,8 @@
 
   let publishModalOpen = $state(false);
   let publishThemeId = $state('');
-  let publishName = $state('');
-  let publishDescription = $state('');
-  let publishVersion = $state('1.0.0');
-  let publishTags = $state('anime, video');
   let publishing = $state(false);
+  let tagInput = $state('');
   let publishStatusMessage = $state('');
   let publishProgress = $state(0);
 
@@ -3367,13 +3365,35 @@
     }
 
     publishThemeId = savedFolder || toSafeName(definition.name);
-    publishName = definition.name || 'My Theme';
-    publishDescription = definition.description || '';
-    publishVersion = definition.version || '1.0.0';
-    publishTags = 'workshop, v2';
     publishProgress = 0;
     publishStatusMessage = '';
     publishModalOpen = true;
+  }
+
+  function addThemeTag() {
+    const value = tagInput.trim().toLowerCase();
+    if (!value) return;
+
+    const current = definition.tags ?? [];
+    if (current.length >= 10) {
+      notifyError('A theme may have at most 10 tags.');
+      return;
+    }
+
+    const tags = normalizeThemeTags([...current, value]);
+    if (!tags.includes(value)) {
+      notifyError(
+        'Tags may contain lowercase letters, numbers, dashes and underscores (max 24 characters).'
+      );
+      return;
+    }
+
+    definition.tags = tags;
+    tagInput = '';
+  }
+
+  function removeThemeTag(tag: string) {
+    definition.tags = (definition.tags ?? []).filter((candidate) => candidate !== tag);
   }
 
   async function handlePublishToWorkshop() {
@@ -3390,18 +3410,16 @@
     try {
       const baseThemesDir = await themesDirectory();
       const themeFolder = await path.join(baseThemesDir, savedFolder);
+      const themeId = savedFolder || toSafeName(definition.name);
 
       await publishThemeToWorkshop({
         themeFolder,
-        themeId: publishThemeId,
-        name: publishName,
-        description: publishDescription,
-        version: publishVersion,
+        themeId,
+        name: definition.name,
+        description: definition.description || '',
+        version: definition.version || '1.0.0',
         apiVersion: definition.apiVersion || '2.0.0',
-        tags: publishTags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
+        tags: definition.tags ?? [],
         onProgress: (msg, pct) => {
           publishStatusMessage = msg;
           publishProgress = pct;
@@ -3410,7 +3428,7 @@
 
       sileo.success({
         title: 'Published to Workshop!',
-        description: `"${publishName}" is now live in the Community Themes Workshop.`,
+        description: `"${definition.name}" is now live in the Community Themes Workshop.`,
       });
 
       publishModalOpen = false;
@@ -4962,6 +4980,63 @@
                 bind:value={definition.description}
                 class="min-h-16 resize-y border-theme-800 bg-theme-950 text-xs text-theme-50"
               />
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <Label for="theme-tags" class={labelClass}>Tags</Label>
+                <span class="text-[9px] tabular-nums text-muted-foreground">
+                  {(definition.tags ?? []).length}/10
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <Input
+                  id="theme-tags"
+                  bind:value={tagInput}
+                  class={fieldClass}
+                  placeholder="anime, dark, minimal"
+                  maxlength={24}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter' || event.key === ',') {
+                      event.preventDefault();
+                      addThemeTag();
+                    }
+                  }}
+                  onblur={addThemeTag}
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  class="h-9 shrink-0 gap-1 px-2.5"
+                  onclick={addThemeTag}
+                  disabled={!tagInput.trim()}
+                >
+                  <Plus class="size-3.5" />
+                  Add
+                </Button>
+              </div>
+              {#if (definition.tags ?? []).length > 0}
+                <div class="flex flex-wrap gap-1.5 pt-1">
+                  {#each definition.tags ?? [] as tag (tag)}
+                    <span
+                      class="inline-flex items-center gap-1 rounded-full border border-theme-700 bg-theme-900 px-2 py-1 text-[10px] text-theme-100"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        class="rounded-full text-muted-foreground transition-colors hover:text-white"
+                        aria-label={`Remove ${tag} tag`}
+                        onclick={() => removeThemeTag(tag)}
+                      >
+                        <X class="size-3" />
+                      </button>
+                    </span>
+                  {/each}
+                </div>
+              {:else}
+                <p class="text-[10px] text-muted-foreground/70">
+                  Add tags to help people discover this theme.
+                </p>
+              {/if}
             </div>
             <div
               class="flex items-start justify-between gap-3 rounded-md border border-theme-800 bg-theme-950 px-3 py-2.5"
@@ -6805,58 +6880,52 @@
           </div>
         {/if}
 
-        <div class="mt-4 flex flex-col gap-3">
-          <div>
-            <Label class="text-[11px] text-muted-foreground">Workshop Identifier (Slug)</Label>
-            <Input
-              class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs font-mono"
-              bind:value={publishThemeId}
-              placeholder="e.g. lucoa-theme"
-              disabled={publishing}
-            />
+        <div class="mt-4 space-y-3 rounded-xl border border-theme-800/70 bg-theme-900/25 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-semibold text-white">
+                {definition.name || 'Untitled theme'}
+              </p>
+              <p class="mt-0.5 text-[10px] text-muted-foreground">
+                by {definition.author || 'Unknown'} · v{definition.version || '1.0.0'}
+              </p>
+            </div>
+            <span
+              class="shrink-0 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] text-cyan-300"
+            >
+              API {definition.apiVersion || '2.0.0'}
+            </span>
           </div>
-
-          <div class="grid grid-cols-3 gap-2">
-            <div class="col-span-2">
-              <Label class="text-[11px] text-muted-foreground">Theme Name</Label>
-              <Input
-                class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs"
-                bind:value={publishName}
-                placeholder="My Awesome Theme"
-                disabled={publishing}
-              />
+          <p class="text-xs leading-relaxed text-muted-foreground">
+            {definition.description?.trim() || 'No description yet.'}
+          </p>
+          <div class="grid grid-cols-2 gap-3 border-t border-theme-800/60 pt-3">
+            <div class="min-w-0">
+              <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Workshop ID
+              </span>
+              <p class="mt-1 truncate font-mono text-[11px] text-theme-100">{publishThemeId}</p>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground">Version</Label>
-              <Input
-                class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs font-mono"
-                bind:value={publishVersion}
-                placeholder="1.0.0"
-                disabled={publishing}
-              />
+              <span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Tags
+              </span>
+              {#if (definition.tags ?? []).length > 0}
+                <div class="mt-1 flex flex-wrap gap-1">
+                  {#each definition.tags ?? [] as tag}
+                    <span class="rounded bg-theme-800 px-1.5 py-0.5 text-[10px] text-theme-100">
+                      {tag}
+                    </span>
+                  {/each}
+                </div>
+              {:else}
+                <p class="mt-1 text-[10px] text-muted-foreground">No tags</p>
+              {/if}
             </div>
           </div>
-
-          <div>
-            <Label class="text-[11px] text-muted-foreground">Description</Label>
-            <Textarea
-              class="mt-1 border-theme-800 bg-theme-900/50 text-xs leading-relaxed"
-              rows={2}
-              bind:value={publishDescription}
-              placeholder="Tell others about your theme..."
-              disabled={publishing}
-            />
-          </div>
-
-          <div>
-            <Label class="text-[11px] text-muted-foreground">Tags (comma-separated)</Label>
-            <Input
-              class="mt-1 h-8 border-theme-800 bg-theme-900/50 text-xs"
-              bind:value={publishTags}
-              placeholder="anime, video, clean"
-              disabled={publishing}
-            />
-          </div>
+          <p class="text-[10px] leading-relaxed text-muted-foreground/70">
+            These details come from the Theme tab. Change them there before publishing.
+          </p>
         </div>
 
         {#if publishing}
@@ -6890,7 +6959,7 @@
             size="sm"
             class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium gap-1.5"
             onclick={handlePublishToWorkshop}
-            disabled={publishing || publishThemeId.trim().length < 2 || publishName.trim().length === 0}
+            disabled={publishing || publishThemeId.trim().length < 2 || definition.name.trim().length === 0}
           >
             {#if publishing}
               <LoaderCircle class="size-3.5 animate-spin" />

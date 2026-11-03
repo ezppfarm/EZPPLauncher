@@ -32,6 +32,7 @@
   import { isThemeTrusted } from '$lib/themeTrust';
   import type { Theme } from '$lib/themes';
   import { Button } from '$lib/components/ui/button';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Input } from '$lib/components/ui/input';
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
@@ -46,7 +47,9 @@
     ChevronDown,
     Code2,
     CopyPlus,
+    Crown,
     Download,
+    Ellipsis,
     ExternalLink,
     Eye,
     EyeOff,
@@ -1255,6 +1258,13 @@
             {@const isDeleted = Boolean(theme.deletedAt)}
             {@const hasUpdate = Boolean(!isDeleted && localTheme && localTheme.version !== theme.version)}
             {@const owned = isOwnedByCurrentUser(theme)}
+            {@const isLegacy =
+              theme.apiVersion === '1.0' || Boolean(theme.tags?.includes('legacy'))}
+            {@const showOverflowMenu =
+              !isDeleted &&
+              (owned ||
+                canModerate ||
+                Boolean($currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined))}
 
             <div
               class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
@@ -1289,20 +1299,7 @@
                         </span>
                       {/snippet}
                     </WorkshopTooltip>
-                  {:else if !theme.hasExecutableCode}
-                    <WorkshopTooltip content="Sandboxed Declarative Theme: pure styles, no executable JS code">
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-950/80 px-1.5 py-0.5 text-[9px] font-medium text-emerald-300 backdrop-blur-sm"
-                        >
-                          <ShieldCheck class="size-3" />
-                          Declarative
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {:else}
+                  {:else if theme.hasExecutableCode}
                     <WorkshopTooltip content="Contains custom Svelte 5 executable logic">
                       {#snippet trigger(props)}
                         <span
@@ -1389,13 +1386,39 @@
                     <span class="truncate text-[11px] font-semibold text-white/95 drop-shadow-sm">
                       {theme.author.name}
                     </span>
-                    {#if theme.author.donor}
+                    {#if theme.author.role === 'owner'}
+                      <WorkshopTooltip content="EZPPFarm owner">
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-0.5 rounded-full border border-rose-500/30 bg-rose-500/20 px-1 py-0.5 text-[8px] font-bold text-rose-200"
+                          >
+                            <Crown class="size-2.5 fill-rose-300" />
+                            Owner
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {:else if theme.author.role === 'moderator'}
+                      <WorkshopTooltip content="Community Workshop moderator">
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1 py-0.5 text-[8px] font-bold text-cyan-200"
+                          >
+                            <ShieldCheck class="size-2.5" />
+                            Moderator
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {:else if theme.author.role === 'supporter' || (!theme.author.role && theme.author.donor)}
                       <WorkshopTooltip content="EZPPFarm Supporter">
                         {#snippet trigger(props)}
                           <span
                             {...props}
                             tabindex="-1"
-                            class="flex items-center gap-0.5 rounded-full bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300 border border-amber-500/30"
+                            class="flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300"
                           >
                             <Sparkles class="size-2.5 fill-amber-300" />
                             Supporter
@@ -1456,28 +1479,6 @@
                         </span>
                       {/each}
                     </div>
-                  {/if}
-
-                  {#if owned && !isDeleted}
-                    <WorkshopTooltip content="Edit this theme's tags">
-                      {#snippet trigger(props)}
-                        <button
-                          {...props}
-                          type="button"
-                          class="mt-2 flex items-center gap-1 text-[9px] text-muted-foreground transition-colors hover:text-cyan-200"
-                          onclick={() => void handleEditTags(theme)}
-                          disabled={tagEditingId === theme.id}
-                        >
-                          {#if tagEditingId === theme.id}
-                            <LoaderCircle class="size-3 animate-spin" />
-                            Saving tags...
-                          {:else}
-                            <Tag class="size-3" />
-                            {theme.tags.length > 0 ? 'Edit tags' : 'Add tags'}
-                          {/if}
-                        </button>
-                      {/snippet}
-                    </WorkshopTooltip>
                   {/if}
 
                   {#if theme.searchMatch}
@@ -1550,35 +1551,32 @@
                       {/snippet}
                     </WorkshopTooltip>
                   {/if}
-
-                  {#if canModerate}
-                    <WorkshopTooltip content="View this theme's moderation history">
-                      {#snippet trigger(props)}
-                        <button
-                          {...props}
-                          type="button"
-                          class="mt-2 flex items-center gap-1 text-[9px] text-muted-foreground transition-colors hover:text-cyan-200"
-                          onclick={() => void openThemeHistory(theme.id, theme.name)}
-                        >
-                          <History class="size-3" />
-                          Moderation history
-                        </button>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
                 </div>
 
                 <!-- Footer Action Row -->
-                <div class="mt-2 flex items-center justify-between border-t border-theme-800/40 pt-2.5">
-                  <div class="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <Download class="size-3" />
-                    <span class="tabular-nums">{theme.downloadCount}</span>
+                <div
+                  class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-theme-800/40 pt-2.5"
+                >
+                  <div class="flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
+                    <span class="inline-flex items-center gap-1">
+                      <Download class="size-3" />
+                      <span class="tabular-nums">{theme.downloadCount}</span>
+                    </span>
+                    {#if isInstalled && !isActive}
+                      <span
+                        class="rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                      >
+                        Installed
+                      </span>
+                    {/if}
                   </div>
 
-                  <div class="flex items-center gap-1">
+                  <div class="flex shrink-0 items-center gap-1">
                     {#if isDownloading}
                       <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-primary tabular-nums">{downloadProgress}%</span>
+                        <span class="text-[10px] text-primary tabular-nums"
+                          >{downloadProgress}%</span
+                        >
                         <div class="h-1.5 w-16 overflow-hidden rounded-full bg-theme-800">
                           <div
                             class="h-full bg-primary transition-all duration-200"
@@ -1598,8 +1596,8 @@
                       <span class="flex items-center gap-1 text-[10px] text-amber-300">
                         <LoaderCircle class="size-3 animate-spin" /> Updating
                       </span>
-                    {:else if owned}
-                      {#if isDeleted}
+                    {:else if isDeleted}
+                      {#if owned}
                         <Button
                           variant="secondary"
                           size="sm"
@@ -1616,63 +1614,15 @@
                           {/if}
                         </Button>
                       {:else}
-                        {#if canModerate && theme.apiVersion !== '1.0' && !theme.tags?.includes('legacy')}
-                          <WorkshopTooltip content={theme.isHidden ? 'Restore theme to the workshop' : 'Hide theme from the workshop'}>
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-amber-300"
-                                onclick={() => handleToggleVisibility(theme)}
-                              >
-                                {#if theme.isHidden}
-                                  <Eye class="size-3.5" />
-                                {:else}
-                                  <EyeOff class="size-3.5" />
-                                {/if}
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if canModerate}
-                          <WorkshopTooltip content={theme.isQuarantined ? 'Lift takedown' : 'Take down theme'}>
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-red-300"
-                                onclick={() => handleToggleQuarantine(theme)}
-                                disabled={quarantineId === theme.id}
-                              >
-                                {#if quarantineId === theme.id}
-                                  <LoaderCircle class="size-3.5 animate-spin" />
-                                {:else}
-                                  <Ban class="size-3.5" />
-                                {/if}
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if isInstalled && hasUpdate}
-                          <WorkshopTooltip
-                            content={`Replace local v${localTheme?.version} with workshop v${theme.version}`}
-                          >
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="secondary"
-                                size="sm"
-                                class="h-7 gap-1 text-xs"
-                                onclick={() => handleRefreshOwnedTheme(theme)}
-                              >
-                                <RefreshCw class="size-3" />
-                                Refresh
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
+                        <Badge
+                          variant="outline"
+                          class="border-red-500/40 bg-red-950/20 text-red-300 text-[10px]"
+                        >
+                          <Trash2 class="mr-1 size-3" /> Deleted
+                        </Badge>
+                      {/if}
+                    {:else}
+                      {#if owned && !isLegacy && isInstalled}
                         <Button
                           size="sm"
                           class="h-7 gap-1 text-xs"
@@ -1681,131 +1631,153 @@
                           <Pencil class="size-3" />
                           Edit
                         </Button>
-                        <WorkshopTooltip content="Move theme to trash">
-                          {#snippet trigger(props)}
-                            <Button
-                              {...props}
-                              variant="ghost"
-                              size="icon"
-                              class="size-7 text-muted-foreground hover:text-red-400"
-                              onclick={() => handleDeleteTheme(theme)}
-                            >
-                              <Trash2 class="size-3.5" />
-                            </Button>
-                          {/snippet}
-                        </WorkshopTooltip>
-                      {/if}
-                    {:else}
-                      {#if isDeleted}
-                        <Badge variant="outline" class="border-red-500/40 bg-red-950/20 text-red-300 text-[10px]">
-                          <Trash2 class="mr-1 size-3" /> Deleted
+                      {:else if isActive}
+                        <Badge
+                          variant="outline"
+                          class="border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-[10px]"
+                        >
+                          <Check class="mr-1 size-3" /> In use
                         </Badge>
+                      {:else if isInstalled && hasUpdate}
+                        <Button
+                          size="sm"
+                          class="h-7 gap-1 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                          onclick={() => handleDownloadAndApply(theme)}
+                        >
+                          <Download class="size-3" />
+                          Update
+                        </Button>
+                      {:else if isInstalled}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          class="h-7 text-xs"
+                          onclick={() => handleApplyExisting(theme)}
+                        >
+                          Apply
+                        </Button>
                       {:else}
-                        {#if canModerate && theme.apiVersion !== '1.0' && !theme.tags?.includes('legacy')}
-                          <WorkshopTooltip content={theme.isHidden ? 'Restore theme to the workshop' : 'Hide theme from the workshop'}>
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-amber-300"
-                                onclick={() => handleToggleVisibility(theme)}
-                              >
-                                {#if theme.isHidden}
-                                  <Eye class="size-3.5" />
-                                {:else}
-                                  <EyeOff class="size-3.5" />
-                                {/if}
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if canModerate}
-                          <WorkshopTooltip content={theme.isQuarantined ? 'Lift takedown' : 'Take down theme'}>
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-red-300"
-                                onclick={() => handleToggleQuarantine(theme)}
-                                disabled={quarantineId === theme.id}
-                              >
-                                {#if quarantineId === theme.id}
-                                  <LoaderCircle class="size-3.5 animate-spin" />
-                                {:else}
-                                  <Ban class="size-3.5" />
-                                {/if}
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if $currentUser && !theme.isHidden && !theme.isQuarantined && theme.apiVersion !== '1.0' && !theme.tags?.includes('legacy')}
-                          <WorkshopTooltip content="Report this theme">
-                            {#snippet trigger(props)}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-amber-300"
-                                onclick={() => openReportDialog(theme)}
-                                disabled={reportSubmitting && reportTarget?.id === theme.id}
-                              >
-                                {#if reportSubmitting && reportTarget?.id === theme.id}
-                                  <LoaderCircle class="size-3.5 animate-spin" />
-                                {:else}
-                                  <Flag class="size-3.5" />
-                                {/if}
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if theme.apiVersion !== '1.0' && !theme.tags?.includes('legacy')}
-                          <WorkshopTooltip content="Fork this theme into your account">
-                            {#snippet trigger(props)}
+                        <Button
+                          size="sm"
+                          class="h-7 gap-1 text-xs"
+                          onclick={() => handleDownloadAndApply(theme)}
+                        >
+                          <Download class="size-3" />
+                          Download & Apply
+                        </Button>
+                      {/if}
+
+                      {#if showOverflowMenu}
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger>
+                            {#snippet child({ props })}
                               <Button
                                 {...props}
                                 variant="ghost"
                                 size="icon"
                                 class="size-7 text-muted-foreground hover:text-white"
+                                aria-label="More actions for {theme.name}"
+                              >
+                                <Ellipsis class="size-4" />
+                              </Button>
+                            {/snippet}
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Content
+                            align="end"
+                            class="w-52 border-theme-700 bg-theme-950 text-theme-50"
+                          >
+                            {#if owned}
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px]"
+                                onclick={() => void handleEditTags(theme)}
+                                disabled={tagEditingId === theme.id}
+                              >
+                                {#if tagEditingId === theme.id}
+                                  <LoaderCircle class="size-3.5 animate-spin" />
+                                  Saving tags...
+                                {:else}
+                                  <Tag class="size-3.5" />
+                                  Edit tags
+                                {/if}
+                              </DropdownMenu.Item>
+                              {#if !isLegacy && isInstalled && hasUpdate}
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => handleRefreshOwnedTheme(theme)}
+                                >
+                                  <RefreshCw class="size-3.5" />
+                                  Refresh installed copy
+                                </DropdownMenu.Item>
+                              {/if}
+                            {:else if $currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined}
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px]"
+                                onclick={() => openReportDialog(theme)}
+                              >
+                                <Flag class="size-3.5" />
+                                Report theme
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px]"
                                 onclick={() => handleForkTheme(theme)}
                               >
                                 <CopyPlus class="size-3.5" />
-                              </Button>
-                            {/snippet}
-                          </WorkshopTooltip>
-                        {/if}
-                        {#if isActive}
-                          <Badge variant="outline" class="border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-[10px]">
-                            <Check class="mr-1 size-3" /> In use
-                          </Badge>
-                        {:else if isInstalled && hasUpdate}
-                          <Button
-                            size="sm"
-                            class="h-7 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
-                            onclick={() => handleDownloadAndApply(theme)}
-                          >
-                            Update
-                          </Button>
-                        {:else if isInstalled}
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            class="h-7 text-xs"
-                            onclick={() => handleApplyExisting(theme)}
-                          >
-                            Apply
-                          </Button>
-                        {:else}
-                          <Button
-                            size="sm"
-                            class="h-7 text-xs"
-                            onclick={() => handleDownloadAndApply(theme)}
-                          >
-                            <Download class="mr-1 size-3" />
-                            Download & Apply
-                          </Button>
-                        {/if}
+                                Fork theme
+                              </DropdownMenu.Item>
+                            {/if}
+
+                            {#if canModerate}
+                              {#if owned || ($currentUser && !isLegacy && !theme.isHidden && !theme.isQuarantined)}
+                                <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                              {/if}
+                              {#if !isLegacy}
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => handleToggleVisibility(theme)}
+                                >
+                                  {#if theme.isHidden}
+                                    <Eye class="size-3.5" />
+                                    Restore visibility
+                                  {:else}
+                                    <EyeOff class="size-3.5" />
+                                    Hide from workshop
+                                  {/if}
+                                </DropdownMenu.Item>
+                              {/if}
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px]"
+                                onclick={() => handleToggleQuarantine(theme)}
+                                disabled={quarantineId === theme.id}
+                              >
+                                {#if quarantineId === theme.id}
+                                  <LoaderCircle class="size-3.5 animate-spin" />
+                                  Updating...
+                                {:else}
+                                  <Ban class="size-3.5" />
+                                  {theme.isQuarantined ? 'Lift takedown' : 'Take down theme'}
+                                {/if}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px]"
+                                onclick={() => void openThemeHistory(theme.id, theme.name)}
+                              >
+                                <History class="size-3.5" />
+                                Moderation history
+                              </DropdownMenu.Item>
+                            {/if}
+
+                            {#if owned}
+                              <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                              <DropdownMenu.Item
+                                class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
+                                onclick={() => handleDeleteTheme(theme)}
+                              >
+                                <Trash2 class="size-3.5" />
+                                Move to trash
+                              </DropdownMenu.Item>
+                            {/if}
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Root>
                       {/if}
                     {/if}
                   </div>

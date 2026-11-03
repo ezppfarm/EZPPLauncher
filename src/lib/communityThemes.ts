@@ -9,6 +9,7 @@ export interface CommunityThemeAuthor {
   id: number;
   name: string;
   donor: boolean;
+  role?: 'owner' | 'moderator' | 'supporter' | null;
   avatarUrl: string;
 }
 

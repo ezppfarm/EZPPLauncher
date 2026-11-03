@@ -647,6 +647,8 @@ export type ThemeV2Definition = {
   apiVersion: '2.0';
   author: string;
   description?: string;
+  /** Workshop discovery tags for this theme. */
+  tags?: string[];
   /** Marks the theme as adult content in the theme manager. */
   nsfw?: boolean;
   /** Optional preview image, relative to the theme's assets folder. */
@@ -723,6 +725,22 @@ export const themeClassTokens = (value: unknown): string[] => {
 
 /** Sanitized class attribute value for a layer or group. */
 export const themeClassNames = (value: unknown): string => themeClassTokens(value).join(' ');
+
+const THEME_TAG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,23}$/;
+
+/** Keep workshop tags lowercase, unique, and within the service limits. */
+export const normalizeThemeTags = (raw: unknown): string[] => {
+  if (!Array.isArray(raw)) return [];
+  const tags: string[] = [];
+  for (const candidate of raw) {
+    if (typeof candidate !== 'string') continue;
+    const tag = candidate.trim().toLowerCase();
+    if (!THEME_TAG_PATTERN.test(tag) || tags.includes(tag)) continue;
+    tags.push(tag);
+    if (tags.length === 10) break;
+  }
+  return tags;
+};
 
 const clampInteger = (value: unknown, fallback: number, min: number, max: number) =>
   Math.round(clamp(value, fallback, min, max));
@@ -1754,6 +1772,7 @@ export const createDefaultThemeV2 = (): ThemeV2Definition => ({
   apiVersion: '2.0',
   author: '',
   description: '',
+  tags: [],
   nsfw: false,
   background: {
     type: 'gradient',
@@ -1881,6 +1900,7 @@ export const normalizeThemeV2 = (raw: Partial<ThemeV2Definition>): ThemeV2Defini
     apiVersion: '2.0',
     author: text(raw.author, 'Unknown'),
     description: text(raw.description),
+    tags: normalizeThemeTags(raw.tags),
     nsfw: raw.nsfw === true,
     preview: text(raw.preview),
     background,
