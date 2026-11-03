@@ -157,6 +157,10 @@
   let exportingReports = $state(false);
   let exportingEvents = $state(false);
   let quarantineId = $state<string | null>(null);
+  let quarantineTarget = $state<CommunityTheme | null>(null);
+  let quarantineAction = $state<'take_down' | 'lift'>('take_down');
+  let quarantineReason = $state('');
+  let quarantineError = $state<string | null>(null);
 
   let tagEditorTarget = $state<CommunityTheme | null>(null);
   let tagEditorTags = $state<string[]>([]);
@@ -1055,38 +1059,46 @@
     }
   }
 
-  async function handleToggleQuarantine(theme: CommunityTheme) {
+  function handleToggleQuarantine(theme: CommunityTheme) {
     if (!canModerate || quarantineId) return;
-    const takingDown = !theme.isQuarantined;
-    const reason = takingDown
-      ? window.prompt(
-          `Take down "${theme.name}"?\n\nReason shown to the owner and stored in the audit log:`,
-          theme.quarantineReason || ''
-        )
-      : window.prompt(
-          `Lift the takedown on "${theme.name}"?\n\nOptional note for the audit log:`,
-          ''
-        );
-    if (reason === null) return;
-    if (takingDown && reason.trim().length < 3) {
-      sileo.error({ title: 'A takedown reason is required' });
+    quarantineTarget = theme;
+    quarantineAction = theme.isQuarantined ? 'lift' : 'take_down';
+    quarantineReason = '';
+    quarantineError = null;
+  }
+
+  function closeQuarantineDialog() {
+    if (quarantineId) return;
+    quarantineTarget = null;
+    quarantineReason = '';
+    quarantineError = null;
+  }
+
+  async function confirmQuarantine() {
+    const theme = quarantineTarget;
+    if (!theme || quarantineId) return;
+
+    const takingDown = quarantineAction === 'take_down';
+    const reason = quarantineReason.trim();
+    if (takingDown && reason.length < 3) {
+      quarantineError = 'Please provide a reason of at least 3 characters.';
       return;
     }
 
     quarantineId = theme.id;
+    quarantineError = null;
     try {
-      await setCommunityThemeQuarantine(theme.id, takingDown, reason.trim() || undefined);
+      await setCommunityThemeQuarantine(theme.id, takingDown, reason || undefined);
       sileo.success({
         title: takingDown ? 'Theme taken down' : 'Takedown lifted',
         description: `"${theme.name}" was updated.`,
       });
+      quarantineTarget = null;
+      quarantineReason = '';
       await loadWorkshopThemes();
       if (showModerationPanel) await loadModerationPanel(moderationPage);
     } catch (err) {
-      sileo.error({
-        title: 'Could not update takedown',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      quarantineError = err instanceof Error ? err.message : String(err);
     } finally {
       quarantineId = null;
     }
@@ -3145,6 +3157,109 @@
               <LoaderCircle class="size-3 animate-spin" /> Saving...
             {:else}
               <Tag class="size-3" /> Save tags
+            {/if}
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if quarantineTarget}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close takedown dialog"
+        onclick={closeQuarantineDialog}
+      ></button>
+      <div
+        class="relative w-full max-w-md overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quarantine-theme-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div>
+            <h2
+              id="quarantine-theme-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
+            >
+              <Ban class="size-4 text-red-300" />
+              {quarantineAction === 'take_down' ? 'Take down theme' : 'Lift takedown'}
+            </h2>
+            <p class="mt-1 pr-2 text-[11px] leading-relaxed text-muted-foreground">
+              {#if quarantineAction === 'take_down'}
+                "{quarantineTarget.name}" will disappear from public search, downloads, previews and
+                updates until the takedown is lifted. The owner and open reporters are notified.
+              {:else}
+                "{quarantineTarget.name}" will become publicly visible again unless it is hidden or
+                still awaiting review.
+              {/if}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 shrink-0 text-muted-foreground hover:text-white"
+            onclick={closeQuarantineDialog}
+            disabled={Boolean(quarantineId)}
+            aria-label="Close takedown dialog"
+          >
+            <X class="size-4" />
+          </Button>
+        </div>
+
+        <div class="space-y-3 p-4">
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >{quarantineAction === 'take_down' ? 'Reason' : 'Note (optional)'}</span
+            >
+            <textarea
+              class="min-h-24 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+              rows="4"
+              maxlength="500"
+              placeholder={quarantineAction === 'take_down'
+                ? 'Explain why the theme is being taken down...'
+                : 'Optional note for the audit log...'}
+              bind:value={quarantineReason}
+              disabled={Boolean(quarantineId)}
+              oninput={() => (quarantineError = null)}
+            ></textarea>
+            <span class="block text-right text-[9px] text-muted-foreground">
+              {quarantineReason.trim().length}/500
+            </span>
+          </label>
+          {#if quarantineError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+            >
+              {quarantineError}
+            </p>
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 text-xs"
+            onclick={closeQuarantineDialog}
+            disabled={Boolean(quarantineId)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant={quarantineAction === 'take_down' ? 'destructive' : 'default'}
+            size="sm"
+            class="h-8 gap-1 text-xs"
+            onclick={() => void confirmQuarantine()}
+            disabled={Boolean(quarantineId)}
+          >
+            {#if quarantineId}
+              <LoaderCircle class="size-3 animate-spin" /> Updating...
+            {:else}
+              <Ban class="size-3" />
+              {quarantineAction === 'take_down' ? 'Take down theme' : 'Lift takedown'}
             {/if}
           </Button>
         </div>
