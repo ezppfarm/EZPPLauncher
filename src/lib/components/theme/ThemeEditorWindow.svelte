@@ -1,6 +1,6 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import { publishThemeToWorkshop } from '$lib/communityThemes';
+  import { fetchCommunityThemeDetails, publishThemeToWorkshop } from '$lib/communityThemes';
   import FontPreview from '$lib/components/theme/FontPreview.svelte';
   import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import ThemeElementInspector from '$lib/components/theme/ThemeElementInspector.svelte';
@@ -173,6 +173,7 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { open, save as saveDialog } from '@tauri-apps/plugin-dialog';
   import * as fs from '@tauri-apps/plugin-fs';
+  import semver from 'semver';
   import { sileo } from 'sileo';
   import { onMount, tick } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
@@ -287,6 +288,7 @@
   let panStart = { x: 0, y: 0, panX: 0, panY: 0 };
   const canvasScale = $derived(canvasFitScale * canvasZoom);
   let statusMessage = $state('Ready');
+  let lastPublishedVersion = $state<string | undefined>(undefined);
   let renamingId = $state<string | undefined>(undefined);
   let draggingLayer = $state<LayerDragItem | undefined>(undefined);
   let dropTarget = $state<LayerDropTarget | undefined>(undefined);
@@ -1803,6 +1805,7 @@
 
   async function loadContext() {
     loading = true;
+    lastPublishedVersion = undefined;
     try {
       const context = await invoke<ThemeEditorContext>('theme_editor_context');
       const parsed = context.themeJson
@@ -3340,6 +3343,63 @@
   let publishStatusMessage = $state('');
   let publishProgress = $state(0);
 
+  async function checkPublishVersion(): Promise<
+    { ok: true; version: string } | { ok: false; error: string }
+  > {
+    const proposed = semver.valid(definition.version.trim());
+    if (!proposed) {
+      return {
+        ok: false,
+        error: 'Use a semantic version such as 1.2.3 in the Theme tab before publishing.',
+      };
+    }
+
+    let publishedVersion = lastPublishedVersion;
+    const workshopId = definition.workshopId?.trim();
+    if (workshopId) {
+      let remoteVersion: string;
+      try {
+        remoteVersion = (await fetchCommunityThemeDetails(workshopId)).version?.trim() ?? '';
+      } catch (error) {
+        console.warn('[Workshop] Could not verify the published theme version:', error);
+        return {
+          ok: false,
+          error:
+            'Could not verify the current workshop version. Check your connection and try again.',
+        };
+      }
+
+      const validRemote = semver.valid(remoteVersion);
+      if (!validRemote) {
+        return {
+          ok: false,
+          error:
+            'The current workshop version could not be read. Contact a workshop administrator.',
+        };
+      }
+      if (!publishedVersion || semver.gt(validRemote, publishedVersion)) {
+        publishedVersion = validRemote;
+      }
+    }
+
+    if (publishedVersion) {
+      if (semver.eq(proposed, publishedVersion)) {
+        return {
+          ok: false,
+          error: `Version ${proposed} has already been published. Increase the version before publishing again.`,
+        };
+      }
+      if (!semver.gt(proposed, publishedVersion)) {
+        return {
+          ok: false,
+          error: `Version ${proposed} must be higher than the last published version ${publishedVersion}.`,
+        };
+      }
+    }
+
+    return { ok: true, version: proposed };
+  }
+
   async function openPublishDialog() {
     if (exporting || saving || publishing) return;
 
@@ -3362,10 +3422,21 @@
       return;
     }
 
+    const versionCheck = await checkPublishVersion();
+    if (!versionCheck.ok) {
+      sileo.error({
+        title: 'Version not publishable',
+        description: versionCheck.error,
+      });
+      return;
+    }
+    const versionChanged = definition.version !== versionCheck.version;
+    if (versionChanged) definition.version = versionCheck.version;
+
     const authorIdChanged = definition.authorId !== user.id;
     if (authorIdChanged) definition.authorId = user.id;
 
-    if (dirty || authorIdChanged) {
+    if (dirty || authorIdChanged || versionChanged) {
       const saved = await saveTheme({ notify: false });
       if (!saved) return;
     }
@@ -3404,17 +3475,34 @@
 
   async function handlePublishToWorkshop() {
     if (publishing) return;
-    if (!savedFolder) {
-      await saveTheme({ notify: false });
-      if (!savedFolder) return;
-    }
 
     const firstPublish = !definition.workshopId;
     publishing = true;
     publishProgress = 5;
-    publishStatusMessage = 'Packaging theme archive...';
+    publishStatusMessage = 'Checking version...';
 
     try {
+      const versionCheck = await checkPublishVersion();
+      if (!versionCheck.ok) {
+        sileo.error({
+          title: 'Version not publishable',
+          description: versionCheck.error,
+        });
+        return;
+      }
+
+      if (definition.version !== versionCheck.version) {
+        definition.version = versionCheck.version;
+        const saved = await saveTheme({ notify: false });
+        if (!saved) return;
+      }
+
+      if (!savedFolder) {
+        const saved = await saveTheme({ notify: false });
+        if (!saved || !savedFolder) return;
+      }
+
+      publishStatusMessage = 'Packaging theme archive...';
       const baseThemesDir = await themesDirectory();
       const themeFolder = await path.join(baseThemesDir, savedFolder);
       const themeId = savedFolder || toSafeName(definition.name);
@@ -3425,7 +3513,7 @@
         workshopId: definition.workshopId,
         name: definition.name,
         description: definition.description || '',
-        version: definition.version || '1.0.0',
+        version: versionCheck.version,
         apiVersion: definition.apiVersion || '2.0.0',
         tags: definition.tags ?? [],
         allowForking: definition.allowForking !== false,
@@ -3434,6 +3522,8 @@
           publishProgress = pct;
         },
       });
+
+      lastPublishedVersion = versionCheck.version;
 
       if (result.themeId) {
         // Persist the server-assigned ID so the next publish updates this
@@ -6988,7 +7078,8 @@
             </div>
           </div>
           <p class="text-[10px] leading-relaxed text-muted-foreground/70">
-            These details come from the Theme tab. Change them there before publishing.
+            These details come from the Theme tab. Published versions cannot be reused, so increase
+            the version before every update.
           </p>
         </div>
 
