@@ -3135,7 +3135,11 @@
                     {/if}
                   </div>
                   <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {activeSettings.description}
+                    {#if $reduceAnimations}
+                      {activeSettings.description}
+                    {:else}
+                      <TextMorph text={activeSettings.description} />
+                    {/if}
                   </p>
                 </div>
                 <div
