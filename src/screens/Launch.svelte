@@ -4069,11 +4069,22 @@
                                 class="absolute right-2 bottom-2 left-2 flex items-center justify-between gap-2"
                               >
                                 <div class="flex min-w-0 items-center gap-1.5">
-                                  <span
-                                    class="flex size-5 shrink-0 items-center justify-center rounded-full border border-white/20 bg-theme-800 text-[9px] font-bold text-white/80 uppercase"
+                                  <Avatar.Root
+                                    class="size-5 shrink-0 border border-white/20 bg-theme-800"
                                   >
-                                    {theme.author.trim().charAt(0) || '?'}
-                                  </span>
+                                    <Avatar.Image
+                                      src={theme.author.trim()
+                                        ? `https://a.ez-pp.farm/${encodeURIComponent(theme.author.trim())}`
+                                        : undefined}
+                                      alt={theme.author || 'Unknown author'}
+                                      class="object-cover"
+                                    />
+                                    <Avatar.Fallback
+                                      class="text-[9px] font-bold text-white/80 uppercase"
+                                    >
+                                      {theme.author.trim().charAt(0) || '?'}
+                                    </Avatar.Fallback>
+                                  </Avatar.Root>
                                   <span
                                     class="truncate text-[11px] font-semibold text-white/95 drop-shadow-sm"
                                   >
