@@ -2178,7 +2178,12 @@
       <ThemeIcon name="settings" set={iconSet} class="size-5!" />
     </Button>
     <div class="mt-auto flex flex-col items-center gap-2">
-      <NotificationHub />
+      <NotificationHub
+        onOpenWorkshop={() => {
+          selectedView = 'THEMES';
+          activeThemesTab = 'workshop';
+        }}
+      />
       <DropdownMenu.Root>
         <DropdownMenu.Trigger disabled={$launching}>
           <Avatar.Root class="size-10">

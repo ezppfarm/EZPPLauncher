@@ -16,6 +16,7 @@ export interface UserNotification {
   themeId: string | null;
   themeName: string | null;
   actorId: number | null;
+  actorName?: string | null;
   readAt: string | null;
   createdAt: string;
 }
