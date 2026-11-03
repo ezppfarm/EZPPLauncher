@@ -163,6 +163,7 @@
     ChevronLeft,
     ChevronRight,
     Clock,
+    Ellipsis,
     ExternalLink,
     Flag,
     Globe,
@@ -503,6 +504,29 @@
 
     loadTheme(theme, $custom_theme_container, $custom_theme_volume);
     await config.value<string>('theme').set(theme.name);
+  };
+
+  const uninstallInstalledTheme = async (theme: Theme) => {
+    try {
+      const deleteResult = await deleteTheme(theme);
+      if (deleteResult) {
+        sileo.success({
+          title: 'Theme uninstalled',
+          description: `"${theme.name}" was removed from your library.`,
+        });
+      } else {
+        sileo.error({
+          title: 'Could not uninstall theme',
+          description: 'The theme files could not be removed.',
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      sileo.error({
+        title: 'Could not uninstall theme',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
   const updateInstalledTheme = async (theme: Theme) => {
@@ -3911,6 +3935,28 @@
                         {#each filteredThemes as theme, index (theme.folder_name)}
                           {@const isActive =
                             $active_custom_theme?.folder_name === theme.folder_name}
+                          {@const canEditTheme =
+                            theme.status === 'installed' && Boolean(theme.definition)}
+                          {@const canRestoreTheme =
+                            theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
+                          {@const canUpdateTheme =
+                            theme.status === 'installed' && theme.updateAvailable}
+                          {@const canReportTheme =
+                            Boolean($currentUser && ownedWorkshopLoaded) &&
+                            !isOwnInstalledTheme(theme) &&
+                            theme.status === 'installed' &&
+                            theme.name !== 'Default' &&
+                            theme.folder_name !== 'default'}
+                          {@const canUninstallTheme =
+                            (theme.status === 'installed' || theme.status === 'deleting') &&
+                            !isActive &&
+                            theme.name !== 'Default'}
+                          {@const hasThemeMenu =
+                            canEditTheme ||
+                            canRestoreTheme ||
+                            canUpdateTheme ||
+                            canReportTheme ||
+                            canUninstallTheme}
                           <div
                             class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
                               ? 'border-primary/60 ring-1 ring-primary/15'
@@ -3925,7 +3971,7 @@
                             }}
                           >
                             <div
-                              class="relative h-36 w-full shrink-0 overflow-hidden bg-theme-950/60"
+                              class="relative aspect-video w-full shrink-0 overflow-hidden bg-theme-950/60"
                             >
                               <div
                                 class="h-full w-full {$reduceAnimations
@@ -4034,13 +4080,11 @@
                                   {/if}
                                 </span>
                               </div>
-                              {#if theme.description}
-                                <p
-                                  class="line-clamp-2 text-[10px] leading-snug text-muted-foreground"
-                                >
-                                  {theme.description}
-                                </p>
-                              {/if}
+                              <p
+                                class="min-h-8 line-clamp-2 text-[10px] leading-snug text-muted-foreground"
+                              >
+                                {theme.description}
+                              </p>
                               <div class="mt-auto flex items-center gap-1 pt-0.5">
                                 <Button
                                   class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
@@ -4089,94 +4133,98 @@
                                     />
                                   </span>
                                 </Button>
-                                {#if theme.status === 'installed' && theme.definition}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Edit theme"
-                                    onclick={() => openThemeEditor(theme)}
-                                  >
-                                    <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Restore previous version ({new Date(
-                                      theme.backups![0].createdAt
-                                    ).toLocaleDateString()})"
-                                    onclick={() => requestThemeRestore(theme, theme.backups![0])}
-                                  >
-                                    <ThemeIcon name="history" set={iconSet} class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if theme.status === 'installed' && theme.updateAvailable}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title={`Update theme${theme.availableVersion ? ` to v${theme.availableVersion}` : ''}`}
-                                    onclick={() => updateInstalledTheme(theme)}
-                                  >
-                                    <ThemeIcon name="download" set={iconSet} class="size-3.5" />
-                                  </Button>
-                                {/if}
-                                {#if (theme.status === 'installed' || theme.status === 'deleting') && !isActive && theme.name !== 'Default'}
-                                  <Button
-                                    variant="destructive"
-                                    size="icon"
-                                    class="size-7 shrink-0"
-                                    title="Uninstall theme"
-                                    disabled={theme.status !== 'installed'}
-                                    onclick={async () => {
-                                      try {
-                                        const deleteResult = await deleteTheme(theme);
-                                        if (deleteResult) {
-                                          sileo.success({
-                                            title: 'Yaay!',
-                                            description: 'Theme uninstalled successfully!',
-                                          });
-                                        } else {
-                                          sileo.error({
-                                            title: 'Uhhm..',
-                                            description: 'Failed to uninstall theme.',
-                                          });
-                                        }
-                                      } catch (err) {
-                                        console.log(err);
-                                        sileo.error({
-                                          title: 'Uhhm..',
-                                          description: 'Failed to uninstall theme.',
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    {#if theme.status === 'deleting'}
-                                      <ThemeIcon
-                                        name="loader"
-                                        set={iconSet}
-                                        class="size-3.5 animate-spin"
-                                      />
-                                    {:else}
-                                      <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
-                                    {/if}
-                                  </Button>
-                                {/if}
-                                {#if $currentUser && ownedWorkshopLoaded && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
-                                  <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    class="size-7 shrink-0 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-300"
-                                    title="Report theme"
-                                    aria-label={`Report ${theme.name}`}
-                                    disabled={installedReportLoading}
-                                    onclick={() => void openInstalledReport(theme)}
-                                  >
-                                    <Flag class="size-3.5" />
-                                  </Button>
+                                {#if hasThemeMenu}
+                                  <DropdownMenu.Root>
+                                    <DropdownMenu.Trigger>
+                                      {#snippet child({ props })}
+                                        <Button
+                                          {...props}
+                                          variant="secondary"
+                                          size="icon"
+                                          class="size-7 shrink-0 text-muted-foreground hover:text-white"
+                                          title="More theme actions"
+                                          aria-label={`More actions for ${theme.name}`}
+                                        >
+                                          <Ellipsis class="size-3.5" />
+                                        </Button>
+                                      {/snippet}
+                                    </DropdownMenu.Trigger>
+                                    <DropdownMenu.Content
+                                      align="end"
+                                      class="w-48 border-theme-700 bg-theme-950 text-theme-50"
+                                    >
+                                      {#if canEditTheme}
+                                        <DropdownMenu.Item
+                                          class="gap-2 text-[11px]"
+                                          onclick={() => openThemeEditor(theme)}
+                                        >
+                                          <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
+                                          Edit theme
+                                        </DropdownMenu.Item>
+                                      {/if}
+                                      {#if canRestoreTheme}
+                                        <DropdownMenu.Item
+                                          class="gap-2 text-[11px]"
+                                          onclick={() =>
+                                            requestThemeRestore(theme, theme.backups![0])}
+                                        >
+                                          <ThemeIcon
+                                            name="history"
+                                            set={iconSet}
+                                            class="size-3.5"
+                                          />
+                                          Restore previous version
+                                        </DropdownMenu.Item>
+                                      {/if}
+                                      {#if canUpdateTheme}
+                                        <DropdownMenu.Item
+                                          class="gap-2 text-[11px]"
+                                          onclick={() => updateInstalledTheme(theme)}
+                                        >
+                                          <ThemeIcon
+                                            name="download"
+                                            set={iconSet}
+                                            class="size-3.5"
+                                          />
+                                          Update theme
+                                        </DropdownMenu.Item>
+                                      {/if}
+                                      {#if canReportTheme}
+                                        <DropdownMenu.Item
+                                          class="gap-2 text-[11px]"
+                                          disabled={installedReportLoading}
+                                          onclick={() => void openInstalledReport(theme)}
+                                        >
+                                          <Flag class="size-3.5" />
+                                          Report theme
+                                        </DropdownMenu.Item>
+                                      {/if}
+                                      {#if canUninstallTheme}
+                                        <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                        <DropdownMenu.Item
+                                          class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
+                                          disabled={theme.status !== 'installed'}
+                                          onclick={() => void uninstallInstalledTheme(theme)}
+                                        >
+                                          {#if theme.status === 'deleting'}
+                                            <ThemeIcon
+                                              name="loader"
+                                              set={iconSet}
+                                              class="size-3.5 animate-spin"
+                                            />
+                                            Uninstalling...
+                                          {:else}
+                                            <ThemeIcon
+                                              name="trash"
+                                              set={iconSet}
+                                              class="size-3.5"
+                                            />
+                                            Uninstall theme
+                                          {/if}
+                                        </DropdownMenu.Item>
+                                      {/if}
+                                    </DropdownMenu.Content>
+                                  </DropdownMenu.Root>
                                 {/if}
                               </div>
                             </div>

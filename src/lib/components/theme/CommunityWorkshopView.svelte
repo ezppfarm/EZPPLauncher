@@ -231,6 +231,7 @@
   let actionError = $state<string | null>(null);
   let actionBusy = $state(false);
   let actionDialogContent = $state<HTMLElement | null>(null);
+  let infoTheme = $state<CommunityTheme | null>(null);
 
   const REPORT_CATEGORIES: Array<{ id: ThemeReportCategory; label: string }> = [
     { id: 'spam', label: 'Spam / advertising' },
@@ -424,6 +425,29 @@
     pendingAction = null;
     actionNote = '';
     actionError = null;
+  }
+
+  function openThemeInfo(theme: CommunityTheme) {
+    infoTheme = theme;
+  }
+
+  function closeThemeInfo() {
+    infoTheme = null;
+  }
+
+  function openThemeInfoTag(tag: string) {
+    closeThemeInfo();
+    handleTagClick(tag);
+  }
+
+  function editFromThemeInfo(theme: CommunityTheme) {
+    closeThemeInfo();
+    void handleEditTheme(theme);
+  }
+
+  function applyFromThemeInfo(theme: CommunityTheme) {
+    closeThemeInfo();
+    void handleApplyExisting(theme);
   }
 
   async function confirmPendingAction() {
@@ -2055,7 +2079,27 @@
                   : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
               >
                 <!-- 16:9 Thumbnail -->
-                <div class="relative aspect-video w-full shrink-0 overflow-hidden bg-theme-950/70">
+                <div
+                  class="relative aspect-video w-full shrink-0 cursor-zoom-in overflow-hidden bg-theme-950/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  role="button"
+                  tabindex="0"
+                  aria-label={`View ${theme.name} details`}
+                  onclick={() => openThemeInfo(theme)}
+                  onkeydown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    openThemeInfo(theme);
+                  }}
+                >
+                  <div
+                    class="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                  >
+                    <span
+                      class="rounded-full border border-white/15 bg-theme-950/80 px-3 py-1.5 text-[10px] font-medium text-white shadow-lg backdrop-blur-sm"
+                    >
+                      View details
+                    </span>
+                  </div>
                   <img
                     src={theme.previewUrl}
                     alt={theme.name}
@@ -2257,11 +2301,14 @@
                 <div class="flex flex-1 flex-col justify-between gap-2 p-3">
                   <div class="min-w-0">
                     <div class="flex items-center justify-between gap-2">
-                      <h3
-                        class="truncate text-[13px] font-bold text-white group-hover:text-primary transition-colors"
+                      <button
+                        type="button"
+                        class="min-w-0 truncate rounded text-left text-[13px] font-bold text-white transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+                        title={`View ${theme.name} details`}
+                        onclick={() => openThemeInfo(theme)}
                       >
                         {theme.name}
-                      </h3>
+                      </button>
 
                       <!-- Interactive Like Button -->
                       {#if isDeleted}
@@ -3993,6 +4040,246 @@
       </div>
     </div>
   {/if}
+  <Dialog.Root
+    open={infoTheme !== null}
+    onOpenChange={(open) => {
+      if (!open) closeThemeInfo();
+    }}
+  >
+    <Dialog.Content
+      class="flex max-h-[calc(100vh-2rem)] w-[calc(100%_-_2rem)] max-w-5xl flex-col gap-0 overflow-hidden rounded-xl border-theme-800 bg-theme-950 p-0 text-white shadow-2xl sm:rounded-xl"
+    >
+      {#if infoTheme}
+        {@const themeInfo = infoTheme}
+        {@const infoLocal =
+          localThemeMap.get(themeInfo.id.toLowerCase()) ??
+          localThemeMap.get(themeInfo.name.toLowerCase())}
+        {@const infoInstalled = Boolean(infoLocal)}
+        {@const infoActive = Boolean(
+          infoLocal && $active_custom_theme?.folder_name === infoLocal.folder_name
+        )}
+        {@const infoDownloading = activeThemeDownloads.has(themeInfo.id)}
+        {@const infoPercent = themeDownloadProgress.get(themeInfo.id) ?? 0}
+        {@const infoOwned = isOwnedByCurrentUser(themeInfo)}
+        {@const infoLegacy =
+          themeInfo.apiVersion === '1.0' || Boolean(themeInfo.tags?.includes('legacy'))}
+        {@const infoHasUpdate = Boolean(
+          !themeInfo.deletedAt && infoLocal && infoLocal.version !== themeInfo.version
+        )}
+        {@const infoUnavailable = themeInfo.isHidden || themeInfo.isQuarantined}
+
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div class="min-w-0">
+            <Dialog.Title class="truncate text-base font-semibold text-white">
+              {themeInfo.name}
+            </Dialog.Title>
+            <Dialog.Description
+              class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground"
+            >
+              <span>by <span class="text-white/80">{themeInfo.author.name}</span></span>
+              <span>·</span>
+              <span>v{themeInfo.version}</span>
+              <span>·</span>
+              <span
+                >{themeInfo.apiVersion === '1.0'
+                  ? 'Legacy v1'
+                  : `API ${themeInfo.apiVersion}`}</span
+              >
+              {#if infoActive}
+                <span>·</span>
+                <span class="font-medium text-primary">In use</span>
+              {/if}
+            </Dialog.Description>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-7 shrink-0 text-muted-foreground hover:text-white"
+            onclick={closeThemeInfo}
+            aria-label="Close theme details"
+          >
+            <X class="size-4" />
+          </Button>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <div class="grid md:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.9fr)]">
+            <div class="space-y-3 bg-black/25 p-3 sm:p-4">
+              <div class="overflow-hidden rounded-xl border border-theme-800 bg-theme-950">
+                <img
+                  src={themeInfo.previewUrl}
+                  alt={`${themeInfo.name} preview`}
+                  class="aspect-video w-full object-cover object-center"
+                  onerror={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
+                  }}
+                />
+              </div>
+              <div
+                class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-muted-foreground"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <Download class="size-3" />{themeInfo.downloadCount} downloads
+                </span>
+                <span class="inline-flex items-center gap-1">
+                  <Heart class="size-3" />{themeInfo.likeCount} likes
+                </span>
+                <span>{formatBytes(themeInfo.fileSize)}</span>
+                <span>Updated {formatModerationDate(themeInfo.updatedAt)}</span>
+              </div>
+              <p class="text-[11px] leading-relaxed text-white/80">
+                {themeInfo.description || 'No description provided.'}
+              </p>
+            </div>
+
+            <div
+              class="flex flex-col gap-4 border-t border-theme-800/70 p-4 md:border-t-0 md:border-l"
+            >
+              <div>
+                <p class="text-[10px] font-semibold tracking-wide text-white/60 uppercase">Tags</p>
+                {#if themeInfo.tags.length > 0}
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    {#each themeInfo.tags as tag (tag)}
+                      <button
+                        type="button"
+                        class="rounded-full border border-theme-700 bg-theme-900 px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-white"
+                        onclick={() => openThemeInfoTag(tag)}
+                      >
+                        #{tag}
+                      </button>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="mt-1.5 text-[10px] text-muted-foreground">No tags.</p>
+                {/if}
+              </div>
+
+              {#if themeInfo.reviewStatus !== 'approved'}
+                <div
+                  class="rounded-lg border border-amber-500/25 bg-amber-500/5 p-2.5 text-[10px] leading-relaxed"
+                >
+                  {#if themeInfo.reviewStatus === 'pending'}
+                    <p class="text-amber-200">
+                      <LoaderCircle class="mr-1 inline size-3 align-[-2px]" /> Awaiting staff review.
+                    </p>
+                  {:else}
+                    <p class="text-red-200">
+                      <X class="mr-1 inline size-3 align-[-2px]" /> Not approved.
+                    </p>
+                    {#if themeInfo.reviewNote}
+                      <p class="mt-1 text-muted-foreground">{themeInfo.reviewNote}</p>
+                    {/if}
+                  {/if}
+                </div>
+              {/if}
+
+              {#if infoUnavailable}
+                <div
+                  class="rounded-lg border border-red-900/40 bg-red-950/15 p-2.5 text-[10px] leading-relaxed"
+                >
+                  {#if themeInfo.isQuarantined}
+                    <p class="text-red-200">
+                      Taken down: {themeInfo.quarantineReason ?? 'No reason provided.'}
+                    </p>
+                  {/if}
+                  {#if themeInfo.isHidden}
+                    <p class="text-red-200">
+                      Hidden: {themeInfo.hiddenReason ?? 'No reason provided.'}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+
+              {#if themeInfo.forkedFrom}
+                {@const forkedFrom = themeInfo.forkedFrom}
+                <button
+                  type="button"
+                  class="flex items-start gap-1.5 text-left text-[10px] text-muted-foreground transition-colors hover:text-white"
+                  onclick={() => {
+                    closeThemeInfo();
+                    void handleOpenForkSource(themeInfo);
+                  }}
+                >
+                  <GitFork class="mt-0.5 size-3 shrink-0" />
+                  <span class="truncate">
+                    Forked from {forkedFrom.name} by {forkedFrom.authorName}
+                  </span>
+                </button>
+              {/if}
+
+              <div class="mt-auto space-y-2 pt-2">
+                {#if themeInfo.deletedAt}
+                  <p
+                    class="rounded-lg border border-red-900/40 bg-red-950/15 p-2.5 text-[10px] text-red-200"
+                  >
+                    This theme is in your trash. Restore it from the Trash view.
+                  </p>
+                {:else if infoUnavailable}
+                  <Button class="w-full gap-1.5" variant="secondary" disabled>
+                    <EyeOff class="size-3.5" /> Currently unavailable
+                  </Button>
+                {:else if infoDownloading}
+                  <div class="space-y-1.5 rounded-lg border border-primary/30 bg-primary/10 p-2.5">
+                    <div class="flex items-center justify-between text-[10px]">
+                      <span class="text-primary">Downloading...</span>
+                      <span class="text-primary tabular-nums">{infoPercent}%</span>
+                    </div>
+                    <div class="h-1.5 overflow-hidden rounded-full bg-theme-800">
+                      <div
+                        class="h-full bg-primary transition-all duration-200"
+                        style={`width: ${infoPercent}%`}
+                      ></div>
+                    </div>
+                  </div>
+                {:else if infoOwned && infoInstalled && !infoLegacy}
+                  <Button class="w-full gap-1.5" onclick={() => editFromThemeInfo(themeInfo)}>
+                    <Pencil class="size-3.5" /> Edit theme
+                  </Button>
+                {:else if infoActive}
+                  <Button class="w-full gap-1.5" disabled>
+                    <Check class="size-3.5" /> Theme in use
+                  </Button>
+                {:else if infoInstalled && infoHasUpdate}
+                  <Button
+                    class="w-full gap-1.5"
+                    onclick={() => void handleDownloadTheme(themeInfo)}
+                  >
+                    <Download class="size-3.5" /> Update to v{themeInfo.version}
+                  </Button>
+                {:else if infoInstalled}
+                  <Button class="w-full gap-1.5" onclick={() => applyFromThemeInfo(themeInfo)}>
+                    <Check class="size-3.5" /> Apply theme
+                  </Button>
+                {:else}
+                  <Button
+                    class="w-full gap-1.5"
+                    onclick={() => void handleDownloadTheme(themeInfo)}
+                  >
+                    <Download class="size-3.5" /> Download & install
+                  </Button>
+                {/if}
+
+                {#if !infoOwned && $currentUser && !infoUnavailable && !themeInfo.deletedAt}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="w-full gap-1.5 text-[11px] text-muted-foreground hover:text-white"
+                    onclick={() => {
+                      closeThemeInfo();
+                      openReportDialog(themeInfo);
+                    }}
+                  >
+                    <Flag class="size-3.5" /> Report theme
+                  </Button>
+                {/if}
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+    </Dialog.Content>
+  </Dialog.Root>
+
   <Dialog.Root
     open={pendingAction !== null}
     onOpenChange={(open) => {
