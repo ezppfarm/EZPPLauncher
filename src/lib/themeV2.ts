@@ -748,6 +748,16 @@ export const normalizeThemeTags = (raw: unknown): string[] => {
   return tags;
 };
 
+const THEME_VERSION_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/;
+
+/** Accept only strict SemVer 2.0.0, preserving prerelease and build metadata. */
+export const normalizeThemeVersion = (raw: unknown): string | undefined => {
+  if (typeof raw !== 'string') return undefined;
+  const version = raw.trim();
+  return version.length > 0 && THEME_VERSION_PATTERN.test(version) ? version : undefined;
+};
+
 const WORKSHOP_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 /** Keep a server-assigned workshop ID while preserving legacy slug IDs. */

@@ -75,6 +75,7 @@
     normalizeChrome,
     normalizeThemeTags,
     normalizeThemeV2,
+    normalizeThemeVersion,
     themeAssetName,
     themeHasLaunchButton,
     type ThemeV2Asset,
@@ -2923,6 +2924,12 @@
       notifyError('Add an author name so people know who made the theme.');
       return false;
     }
+    const version = normalizeThemeVersion(definition.version);
+    if (!version) {
+      notifyError('The version must use semantic versioning, for example 1.2.3 or 1.2.3-beta.1.');
+      return false;
+    }
+    if (definition.version !== version) definition.version = version;
     const folderName = savedFolder ?? toSafeName(definition.name);
     if (!folderName.replace(/_/g, '')) {
       notifyError('The theme name needs at least one letter or number.');
@@ -3019,8 +3026,10 @@
 
     if (!definition.name.trim()) error('The theme needs a name.');
     if (!definition.author.trim()) error('The theme needs an author.');
-    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(definition.version.trim())) {
-      warning('The version should use semantic versioning, for example 1.0.0.');
+    if (!normalizeThemeVersion(definition.version)) {
+      error(
+        'The version must use semantic versioning, for example 1.0.0 or 1.0.0-beta.1, with no "v" prefix.'
+      );
     }
     if (!themeHasLaunchButton(definition)) {
       error(
@@ -3346,7 +3355,7 @@
   async function checkPublishVersion(): Promise<
     { ok: true; version: string } | { ok: false; error: string }
   > {
-    const proposed = semver.valid(definition.version.trim());
+    const proposed = normalizeThemeVersion(definition.version);
     if (!proposed) {
       return {
         ok: false,
@@ -3369,7 +3378,7 @@
         };
       }
 
-      const validRemote = semver.valid(remoteVersion);
+      const validRemote = normalizeThemeVersion(remoteVersion);
       if (!validRemote) {
         return {
           ok: false,

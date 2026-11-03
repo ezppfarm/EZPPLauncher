@@ -1,4 +1,5 @@
 import { config } from './config';
+import { normalizeThemeVersion } from './themeV2';
 import {
   reloadThemes,
   themesDirectory,
@@ -727,6 +728,13 @@ export async function publishThemeToWorkshop(options: {
     throw new Error('You must be logged in to EZPPFarm to publish themes.');
   }
 
+  const version = normalizeThemeVersion(options.version ?? '1.0.0');
+  if (!version) {
+    throw new Error(
+      'Theme version must use semantic versioning, for example 1.2.3 or 1.2.3-beta.1.'
+    );
+  }
+
   onProgress('Packaging theme archive...', 5);
 
   const baseThemesDir = await themesDirectory();
@@ -771,7 +779,7 @@ export async function publishThemeToWorkshop(options: {
         themeId: options.workshopId || options.themeId,
         name: options.name,
         description: options.description || '',
-        version: options.version || '1.0.0',
+        version,
         apiVersion: options.apiVersion || '2.0.0',
         totalSize,
         totalChunks,
