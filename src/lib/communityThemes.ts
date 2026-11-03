@@ -12,6 +12,20 @@ export interface CommunityThemeAuthor {
   avatarUrl: string;
 }
 
+export interface CommunityThemeForkOrigin {
+  id: string;
+  name: string;
+  authorName: string;
+}
+
+export type ThemeSearchField = 'id' | 'name' | 'tag' | 'author' | 'description';
+
+export interface ThemeSearchMatch {
+  field: ThemeSearchField;
+  value: string;
+  score: number;
+}
+
 export interface CommunityTheme {
   id: string;
   name: string;
@@ -28,8 +42,22 @@ export interface CommunityTheme {
   updatedAt: string;
   author: CommunityThemeAuthor;
   isLiked: boolean;
+  isOwner: boolean;
+  isHidden: boolean;
+  hiddenReason: string | null;
+  hiddenAt: string | null;
+  hiddenBy: number | null;
+  hiddenByName: string | null;
+  isQuarantined: boolean;
+  quarantineReason: string | null;
+  quarantinedAt: string | null;
+  quarantinedBy: number | null;
+  quarantinedByName: string | null;
+  deletedAt: string | null;
+  forkedFrom: CommunityThemeForkOrigin | null;
   previewUrl: string;
   downloadUrl: string;
+  searchMatch?: ThemeSearchMatch | null;
 }
 
 export interface CommunityThemesResponse {
@@ -37,154 +65,83 @@ export interface CommunityThemesResponse {
   total: number;
   page: number;
   totalPages: number;
+  canModerate: boolean;
 }
 
-export const LEGACY_COMMUNITY_THEMES: CommunityTheme[] = [
-  {
-    id: 'execution_clap',
-    name: 'Execution Clap',
-    description: '',
-    version: '1.0.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 59213509,
-    checksumSha256: '',
-    downloadCount: 142,
-    likeCount: 28,
-    tags: ['legacy', 'apiv1', 'video', 'anime'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/execution_clap.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/execution_clap.ezpplauncher-theme',
-  },
-  {
-    id: 'dance',
-    name: 'Dance',
-    description: '',
-    version: '1.0.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 21956554,
-    checksumSha256: '',
-    downloadCount: 98,
-    likeCount: 19,
-    tags: ['legacy', 'apiv1', 'video', 'anime'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/dance.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/dance.ezpplauncher-theme',
-  },
-  {
-    id: 'lagtrain',
-    name: 'Lagtrain',
-    description: '',
-    version: '1.1.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 45781440,
-    checksumSha256: '',
-    downloadCount: 230,
-    likeCount: 54,
-    tags: ['legacy', 'apiv1', 'video', 'anime'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/lagtrain.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/lagtrain.ezpplauncher-theme',
-  },
-  {
-    id: 'looping_the_rooms',
-    name: 'Looping the Rooms',
-    description: '',
-    version: '1.0.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 14507000,
-    checksumSha256: '',
-    downloadCount: 76,
-    likeCount: 14,
-    tags: ['legacy', 'apiv1', 'video'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/looping_the_rooms.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/looping_the_rooms.ezpplauncher-theme',
-  },
-  {
-    id: 'daidaidaidaidaikirai',
-    name: 'Daidaidaidaidaikirai',
-    description: '',
-    version: '1.1.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 19800000,
-    checksumSha256: '',
-    downloadCount: 185,
-    likeCount: 41,
-    tags: ['legacy', 'apiv1', 'video', 'anime'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/daidaidaidaidaikirai.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/daidaidaidaidaikirai.ezpplauncher-theme',
-  },
-  {
-    id: 'teto_the_31st',
-    name: 'Teto the 31st',
-    description: '',
-    version: '1.1.0',
-    apiVersion: '1.0',
-    hasExecutableCode: true,
-    fileSize: 23400000,
-    checksumSha256: '',
-    downloadCount: 310,
-    likeCount: 82,
-    tags: ['legacy', 'apiv1', 'video', 'anime'],
-    createdAt: '2025-01-01T00:00:00.000Z',
-    updatedAt: '2025-01-01T00:00:00.000Z',
-    author: {
-      id: 1001,
-      name: 'HorizonCode',
-      donor: true,
-      avatarUrl: 'https://a.ez-pp.farm/1001',
-    },
-    isLiked: false,
-    previewUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/previews/teto_the_31st.png',
-    downloadUrl: 'https://git.ez-pp.farm/EZPPFarm/EZPPLauncher-Themes/raw/branch/main/themes/teto_the_31st.ezpplauncher-theme',
-  },
-];
+export type ThemeReportStatus = 'open' | 'resolved' | 'dismissed';
+export type ThemeReportCategory =
+  | 'spam'
+  | 'harassment'
+  | 'malware'
+  | 'copyright'
+  | 'broken'
+  | 'other';
+
+export interface ThemeReport {
+  id: number;
+  themeId: string;
+  themeName: string;
+  themeAuthorName: string;
+  themeHidden: boolean;
+  themeDeleted: boolean;
+  themeQuarantined: boolean;
+  reporterId: number;
+  reporterName: string;
+  category: ThemeReportCategory;
+  reason: string;
+  status: ThemeReportStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: number | null;
+  resolvedByName: string | null;
+  resolutionNote: string | null;
+}
+
+export interface ThemeReportQuery {
+  status?: ThemeReportStatus | 'all';
+  q?: string;
+  category?: ThemeReportCategory | 'all';
+  author?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ModerationEvent {
+  id: number;
+  themeId: string;
+  themeName: string;
+  actorId: number;
+  actorName: string;
+  action: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface ModerationEventQuery {
+  themeId?: string;
+  action?: string;
+  actor?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ModerationEventsResponse {
+  events: ModerationEvent[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface ThemeReportsResponse {
+  reports: ThemeReport[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
 
 const DEFAULT_THEMES_SERVICE_URL = 'https://themes.ez-pp.farm';
 
@@ -213,104 +170,72 @@ export async function fetchCommunityThemes(options?: {
   q?: string;
   tag?: string;
   authorId?: number;
-  sort?: 'popular' | 'recent' | 'likes' | 'downloads';
+  sort?: 'relevance' | 'popular' | 'recent' | 'likes' | 'downloads';
   page?: number;
   limit?: number;
+  hidden?: boolean;
+  quarantined?: boolean;
+  trashed?: boolean;
 }): Promise<CommunityThemesResponse> {
-  let remoteData: CommunityThemesResponse | null = null;
-  let remoteError: Error | null = null;
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
 
-  try {
-    const baseUrl = await getThemesServiceUrl();
-    const headers = await getAuthHeaders();
+  const url = new URL(`${baseUrl}/v1/themes`);
+  if (options?.q) url.searchParams.set('q', options.q);
+  if (options?.tag) url.searchParams.set('tag', options.tag);
+  if (options?.authorId) url.searchParams.set('authorId', String(options.authorId));
+  if (options?.sort) url.searchParams.set('sort', options.sort);
+  if (options?.page) url.searchParams.set('page', String(options.page));
+  if (options?.limit) url.searchParams.set('limit', String(options.limit));
+  if (options?.hidden) url.searchParams.set('hidden', '1');
+  if (options?.quarantined) url.searchParams.set('quarantined', '1');
+  if (options?.trashed) url.searchParams.set('trashed', '1');
 
-    const url = new URL(`${baseUrl}/v1/themes`);
-    if (options?.q) url.searchParams.set('q', options.q);
-    if (options?.tag) url.searchParams.set('tag', options.tag);
-    if (options?.authorId) url.searchParams.set('authorId', String(options.authorId));
-    if (options?.sort) url.searchParams.set('sort', options.sort);
-    if (options?.page) url.searchParams.set('page', String(options.page));
-    if (options?.limit) url.searchParams.set('limit', String(options.limit));
-
-    const res = await fetch(url.toString(), { headers });
-    if (res.ok) {
-      remoteData = (await res.json()) as CommunityThemesResponse;
-      for (const item of remoteData.items) {
-        if (item.previewUrl && !item.previewUrl.startsWith('http')) {
-          item.previewUrl = `${baseUrl}${item.previewUrl}`;
-        }
-        if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
-          item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
-        }
-      }
-    } else {
-      remoteError = new Error(`Failed to load themes (HTTP ${res.status})`);
-    }
-  } catch (err) {
-    remoteError = err instanceof Error ? err : new Error(String(err));
-    console.warn('[CommunityThemes] Microservice unavailable, falling back to legacy catalogue:', err);
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to load themes (HTTP ${res.status})`);
   }
 
-  // Filter legacy themes based on options
-  const matchingLegacy = LEGACY_COMMUNITY_THEMES.filter((item) => {
-    if (options?.authorId && options.authorId !== item.author.id) return false;
-    if (options?.tag && options.tag !== 'all' && !item.tags.includes(options.tag.toLowerCase())) return false;
-    if (options?.q && options.q.trim().length > 0) {
-      const q = options.q.trim().toLowerCase();
-      const text = `${item.name} ${item.description} ${item.id}`.toLowerCase();
-      if (!text.includes(q)) return false;
+  const remoteData = (await res.json()) as CommunityThemesResponse;
+  for (const item of remoteData.items) {
+    if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+      item.previewUrl = `${baseUrl}${item.previewUrl}`;
     }
-    return true;
-  });
-
-  if (!remoteData) {
-    if (matchingLegacy.length > 0 || !remoteError) {
-      return {
-        items: matchingLegacy,
-        total: matchingLegacy.length,
-        page: 1,
-        totalPages: 1,
-      };
+    if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+      item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
     }
-    throw remoteError;
   }
 
-  // If remoteData returned, merge legacy themes if not already present in the list
-  const existingIds = new Set(remoteData.items.map((i) => i.id.toLowerCase()));
-  const missingLegacy = matchingLegacy.filter((l) => !existingIds.has(l.id.toLowerCase()));
-
-  const allItems = [...remoteData.items, ...missingLegacy];
   return {
-    items: allItems,
-    total: remoteData.total + missingLegacy.length,
-    page: remoteData.page,
-    totalPages: Math.ceil((remoteData.total + missingLegacy.length) / (options?.limit || 24)) || 1,
+    items: remoteData.items,
+    total: remoteData.total,
+    page: remoteData.page || 1,
+    totalPages: Number.isFinite(remoteData.totalPages)
+      ? Math.max(1, remoteData.totalPages)
+      : Math.ceil(Number(remoteData.total || 0) / Math.max(1, options?.limit || 24)) || 1,
+    canModerate: remoteData.canModerate ?? false,
   };
 }
 
 export async function fetchCommunityThemeDetails(themeId: string): Promise<CommunityTheme> {
   const cleanId = themeId.trim().toLowerCase();
-  try {
-    const baseUrl = await getThemesServiceUrl();
-    const headers = await getAuthHeaders();
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(cleanId)}`, { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || 'Theme not found.');
+  }
 
-    const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(cleanId)}`, { headers });
-    if (res.ok) {
-      const item = (await res.json()) as CommunityTheme;
-      if (item.previewUrl && !item.previewUrl.startsWith('http')) {
-        item.previewUrl = `${baseUrl}${item.previewUrl}`;
-      }
-      if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
-        item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
-      }
-      return item;
-    }
-  } catch {}
-
-  const legacy = LEGACY_COMMUNITY_THEMES.find((t) => t.id === cleanId);
-  if (legacy) return legacy;
-
-  throw new Error('Theme not found.');
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
 }
 
 export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked: boolean; likeCount: number }> {
@@ -334,6 +259,34 @@ export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked
   return (await res.json()) as { liked: boolean; likeCount: number };
 }
 
+export async function forkCommunityTheme(themeId: string): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to fork community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/fork`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to fork theme (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
+}
+
 export async function deleteCommunityTheme(themeId: string): Promise<void> {
   const baseUrl = await getThemesServiceUrl();
   const headers = await getAuthHeaders();
@@ -353,6 +306,337 @@ export async function deleteCommunityTheme(themeId: string): Promise<void> {
   }
 }
 
+export async function reportCommunityTheme(
+  themeId: string,
+  reason: string,
+  category: ThemeReportCategory = 'other'
+): Promise<void> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to report community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/report`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason, category }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to report theme (HTTP ${res.status})`);
+  }
+}
+
+export async function restoreCommunityTheme(themeId: string): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to restore community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/restore`, {
+    method: 'POST',
+    headers,
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to restore theme (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
+}
+
+export async function fetchThemeReports(
+  options: ThemeReportQuery = {}
+): Promise<ThemeReportsResponse> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to view theme reports.');
+  }
+
+  const url = new URL(`${baseUrl}/v1/themes/moderation/reports`);
+  url.searchParams.set('status', options.status ?? 'open');
+  if (options.q?.trim()) url.searchParams.set('q', options.q.trim());
+  if (options.category && options.category !== 'all') {
+    url.searchParams.set('category', options.category);
+  }
+  if (options.author?.trim()) url.searchParams.set('author', options.author.trim());
+  if (options.from) url.searchParams.set('from', options.from);
+  if (options.to) url.searchParams.set('to', options.to);
+  if (options.page) url.searchParams.set('page', String(options.page));
+  if (options.limit) url.searchParams.set('limit', String(options.limit));
+
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to load reports (HTTP ${res.status})`);
+  }
+  return (await res.json()) as ThemeReportsResponse;
+}
+
+export async function resolveThemeReport(
+  reportId: number,
+  status: 'resolved' | 'dismissed',
+  note?: string
+): Promise<void> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to manage theme reports.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/moderation/reports/${reportId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, note }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to update report (HTTP ${res.status})`);
+  }
+}
+
+export async function bulkResolveThemeReports(
+  reportIds: number[],
+  action: 'hide' | 'resolved' | 'dismissed',
+  note?: string
+): Promise<{ updated: number; themes: number }> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to manage theme reports.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/moderation/reports/bulk`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reportIds, action, note }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to update reports (HTTP ${res.status})`);
+  }
+  return (await res.json()) as { updated: number; themes: number };
+}
+
+export async function downloadThemeReportsCsv(options: ThemeReportQuery = {}): Promise<boolean> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to export theme reports.');
+  }
+
+  const url = new URL(`${baseUrl}/v1/themes/moderation/reports/export`);
+  url.searchParams.set('status', options.status ?? 'open');
+  if (options.q?.trim()) url.searchParams.set('q', options.q.trim());
+  if (options.category && options.category !== 'all') {
+    url.searchParams.set('category', options.category);
+  }
+  if (options.author?.trim()) url.searchParams.set('author', options.author.trim());
+  if (options.from) url.searchParams.set('from', options.from);
+  if (options.to) url.searchParams.set('to', options.to);
+
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to export reports (HTTP ${res.status})`);
+  }
+
+  const truncated = res.headers.get('x-export-truncated') === 'true';
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'theme-reports.csv';
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  return truncated;
+}
+
+export async function setCommunityThemeQuarantine(
+  themeId: string,
+  quarantined: boolean,
+  reason?: string
+): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to moderate community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/quarantine`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quarantined, reason: quarantined ? reason : undefined }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to update theme takedown (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
+}
+
+export async function fetchModerationEvents(
+  options: ModerationEventQuery = {}
+): Promise<ModerationEventsResponse> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to view moderation history.');
+  }
+
+  const url = new URL(`${baseUrl}/v1/themes/moderation/events`);
+  if (options.themeId) url.searchParams.set('themeId', options.themeId);
+  if (options.action && options.action !== 'all') url.searchParams.set('action', options.action);
+  if (options.actor?.trim()) url.searchParams.set('actor', options.actor.trim());
+  if (options.from) url.searchParams.set('from', options.from);
+  if (options.to) url.searchParams.set('to', options.to);
+  if (options.page) url.searchParams.set('page', String(options.page));
+  url.searchParams.set('limit', String(options.limit ?? 50));
+
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to load moderation history (HTTP ${res.status})`);
+  }
+  return (await res.json()) as ModerationEventsResponse;
+}
+
+export async function downloadModerationEventsCsv(
+  options: ModerationEventQuery = {}
+): Promise<void> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to export moderation history.');
+  }
+
+  const url = new URL(`${baseUrl}/v1/themes/moderation/events/export`);
+  if (options.themeId) url.searchParams.set('themeId', options.themeId);
+  if (options.action && options.action !== 'all') url.searchParams.set('action', options.action);
+  if (options.actor?.trim()) url.searchParams.set('actor', options.actor.trim());
+  if (options.from) url.searchParams.set('from', options.from);
+  if (options.to) url.searchParams.set('to', options.to);
+
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to export moderation history (HTTP ${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'theme-moderation-events.csv';
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+export async function setCommunityThemeTags(
+  themeId: string,
+  tags: string[]
+): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to edit community theme tags.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/tags`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to update theme tags (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
+}
+
+export async function setCommunityThemeVisibility(
+  themeId: string,
+  hidden: boolean,
+  reason?: string
+): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to moderate community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/visibility`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hidden, reason: hidden ? reason : undefined }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to update theme visibility (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
+}
+
 /**
  * 3-step Cloudflare-compliant chunked upload protocol (~15 MB slices).
  */
@@ -366,7 +650,7 @@ export async function publishThemeToWorkshop(options: {
   tags?: string[];
   previewImageBase64?: string;
   onProgress?: (status: string, percentage: number) => void;
-}): Promise<{ success: boolean; theme: any }> {
+}): Promise<{ success: boolean; theme: unknown }> {
   const { onProgress = () => {} } = options;
   const baseUrl = await getThemesServiceUrl();
   const authHeaders = await getAuthHeaders();

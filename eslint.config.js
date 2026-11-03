@@ -44,6 +44,7 @@ export default ts.config(
   {
     rules: {
       'no-empty': 'off',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^\\$\\$(Props|Events|Slots|Generic)$' },

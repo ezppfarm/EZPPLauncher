@@ -4,6 +4,7 @@
   import { ezppfarm } from '$lib/api/ezpp';
   import DiagnosticsPanel from '$lib/components/diagnostics/DiagnosticsPanel.svelte';
   import LogViewer from '$lib/components/logs/LogViewer.svelte';
+  import NotificationHub from '$lib/components/notifications/NotificationHub.svelte';
   import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
@@ -2020,7 +2021,8 @@
     >
       <ThemeIcon name="settings" set={iconSet} class="size-5!" />
     </Button>
-    <div class="mt-auto">
+    <div class="mt-auto flex flex-col items-center gap-2">
+      <NotificationHub />
       <DropdownMenu.Root>
         <DropdownMenu.Trigger disabled={$launching}>
           <Avatar.Root class="size-10">
@@ -3730,6 +3732,7 @@
                 <CommunityWorkshopView
                   onApplyTheme={applyInstalledTheme}
                   onRequestTrust={(theme) => requestThemeTrust(theme, false)}
+                  onEditTheme={openThemeEditor}
                 />
               {:else}
                 <ScrollContainer class="pr-2">

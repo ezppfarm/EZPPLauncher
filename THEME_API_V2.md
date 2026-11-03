@@ -7,7 +7,9 @@ editor can create and edit these themes without writing code. Themes can opt int
 custom **Svelte layer** when they need behavior that data alone cannot express; that
 layer runs theme-authored JavaScript and therefore needs an explicit trust prompt.
 
-API 1.0 themes continue to work unchanged. Pick the API that fits the theme:
+API 1.0 themes still work when they are already installed or installed manually from a
+`.ezpplauncher-theme` file, but they can no longer be uploaded to the Community Themes
+Workshop. Workshop uploads accept API 2.0 only. Pick the API that fits the theme:
 
 |                         | API 1.0                                           | API 2.0                                        |
 | ----------------------- | ------------------------------------------------- | ---------------------------------------------- |
