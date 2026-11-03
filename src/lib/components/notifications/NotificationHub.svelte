@@ -37,6 +37,8 @@
   const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
     theme_hidden: 'Theme hidden',
     theme_restored: 'Theme restored',
+    theme_approved: 'Theme approved',
+    theme_rejected: 'Theme needs changes',
     theme_taken_down: 'Theme taken down',
     report_resolved: 'Report resolved',
     report_dismissed: 'Report dismissed',

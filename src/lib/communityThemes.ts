@@ -32,6 +32,8 @@ export interface ThemeSearchMatch {
   score: number;
 }
 
+export type ThemeReviewStatus = 'pending' | 'approved' | 'rejected';
+
 export interface CommunityTheme {
   id: string;
   name: string;
@@ -45,6 +47,11 @@ export interface CommunityTheme {
   likeCount: number;
   tags: string[];
   allowForking: boolean;
+  reviewStatus: ThemeReviewStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  reviewedBy: number | null;
+  reviewedByName: string | null;
   createdAt: string;
   updatedAt: string;
   author: CommunityThemeAuthor;
@@ -834,7 +841,7 @@ export async function publishThemeToWorkshop(options: {
     const completeData = (await completeRes.json()) as Record<string, unknown> & {
       themeId?: unknown;
     };
-    onProgress('Theme published successfully!', 100);
+    onProgress('Upload complete', 100);
 
     return {
       success: true,
@@ -847,6 +854,88 @@ export async function publishThemeToWorkshop(options: {
       await fs.remove(destinationZip).catch(() => {});
     }
   }
+}
+
+export interface ThemeReviewQueueResponse {
+  items: CommunityTheme[];
+  total: number;
+  page: number;
+  totalPages: number;
+  canModerate: boolean;
+}
+
+/**
+ * Load the staff review queue. New themes stay out of public listings until approved.
+ */
+export async function fetchThemeReviewQueue(
+  status: ThemeReviewStatus = 'pending',
+  page = 1,
+  limit = 50
+): Promise<ThemeReviewQueueResponse> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to view the review queue.');
+  }
+
+  const url = new URL(`${baseUrl}/v1/themes/moderation/review`);
+  url.searchParams.set('status', status);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('limit', String(limit));
+
+  const res = await fetch(url.toString(), { headers });
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to load the review queue (HTTP ${res.status})`);
+  }
+
+  const data = (await res.json()) as ThemeReviewQueueResponse;
+  for (const item of data.items) {
+    if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+      item.previewUrl = `${baseUrl}${item.previewUrl}`;
+    }
+    if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+      item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+    }
+  }
+  return data;
+}
+
+/**
+ * Approve a pending theme so it becomes publicly listed, or reject it with a note.
+ */
+export async function reviewCommunityTheme(
+  themeId: string,
+  status: 'approved' | 'rejected',
+  note?: string
+): Promise<CommunityTheme> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to review themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/review`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, note }),
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to review theme (HTTP ${res.status})`);
+  }
+
+  const item = (await res.json()) as CommunityTheme;
+  if (item.previewUrl && !item.previewUrl.startsWith('http')) {
+    item.previewUrl = `${baseUrl}${item.previewUrl}`;
+  }
+  if (item.downloadUrl && !item.downloadUrl.startsWith('http')) {
+    item.downloadUrl = `${baseUrl}${item.downloadUrl}`;
+  }
+  return item;
 }
 
 /**

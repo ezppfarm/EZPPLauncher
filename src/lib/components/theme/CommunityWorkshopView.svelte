@@ -15,6 +15,8 @@
     setCommunityThemeTags,
     reportCommunityTheme,
     fetchThemeReports,
+    fetchThemeReviewQueue,
+    reviewCommunityTheme,
     resolveThemeReport,
     bulkResolveThemeReports,
     downloadThemeReportsCsv,
@@ -147,6 +149,9 @@
   let moderationEventActor = $state('');
   let moderationEventsPage = $state(1);
   let moderationEventsTotalPages = $state(1);
+  let reviewQueue = $state<CommunityTheme[]>([]);
+  let reviewTotal = $state(0);
+  let reviewActionId = $state<string | null>(null);
   let selectedReportIds = $state<number[]>([]);
   let reportActionId = $state<number | null>(null);
   let bulkAction = $state<'hide' | 'resolved' | 'dismissed' | null>(null);
@@ -211,6 +216,8 @@
     report_dismissed: 'Report dismissed',
     quarantine: 'Taken down',
     quarantine_restore: 'Takedown lifted',
+    review_approved: 'Theme approved',
+    review_rejected: 'Theme rejected',
   };
   const AUDIT_ACTIONS = [
     { id: 'all', label: 'All actions' },
@@ -221,6 +228,8 @@
     { id: 'report', label: 'Reported' },
     { id: 'report_resolved', label: 'Report resolved' },
     { id: 'report_dismissed', label: 'Report dismissed' },
+    { id: 'review_approved', label: 'Theme approved' },
+    { id: 'review_rejected', label: 'Theme rejected' },
     { id: 'delete', label: 'Trashed' },
     { id: 'restore_deleted', label: 'Restored from trash' },
     { id: 'delete_permanent', label: 'Permanently deleted' },
@@ -918,11 +927,14 @@
     moderationLoading = true;
     moderationError = null;
     try {
-      const [reportsResult, eventsResult] = await Promise.all([
+      const [reportsResult, eventsResult, reviewResult] = await Promise.all([
         fetchThemeReports({ ...currentReportFilters(), page, limit: 50 }),
         fetchModerationEvents({ ...currentEventFilters(), page: 1, limit: 50 }),
+        fetchThemeReviewQueue('pending', 1, 50),
       ]);
       moderationReports = reportsResult.reports;
+      reviewQueue = reviewResult.items;
+      reviewTotal = reviewResult.total;
       moderationTotal = reportsResult.total;
       moderationPage = reportsResult.page;
       moderationTotalPages = reportsResult.totalPages;
@@ -947,6 +959,41 @@
     moderationEventsPage = 1;
     selectedReportIds = [];
     void loadModerationPanel(1);
+  }
+
+  async function handleReviewTheme(theme: CommunityTheme, status: 'approved' | 'rejected') {
+    if (reviewActionId) return;
+
+    let note: string | undefined;
+    if (status === 'rejected') {
+      const answer = window.prompt(
+        `Reject "${theme.name}"? Add an optional note for the creator:`,
+        ''
+      );
+      if (answer === null) return;
+      note = answer.trim() || undefined;
+    }
+
+    reviewActionId = theme.id;
+    try {
+      await reviewCommunityTheme(theme.id, status, note);
+      sileo.success({
+        title: status === 'approved' ? 'Theme approved' : 'Theme rejected',
+        description:
+          status === 'approved'
+            ? `"${theme.name}" is now listed in the Community Workshop.`
+            : `"${theme.name}" stays hidden until the creator republishes it.`,
+      });
+      await loadModerationPanel(moderationPage);
+      void loadWorkshopThemes();
+    } catch (err) {
+      sileo.error({
+        title: 'Could not review theme',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      reviewActionId = null;
+    }
   }
 
   function handleAuditFilterChange() {
@@ -1616,6 +1663,37 @@
                         {/snippet}
                       </WorkshopTooltip>
                     {/if}
+                    {#if theme.reviewStatus === 'pending'}
+                      <WorkshopTooltip
+                        content="Waiting for staff review before it is listed publicly"
+                      >
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-950/85 px-1.5 py-0.5 text-[9px] font-medium text-amber-200 backdrop-blur-sm"
+                          >
+                            <LoaderCircle class="size-3" />
+                            In review
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {:else if theme.reviewStatus === 'rejected'}
+                      <WorkshopTooltip
+                        content={`Not approved${theme.reviewNote ? `: ${theme.reviewNote}` : ''}`}
+                      >
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-950/85 px-1.5 py-0.5 text-[9px] font-medium text-red-200 backdrop-blur-sm"
+                          >
+                            <X class="size-3" />
+                            Rejected
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {/if}
                     {#if theme.isHidden}
                       <WorkshopTooltip
                         content={`${theme.hiddenReason || 'Hidden by a moderator'}${
@@ -2145,7 +2223,7 @@
             Moderation
           </Dialog.Title>
           <Dialog.Description class="mt-1 text-[11px] text-muted-foreground">
-            Open reports and recent staff activity.
+            Themes awaiting review, open reports and recent staff activity.
           </Dialog.Description>
         </div>
         <div class="flex items-center gap-1">
@@ -2359,6 +2437,76 @@
             <LoaderCircle class="size-4 animate-spin text-primary" /> Loading moderation data...
           </div>
         {:else}
+          <section>
+            <h3
+              class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase"
+            >
+              <ShieldCheck class="size-3.5 text-cyan-300" />
+              Review queue
+              <Badge
+                variant="secondary"
+                class="bg-theme-800 px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground"
+              >
+                {reviewTotal}
+              </Badge>
+            </h3>
+            {#if reviewQueue.length === 0}
+              <p
+                class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+              >
+                No themes are waiting for review.
+              </p>
+            {:else}
+              <div class="mt-2 space-y-2">
+                {#each reviewQueue as theme (theme.id)}
+                  <div
+                    class="flex items-start justify-between gap-3 rounded-lg border border-theme-800/70 bg-theme-900/30 p-3"
+                  >
+                    <div class="min-w-0">
+                      <p class="truncate text-xs font-semibold text-white">{theme.name}</p>
+                      <p class="mt-0.5 text-[10px] text-muted-foreground">
+                        by {theme.author.name} · v{theme.version} ·
+                        {formatModerationDate(theme.createdAt)}
+                      </p>
+                      {#if theme.description}
+                        <p
+                          class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground"
+                        >
+                          {theme.description}
+                        </p>
+                      {/if}
+                    </div>
+                    <div class="flex shrink-0 items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        class="h-7 gap-1 text-xs"
+                        onclick={() => void handleReviewTheme(theme, 'approved')}
+                        disabled={reviewActionId === theme.id}
+                      >
+                        {#if reviewActionId === theme.id}
+                          <LoaderCircle class="size-3 animate-spin" />
+                        {:else}
+                          <Check class="size-3" />
+                        {/if}
+                        Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        class="h-7 gap-1 text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                        onclick={() => void handleReviewTheme(theme, 'rejected')}
+                        disabled={reviewActionId === theme.id}
+                      >
+                        <X class="size-3" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </section>
+
           <section>
             <h3
               class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase"

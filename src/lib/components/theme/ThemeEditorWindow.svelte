@@ -3404,6 +3404,7 @@
       if (!savedFolder) return;
     }
 
+    const firstPublish = !definition.workshopId;
     publishing = true;
     publishProgress = 5;
     publishStatusMessage = 'Packaging theme archive...';
@@ -3452,8 +3453,10 @@
       }
 
       sileo.success({
-        title: 'Published to Workshop!',
-        description: `"${definition.name}" is now live in the Community Themes Workshop.`,
+        title: firstPublish ? 'Submitted for review' : 'Workshop update submitted',
+        description: firstPublish
+          ? `"${definition.name}" will be listed once a moderator approves it.`
+          : `"${definition.name}" was updated in the Community Workshop.`,
       });
 
       publishModalOpen = false;
