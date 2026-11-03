@@ -202,6 +202,13 @@
     { id: 'broken', label: 'Broken / unusable' },
     { id: 'other', label: 'Other' },
   ];
+  const SORT_OPTIONS: Array<{ id: WorkshopSort; label: string }> = [
+    { id: 'relevance', label: 'Best match' },
+    { id: 'popular', label: 'Most Popular' },
+    { id: 'recent', label: 'Most Recent' },
+    { id: 'likes', label: 'Most Liked' },
+    { id: 'downloads', label: 'Most Downloaded' },
+  ];
   const REPORT_STATUS_OPTIONS: Array<{ id: ThemeReportStatus | 'all'; label: string }> = [
     { id: 'open', label: 'Open reports' },
     { id: 'resolved', label: 'Resolved reports' },
@@ -1492,17 +1499,26 @@
 
         <!-- Controls Right: Sort, Search, Moderation, Trash & Refresh -->
         <div class="flex shrink-0 items-center gap-2">
-          <select
-            class="h-7.5 rounded-lg border border-theme-800 bg-theme-950/80 px-2.5 text-[11px] text-muted-foreground outline-none transition-colors hover:text-white focus:border-primary/50"
+          <Select.Root
+            type="single"
             value={selectedSort}
-            onchange={(e) => handleSortChange(parseWorkshopSort(e.currentTarget.value))}
+            onValueChange={(value) => {
+              if (!value) return;
+              handleSortChange(parseWorkshopSort(value));
+            }}
           >
-            <option value="relevance">Best match</option>
-            <option value="popular">Most Popular</option>
-            <option value="recent">Most Recent</option>
-            <option value="likes">Most Liked</option>
-            <option value="downloads">Most Downloaded</option>
-          </select>
+            <Select.Trigger
+              class="h-7.5 w-36 border-theme-800 bg-theme-950/80 px-2.5 text-[11px] text-muted-foreground transition-colors hover:text-white"
+              aria-label="Sort themes"
+            >
+              {SORT_OPTIONS.find((option) => option.id === selectedSort)?.label ?? 'Best match'}
+            </Select.Trigger>
+            <Select.Content class="border-theme-800 bg-theme-950">
+              {#each SORT_OPTIONS as option (option.id)}
+                <Select.Item value={option.id} label={option.label} />
+              {/each}
+            </Select.Content>
+          </Select.Root>
 
           <div class="relative w-48">
             <Search
@@ -2888,18 +2904,30 @@
               {announcementMessage.trim().length}/1000 · minimum 10
             </span>
           </label>
-          <label class="block space-y-1.5">
+          <div class="block space-y-1.5">
             <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
               >Audience</span
             >
-            <select
-              class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
-              bind:value={announcementAudience}
+            <Select.Root
+              type="single"
+              value={announcementAudience}
+              onValueChange={(value) => {
+                if (!value) return;
+                announcementAudience = value as 'all' | 'staff';
+              }}
             >
-              <option value="all">Everyone</option>
-              <option value="staff">Staff only</option>
-            </select>
-          </label>
+              <Select.Trigger
+                class="h-8 border-theme-800 bg-theme-900/60 text-[11px] text-white"
+                aria-label="Announcement audience"
+              >
+                {announcementAudience === 'staff' ? 'Staff only' : 'Everyone'}
+              </Select.Trigger>
+              <Select.Content class="border-theme-800 bg-theme-950">
+                <Select.Item value="all" label="Everyone" />
+                <Select.Item value="staff" label="Staff only" />
+              </Select.Content>
+            </Select.Root>
+          </div>
           {#if announcementError}
             <p
               class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
@@ -3313,19 +3341,32 @@
           </WorkshopTooltip>
         </div>
         <div class="space-y-3 p-4">
-          <label class="block space-y-1.5">
+          <div class="block space-y-1.5">
             <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
               >Category</span
             >
-            <select
-              class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
-              bind:value={reportCategory}
+            <Select.Root
+              type="single"
+              value={reportCategory}
+              onValueChange={(value) => {
+                if (!value) return;
+                reportCategory = value as ThemeReportCategory;
+              }}
             >
-              {#each REPORT_CATEGORIES as category (category.id)}
-                <option value={category.id}>{category.label}</option>
-              {/each}
-            </select>
-          </label>
+              <Select.Trigger
+                class="h-8 border-theme-800 bg-theme-900/60 text-[11px] text-white"
+                aria-label="Report category"
+              >
+                {REPORT_CATEGORIES.find((category) => category.id === reportCategory)?.label ??
+                  'Other'}
+              </Select.Trigger>
+              <Select.Content class="border-theme-800 bg-theme-950">
+                {#each REPORT_CATEGORIES as category (category.id)}
+                  <Select.Item value={category.id} label={category.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
           <label class="block space-y-1.5">
             <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
               >Details</span
