@@ -345,6 +345,25 @@ export async function deleteCommunityTheme(themeId: string): Promise<void> {
   }
 }
 
+export async function permanentlyDeleteCommunityTheme(themeId: string): Promise<void> {
+  const baseUrl = await getThemesServiceUrl();
+  const headers = await getAuthHeaders();
+
+  if (!headers['X-Username'] || !headers['X-Password']) {
+    throw new Error('Please log in to permanently delete community themes.');
+  }
+
+  const res = await fetch(`${baseUrl}/v1/themes/${encodeURIComponent(themeId)}/permanent`, {
+    method: 'DELETE',
+    headers,
+  });
+
+  if (!res.ok) {
+    const errorJson = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorJson.error || `Failed to permanently delete theme (HTTP ${res.status})`);
+  }
+}
+
 export async function reportCommunityTheme(
   themeId: string,
   reason: string,

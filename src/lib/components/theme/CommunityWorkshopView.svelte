@@ -8,6 +8,7 @@
     downloadAndInstallCommunityTheme,
     forkCommunityTheme,
     deleteCommunityTheme,
+    permanentlyDeleteCommunityTheme,
     restoreCommunityTheme,
     setCommunityThemeVisibility,
     setCommunityThemeQuarantine,
@@ -28,6 +29,7 @@
     type ThemeReportQuery,
     type ThemeReportStatus,
   } from '$lib/communityThemes';
+  import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Checkbox } from '$lib/components/ui/checkbox';
@@ -121,6 +123,10 @@
   let deletingId = $state<string | null>(null);
   let moderatingId = $state<string | null>(null);
   let restoringId = $state<string | null>(null);
+  let purgingId = $state<string | null>(null);
+  let restoreTarget = $state<CommunityTheme | null>(null);
+  let purgeTarget = $state<CommunityTheme | null>(null);
+  let trashActionError = $state<string | null>(null);
   let canModerate = $state(false);
 
   let showModerationPanel = $state(false);
@@ -199,6 +205,7 @@
     restore: 'Visibility restored',
     delete: 'Moved to trash',
     restore_deleted: 'Restored from trash',
+    delete_permanent: 'Permanently deleted',
     report: 'Reported',
     report_resolved: 'Report resolved',
     report_dismissed: 'Report dismissed',
@@ -216,6 +223,7 @@
     { id: 'report_dismissed', label: 'Report dismissed' },
     { id: 'delete', label: 'Trashed' },
     { id: 'restore_deleted', label: 'Restored from trash' },
+    { id: 'delete_permanent', label: 'Permanently deleted' },
   ];
 
   const localThemeMap = $derived.by(() => {
@@ -780,27 +788,79 @@
     }
   }
 
-  async function handleRestoreTheme(theme: CommunityTheme) {
-    if (restoringId || downloadingId || forkingId || deletingId || moderatingId) return;
-    if (!window.confirm(`Restore "${theme.name}" to the workshop?`)) return;
+  function openRestoreDialog(theme: CommunityTheme) {
+    if (restoringId || purgingId || downloadingId || forkingId || deletingId || moderatingId)
+      return;
+    purgeTarget = null;
+    trashActionError = null;
+    restoreTarget = theme;
+  }
+
+  function openPermanentDeleteDialog(theme: CommunityTheme) {
+    if (restoringId || purgingId || downloadingId || forkingId || deletingId || moderatingId)
+      return;
+    restoreTarget = null;
+    trashActionError = null;
+    purgeTarget = theme;
+  }
+
+  function closeRestoreDialog() {
+    if (restoringId) return;
+    restoreTarget = null;
+    trashActionError = null;
+  }
+
+  function closePermanentDeleteDialog() {
+    if (purgingId) return;
+    purgeTarget = null;
+    trashActionError = null;
+  }
+
+  async function handleRestoreTheme() {
+    const theme = restoreTarget;
+    if (!theme || restoringId || purgingId) return;
 
     restoringId = theme.id;
+    trashActionError = null;
     try {
       await restoreCommunityTheme(theme.id);
       themes = themes.filter((item) => item.id !== theme.id);
       totalThemes = Math.max(0, totalThemes - 1);
+      restoreTarget = null;
       sileo.success({
         title: 'Theme restored',
         description: `"${theme.name}" is back in the workshop.`,
       });
       void loadWorkshopThemes();
+      void loadWorkshopTags();
     } catch (err) {
-      sileo.error({
-        title: 'Could not restore theme',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      trashActionError = err instanceof Error ? err.message : String(err);
     } finally {
       restoringId = null;
+    }
+  }
+
+  async function handlePermanentDeleteTheme() {
+    const theme = purgeTarget;
+    if (!theme || restoringId || purgingId) return;
+
+    purgingId = theme.id;
+    trashActionError = null;
+    try {
+      await permanentlyDeleteCommunityTheme(theme.id);
+      themes = themes.filter((item) => item.id !== theme.id);
+      totalThemes = Math.max(0, totalThemes - 1);
+      purgeTarget = null;
+      sileo.success({
+        title: 'Theme permanently deleted',
+        description: `"${theme.name}" and its server files were removed.`,
+      });
+      void loadWorkshopThemes();
+      void loadWorkshopTags();
+    } catch (err) {
+      trashActionError = err instanceof Error ? err.message : String(err);
+    } finally {
+      purgingId = null;
     }
   }
 
@@ -1866,8 +1926,8 @@
                             variant="secondary"
                             size="sm"
                             class="h-7 gap-1 text-xs"
-                            onclick={() => handleRestoreTheme(theme)}
-                            disabled={restoringId === theme.id}
+                            onclick={() => openRestoreDialog(theme)}
+                            disabled={restoringId === theme.id || purgingId === theme.id}
                           >
                             {#if restoringId === theme.id}
                               <LoaderCircle class="size-3 animate-spin" />
@@ -1875,6 +1935,21 @@
                             {:else}
                               <RotateCcw class="size-3" />
                               Restore
+                            {/if}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            class="h-7 gap-1 text-xs text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                            onclick={() => openPermanentDeleteDialog(theme)}
+                            disabled={restoringId === theme.id || purgingId === theme.id}
+                          >
+                            {#if purgingId === theme.id}
+                              <LoaderCircle class="size-3 animate-spin" />
+                              Deleting...
+                            {:else}
+                              <Trash2 class="size-3" />
+                              Delete forever
                             {/if}
                           </Button>
                         {:else}
@@ -3133,4 +3208,101 @@
       </div>
     </div>
   {/if}
+  <AlertDialog.Root
+    open={restoreTarget !== null}
+    onOpenChange={(open) => {
+      if (!open) closeRestoreDialog();
+    }}
+  >
+    <AlertDialog.Content class="max-w-md border-theme-800 bg-theme-950 text-white">
+      <AlertDialog.Header>
+        <AlertDialog.Title class="flex items-center gap-2 text-base">
+          <RotateCcw class="size-4 text-cyan-300" /> Restore theme?
+        </AlertDialog.Title>
+        <AlertDialog.Description class="text-[11px] leading-relaxed text-muted-foreground">
+          Restore <span class="font-medium text-theme-100">{restoreTarget?.name}</span> to the workshop?
+          It will return with its existing visibility and moderation state.
+        </AlertDialog.Description>
+      </AlertDialog.Header>
+      {#if trashActionError}
+        <p class="rounded-md border border-red-900/50 bg-red-950/30 p-2 text-[11px] text-red-300">
+          {trashActionError}
+        </p>
+      {/if}
+      <AlertDialog.Footer class="gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={closeRestoreDialog}
+          disabled={restoringId !== null}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          class="gap-1.5"
+          onclick={() => void handleRestoreTheme()}
+          disabled={restoringId !== null}
+        >
+          {#if restoringId}
+            <LoaderCircle class="size-3.5 animate-spin" />
+            Restoring...
+          {:else}
+            <RotateCcw class="size-3.5" />
+            Restore theme
+          {/if}
+        </Button>
+      </AlertDialog.Footer>
+    </AlertDialog.Content>
+  </AlertDialog.Root>
+
+  <AlertDialog.Root
+    open={purgeTarget !== null}
+    onOpenChange={(open) => {
+      if (!open) closePermanentDeleteDialog();
+    }}
+  >
+    <AlertDialog.Content class="max-w-md border-theme-800 bg-theme-950 text-white">
+      <AlertDialog.Header>
+        <AlertDialog.Title class="flex items-center gap-2 text-base">
+          <Trash2 class="size-4 text-red-400" /> Permanently delete theme?
+        </AlertDialog.Title>
+        <AlertDialog.Description class="text-[11px] leading-relaxed text-muted-foreground">
+          Permanently delete <span class="font-medium text-theme-100">{purgeTarget?.name}</span>?
+          This removes the theme package, preview, likes, downloads and reports from the server.
+          This cannot be undone. Installed copies on computers are not affected.
+        </AlertDialog.Description>
+      </AlertDialog.Header>
+      {#if trashActionError}
+        <p class="rounded-md border border-red-900/50 bg-red-950/30 p-2 text-[11px] text-red-300">
+          {trashActionError}
+        </p>
+      {/if}
+      <AlertDialog.Footer class="gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={closePermanentDeleteDialog}
+          disabled={purgingId !== null}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          class="gap-1.5"
+          onclick={() => void handlePermanentDeleteTheme()}
+          disabled={purgingId !== null}
+        >
+          {#if purgingId}
+            <LoaderCircle class="size-3.5 animate-spin" />
+            Deleting...
+          {:else}
+            <Trash2 class="size-3.5" />
+            Delete permanently
+          {/if}
+        </Button>
+      </AlertDialog.Footer>
+    </AlertDialog.Content>
+  </AlertDialog.Root>
 </Tooltip.Provider>
