@@ -1,5 +1,6 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
+  import { publishThemeToWorkshop } from '$lib/communityThemes';
   import FontPreview from '$lib/components/theme/FontPreview.svelte';
   import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import ThemeElementInspector from '$lib/components/theme/ThemeElementInspector.svelte';
@@ -102,7 +103,6 @@
     toSafeName,
     updateInstalledThemeWorkshopId,
   } from '$lib/themes';
-  import { publishThemeToWorkshop } from '$lib/communityThemes';
   import type { EZPPUser, EZPPUserInfo } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import { osuInstallationPath } from '$lib/userSettings';
@@ -5091,8 +5091,8 @@
                   Allow forking
                 </Label>
                 <p class="text-[10px] leading-relaxed text-muted-foreground">
-                  Let other creators fork this theme from the workshop. Takes effect when you publish
-                  or update it; existing forks are not affected.
+                  Let other creators fork this theme from the workshop. Takes effect when you
+                  publish or update it; existing forks are not affected.
                 </p>
               </div>
               <Checkbox
@@ -6900,7 +6900,9 @@
         </div>
 
         {#if $currentUser}
-          <div class="mt-4 flex items-center justify-between rounded-xl border border-theme-800/70 bg-theme-900/40 px-3.5 py-2.5">
+          <div
+            class="mt-4 flex items-center justify-between rounded-xl border border-theme-800/70 bg-theme-900/40 px-3.5 py-2.5"
+          >
             <div class="flex items-center gap-2.5">
               <img
                 src={`https://a.ez-pp.farm/${$currentUser.id}`}
@@ -6914,7 +6916,9 @@
                 <div class="flex items-center gap-1.5">
                   <span class="text-xs font-semibold text-white">{$currentUser.name}</span>
                   {#if $currentUser.donor}
-                    <span class="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-300 border border-amber-500/30">
+                    <span
+                      class="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-300 border border-amber-500/30"
+                    >
                       Supporter
                     </span>
                   {/if}
@@ -6953,7 +6957,9 @@
               {#if publishThemeId}
                 <p class="mt-1 truncate font-mono text-[11px] text-theme-100">{publishThemeId}</p>
               {:else}
-                <p class="mt-1 text-[11px] text-muted-foreground">Assigned by EZPPFarm on publish</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  Assigned by EZPPFarm on publish
+                </p>
               {/if}
             </div>
             <div>
@@ -6962,7 +6968,7 @@
               </span>
               {#if (definition.tags ?? []).length > 0}
                 <div class="mt-1 flex flex-wrap gap-1">
-                  {#each definition.tags ?? [] as tag}
+                  {#each definition.tags ?? [] as tag (tag)}
                     <span class="rounded bg-theme-800 px-1.5 py-0.5 text-[10px] text-theme-100">
                       {tag}
                     </span>

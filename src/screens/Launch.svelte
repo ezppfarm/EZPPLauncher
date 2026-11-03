@@ -11,6 +11,7 @@
   import LogViewer from '$lib/components/logs/LogViewer.svelte';
   import NotificationHub from '$lib/components/notifications/NotificationHub.svelte';
   import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
+  import CommunityWorkshopView from '$lib/components/theme/CommunityWorkshopView.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeReportDialog from '$lib/components/theme/ThemeReportDialog.svelte';
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
@@ -26,7 +27,6 @@
   import Progress from '$lib/components/ui/progress/progress.svelte';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '$lib/components/ui/select';
-  import CommunityWorkshopView from '$lib/components/theme/CommunityWorkshopView.svelte';
   import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
   import {
@@ -180,6 +180,7 @@
   import { animate } from 'animejs';
   import { sileo } from 'sileo';
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { get } from 'svelte/store';
   import { fade, fly, scale } from 'svelte/transition';
   import { TextMorph } from 'torph/svelte';
@@ -355,7 +356,7 @@
   });
 
   const currentUserAliases = $derived.by(() => {
-    const aliases = new Set<string>();
+    const aliases = new SvelteSet<string>();
     const add = (value: string | undefined) => {
       const normalized = value?.trim().toLowerCase();
       if (normalized) aliases.add(normalized);
@@ -371,8 +372,8 @@
   const loadOwnedWorkshopThemes = async (userId: number) => {
     const requestId = ++ownedThemesRequestId;
     ownedWorkshopLoaded = false;
-    const ids = new Set<string>();
-    const names = new Set<string>();
+    const ids = new SvelteSet<string>();
+    const names = new SvelteSet<string>();
 
     try {
       let page = 1;
@@ -3765,10 +3766,13 @@
                   </div>
 
                   <!-- Tab Switcher: Installed vs Community Workshop -->
-                  <div class="flex items-center rounded-lg border border-theme-800/60 bg-theme-900/50 p-0.5">
+                  <div
+                    class="flex items-center rounded-lg border border-theme-800/60 bg-theme-900/50 p-0.5"
+                  >
                     <button
                       type="button"
-                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab === 'library'
+                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab ===
+                      'library'
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-white'}"
                       onclick={() => (activeThemesTab = 'library')}
@@ -3781,7 +3785,8 @@
                     </button>
                     <button
                       type="button"
-                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab === 'workshop'
+                      class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors {activeThemesTab ===
+                      'workshop'
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-white'}"
                       onclick={() => (activeThemesTab = 'workshop')}
@@ -3891,325 +3896,328 @@
                 />
               {:else}
                 <ScrollContainer class="pr-2">
-                {#if filteredThemes.length > 0}
-                  {#key themeFilter}
-                    <div class="grid grid-cols-3 gap-3 pb-4 pr-1">
-                      {#each filteredThemes as theme, index (theme.folder_name)}
-                        {@const isActive = $active_custom_theme?.folder_name === theme.folder_name}
-                        <div
-                          class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
-                            ? 'border-primary/60 ring-1 ring-primary/15'
-                            : 'border-theme-800/60'} {$reduceAnimations
-                            ? ''
-                            : 'transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/25'}"
-                          in:fly={{
-                            duration: $reduceAnimations ? 0 : 260,
-                            delay: $reduceAnimations ? 0 : Math.min(index * 35, 210),
-                            y: 8,
-                            opacity: 0,
-                          }}
-                        >
+                  {#if filteredThemes.length > 0}
+                    {#key themeFilter}
+                      <div class="grid grid-cols-3 gap-3 pb-4 pr-1">
+                        {#each filteredThemes as theme, index (theme.folder_name)}
+                          {@const isActive =
+                            $active_custom_theme?.folder_name === theme.folder_name}
                           <div
-                            class="relative h-36 w-full shrink-0 overflow-hidden bg-theme-950/60"
+                            class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
+                              ? 'border-primary/60 ring-1 ring-primary/15'
+                              : 'border-theme-800/60'} {$reduceAnimations
+                              ? ''
+                              : 'transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/25'}"
+                            in:fly={{
+                              duration: $reduceAnimations ? 0 : 260,
+                              delay: $reduceAnimations ? 0 : Math.min(index * 35, 210),
+                              y: 8,
+                              opacity: 0,
+                            }}
                           >
                             <div
-                              class="h-full w-full {$reduceAnimations
-                                ? ''
-                                : 'transition-transform duration-500 ease-out group-hover:scale-[1.03]'} {theme.nsfw &&
-                              !revealedNsfw.includes(theme.name)
-                                ? 'scale-105 blur-2xl'
-                                : ''}"
+                              class="relative h-36 w-full shrink-0 overflow-hidden bg-theme-950/60"
                             >
-                              {#if theme.preview}
-                                <img
-                                  src={theme.preview}
-                                  alt="Preview of {theme.name}"
-                                  class="pointer-events-none h-full w-full object-cover object-center select-none"
-                                />
-                              {:else if themeBackgroundVideo(theme)}
-                                <video
-                                  src={themeBackgroundVideo(theme)}
-                                  class="pointer-events-none h-full w-full object-cover object-center"
-                                  autoplay
-                                  loop
-                                  muted
-                                  playsinline
-                                ></video>
-                              {:else if theme.definition}
-                                <div
-                                  class="h-full w-full"
-                                  style={themeV2ThumbnailStyle(theme.definition, theme.assets)}
-                                ></div>
-                              {:else}
-                                <img
-                                  src={DefaultThemePreview}
-                                  alt="Preview of {theme.name}"
-                                  class="pointer-events-none h-full w-full object-cover object-center select-none"
-                                />
+                              <div
+                                class="h-full w-full {$reduceAnimations
+                                  ? ''
+                                  : 'transition-transform duration-500 ease-out group-hover:scale-[1.03]'} {theme.nsfw &&
+                                !revealedNsfw.includes(theme.name)
+                                  ? 'scale-105 blur-2xl'
+                                  : ''}"
+                              >
+                                {#if theme.preview}
+                                  <img
+                                    src={theme.preview}
+                                    alt="Preview of {theme.name}"
+                                    class="pointer-events-none h-full w-full object-cover object-center select-none"
+                                  />
+                                {:else if themeBackgroundVideo(theme)}
+                                  <video
+                                    src={themeBackgroundVideo(theme)}
+                                    class="pointer-events-none h-full w-full object-cover object-center"
+                                    autoplay
+                                    loop
+                                    muted
+                                    playsinline
+                                  ></video>
+                                {:else if theme.definition}
+                                  <div
+                                    class="h-full w-full"
+                                    style={themeV2ThumbnailStyle(theme.definition, theme.assets)}
+                                  ></div>
+                                {:else}
+                                  <img
+                                    src={DefaultThemePreview}
+                                    alt="Preview of {theme.name}"
+                                    class="pointer-events-none h-full w-full object-cover object-center select-none"
+                                  />
+                                {/if}
+                              </div>
+                              <div
+                                class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/75 via-transparent to-transparent"
+                              ></div>
+                              {#if isActive}
+                                <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
+                              {/if}
+                              {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
+                                <Badge
+                                  variant="secondary"
+                                  class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
+                                >
+                                  API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
+                                </Badge>
+                              {/if}
+                              {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
+                                <button
+                                  type="button"
+                                  class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/20 text-white transition hover:bg-black/30"
+                                  onclick={() => toggleNsfwPreview(theme.name)}
+                                >
+                                  <ThemeIcon name="eye" set={iconSet} class="size-5" />
+                                  <span class="text-[9px] font-semibold uppercase tracking-wide">
+                                    Adult preview
+                                  </span>
+                                  <span class="text-[8px] text-white/70">Click to reveal</span>
+                                </button>
+                              {:else if theme.nsfw}
+                                <button
+                                  type="button"
+                                  class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
+                                  onclick={() => toggleNsfwPreview(theme.name)}
+                                >
+                                  <ThemeIcon name="eye-off" set={iconSet} class="size-3" />
+                                  Hide preview
+                                </button>
+                              {/if}
+                              {#if theme.nsfw}
+                                <Badge
+                                  variant="destructive"
+                                  class="absolute right-1.5 bottom-1.5 px-1.5 py-0 text-[9px]"
+                                  title="Adult content"
+                                >
+                                  18+
+                                </Badge>
                               {/if}
                             </div>
-                            <div
-                              class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/75 via-transparent to-transparent"
-                            ></div>
-                            {#if isActive}
-                              <Badge class="absolute top-1.5 left-1.5 text-[9px]">In use</Badge>
-                            {/if}
-                            {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
-                              <Badge
-                                variant="secondary"
-                                class="absolute top-1.5 right-1.5 bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
-                              >
-                                API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
-                              </Badge>
-                            {/if}
-                            {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
-                              <button
-                                type="button"
-                                class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-black/20 text-white transition hover:bg-black/30"
-                                onclick={() => toggleNsfwPreview(theme.name)}
-                              >
-                                <ThemeIcon name="eye" set={iconSet} class="size-5" />
-                                <span class="text-[9px] font-semibold uppercase tracking-wide">
-                                  Adult preview
-                                </span>
-                                <span class="text-[8px] text-white/70">Click to reveal</span>
-                              </button>
-                            {:else if theme.nsfw}
-                              <button
-                                type="button"
-                                class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[8px] font-medium text-white/80 backdrop-blur-sm hover:bg-black/75 hover:text-white"
-                                onclick={() => toggleNsfwPreview(theme.name)}
-                              >
-                                <ThemeIcon name="eye-off" set={iconSet} class="size-3" />
-                                Hide preview
-                              </button>
-                            {/if}
-                            {#if theme.nsfw}
-                              <Badge
-                                variant="destructive"
-                                class="absolute right-1.5 bottom-1.5 px-1.5 py-0 text-[9px]"
-                                title="Adult content"
-                              >
-                                18+
-                              </Badge>
-                            {/if}
-                          </div>
-                          <div class="flex flex-1 flex-col gap-1.5 p-2.5">
-                            <div class="flex items-start justify-between gap-1.5">
-                              <div class="min-w-0">
+                            <div class="flex flex-1 flex-col gap-1.5 p-2.5">
+                              <div class="flex items-start justify-between gap-1.5">
+                                <div class="min-w-0">
+                                  <span
+                                    class="block truncate text-[13px] leading-tight font-semibold"
+                                  >
+                                    {theme.name}
+                                  </span>
+                                  <span
+                                    class="mt-0.5 block truncate text-[10px] text-muted-foreground"
+                                  >
+                                    by {theme.author}
+                                  </span>
+                                </div>
                                 <span
-                                  class="block truncate text-[13px] leading-tight font-semibold"
+                                  class="shrink-0 rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] whitespace-nowrap tabular-nums text-muted-foreground"
                                 >
-                                  {theme.name}
-                                </span>
-                                <span
-                                  class="mt-0.5 block truncate text-[10px] text-muted-foreground"
-                                >
-                                  by {theme.author}
+                                  {#if theme.updateAvailable && theme.availableVersion}
+                                    v{theme.version} <span class="text-primary">→</span>
+                                    v{theme.availableVersion}
+                                  {:else}
+                                    v{theme.version}
+                                  {/if}
                                 </span>
                               </div>
-                              <span
-                                class="shrink-0 rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] whitespace-nowrap tabular-nums text-muted-foreground"
-                              >
-                                {#if theme.updateAvailable && theme.availableVersion}
-                                  v{theme.version} <span class="text-primary">→</span>
-                                  v{theme.availableVersion}
-                                {:else}
-                                  v{theme.version}
-                                {/if}
-                              </span>
-                            </div>
-                            {#if theme.description}
-                              <p
-                                class="line-clamp-2 text-[10px] leading-snug text-muted-foreground"
-                              >
-                                {theme.description}
-                              </p>
-                            {/if}
-                            <div class="mt-auto flex items-center gap-1 pt-0.5">
-                              <Button
-                                class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
-                                  'downloading' || theme.status === 'extracting'
-                                  ? 'disabled:bg-primary disabled:opacity-100'
-                                  : ''}"
-                                size="sm"
-                                aria-busy={theme.status === 'downloading' ||
-                                  theme.status === 'extracting'}
-                                disabled={isActive ||
-                                  theme.status === 'downloading' ||
-                                  theme.status === 'extracting' ||
-                                  theme.status === 'deleting'}
-                                onclick={() => requestThemeApply(theme)}
-                              >
-                                {#if theme.status === 'downloading' || theme.status === 'extracting'}
-                                  <span
-                                    class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
-                                    style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
-                                  ></span>
-                                  {#if !$reduceAnimations}
+                              {#if theme.description}
+                                <p
+                                  class="line-clamp-2 text-[10px] leading-snug text-muted-foreground"
+                                >
+                                  {theme.description}
+                                </p>
+                              {/if}
+                              <div class="mt-auto flex items-center gap-1 pt-0.5">
+                                <Button
+                                  class="relative h-8 min-w-0 flex-1 overflow-hidden px-2 text-xs {theme.status ===
+                                    'downloading' || theme.status === 'extracting'
+                                    ? 'disabled:bg-primary disabled:opacity-100'
+                                    : ''}"
+                                  size="sm"
+                                  aria-busy={theme.status === 'downloading' ||
+                                    theme.status === 'extracting'}
+                                  disabled={isActive ||
+                                    theme.status === 'downloading' ||
+                                    theme.status === 'extracting' ||
+                                    theme.status === 'deleting'}
+                                  onclick={() => requestThemeApply(theme)}
+                                >
+                                  {#if theme.status === 'downloading' || theme.status === 'extracting'}
                                     <span
-                                      class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                                      class="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-300 ease-out"
+                                      style={`width: ${Math.min(100, Math.max(0, theme.progress * 100))}%`}
                                     ></span>
+                                    {#if !$reduceAnimations}
+                                      <span
+                                        class="theme-download-shimmer absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+                                      ></span>
+                                    {/if}
                                   {/if}
-                                {/if}
-                                <span class="relative z-10 flex items-center justify-center gap-2">
-                                  {#if theme.status === 'extracting'}
-                                    <ThemeIcon
-                                      name="loader"
-                                      set={iconSet}
-                                      class="size-4 animate-spin"
+                                  <span
+                                    class="relative z-10 flex items-center justify-center gap-2"
+                                  >
+                                    {#if theme.status === 'extracting'}
+                                      <ThemeIcon
+                                        name="loader"
+                                        set={iconSet}
+                                        class="size-4 animate-spin"
+                                      />
+                                    {/if}
+                                    <TextMorph
+                                      text={themeButtonLabel(
+                                        theme,
+                                        $active_custom_theme?.folder_name
+                                      )}
+                                      duration={260}
+                                      ease="cubic-bezier(0.19, 1, 0.22, 1)"
+                                      disabled={$reduceAnimations}
+                                      class="whitespace-nowrap"
                                     />
-                                  {/if}
-                                  <TextMorph
-                                    text={themeButtonLabel(
-                                      theme,
-                                      $active_custom_theme?.folder_name
-                                    )}
-                                    duration={260}
-                                    ease="cubic-bezier(0.19, 1, 0.22, 1)"
-                                    disabled={$reduceAnimations}
-                                    class="whitespace-nowrap"
-                                  />
-                                </span>
-                              </Button>
-                              {#if theme.status === 'installed' && theme.definition}
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  class="size-7 shrink-0"
-                                  title="Edit theme"
-                                  onclick={() => openThemeEditor(theme)}
-                                >
-                                  <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
+                                  </span>
                                 </Button>
-                              {/if}
-                              {#if theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  class="size-7 shrink-0"
-                                  title="Restore previous version ({new Date(
-                                    theme.backups![0].createdAt
-                                  ).toLocaleDateString()})"
-                                  onclick={() => requestThemeRestore(theme, theme.backups![0])}
-                                >
-                                  <ThemeIcon name="history" set={iconSet} class="size-3.5" />
-                                </Button>
-                              {/if}
-                              {#if theme.status === 'installed' && theme.updateAvailable}
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  class="size-7 shrink-0"
-                                  title={`Update theme${theme.availableVersion ? ` to v${theme.availableVersion}` : ''}`}
-                                  onclick={() => updateInstalledTheme(theme)}
-                                >
-                                  <ThemeIcon name="download" set={iconSet} class="size-3.5" />
-                                </Button>
-                              {/if}
-                              {#if (theme.status === 'installed' || theme.status === 'deleting') && !isActive && theme.name !== 'Default'}
-                                <Button
-                                  variant="destructive"
-                                  size="icon"
-                                  class="size-7 shrink-0"
-                                  title="Uninstall theme"
-                                  disabled={theme.status !== 'installed'}
-                                  onclick={async () => {
-                                    try {
-                                      const deleteResult = await deleteTheme(theme);
-                                      if (deleteResult) {
-                                        sileo.success({
-                                          title: 'Yaay!',
-                                          description: 'Theme uninstalled successfully!',
-                                        });
-                                      } else {
+                                {#if theme.status === 'installed' && theme.definition}
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    class="size-7 shrink-0"
+                                    title="Edit theme"
+                                    onclick={() => openThemeEditor(theme)}
+                                  >
+                                    <ThemeIcon name="edit" set={iconSet} class="size-3.5" />
+                                  </Button>
+                                {/if}
+                                {#if theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    class="size-7 shrink-0"
+                                    title="Restore previous version ({new Date(
+                                      theme.backups![0].createdAt
+                                    ).toLocaleDateString()})"
+                                    onclick={() => requestThemeRestore(theme, theme.backups![0])}
+                                  >
+                                    <ThemeIcon name="history" set={iconSet} class="size-3.5" />
+                                  </Button>
+                                {/if}
+                                {#if theme.status === 'installed' && theme.updateAvailable}
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    class="size-7 shrink-0"
+                                    title={`Update theme${theme.availableVersion ? ` to v${theme.availableVersion}` : ''}`}
+                                    onclick={() => updateInstalledTheme(theme)}
+                                  >
+                                    <ThemeIcon name="download" set={iconSet} class="size-3.5" />
+                                  </Button>
+                                {/if}
+                                {#if (theme.status === 'installed' || theme.status === 'deleting') && !isActive && theme.name !== 'Default'}
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    class="size-7 shrink-0"
+                                    title="Uninstall theme"
+                                    disabled={theme.status !== 'installed'}
+                                    onclick={async () => {
+                                      try {
+                                        const deleteResult = await deleteTheme(theme);
+                                        if (deleteResult) {
+                                          sileo.success({
+                                            title: 'Yaay!',
+                                            description: 'Theme uninstalled successfully!',
+                                          });
+                                        } else {
+                                          sileo.error({
+                                            title: 'Uhhm..',
+                                            description: 'Failed to uninstall theme.',
+                                          });
+                                        }
+                                      } catch (err) {
+                                        console.log(err);
                                         sileo.error({
                                           title: 'Uhhm..',
                                           description: 'Failed to uninstall theme.',
                                         });
                                       }
-                                    } catch (err) {
-                                      console.log(err);
-                                      sileo.error({
-                                        title: 'Uhhm..',
-                                        description: 'Failed to uninstall theme.',
-                                      });
-                                    }
-                                  }}
-                                >
-                                  {#if theme.status === 'deleting'}
-                                    <ThemeIcon
-                                      name="loader"
-                                      set={iconSet}
-                                      class="size-3.5 animate-spin"
-                                    />
-                                  {:else}
-                                    <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
-                                  {/if}
-                                </Button>
-                              {/if}
-                              {#if $currentUser && ownedWorkshopLoaded && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  class="size-7 shrink-0 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-300"
-                                  title="Report theme"
-                                  aria-label={`Report ${theme.name}`}
-                                  disabled={installedReportLoading}
-                                  onclick={() => void openInstalledReport(theme)}
-                                >
-                                  <Flag class="size-3.5" />
-                                </Button>
-                              {/if}
+                                    }}
+                                  >
+                                    {#if theme.status === 'deleting'}
+                                      <ThemeIcon
+                                        name="loader"
+                                        set={iconSet}
+                                        class="size-3.5 animate-spin"
+                                      />
+                                    {:else}
+                                      <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
+                                    {/if}
+                                  </Button>
+                                {/if}
+                                {#if $currentUser && ownedWorkshopLoaded && !isOwnInstalledTheme(theme) && theme.status === 'installed' && theme.name !== 'Default' && theme.folder_name !== 'default'}
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    class="size-7 shrink-0 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-300"
+                                    title="Report theme"
+                                    aria-label={`Report ${theme.name}`}
+                                    disabled={installedReportLoading}
+                                    onclick={() => void openInstalledReport(theme)}
+                                  >
+                                    <Flag class="size-3.5" />
+                                  </Button>
+                                {/if}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      {/each}
-                    </div>
-                  {/key}
-                {:else}
-                  <div
-                    class="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground"
-                  >
-                    <div class="rounded-full bg-theme-900/60 p-3">
-                      <ThemeIcon name="search" set={iconSet} class="size-5 opacity-60" />
-                    </div>
-                    <p class="text-sm font-semibold text-theme-100">
-                      {#if themeSearch}
-                        No themes match "{themeSearch}"
-                      {:else if themeFilter === 'updates'}
-                        Everything is up to date
-                      {:else}
-                        No themes found
+                        {/each}
+                      </div>
+                    {/key}
+                  {:else}
+                    <div
+                      class="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground"
+                    >
+                      <div class="rounded-full bg-theme-900/60 p-3">
+                        <ThemeIcon name="search" set={iconSet} class="size-5 opacity-60" />
+                      </div>
+                      <p class="text-sm font-semibold text-theme-100">
+                        {#if themeSearch}
+                          No themes match "{themeSearch}"
+                        {:else if themeFilter === 'updates'}
+                          Everything is up to date
+                        {:else}
+                          No themes found
+                        {/if}
+                      </p>
+                      <p class="max-w-xs text-xs leading-relaxed">
+                        {#if themeSearch}
+                          Try a different name, author or API version.
+                        {:else if themeFilter === 'updates'}
+                          You are running the latest version of every installed theme.
+                        {:else}
+                          Discover themes in the Community Workshop or create a new API 2.0 theme.
+                        {/if}
+                      </p>
+                      {#if themeSearch || themeFilter !== 'all'}
+                        <Button
+                          class="mt-1"
+                          variant="secondary"
+                          size="sm"
+                          onclick={() => {
+                            themeSearch = '';
+                            themeFilter = 'all';
+                          }}
+                        >
+                          Clear filters
+                        </Button>
                       {/if}
-                    </p>
-                    <p class="max-w-xs text-xs leading-relaxed">
-                      {#if themeSearch}
-                        Try a different name, author or API version.
-                      {:else if themeFilter === 'updates'}
-                        You are running the latest version of every installed theme.
-                      {:else}
-                        Discover themes in the Community Workshop or create a new API 2.0 theme.
-                      {/if}
-                    </p>
-                    {#if themeSearch || themeFilter !== 'all'}
-                      <Button
-                        class="mt-1"
-                        variant="secondary"
-                        size="sm"
-                        onclick={() => {
-                          themeSearch = '';
-                          themeFilter = 'all';
-                        }}
-                      >
-                        Clear filters
-                      </Button>
-                    {/if}
-                  </div>
-                {/if}
-              </ScrollContainer>
-            {/if}
-          </div>
+                    </div>
+                  {/if}
+                </ScrollContainer>
+              {/if}
+            </div>
           </div>
         </div>
       </div>

@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { Flag, LoaderCircle, X } from '@lucide/svelte';
-  import { Button } from '$lib/components/ui/button';
-  import * as Dialog from '$lib/components/ui/dialog';
-  import { Label } from '$lib/components/ui/label';
-  import * as Select from '$lib/components/ui/select';
-  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
   import {
     reportCommunityTheme,
     type CommunityTheme,
     type ThemeReportCategory,
   } from '$lib/communityThemes';
+  import { Button } from '$lib/components/ui/button';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import { Label } from '$lib/components/ui/label';
+  import * as Select from '$lib/components/ui/select';
+  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import { Flag, LoaderCircle, X } from '@lucide/svelte';
   import { sileo } from 'sileo';
 
   let {
@@ -79,8 +79,8 @@
             <Flag class="size-4 text-amber-300" /> Report theme
           </Dialog.Title>
           <Dialog.Description class="mt-1 text-[11px] text-muted-foreground">
-            Reporting <span class="text-white/80">{theme.name}</span> by {theme.author.name}. Reports
-            are visible to moderators only.
+            Reporting <span class="text-white/80">{theme.name}</span> by {theme.author.name}.
+            Reports are visible to moderators only.
           </Dialog.Description>
         </div>
         <Button
@@ -97,7 +97,10 @@
 
       <div class="space-y-3 p-4">
         <div class="space-y-1.5">
-          <Label for="installed-report-category" class="text-[10px] uppercase tracking-wide text-white/70">
+          <Label
+            for="installed-report-category"
+            class="text-[10px] uppercase tracking-wide text-white/70"
+          >
             Category
           </Label>
           <Select.Root
@@ -122,7 +125,10 @@
         </div>
 
         <div class="space-y-1.5">
-          <Label for="installed-report-details" class="text-[10px] uppercase tracking-wide text-white/70">
+          <Label
+            for="installed-report-details"
+            class="text-[10px] uppercase tracking-wide text-white/70"
+          >
             Details
           </Label>
           <Textarea
@@ -141,7 +147,9 @@
         </div>
 
         {#if error}
-          <p class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300">
+          <p
+            class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+          >
             {error}
           </p>
         {/if}

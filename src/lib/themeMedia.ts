@@ -13,10 +13,10 @@
  * theme videos and videos picked in the editor (served as /preview/ URLs) are
  * transcoded to a cached H.264 copy by the Rust backend before playback.
  */
+import { custom_theme_volume } from './global';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { get, writable } from 'svelte/store';
-import { custom_theme_volume } from './global';
 
 type MediaCleanup = () => void;
 

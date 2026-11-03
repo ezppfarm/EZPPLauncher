@@ -1,7 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import * as path from '@tauri-apps/api/path';
-import * as fs from '@tauri-apps/plugin-fs';
 import { config } from './config';
 import {
   reloadThemes,
@@ -9,6 +5,10 @@ import {
   updateInstalledThemeTags,
   updateInstalledThemeWorkshopId,
 } from './themes';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import * as path from '@tauri-apps/api/path';
+import * as fs from '@tauri-apps/plugin-fs';
 
 export interface CommunityThemeAuthor {
   id: number;
@@ -159,7 +159,9 @@ const DEFAULT_THEMES_SERVICE_URL = 'https://themes.ez-pp.farm';
 
 export async function getThemesServiceUrl(): Promise<string> {
   const customUrl = await config.value<string>('themes_service_url').get('');
-  return customUrl.trim().length > 0 ? customUrl.trim().replace(/\/+$/, '') : DEFAULT_THEMES_SERVICE_URL;
+  return customUrl.trim().length > 0
+    ? customUrl.trim().replace(/\/+$/, '')
+    : DEFAULT_THEMES_SERVICE_URL;
 }
 
 /**
@@ -273,7 +275,9 @@ export async function fetchCommunityThemeDetails(themeId: string): Promise<Commu
   return item;
 }
 
-export async function toggleCommunityThemeLike(themeId: string): Promise<{ liked: boolean; likeCount: number }> {
+export async function toggleCommunityThemeLike(
+  themeId: string
+): Promise<{ liked: boolean; likeCount: number }> {
   const baseUrl = await getThemesServiceUrl();
   const headers = await getAuthHeaders();
 

@@ -506,7 +506,9 @@ export const reloadThemes = async () => {
     const ACTIVE_STATUSES = new Set(['downloading', 'extracting', 'deleting']);
 
     const updatedThemes = storeThemes
-      .filter((storeTheme) => installedMap.has(storeTheme.name) || ACTIVE_STATUSES.has(storeTheme.status))
+      .filter(
+        (storeTheme) => installedMap.has(storeTheme.name) || ACTIVE_STATUSES.has(storeTheme.status)
+      )
       .map((storeTheme) => {
         if (ACTIVE_STATUSES.has(storeTheme.status)) return storeTheme;
         const theme = installedMap.get(storeTheme.name);
@@ -564,10 +566,7 @@ export const saveThemeProject = async (
   return themeFolder;
 };
 
-const updateInstalledThemeManifest = async (
-  folderName: string,
-  patch: Record<string, unknown>
-) => {
+const updateInstalledThemeManifest = async (folderName: string, patch: Record<string, unknown>) => {
   const themeFolder = await path.join(await themesDirectory(), folderName);
   const configPath = await path.join(themeFolder, 'theme.json');
   if (!(await fs.exists(configPath))) {
@@ -585,10 +584,7 @@ const updateInstalledThemeManifest = async (
   }
 
   const updated = { ...(parsed as Record<string, unknown>), ...patch };
-  await fs.writeFile(
-    configPath,
-    new TextEncoder().encode(`${JSON.stringify(updated, null, 2)}\n`)
-  );
+  await fs.writeFile(configPath, new TextEncoder().encode(`${JSON.stringify(updated, null, 2)}\n`));
 };
 
 /** Write workshop tags into an installed theme's manifest without dropping other fields. */
@@ -596,10 +592,8 @@ export const updateInstalledThemeTags = async (folderName: string, tags: string[
   updateInstalledThemeManifest(folderName, { tags });
 
 /** Remember the server-assigned workshop ID so later publishes update the same theme. */
-export const updateInstalledThemeWorkshopId = async (
-  folderName: string,
-  workshopId: string
-) => updateInstalledThemeManifest(folderName, { workshopId });
+export const updateInstalledThemeWorkshopId = async (folderName: string, workshopId: string) =>
+  updateInstalledThemeManifest(folderName, { workshopId });
 
 export const exportThemeFolder = async (folderName: string, destinationPath: string) => {
   const themeFolder = await path.join(await themesDirectory(), folderName);
@@ -631,11 +625,4 @@ export const toSafeName = (name: string) => {
       .replace(/_+/g, '_')
       .replace(/[. ]+$/g, '_')
   );
-};
-
-const generateRandomString = (length: number) => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length }, () =>
-    characters.charAt(Math.floor(Math.random() * characters.length))
-  ).join('');
 };

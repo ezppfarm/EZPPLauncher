@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import DefaultThemePreview from '$assets/default_preview.png';
   import {
     fetchCommunityTags,
     fetchCommunityThemes,
@@ -28,12 +28,6 @@
     type ThemeReportQuery,
     type ThemeReportStatus,
   } from '$lib/communityThemes';
-  import { active_custom_theme, custom_themes } from '$lib/global';
-  import { reduceAnimations } from '$lib/userSettings';
-  import { currentUser } from '$lib/userAuthentication';
-  import { isThemeTrusted } from '$lib/themeTrust';
-  import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/themes';
-  import { normalizeThemeTags } from '$lib/themeV2';
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import { Button } from '$lib/components/ui/button';
   import { Checkbox } from '$lib/components/ui/checkbox';
@@ -41,13 +35,17 @@
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { Input } from '$lib/components/ui/input';
-  import * as Popover from '$lib/components/ui/popover';
   import { Label } from '$lib/components/ui/label';
+  import * as Popover from '$lib/components/ui/popover';
   import ScrollContainer from '$lib/components/ui/scroll-container/ScrollContainer.svelte';
   import * as Select from '$lib/components/ui/select';
-  import { sileo } from 'sileo';
-  import { sendSystemAnnouncement } from '$lib/notifications';
   import * as Tooltip from '$lib/components/ui/tooltip';
+  import { active_custom_theme, custom_themes } from '$lib/global';
+  import { sendSystemAnnouncement } from '$lib/notifications';
+  import { isThemeTrusted } from '$lib/themeTrust';
+  import { normalizeThemeTags } from '$lib/themeV2';
+  import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/themes';
+  import { currentUser } from '$lib/userAuthentication';
   import WorkshopTooltip from './WorkshopTooltip.svelte';
   import {
     Archive,
@@ -80,7 +78,9 @@
     Trash2,
     X,
   } from '@lucide/svelte';
-  import DefaultThemePreview from '$assets/default_preview.png';
+  import { sileo } from 'sileo';
+  import { onMount } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
 
   let {
     onApplyTheme,
@@ -117,7 +117,6 @@
 
   let downloadingId = $state<string | null>(null);
   let downloadProgress = $state(0);
-  let downloadStatus = $state('');
   let forkingId = $state<string | null>(null);
   let deletingId = $state<string | null>(null);
   let moderatingId = $state<string | null>(null);
@@ -220,7 +219,7 @@
   ];
 
   const localThemeMap = $derived.by(() => {
-    const map = new Map<string, Theme>();
+    const map = new SvelteMap<string, Theme>();
     for (const t of $custom_themes) {
       map.set(t.folder_name.toLowerCase(), t);
       map.set(t.name.toLowerCase(), t);
@@ -229,7 +228,7 @@
   });
 
   const tagOptions = $derived.by(() => {
-    const counts = new Map<string, number>();
+    const counts = new SvelteMap<string, number>();
 
     // The service returns every used tag. While it is unavailable or loading,
     // fall back to tags visible on the current page so filtering still works.
@@ -362,10 +361,7 @@
   }
 
   function parseWorkshopSort(value: string): WorkshopSort {
-    return value === 'relevance' ||
-      value === 'recent' ||
-      value === 'likes' ||
-      value === 'downloads'
+    return value === 'relevance' || value === 'recent' || value === 'likes' || value === 'downloads'
       ? value
       : 'popular';
   }
@@ -406,11 +402,9 @@
 
     downloadingId = theme.id;
     downloadProgress = 10;
-    downloadStatus = 'Downloading theme package...';
 
     try {
       const res = await downloadAndInstallCommunityTheme(theme, (msg, progress) => {
-        downloadStatus = msg;
         downloadProgress = progress;
       });
 
@@ -440,15 +434,13 @@
     } finally {
       downloadingId = null;
       downloadProgress = 0;
-      downloadStatus = '';
     }
   }
 
   async function handleApplyExisting(theme: CommunityTheme) {
     if (theme.deletedAt) return;
     const installed =
-      localThemeMap.get(theme.id.toLowerCase()) ||
-      localThemeMap.get(theme.name.toLowerCase());
+      localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
     if (!installed) {
       await handleDownloadAndApply(theme);
       return;
@@ -465,16 +457,13 @@
     if (theme.deletedAt || downloadingId || forkingId || deletingId || moderatingId) return;
 
     let installed =
-      localThemeMap.get(theme.id.toLowerCase()) ||
-      localThemeMap.get(theme.name.toLowerCase());
+      localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
 
     if (!installed) {
       downloadingId = theme.id;
       downloadProgress = 10;
-      downloadStatus = 'Downloading theme package...';
       try {
         await downloadAndInstallCommunityTheme(theme, (msg, progress) => {
-          downloadStatus = msg;
           downloadProgress = progress;
         });
         installed = $custom_themes.find(
@@ -489,7 +478,6 @@
       } finally {
         downloadingId = null;
         downloadProgress = 0;
-        downloadStatus = '';
       }
     }
 
@@ -502,8 +490,7 @@
     if (theme.deletedAt || downloadingId || forkingId || deletingId || moderatingId) return;
 
     const installed =
-      localThemeMap.get(theme.id.toLowerCase()) ||
-      localThemeMap.get(theme.name.toLowerCase());
+      localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase());
     if (!installed) {
       await handleEditTheme(theme);
       return;
@@ -520,10 +507,8 @@
 
     downloadingId = theme.id;
     downloadProgress = 10;
-    downloadStatus = 'Refreshing local theme...';
     try {
       const res = await downloadAndInstallCommunityTheme(theme, (msg, progress) => {
-        downloadStatus = msg;
         downloadProgress = progress;
       });
       const refreshed = $custom_themes.find(
@@ -545,7 +530,6 @@
     } finally {
       downloadingId = null;
       downloadProgress = 0;
-      downloadStatus = '';
     }
   }
 
@@ -666,8 +650,7 @@
       themes = themes.map((item) => (item.id === updated.id ? updated : item));
 
       const installed =
-        localThemeMap.get(target.id.toLowerCase()) ||
-        localThemeMap.get(target.name.toLowerCase());
+        localThemeMap.get(target.id.toLowerCase()) || localThemeMap.get(target.name.toLowerCase());
       let localSyncError: string | null = null;
       if (installed) {
         try {
@@ -746,9 +729,7 @@
       await loadWorkshopThemes();
       downloadingId = fork.id;
       downloadProgress = 10;
-      downloadStatus = 'Downloading your fork...';
       const res = await downloadAndInstallCommunityTheme(fork, (msg, progress) => {
-        downloadStatus = msg;
         downloadProgress = progress;
       });
       installed = $custom_themes.find(
@@ -762,7 +743,6 @@
     } finally {
       downloadingId = null;
       downloadProgress = 0;
-      downloadStatus = '';
     }
 
     if (installed) {
@@ -1106,7 +1086,9 @@
       const truncated = await downloadThemeReportsCsv(currentReportFilters());
       sileo.success({
         title: 'Report export downloaded',
-        description: truncated ? 'The export is capped at 5,000 rows. Narrow the date range for the rest.' : undefined,
+        description: truncated
+          ? 'The export is capped at 5,000 rows. Narrow the date range for the rest.'
+          : undefined,
       });
     } catch (err) {
       sileo.error({
@@ -1200,10 +1182,7 @@
         limit: 50,
       });
       const known = new Set(historyEvents.map((event) => event.id));
-      historyEvents = [
-        ...historyEvents,
-        ...result.events.filter((event) => !known.has(event.id)),
-      ];
+      historyEvents = [...historyEvents, ...result.events.filter((event) => !known.has(event.id))];
       historyPage = result.page;
       historyTotalPages = result.totalPages;
     } catch (err) {
@@ -1256,819 +1235,857 @@
 </script>
 
 <Tooltip.Provider delayDuration={220}>
-<div class="flex h-full flex-col overflow-hidden">
-  <!-- Workshop Filter & Search Toolbar -->
-  <div class="flex flex-col gap-2.5 pb-3">
-    <div class="flex items-center justify-between gap-3">
-      <!-- Tag Chips / Trash label -->
-      <div class="flex min-w-0 flex-wrap items-center gap-1">
-        {#if selectedView === 'trash'}
-          <span class="flex items-center gap-1 rounded-full border border-red-900/40 bg-red-950/40 px-2.5 py-1 text-[11px] font-medium text-red-300">
-            <Archive class="size-3" />
-            Your trash
-          </span>
-        {:else}
-          <button
-            type="button"
-            class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {selectedTag === 'all'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
-            onclick={() => handleTagClick('all')}
-          >
-            All Tags
-          </button>
-
-          <Popover.Root bind:open={tagFilterOpen}>
-            <Popover.Trigger
-              class="flex h-7 max-w-44 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors {selectedTag ===
+  <div class="flex h-full flex-col overflow-hidden">
+    <!-- Workshop Filter & Search Toolbar -->
+    <div class="flex flex-col gap-2.5 pb-3">
+      <div class="flex items-center justify-between gap-3">
+        <!-- Tag Chips / Trash label -->
+        <div class="flex min-w-0 flex-wrap items-center gap-1">
+          {#if selectedView === 'trash'}
+            <span
+              class="flex items-center gap-1 rounded-full border border-red-900/40 bg-red-950/40 px-2.5 py-1 text-[11px] font-medium text-red-300"
+            >
+              <Archive class="size-3" />
+              Your trash
+            </span>
+          {:else}
+            <button
+              type="button"
+              class="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {selectedTag ===
               'all'
-                ? 'border-theme-800 bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'
-                : 'border-primary/40 bg-primary/15 text-primary'}"
-              aria-label="Filter workshop by tag"
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+              onclick={() => handleTagClick('all')}
             >
-              <Tag class="size-3 shrink-0" />
-              <span class="truncate">
-                {selectedTag === 'all' ? 'Filter by tag' : `#${selectedTag}`}
-              </span>
-              {#if tagOptions.length > 0}
-                <span
-                  class="shrink-0 rounded bg-theme-800/80 px-1 text-[9px] tabular-nums text-muted-foreground"
-                >
-                  {tagOptions.length}
-                </span>
-              {/if}
-              {#if tagsLoading}
-                <LoaderCircle class="size-3 shrink-0 animate-spin" />
-              {:else}
-                <ChevronDown class="size-3 shrink-0 opacity-60" />
-              {/if}
-            </Popover.Trigger>
+              All Tags
+            </button>
 
-            <Popover.Content
-              align="start"
-              class="w-72 border-theme-800 bg-theme-950 p-0 text-theme-50 shadow-2xl"
-            >
-              <div class="border-b border-theme-800/70 p-2">
-                <div class="relative">
-                  <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    bind:value={tagSearch}
-                    class="h-8 border-theme-800 bg-theme-900/60 pr-8 pl-8 text-[11px]"
-                    placeholder="Search used tags..."
-                    autofocus
-                  />
-                  {#if tagSearch}
-                    <button
-                      type="button"
-                      class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-white"
-                      aria-label="Clear tag search"
-                      onclick={() => (tagSearch = '')}
-                    >
-                      <X class="size-3.5" />
-                    </button>
+            <Popover.Root bind:open={tagFilterOpen}>
+              <Popover.Trigger
+                class="flex h-7 max-w-44 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors {selectedTag ===
+                'all'
+                  ? 'border-theme-800 bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'
+                  : 'border-primary/40 bg-primary/15 text-primary'}"
+                aria-label="Filter workshop by tag"
+              >
+                <Tag class="size-3 shrink-0" />
+                <span class="truncate">
+                  {selectedTag === 'all' ? 'Filter by tag' : `#${selectedTag}`}
+                </span>
+                {#if tagOptions.length > 0}
+                  <span
+                    class="shrink-0 rounded bg-theme-800/80 px-1 text-[9px] tabular-nums text-muted-foreground"
+                  >
+                    {tagOptions.length}
+                  </span>
+                {/if}
+                {#if tagsLoading}
+                  <LoaderCircle class="size-3 shrink-0 animate-spin" />
+                {:else}
+                  <ChevronDown class="size-3 shrink-0 opacity-60" />
+                {/if}
+              </Popover.Trigger>
+
+              <Popover.Content
+                align="start"
+                class="w-72 border-theme-800 bg-theme-950 p-0 text-theme-50 shadow-2xl"
+              >
+                <div class="border-b border-theme-800/70 p-2">
+                  <div class="relative">
+                    <Search
+                      class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      bind:value={tagSearch}
+                      class="h-8 border-theme-800 bg-theme-900/60 pr-8 pl-8 text-[11px]"
+                      placeholder="Search used tags..."
+                      autofocus
+                    />
+                    {#if tagSearch}
+                      <button
+                        type="button"
+                        class="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-white"
+                        aria-label="Clear tag search"
+                        onclick={() => (tagSearch = '')}
+                      >
+                        <X class="size-3.5" />
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+
+                <div class="max-h-64 overflow-y-auto p-1">
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
+                    'all'
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+                    onclick={() => handleTagClick('all')}
+                  >
+                    <span class="flex items-center gap-2"><Tag class="size-3" /> All tags</span>
+                    {#if selectedTag === 'all'}<Check class="size-3" />{/if}
+                  </button>
+
+                  {#if filteredTagOptions.length === 0}
+                    <p class="px-2 py-4 text-center text-[10px] text-muted-foreground">
+                      {tagOptions.length === 0
+                        ? 'No tags are in use yet.'
+                        : 'No tags match your search.'}
+                    </p>
+                  {:else}
+                    {#each filteredTagOptions as option (option.tag)}
+                      <button
+                        type="button"
+                        class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
+                        option.tag
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+                        onclick={() => handleTagClick(option.tag)}
+                      >
+                        <span class="truncate">#{option.tag}</span>
+                        <span class="shrink-0 text-[9px] tabular-nums text-muted-foreground">
+                          {option.count}
+                        </span>
+                      </button>
+                    {/each}
                   {/if}
                 </div>
-              </div>
+              </Popover.Content>
+            </Popover.Root>
 
-              <div class="max-h-64 overflow-y-auto p-1">
-                <button
-                  type="button"
-                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
-                  'all'
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
-                  onclick={() => handleTagClick('all')}
-                >
-                  <span class="flex items-center gap-2"><Tag class="size-3" /> All tags</span>
-                  {#if selectedTag === 'all'}<Check class="size-3" />{/if}
-                </button>
+            {#if canModerate}
+              <WorkshopTooltip content="Show only hidden themes">
+                {#snippet trigger(props)}
+                  <button
+                    {...props}
+                    type="button"
+                    class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {showHiddenOnly
+                      ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
+                      : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
+                    onclick={handleHiddenFilter}
+                  >
+                    <EyeOff class="size-3" />
+                    Hidden
+                  </button>
+                {/snippet}
+              </WorkshopTooltip>
+            {/if}
+          {/if}
+        </div>
 
-                {#if filteredTagOptions.length === 0}
-                  <p class="px-2 py-4 text-center text-[10px] text-muted-foreground">
-                    {tagOptions.length === 0
-                      ? 'No tags are in use yet.'
-                      : 'No tags match your search.'}
-                  </p>
-                {:else}
-                  {#each filteredTagOptions as option (option.tag)}
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-[11px] transition-colors {selectedTag ===
-                      option.tag
-                        ? 'bg-primary/15 text-primary'
-                        : 'text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
-                      onclick={() => handleTagClick(option.tag)}
-                    >
-                      <span class="truncate">#{option.tag}</span>
-                      <span class="shrink-0 text-[9px] tabular-nums text-muted-foreground">
-                        {option.count}
-                      </span>
-                    </button>
-                  {/each}
-                {/if}
-              </div>
-            </Popover.Content>
-          </Popover.Root>
+        <!-- Controls Right: Sort, Search, Moderation, Trash & Refresh -->
+        <div class="flex shrink-0 items-center gap-2">
+          <select
+            class="h-7.5 rounded-lg border border-theme-800 bg-theme-950/80 px-2.5 text-[11px] text-muted-foreground outline-none transition-colors hover:text-white focus:border-primary/50"
+            value={selectedSort}
+            onchange={(e) => handleSortChange(parseWorkshopSort(e.currentTarget.value))}
+          >
+            <option value="relevance">Best match</option>
+            <option value="popular">Most Popular</option>
+            <option value="recent">Most Recent</option>
+            <option value="likes">Most Liked</option>
+            <option value="downloads">Most Downloaded</option>
+          </select>
+
+          <div class="relative w-48">
+            <Search
+              class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+            />
+            <WorkshopTooltip
+              content="Typed search: tag:anime, author:name, name:night, id:my-theme"
+            >
+              {#snippet trigger(props)}
+                <Input
+                  {...props}
+                  type="text"
+                  class="h-7.5 border-theme-800 bg-theme-950/80 pl-8 text-[11px]"
+                  placeholder={selectedView === 'trash'
+                    ? 'Search trash...'
+                    : 'Search themes, tags, authors...'}
+                  bind:value={searchQuery}
+                  oninput={handleSearchInput}
+                />
+              {/snippet}
+            </WorkshopTooltip>
+          </div>
 
           {#if canModerate}
-            <WorkshopTooltip content="Show only hidden themes">
+            <WorkshopTooltip content="Moderation queue and audit history">
               {#snippet trigger(props)}
-                <button
+                <Button
                   {...props}
-                  type="button"
-                  class="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors {showHiddenOnly
-                    ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
-                    : 'bg-theme-900/60 text-muted-foreground hover:bg-theme-800/60 hover:text-white'}"
-                  onclick={handleHiddenFilter}
+                  variant="ghost"
+                  size="icon"
+                  class="size-7.5 text-muted-foreground hover:text-amber-300"
+                  onclick={openModerationPanel}
                 >
-                  <EyeOff class="size-3" />
-                  Hidden
-                </button>
+                  <Flag class="size-3.5" />
+                </Button>
               {/snippet}
             </WorkshopTooltip>
           {/if}
-        {/if}
-      </div>
 
-      <!-- Controls Right: Sort, Search, Moderation, Trash & Refresh -->
-      <div class="flex shrink-0 items-center gap-2">
-        <select
-          class="h-7.5 rounded-lg border border-theme-800 bg-theme-950/80 px-2.5 text-[11px] text-muted-foreground outline-none transition-colors hover:text-white focus:border-primary/50"
-          value={selectedSort}
-          onchange={(e) => handleSortChange(parseWorkshopSort(e.currentTarget.value))}
-        >
-          <option value="relevance">Best match</option>
-          <option value="popular">Most Popular</option>
-          <option value="recent">Most Recent</option>
-          <option value="likes">Most Liked</option>
-          <option value="downloads">Most Downloaded</option>
-        </select>
+          {#if $currentUser}
+            <WorkshopTooltip content={selectedView === 'trash' ? 'Back to workshop' : 'Open trash'}>
+              {#snippet trigger(props)}
+                <Button
+                  {...props}
+                  variant={selectedView === 'trash' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  class="size-7.5 text-muted-foreground hover:text-white"
+                  onclick={() => handleViewChange(selectedView === 'trash' ? 'workshop' : 'trash')}
+                >
+                  <Archive class="size-3.5" />
+                </Button>
+              {/snippet}
+            </WorkshopTooltip>
+          {/if}
 
-        <div class="relative w-48">
-          <Search class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <WorkshopTooltip content="Typed search: tag:anime, author:name, name:night, id:my-theme">
-            {#snippet trigger(props)}
-              <Input
-                {...props}
-                type="text"
-                class="h-7.5 border-theme-800 bg-theme-950/80 pl-8 text-[11px]"
-                placeholder={selectedView === 'trash' ? 'Search trash...' : 'Search themes, tags, authors...'}
-                bind:value={searchQuery}
-                oninput={handleSearchInput}
-              />
-            {/snippet}
-          </WorkshopTooltip>
-        </div>
-
-        {#if canModerate}
-          <WorkshopTooltip content="Moderation queue and audit history">
+          <WorkshopTooltip content="Refresh Workshop">
             {#snippet trigger(props)}
               <Button
                 {...props}
                 variant="ghost"
                 size="icon"
-                class="size-7.5 text-muted-foreground hover:text-amber-300"
-                onclick={openModerationPanel}
-              >
-                <Flag class="size-3.5" />
-              </Button>
-            {/snippet}
-          </WorkshopTooltip>
-        {/if}
-
-        {#if $currentUser}
-          <WorkshopTooltip content={selectedView === 'trash' ? 'Back to workshop' : 'Open trash'}>
-            {#snippet trigger(props)}
-              <Button
-                {...props}
-                variant={selectedView === 'trash' ? 'secondary' : 'ghost'}
-                size="icon"
                 class="size-7.5 text-muted-foreground hover:text-white"
-                onclick={() => handleViewChange(selectedView === 'trash' ? 'workshop' : 'trash')}
+                onclick={() => {
+                  void loadWorkshopThemes();
+                  void loadWorkshopTags();
+                }}
+                disabled={loading}
               >
-                <Archive class="size-3.5" />
+                <RefreshCw class="size-3.5 {loading ? 'animate-spin' : ''}" />
               </Button>
             {/snippet}
           </WorkshopTooltip>
-        {/if}
-
-        <WorkshopTooltip content="Refresh Workshop">
-          {#snippet trigger(props)}
-            <Button
-              {...props}
-              variant="ghost"
-              size="icon"
-              class="size-7.5 text-muted-foreground hover:text-white"
-              onclick={() => {
-                void loadWorkshopThemes();
-                void loadWorkshopTags();
-              }}
-              disabled={loading}
-            >
-              <RefreshCw class="size-3.5 {loading ? 'animate-spin' : ''}" />
-            </Button>
-          {/snippet}
-        </WorkshopTooltip>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Content Grid / Status -->
-  <div class="min-h-0 flex-1 pt-1">
-    <ScrollContainer class="pr-2">
-      {#if loading && themes.length === 0}
-        <div class="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-          <LoaderCircle class="size-6 animate-spin text-primary" />
-          <p class="text-xs">Connecting to EZPPFarm Community Workshop...</p>
-        </div>
-      {:else if error && themes.length === 0}
-        <div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
-          <div class="rounded-full bg-red-500/10 p-3 text-red-400">
-            <Globe class="size-6" />
+    <!-- Content Grid / Status -->
+    <div class="min-h-0 flex-1 pt-1">
+      <ScrollContainer class="pr-2">
+        {#if loading && themes.length === 0}
+          <div class="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+            <LoaderCircle class="size-6 animate-spin text-primary" />
+            <p class="text-xs">Connecting to EZPPFarm Community Workshop...</p>
           </div>
-          <div class="max-w-md">
-            <p class="text-sm font-semibold text-white">Workshop Offline or Unreachable</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {error}. Ensure the themes microservice container is running.
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" class="mt-2 text-xs" onclick={() => void loadWorkshopThemes()}>
-            <RefreshCw class="mr-1.5 size-3.5" />
-            Try Again
-          </Button>
-        </div>
-      {:else if themes.length === 0}
-        <div class="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-          <Globe class="size-8 opacity-40" />
-          <p class="text-xs">No community themes found matching your search.</p>
-        </div>
-      {:else}
-        <div class="grid grid-cols-3 gap-3 pb-4">
-          {#each themes as theme (theme.id)}
-            {@const localTheme = localThemeMap.get(theme.id.toLowerCase()) || localThemeMap.get(theme.name.toLowerCase())}
-            {@const isInstalled = Boolean(localTheme)}
-            {@const isActive = Boolean(localTheme && $active_custom_theme?.folder_name === localTheme.folder_name)}
-            {@const isDownloading = downloadingId === theme.id}
-            {@const isDeleted = Boolean(theme.deletedAt)}
-            {@const hasUpdate = Boolean(!isDeleted && localTheme && localTheme.version !== theme.version)}
-            {@const owned = isOwnedByCurrentUser(theme)}
-            {@const isLegacy =
-              theme.apiVersion === '1.0' || Boolean(theme.tags?.includes('legacy'))}
-            {@const canReport =
-              Boolean($currentUser) && !owned && !theme.isHidden && !theme.isQuarantined}
-            {@const canFork = canReport && !isLegacy && theme.allowForking !== false}
-            {@const showOverflowMenu = !isDeleted && (owned || canModerate || canReport)}
-
-            <div
-              class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
-                ? 'border-primary/60 ring-1 ring-primary/20'
-                : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
+        {:else if error && themes.length === 0}
+          <div class="flex h-64 flex-col items-center justify-center gap-3 text-center">
+            <div class="rounded-full bg-red-500/10 p-3 text-red-400">
+              <Globe class="size-6" />
+            </div>
+            <div class="max-w-md">
+              <p class="text-sm font-semibold text-white">Workshop Offline or Unreachable</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {error}. Ensure the themes microservice container is running.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              class="mt-2 text-xs"
+              onclick={() => void loadWorkshopThemes()}
             >
-              <!-- 16:9 Thumbnail -->
-              <div class="relative aspect-video w-full shrink-0 overflow-hidden bg-theme-950/70">
-                <img
-                  src={theme.previewUrl}
-                  alt={theme.name}
-                  class="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
-                  onerror={(e) => {
-                    // Fallback to default theme preview if server preview not loaded
-                    (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
-                  }}
-                />
-                <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/90 via-transparent to-transparent"></div>
+              <RefreshCw class="mr-1.5 size-3.5" />
+              Try Again
+            </Button>
+          </div>
+        {:else if themes.length === 0}
+          <div class="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Globe class="size-8 opacity-40" />
+            <p class="text-xs">No community themes found matching your search.</p>
+          </div>
+        {:else}
+          <div class="grid grid-cols-3 gap-3 pb-4">
+            {#each themes as theme (theme.id)}
+              {@const localTheme =
+                localThemeMap.get(theme.id.toLowerCase()) ||
+                localThemeMap.get(theme.name.toLowerCase())}
+              {@const isInstalled = Boolean(localTheme)}
+              {@const isActive = Boolean(
+                localTheme && $active_custom_theme?.folder_name === localTheme.folder_name
+              )}
+              {@const isDownloading = downloadingId === theme.id}
+              {@const isDeleted = Boolean(theme.deletedAt)}
+              {@const hasUpdate = Boolean(
+                !isDeleted && localTheme && localTheme.version !== theme.version
+              )}
+              {@const owned = isOwnedByCurrentUser(theme)}
+              {@const isLegacy =
+                theme.apiVersion === '1.0' || Boolean(theme.tags?.includes('legacy'))}
+              {@const canReport =
+                Boolean($currentUser) && !owned && !theme.isHidden && !theme.isQuarantined}
+              {@const canFork = canReport && !isLegacy && theme.allowForking !== false}
+              {@const showOverflowMenu = !isDeleted && (owned || canModerate || canReport)}
 
-                <!-- Top Left: Trust Badge -->
-                <div class="absolute top-2 left-2 flex items-center gap-1.5">
-                  {#if theme.apiVersion === '1.0' || theme.tags?.includes('legacy')}
-                    <WorkshopTooltip content="Legacy v1 theme: video/audio playback">
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-purple-500/40 bg-purple-950/80 px-1.5 py-0.5 text-[9px] font-medium text-purple-300 backdrop-blur-sm"
-                        >
-                          <Sparkles class="size-3 text-purple-300" />
-                          Legacy v1
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {:else if theme.hasExecutableCode}
-                    <WorkshopTooltip content="Contains custom Svelte 5 executable logic">
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/80 px-1.5 py-0.5 text-[9px] font-medium text-amber-300 backdrop-blur-sm"
-                        >
-                          <Code2 class="size-3" />
-                          Svelte Code
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
-                  {#if theme.isHidden}
-                    <WorkshopTooltip
-                      content={`${theme.hiddenReason || 'Hidden by a moderator'}${
-                        theme.hiddenByName ? ` · by ${theme.hiddenByName}` : ''
-                      }${theme.hiddenAt ? ` · ${formatModerationDate(theme.hiddenAt)}` : ''}`}
-                    >
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-950/85 px-1.5 py-0.5 text-[9px] font-medium text-red-300 backdrop-blur-sm"
-                        >
-                          <EyeOff class="size-3" />
-                          Hidden
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
-                  {#if theme.isQuarantined}
-                    <WorkshopTooltip
-                      content={`${theme.quarantineReason || 'Taken down by staff'}${
-                        theme.quarantinedByName ? ` · by ${theme.quarantinedByName}` : ''
-                      }${theme.quarantinedAt ? ` · ${formatModerationDate(theme.quarantinedAt)}` : ''}`}
-                    >
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-red-500/50 bg-red-950/90 px-1.5 py-0.5 text-[9px] font-medium text-red-200 backdrop-blur-sm"
-                        >
-                          <Ban class="size-3" />
-                          Taken down
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
-                  {#if isDeleted}
-                    <WorkshopTooltip content="This theme is in your trash">
-                      {#snippet trigger(props)}
-                        <span
-                          {...props}
-                          tabindex="-1"
-                          class="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-950/85 px-1.5 py-0.5 text-[9px] font-medium text-red-300 backdrop-blur-sm"
-                        >
-                          <Trash2 class="size-3" />
-                          Trash
-                        </span>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
-                </div>
+              <div
+                class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
+                  ? 'border-primary/60 ring-1 ring-primary/20'
+                  : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
+              >
+                <!-- 16:9 Thumbnail -->
+                <div class="relative aspect-video w-full shrink-0 overflow-hidden bg-theme-950/70">
+                  <img
+                    src={theme.previewUrl}
+                    alt={theme.name}
+                    class="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
+                    onerror={(e) => {
+                      // Fallback to default theme preview if server preview not loaded
+                      (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
+                    }}
+                  />
+                  <div
+                    class="pointer-events-none absolute inset-0 bg-gradient-to-t from-theme-950/90 via-transparent to-transparent"
+                  ></div>
 
-                <!-- Top Right: Version -->
-                <div class="absolute top-2 right-2">
-                  <span class="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm">
-                    v{theme.version}
-                  </span>
-                </div>
-
-                <!-- Bottom: Author Info -->
-                <div class="absolute right-2 bottom-2 left-2 flex items-center justify-between gap-2">
-                  <div class="flex min-w-0 items-center gap-1.5">
-                    <img
-                      src={theme.author.avatarUrl}
-                      alt={theme.author.name}
-                      class="size-5 rounded-full border border-white/20 bg-theme-900 object-cover"
-                      onerror={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                    <span class="truncate text-[11px] font-semibold text-white/95 drop-shadow-sm">
-                      {theme.author.name}
-                    </span>
-                    {#if theme.author.role === 'owner'}
-                      <WorkshopTooltip content="EZPPFarm owner">
+                  <!-- Top Left: Trust Badge -->
+                  <div class="absolute top-2 left-2 flex items-center gap-1.5">
+                    {#if theme.apiVersion === '1.0' || theme.tags?.includes('legacy')}
+                      <WorkshopTooltip content="Legacy v1 theme: video/audio playback">
                         {#snippet trigger(props)}
                           <span
                             {...props}
                             tabindex="-1"
-                            class="flex items-center gap-0.5 rounded-full border border-rose-500/30 bg-rose-500/20 px-1 py-0.5 text-[8px] font-bold text-rose-200"
+                            class="flex items-center gap-1 rounded-md border border-purple-500/40 bg-purple-950/80 px-1.5 py-0.5 text-[9px] font-medium text-purple-300 backdrop-blur-sm"
                           >
-                            <Crown class="size-2.5 fill-rose-300" />
-                            Owner
+                            <Sparkles class="size-3 text-purple-300" />
+                            Legacy v1
                           </span>
                         {/snippet}
                       </WorkshopTooltip>
-                    {:else if theme.author.role === 'moderator'}
-                      <WorkshopTooltip content="Community Workshop moderator">
+                    {:else if theme.hasExecutableCode}
+                      <WorkshopTooltip content="Contains custom Svelte 5 executable logic">
                         {#snippet trigger(props)}
                           <span
                             {...props}
                             tabindex="-1"
-                            class="flex items-center gap-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1 py-0.5 text-[8px] font-bold text-cyan-200"
+                            class="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/80 px-1.5 py-0.5 text-[9px] font-medium text-amber-300 backdrop-blur-sm"
                           >
-                            <ShieldCheck class="size-2.5" />
-                            Moderator
+                            <Code2 class="size-3" />
+                            Svelte Code
                           </span>
                         {/snippet}
                       </WorkshopTooltip>
-                    {:else if theme.author.role === 'supporter' || (!theme.author.role && theme.author.donor)}
-                      <WorkshopTooltip content="EZPPFarm Supporter">
+                    {/if}
+                    {#if theme.isHidden}
+                      <WorkshopTooltip
+                        content={`${theme.hiddenReason || 'Hidden by a moderator'}${
+                          theme.hiddenByName ? ` · by ${theme.hiddenByName}` : ''
+                        }${theme.hiddenAt ? ` · ${formatModerationDate(theme.hiddenAt)}` : ''}`}
+                      >
                         {#snippet trigger(props)}
                           <span
                             {...props}
                             tabindex="-1"
-                            class="flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300"
+                            class="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-950/85 px-1.5 py-0.5 text-[9px] font-medium text-red-300 backdrop-blur-sm"
                           >
-                            <Sparkles class="size-2.5 fill-amber-300" />
-                            Supporter
+                            <EyeOff class="size-3" />
+                            Hidden
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {/if}
+                    {#if theme.isQuarantined}
+                      <WorkshopTooltip
+                        content={`${theme.quarantineReason || 'Taken down by staff'}${
+                          theme.quarantinedByName ? ` · by ${theme.quarantinedByName}` : ''
+                        }${theme.quarantinedAt ? ` · ${formatModerationDate(theme.quarantinedAt)}` : ''}`}
+                      >
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-1 rounded-md border border-red-500/50 bg-red-950/90 px-1.5 py-0.5 text-[9px] font-medium text-red-200 backdrop-blur-sm"
+                          >
+                            <Ban class="size-3" />
+                            Taken down
+                          </span>
+                        {/snippet}
+                      </WorkshopTooltip>
+                    {/if}
+                    {#if isDeleted}
+                      <WorkshopTooltip content="This theme is in your trash">
+                        {#snippet trigger(props)}
+                          <span
+                            {...props}
+                            tabindex="-1"
+                            class="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-950/85 px-1.5 py-0.5 text-[9px] font-medium text-red-300 backdrop-blur-sm"
+                          >
+                            <Trash2 class="size-3" />
+                            Trash
                           </span>
                         {/snippet}
                       </WorkshopTooltip>
                     {/if}
                   </div>
-                  <span class="text-[9px] text-muted-foreground/90 tabular-nums">
-                    {formatBytes(theme.fileSize)}
-                  </span>
-                </div>
-              </div>
 
-              <!-- Body -->
-              <div class="flex flex-1 flex-col justify-between gap-2 p-3">
-                <div class="min-w-0">
-                  <div class="flex items-center justify-between gap-2">
-                    <h3 class="truncate text-[13px] font-bold text-white group-hover:text-primary transition-colors">
-                      {theme.name}
-                    </h3>
+                  <!-- Top Right: Version -->
+                  <div class="absolute top-2 right-2">
+                    <span
+                      class="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm"
+                    >
+                      v{theme.version}
+                    </span>
+                  </div>
 
-                    <!-- Interactive Like Button -->
-                    {#if isDeleted}
-                      <span class="flex items-center gap-1 rounded-full bg-red-950/40 px-2 py-0.5 text-[10px] text-red-300">
-                        <Trash2 class="size-3" /> Deleted
+                  <!-- Bottom: Author Info -->
+                  <div
+                    class="absolute right-2 bottom-2 left-2 flex items-center justify-between gap-2"
+                  >
+                    <div class="flex min-w-0 items-center gap-1.5">
+                      <img
+                        src={theme.author.avatarUrl}
+                        alt={theme.author.name}
+                        class="size-5 rounded-full border border-white/20 bg-theme-900 object-cover"
+                        onerror={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <span class="truncate text-[11px] font-semibold text-white/95 drop-shadow-sm">
+                        {theme.author.name}
                       </span>
-                    {:else}
-                      <WorkshopTooltip content={theme.isLiked ? 'Unlike' : 'Like'}>
+                      {#if theme.author.role === 'owner'}
+                        <WorkshopTooltip content="EZPPFarm owner">
+                          {#snippet trigger(props)}
+                            <span
+                              {...props}
+                              tabindex="-1"
+                              class="flex items-center gap-0.5 rounded-full border border-rose-500/30 bg-rose-500/20 px-1 py-0.5 text-[8px] font-bold text-rose-200"
+                            >
+                              <Crown class="size-2.5 fill-rose-300" />
+                              Owner
+                            </span>
+                          {/snippet}
+                        </WorkshopTooltip>
+                      {:else if theme.author.role === 'moderator'}
+                        <WorkshopTooltip content="Community Workshop moderator">
+                          {#snippet trigger(props)}
+                            <span
+                              {...props}
+                              tabindex="-1"
+                              class="flex items-center gap-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/20 px-1 py-0.5 text-[8px] font-bold text-cyan-200"
+                            >
+                              <ShieldCheck class="size-2.5" />
+                              Moderator
+                            </span>
+                          {/snippet}
+                        </WorkshopTooltip>
+                      {:else if theme.author.role === 'supporter' || (!theme.author.role && theme.author.donor)}
+                        <WorkshopTooltip content="EZPPFarm Supporter">
+                          {#snippet trigger(props)}
+                            <span
+                              {...props}
+                              tabindex="-1"
+                              class="flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-300"
+                            >
+                              <Sparkles class="size-2.5 fill-amber-300" />
+                              Supporter
+                            </span>
+                          {/snippet}
+                        </WorkshopTooltip>
+                      {/if}
+                    </div>
+                    <span class="text-[9px] text-muted-foreground/90 tabular-nums">
+                      {formatBytes(theme.fileSize)}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Body -->
+                <div class="flex flex-1 flex-col justify-between gap-2 p-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                      <h3
+                        class="truncate text-[13px] font-bold text-white group-hover:text-primary transition-colors"
+                      >
+                        {theme.name}
+                      </h3>
+
+                      <!-- Interactive Like Button -->
+                      {#if isDeleted}
+                        <span
+                          class="flex items-center gap-1 rounded-full bg-red-950/40 px-2 py-0.5 text-[10px] text-red-300"
+                        >
+                          <Trash2 class="size-3" /> Deleted
+                        </span>
+                      {:else}
+                        <WorkshopTooltip content={theme.isLiked ? 'Unlike' : 'Like'}>
+                          {#snippet trigger(props)}
+                            <button
+                              {...props}
+                              type="button"
+                              class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors {theme.isLiked
+                                ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+                                : 'bg-theme-800/40 text-muted-foreground hover:bg-theme-800/80 hover:text-white'}"
+                              onclick={(e) => handleLike(theme, e)}
+                            >
+                              <Heart
+                                class="size-3 {theme.isLiked ? 'fill-rose-400 text-rose-400' : ''}"
+                              />
+                              <span class="tabular-nums text-[10px]">{theme.likeCount}</span>
+                            </button>
+                          {/snippet}
+                        </WorkshopTooltip>
+                      {/if}
+                    </div>
+
+                    {#if theme.description}
+                      <p
+                        class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground"
+                      >
+                        {theme.description}
+                      </p>
+                    {/if}
+
+                    {#if theme.tags && theme.tags.length > 0}
+                      <div class="mt-2 flex flex-wrap gap-1">
+                        {#each theme.tags.slice(0, 3) as tag (tag)}
+                          <button
+                            type="button"
+                            class="cursor-pointer rounded px-1.5 py-0.5 text-[9px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 {selectedTag ===
+                            tag
+                              ? 'bg-primary/20 text-primary'
+                              : 'bg-theme-800/50 text-muted-foreground hover:bg-theme-800 hover:text-white'}"
+                            title={`Filter workshop by #${tag}`}
+                            aria-label={`Filter workshop by #${tag}`}
+                            aria-pressed={selectedTag === tag}
+                            onclick={(event) => {
+                              event.stopPropagation();
+                              handleTagClick(tag);
+                            }}
+                          >
+                            #{tag}
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+
+                    {#if theme.isHidden || theme.isQuarantined}
+                      <div
+                        class="mt-2 space-y-1 rounded-md border border-red-900/40 bg-red-950/15 px-2 py-1.5 text-[9px] leading-relaxed"
+                      >
+                        {#if theme.isHidden}
+                          <p class="text-red-200/90">
+                            <EyeOff class="mr-1 inline size-3 align-[-2px]" />
+                            Hidden by {theme.hiddenByName ?? 'staff'}
+                            {#if theme.hiddenAt}
+                              · {formatModerationDate(theme.hiddenAt)}
+                            {/if}
+                          </p>
+                          {#if theme.hiddenReason}
+                            <p class="text-muted-foreground">{theme.hiddenReason}</p>
+                          {/if}
+                        {/if}
+                        {#if theme.isQuarantined}
+                          <p class="text-red-200/90">
+                            <Ban class="mr-1 inline size-3 align-[-2px]" />
+                            Taken down by {theme.quarantinedByName ?? 'staff'}
+                            {#if theme.quarantinedAt}
+                              · {formatModerationDate(theme.quarantinedAt)}
+                            {/if}
+                          </p>
+                          {#if theme.quarantineReason}
+                            <p class="text-muted-foreground">{theme.quarantineReason}</p>
+                          {/if}
+                        {/if}
+                      </div>
+                    {/if}
+
+                    {#if theme.forkedFrom}
+                      {@const forkedFrom = theme.forkedFrom}
+                      <WorkshopTooltip
+                        content={`Open ${forkedFrom.name} by ${forkedFrom.authorName}`}
+                      >
                         {#snippet trigger(props)}
                           <button
                             {...props}
                             type="button"
-                            class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] transition-colors {theme.isLiked
-                              ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-                              : 'bg-theme-800/40 text-muted-foreground hover:bg-theme-800/80 hover:text-white'}"
-                            onclick={(e) => handleLike(theme, e)}
+                            class="mt-2 flex max-w-full min-w-0 items-center gap-1 text-left text-[9px] text-muted-foreground transition-colors hover:text-white"
+                            onclick={() => handleOpenForkSource(theme)}
                           >
-                            <Heart class="size-3 {theme.isLiked ? 'fill-rose-400 text-rose-400' : ''}" />
-                            <span class="tabular-nums text-[10px]">{theme.likeCount}</span>
+                            <GitFork class="size-3 shrink-0" />
+                            <span class="truncate">
+                              Forked from <span class="text-white/75">{forkedFrom.name}</span>
+                              by {forkedFrom.authorName}
+                            </span>
+                            <ExternalLink class="size-2.5 shrink-0 opacity-60" />
                           </button>
                         {/snippet}
                       </WorkshopTooltip>
                     {/if}
                   </div>
 
-                  {#if theme.description}
-                    <p class="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
-                      {theme.description}
-                    </p>
-                  {/if}
-
-                  {#if theme.tags && theme.tags.length > 0}
-                    <div class="mt-2 flex flex-wrap gap-1">
-                      {#each theme.tags.slice(0, 3) as tag (tag)}
-                        <button
-                          type="button"
-                          class="cursor-pointer rounded px-1.5 py-0.5 text-[9px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 {selectedTag ===
-                          tag
-                            ? 'bg-primary/20 text-primary'
-                            : 'bg-theme-800/50 text-muted-foreground hover:bg-theme-800 hover:text-white'}"
-                          title={`Filter workshop by #${tag}`}
-                          aria-label={`Filter workshop by #${tag}`}
-                          aria-pressed={selectedTag === tag}
-                          onclick={(event) => {
-                            event.stopPropagation();
-                            handleTagClick(tag);
-                          }}
+                  <!-- Footer Action Row -->
+                  <div
+                    class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-theme-800/40 pt-2.5"
+                  >
+                    <div class="flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
+                      <span class="inline-flex items-center gap-1">
+                        <Download class="size-3" />
+                        <span class="tabular-nums">{theme.downloadCount}</span>
+                      </span>
+                      {#if isInstalled && !isActive}
+                        <span
+                          class="rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
                         >
-                          #{tag}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-
-                  {#if theme.isHidden || theme.isQuarantined}
-                    <div class="mt-2 space-y-1 rounded-md border border-red-900/40 bg-red-950/15 px-2 py-1.5 text-[9px] leading-relaxed">
-                      {#if theme.isHidden}
-                        <p class="text-red-200/90">
-                          <EyeOff class="mr-1 inline size-3 align-[-2px]" />
-                          Hidden by {theme.hiddenByName ?? 'staff'}
-                          {#if theme.hiddenAt}
-                            · {formatModerationDate(theme.hiddenAt)}
-                          {/if}
-                        </p>
-                        {#if theme.hiddenReason}
-                          <p class="text-muted-foreground">{theme.hiddenReason}</p>
-                        {/if}
-                      {/if}
-                      {#if theme.isQuarantined}
-                        <p class="text-red-200/90">
-                          <Ban class="mr-1 inline size-3 align-[-2px]" />
-                          Taken down by {theme.quarantinedByName ?? 'staff'}
-                          {#if theme.quarantinedAt}
-                            · {formatModerationDate(theme.quarantinedAt)}
-                          {/if}
-                        </p>
-                        {#if theme.quarantineReason}
-                          <p class="text-muted-foreground">{theme.quarantineReason}</p>
-                        {/if}
+                          Installed
+                        </span>
                       {/if}
                     </div>
-                  {/if}
 
-                  {#if theme.forkedFrom}
-                    {@const forkedFrom = theme.forkedFrom}
-                    <WorkshopTooltip content={`Open ${forkedFrom.name} by ${forkedFrom.authorName}`}>
-                      {#snippet trigger(props)}
-                        <button
-                          {...props}
-                          type="button"
-                          class="mt-2 flex max-w-full min-w-0 items-center gap-1 text-left text-[9px] text-muted-foreground transition-colors hover:text-white"
-                          onclick={() => handleOpenForkSource(theme)}
-                        >
-                          <GitFork class="size-3 shrink-0" />
-                          <span class="truncate">
-                            Forked from <span class="text-white/75">{forkedFrom.name}</span>
-                            by {forkedFrom.authorName}
-                          </span>
-                          <ExternalLink class="size-2.5 shrink-0 opacity-60" />
-                        </button>
-                      {/snippet}
-                    </WorkshopTooltip>
-                  {/if}
-                </div>
-
-                <!-- Footer Action Row -->
-                <div
-                  class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-theme-800/40 pt-2.5"
-                >
-                  <div class="flex min-w-0 items-center gap-2 text-[10px] text-muted-foreground">
-                    <span class="inline-flex items-center gap-1">
-                      <Download class="size-3" />
-                      <span class="tabular-nums">{theme.downloadCount}</span>
-                    </span>
-                    {#if isInstalled && !isActive}
-                      <span
-                        class="rounded-full bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
-                      >
-                        Installed
-                      </span>
-                    {/if}
-                  </div>
-
-                  <div class="flex shrink-0 items-center gap-1">
-                    {#if isDownloading}
-                      <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-primary tabular-nums"
-                          >{downloadProgress}%</span
-                        >
-                        <div class="h-1.5 w-16 overflow-hidden rounded-full bg-theme-800">
-                          <div
-                            class="h-full bg-primary transition-all duration-200"
-                            style="width: {downloadProgress}%"
-                          ></div>
-                        </div>
-                      </div>
-                    {:else if deletingId === theme.id}
-                      <span class="flex items-center gap-1 text-[10px] text-red-300">
-                        <LoaderCircle class="size-3 animate-spin" /> Deleting
-                      </span>
-                    {:else if forkingId === theme.id}
-                      <span class="flex items-center gap-1 text-[10px] text-cyan-300">
-                        <LoaderCircle class="size-3 animate-spin" /> Forking
-                      </span>
-                    {:else if moderatingId === theme.id}
-                      <span class="flex items-center gap-1 text-[10px] text-amber-300">
-                        <LoaderCircle class="size-3 animate-spin" /> Updating
-                      </span>
-                    {:else if isDeleted}
-                      {#if owned}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          class="h-7 gap-1 text-xs"
-                          onclick={() => handleRestoreTheme(theme)}
-                          disabled={restoringId === theme.id}
-                        >
-                          {#if restoringId === theme.id}
-                            <LoaderCircle class="size-3 animate-spin" />
-                            Restoring
-                          {:else}
-                            <RotateCcw class="size-3" />
-                            Restore
-                          {/if}
-                        </Button>
-                      {:else}
-                        <Badge
-                          variant="outline"
-                          class="border-red-500/40 bg-red-950/20 text-red-300 text-[10px]"
-                        >
-                          <Trash2 class="mr-1 size-3" /> Deleted
-                        </Badge>
-                      {/if}
-                    {:else}
-                      {#if owned && !isLegacy && isInstalled}
-                        <Button
-                          size="sm"
-                          class="h-7 gap-1 text-xs"
-                          onclick={() => handleEditTheme(theme)}
-                        >
-                          <Pencil class="size-3" />
-                          Edit
-                        </Button>
-                      {:else if isActive}
-                        <Badge
-                          variant="outline"
-                          class="border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-[10px]"
-                        >
-                          <Check class="mr-1 size-3" /> In use
-                        </Badge>
-                      {:else if isInstalled && hasUpdate}
-                        <Button
-                          size="sm"
-                          class="h-7 gap-1 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
-                          onclick={() => handleDownloadAndApply(theme)}
-                        >
-                          <Download class="size-3" />
-                          Update
-                        </Button>
-                      {:else if isInstalled}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          class="h-7 text-xs"
-                          onclick={() => handleApplyExisting(theme)}
-                        >
-                          Apply
-                        </Button>
-                      {:else}
-                        <Button
-                          size="sm"
-                          class="h-7 gap-1 text-xs"
-                          onclick={() => handleDownloadAndApply(theme)}
-                        >
-                          <Download class="size-3" />
-                          Download & Apply
-                        </Button>
-                      {/if}
-
-                      {#if showOverflowMenu}
-                        <DropdownMenu.Root>
-                          <DropdownMenu.Trigger>
-                            {#snippet child({ props })}
-                              <Button
-                                {...props}
-                                variant="ghost"
-                                size="icon"
-                                class="size-7 text-muted-foreground hover:text-white"
-                                aria-label="More actions for {theme.name}"
-                              >
-                                <Ellipsis class="size-4" />
-                              </Button>
-                            {/snippet}
-                          </DropdownMenu.Trigger>
-                          <DropdownMenu.Content
-                            align="end"
-                            class="w-52 border-theme-700 bg-theme-950 text-theme-50"
+                    <div class="flex shrink-0 items-center gap-1">
+                      {#if isDownloading}
+                        <div class="flex items-center gap-2">
+                          <span class="text-[10px] text-primary tabular-nums"
+                            >{downloadProgress}%</span
                           >
-                            {#if owned}
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px]"
-                                onclick={() => openTagEditor(theme)}
-                              >
-                                <Tag class="size-3.5" />
-                                Edit tags
-                              </DropdownMenu.Item>
-                              {#if !isLegacy && isInstalled && hasUpdate}
-                                <DropdownMenu.Item
-                                  class="gap-2 text-[11px]"
-                                  onclick={() => handleRefreshOwnedTheme(theme)}
-                                >
-                                  <RefreshCw class="size-3.5" />
-                                  Refresh installed copy
-                                </DropdownMenu.Item>
-                              {/if}
-                            {:else if canReport || canFork}
-                              {#if canReport}
-                                <DropdownMenu.Item
-                                  class="gap-2 text-[11px]"
-                                  onclick={() => openReportDialog(theme)}
-                                >
-                                  <Flag class="size-3.5" />
-                                  Report theme
-                                </DropdownMenu.Item>
-                              {/if}
-                              {#if canFork}
-                                <DropdownMenu.Item
-                                  class="gap-2 text-[11px]"
-                                  onclick={() => handleForkTheme(theme)}
-                                >
-                                  <CopyPlus class="size-3.5" />
-                                  Fork theme
-                                </DropdownMenu.Item>
-                              {/if}
+                          <div class="h-1.5 w-16 overflow-hidden rounded-full bg-theme-800">
+                            <div
+                              class="h-full bg-primary transition-all duration-200"
+                              style="width: {downloadProgress}%"
+                            ></div>
+                          </div>
+                        </div>
+                      {:else if deletingId === theme.id}
+                        <span class="flex items-center gap-1 text-[10px] text-red-300">
+                          <LoaderCircle class="size-3 animate-spin" /> Deleting
+                        </span>
+                      {:else if forkingId === theme.id}
+                        <span class="flex items-center gap-1 text-[10px] text-cyan-300">
+                          <LoaderCircle class="size-3 animate-spin" /> Forking
+                        </span>
+                      {:else if moderatingId === theme.id}
+                        <span class="flex items-center gap-1 text-[10px] text-amber-300">
+                          <LoaderCircle class="size-3 animate-spin" /> Updating
+                        </span>
+                      {:else if isDeleted}
+                        {#if owned}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            class="h-7 gap-1 text-xs"
+                            onclick={() => handleRestoreTheme(theme)}
+                            disabled={restoringId === theme.id}
+                          >
+                            {#if restoringId === theme.id}
+                              <LoaderCircle class="size-3 animate-spin" />
+                              Restoring
+                            {:else}
+                              <RotateCcw class="size-3" />
+                              Restore
                             {/if}
+                          </Button>
+                        {:else}
+                          <Badge
+                            variant="outline"
+                            class="border-red-500/40 bg-red-950/20 text-red-300 text-[10px]"
+                          >
+                            <Trash2 class="mr-1 size-3" /> Deleted
+                          </Badge>
+                        {/if}
+                      {:else}
+                        {#if owned && !isLegacy && isInstalled}
+                          <Button
+                            size="sm"
+                            class="h-7 gap-1 text-xs"
+                            onclick={() => handleEditTheme(theme)}
+                          >
+                            <Pencil class="size-3" />
+                            Edit
+                          </Button>
+                        {:else if isActive}
+                          <Badge
+                            variant="outline"
+                            class="border-emerald-500/40 bg-emerald-950/20 text-emerald-300 text-[10px]"
+                          >
+                            <Check class="mr-1 size-3" /> In use
+                          </Badge>
+                        {:else if isInstalled && hasUpdate}
+                          <Button
+                            size="sm"
+                            class="h-7 gap-1 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+                            onclick={() => handleDownloadAndApply(theme)}
+                          >
+                            <Download class="size-3" />
+                            Update
+                          </Button>
+                        {:else if isInstalled}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            class="h-7 text-xs"
+                            onclick={() => handleApplyExisting(theme)}
+                          >
+                            Apply
+                          </Button>
+                        {:else}
+                          <Button
+                            size="sm"
+                            class="h-7 gap-1 text-xs"
+                            onclick={() => handleDownloadAndApply(theme)}
+                          >
+                            <Download class="size-3" />
+                            Download & Apply
+                          </Button>
+                        {/if}
 
-                            {#if canModerate}
-                              {#if owned || canReport}
-                                <DropdownMenu.Separator class="my-1 bg-theme-800" />
-                              {/if}
-                              {#if !isLegacy}
+                        {#if showOverflowMenu}
+                          <DropdownMenu.Root>
+                            <DropdownMenu.Trigger>
+                              {#snippet child({ props })}
+                                <Button
+                                  {...props}
+                                  variant="ghost"
+                                  size="icon"
+                                  class="size-7 text-muted-foreground hover:text-white"
+                                  aria-label="More actions for {theme.name}"
+                                >
+                                  <Ellipsis class="size-4" />
+                                </Button>
+                              {/snippet}
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Content
+                              align="end"
+                              class="w-52 border-theme-700 bg-theme-950 text-theme-50"
+                            >
+                              {#if owned}
                                 <DropdownMenu.Item
                                   class="gap-2 text-[11px]"
-                                  onclick={() => handleToggleVisibility(theme)}
+                                  onclick={() => openTagEditor(theme)}
                                 >
-                                  {#if theme.isHidden}
-                                    <Eye class="size-3.5" />
-                                    Restore visibility
+                                  <Tag class="size-3.5" />
+                                  Edit tags
+                                </DropdownMenu.Item>
+                                {#if !isLegacy && isInstalled && hasUpdate}
+                                  <DropdownMenu.Item
+                                    class="gap-2 text-[11px]"
+                                    onclick={() => handleRefreshOwnedTheme(theme)}
+                                  >
+                                    <RefreshCw class="size-3.5" />
+                                    Refresh installed copy
+                                  </DropdownMenu.Item>
+                                {/if}
+                              {:else if canReport || canFork}
+                                {#if canReport}
+                                  <DropdownMenu.Item
+                                    class="gap-2 text-[11px]"
+                                    onclick={() => openReportDialog(theme)}
+                                  >
+                                    <Flag class="size-3.5" />
+                                    Report theme
+                                  </DropdownMenu.Item>
+                                {/if}
+                                {#if canFork}
+                                  <DropdownMenu.Item
+                                    class="gap-2 text-[11px]"
+                                    onclick={() => handleForkTheme(theme)}
+                                  >
+                                    <CopyPlus class="size-3.5" />
+                                    Fork theme
+                                  </DropdownMenu.Item>
+                                {/if}
+                              {/if}
+
+                              {#if canModerate}
+                                {#if owned || canReport}
+                                  <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                {/if}
+                                {#if !isLegacy}
+                                  <DropdownMenu.Item
+                                    class="gap-2 text-[11px]"
+                                    onclick={() => handleToggleVisibility(theme)}
+                                  >
+                                    {#if theme.isHidden}
+                                      <Eye class="size-3.5" />
+                                      Restore visibility
+                                    {:else}
+                                      <EyeOff class="size-3.5" />
+                                      Hide from workshop
+                                    {/if}
+                                  </DropdownMenu.Item>
+                                {/if}
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => handleToggleQuarantine(theme)}
+                                  disabled={quarantineId === theme.id}
+                                >
+                                  {#if quarantineId === theme.id}
+                                    <LoaderCircle class="size-3.5 animate-spin" />
+                                    Updating...
                                   {:else}
-                                    <EyeOff class="size-3.5" />
-                                    Hide from workshop
+                                    <Ban class="size-3.5" />
+                                    {theme.isQuarantined ? 'Lift takedown' : 'Take down theme'}
                                   {/if}
                                 </DropdownMenu.Item>
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px]"
+                                  onclick={() => void openThemeHistory(theme.id, theme.name)}
+                                >
+                                  <History class="size-3.5" />
+                                  Moderation history
+                                </DropdownMenu.Item>
                               {/if}
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px]"
-                                onclick={() => handleToggleQuarantine(theme)}
-                                disabled={quarantineId === theme.id}
-                              >
-                                {#if quarantineId === theme.id}
-                                  <LoaderCircle class="size-3.5 animate-spin" />
-                                  Updating...
-                                {:else}
-                                  <Ban class="size-3.5" />
-                                  {theme.isQuarantined ? 'Lift takedown' : 'Take down theme'}
-                                {/if}
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px]"
-                                onclick={() => void openThemeHistory(theme.id, theme.name)}
-                              >
-                                <History class="size-3.5" />
-                                Moderation history
-                              </DropdownMenu.Item>
-                            {/if}
 
-                            {#if owned}
-                              <DropdownMenu.Separator class="my-1 bg-theme-800" />
-                              <DropdownMenu.Item
-                                class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
-                                onclick={() => handleDeleteTheme(theme)}
-                              >
-                                <Trash2 class="size-3.5" />
-                                Move to trash
-                              </DropdownMenu.Item>
-                            {/if}
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Root>
+                              {#if owned}
+                                <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                <DropdownMenu.Item
+                                  class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
+                                  onclick={() => handleDeleteTheme(theme)}
+                                >
+                                  <Trash2 class="size-3.5" />
+                                  Move to trash
+                                </DropdownMenu.Item>
+                              {/if}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Root>
+                        {/if}
                       {/if}
-                    {/if}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          {/each}
-        </div>
-        {#if page < totalPages}
-          <div class="flex items-center justify-center pb-4">
-            <Button
-              variant="secondary"
-              size="sm"
-              class="h-8 gap-1.5 text-xs"
-              onclick={handleLoadMore}
-              disabled={loadingMore}
-            >
-              {#if loadingMore}
-                <LoaderCircle class="size-3.5 animate-spin" />
-                Loading...
-              {:else}
-                <ChevronDown class="size-3.5" />
-                Load more ({themes.length} of {totalThemes})
-              {/if}
-            </Button>
+            {/each}
           </div>
+          {#if page < totalPages}
+            <div class="flex items-center justify-center pb-4">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 gap-1.5 text-xs"
+                onclick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {#if loadingMore}
+                  <LoaderCircle class="size-3.5 animate-spin" />
+                  Loading...
+                {:else}
+                  <ChevronDown class="size-3.5" />
+                  Load more ({themes.length} of {totalThemes})
+                {/if}
+              </Button>
+            </div>
+          {/if}
         {/if}
-      {/if}
-    </ScrollContainer>
+      </ScrollContainer>
+    </div>
   </div>
-</div>
 
-<Dialog.Root bind:open={showModerationPanel}>
-  <Dialog.Content
-    class="top-12 bottom-4 flex h-auto w-[calc(100%_-_2rem)] max-w-6xl translate-y-0 flex-col gap-0 overflow-hidden rounded-xl border-theme-800 bg-theme-950 p-0 text-white shadow-2xl sm:rounded-xl"
-  >
-    <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-      <div>
-        <Dialog.Title class="flex items-center gap-2 text-sm font-semibold text-white">
-          <Flag class="size-4 text-amber-300" />
-          Moderation
-        </Dialog.Title>
-        <Dialog.Description class="mt-1 text-[11px] text-muted-foreground">
-          Open reports and recent staff activity.
-        </Dialog.Description>
-      </div>
+  <Dialog.Root bind:open={showModerationPanel}>
+    <Dialog.Content
+      class="top-12 bottom-4 flex h-auto w-[calc(100%_-_2rem)] max-w-6xl translate-y-0 flex-col gap-0 overflow-hidden rounded-xl border-theme-800 bg-theme-950 p-0 text-white shadow-2xl sm:rounded-xl"
+    >
+      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+        <div>
+          <Dialog.Title class="flex items-center gap-2 text-sm font-semibold text-white">
+            <Flag class="size-4 text-amber-300" />
+            Moderation
+          </Dialog.Title>
+          <Dialog.Description class="mt-1 text-[11px] text-muted-foreground">
+            Open reports and recent staff activity.
+          </Dialog.Description>
+        </div>
         <div class="flex items-center gap-1">
           <WorkshopTooltip content="Send a system announcement">
             {#snippet trigger(props)}
@@ -2281,7 +2298,9 @@
           </div>
         {:else}
           <section>
-            <h3 class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase">
+            <h3
+              class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase"
+            >
               <Flag class="size-3.5 text-amber-300" />
               Reports
               <Badge
@@ -2303,7 +2322,9 @@
               </Label>
             {/if}
             {#if moderationReports.length === 0}
-              <p class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground">
+              <p
+                class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+              >
                 No reports match these filters.
               </p>
             {:else}
@@ -2323,7 +2344,9 @@
                         <div class="flex items-start justify-between gap-3">
                           <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-1.5">
-                              <p class="truncate text-xs font-semibold text-white">{report.themeName}</p>
+                              <p class="truncate text-xs font-semibold text-white">
+                                {report.themeName}
+                              </p>
                               <Badge
                                 variant="outline"
                                 class="border-theme-700/70 bg-theme-800/60 px-1.5 py-0.5 text-[9px] text-muted-foreground"
@@ -2354,7 +2377,9 @@
                             {formatModerationDate(report.createdAt)}
                           </span>
                         </div>
-                        <p class="mt-2 text-[11px] leading-relaxed text-white/80">{report.reason}</p>
+                        <p class="mt-2 text-[11px] leading-relaxed text-white/80">
+                          {report.reason}
+                        </p>
                         {#if report.status !== 'open'}
                           <p class="mt-2 text-[10px] text-muted-foreground">
                             {report.status === 'resolved' ? 'Resolved' : 'Dismissed'} by
@@ -2364,7 +2389,9 @@
                             {/if}
                           </p>
                           {#if report.resolutionNote}
-                            <p class="mt-1 rounded border border-theme-800/60 bg-theme-950/40 px-2 py-1 text-[10px] text-muted-foreground">
+                            <p
+                              class="mt-1 rounded border border-theme-800/60 bg-theme-950/40 px-2 py-1 text-[10px] text-muted-foreground"
+                            >
                               Note: {report.resolutionNote}
                             </p>
                           {/if}
@@ -2438,7 +2465,9 @@
 
           <section>
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <h3 class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase">
+              <h3
+                class="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-white/80 uppercase"
+              >
                 <History class="size-3.5 text-cyan-300" />
                 Recent activity
               </h3>
@@ -2498,7 +2527,9 @@
               </Button>
             </div>
             {#if moderationEvents.length === 0}
-              <p class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground">
+              <p
+                class="mt-2 rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+              >
                 No moderation events yet.
               </p>
             {:else}
@@ -2508,9 +2539,9 @@
                     <div class="flex items-center justify-between gap-2">
                       <p class="truncate text-[11px] text-white/80">
                         <span class="font-semibold text-white">{event.actorName}</span>
-                        {' · '}
+                        ·
                         {moderationActionLabel(event.action)}
-                        {' · '}
+                        ·
                         <span class="text-white/60">{event.themeName}</span>
                       </p>
                       <span class="shrink-0 text-[9px] text-muted-foreground">
@@ -2520,7 +2551,11 @@
                     {#if event.reason}
                       <WorkshopTooltip content={event.reason}>
                         {#snippet trigger(props)}
-                          <p {...props} tabindex="-1" class="mt-1 truncate text-[10px] text-muted-foreground">
+                          <p
+                            {...props}
+                            tabindex="-1"
+                            class="mt-1 truncate text-[10px] text-muted-foreground"
+                          >
                             {event.reason}
                           </p>
                         {/snippet}
@@ -2546,521 +2581,556 @@
           </section>
         {/if}
       </div>
-  </Dialog.Content>
-</Dialog.Root>
+    </Dialog.Content>
+  </Dialog.Root>
 
-{#if announcementOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close announcement composer"
-      onclick={() => {
-        if (!announcementSending) announcementOpen = false;
-      }}
-    ></button>
-    <div
-      class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="announcement-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div>
-          <h2 id="announcement-title" class="flex items-center gap-2 text-sm font-semibold text-white">
-            <Megaphone class="size-4 text-cyan-300" /> Send announcement
-          </h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">
-            This appears as a system notification in the recipient's hub.
-          </p>
-        </div>
-        <WorkshopTooltip content="Close">
-          {#snippet trigger(props)}
-            <Button
-              {...props}
-              variant="ghost"
-              size="icon"
-              class="size-7 text-muted-foreground hover:text-white"
-              onclick={() => {
-                if (!announcementSending) announcementOpen = false;
-              }}
+  {#if announcementOpen}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close announcement composer"
+        onclick={() => {
+          if (!announcementSending) announcementOpen = false;
+        }}
+      ></button>
+      <div
+        class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="announcement-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div>
+            <h2
+              id="announcement-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
             >
-              <X class="size-4" />
-            </Button>
-          {/snippet}
-        </WorkshopTooltip>
-      </div>
-      <div class="space-y-3 p-4">
-        <label class="block space-y-1.5">
-          <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">Title</span>
-          <Input
-            class="h-8 border-theme-800 bg-theme-900/60 text-[11px]"
-            maxlength={120}
-            placeholder="Workshop maintenance tonight"
-            bind:value={announcementTitle}
-          />
-        </label>
-        <label class="block space-y-1.5">
-          <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">Message</span>
-          <textarea
-            class="min-h-28 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
-            rows="5"
-            maxlength="1000"
-            placeholder="Share an update with the community..."
-            bind:value={announcementMessage}
-          ></textarea>
-          <span class="block text-right text-[9px] text-muted-foreground">
-            {announcementMessage.trim().length}/1000 · minimum 10
-          </span>
-        </label>
-        <label class="block space-y-1.5">
-          <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">Audience</span>
-          <select
-            class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
-            bind:value={announcementAudience}
-          >
-            <option value="all">Everyone</option>
-            <option value="staff">Staff only</option>
-          </select>
-        </label>
-        {#if announcementError}
-          <p class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300">
-            {announcementError}
-          </p>
-        {/if}
-      </div>
-      <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 text-xs"
-          onclick={() => (announcementOpen = false)}
-          disabled={announcementSending}
-        >
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          class="h-8 gap-1 text-xs"
-          onclick={() => void submitAnnouncement()}
-          disabled={announcementSending}
-        >
-          {#if announcementSending}
-            <LoaderCircle class="size-3 animate-spin" /> Sending...
-          {:else}
-            <Megaphone class="size-3" /> Send announcement
-          {/if}
-        </Button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-{#if sourceDialogOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close fork origin"
-      onclick={() => (sourceDialogOpen = false)}
-    ></button>
-    <div
-      class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="fork-source-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div>
-          <h2 id="fork-source-title" class="flex items-center gap-2 text-sm font-semibold text-white">
-            <GitFork class="size-4 text-cyan-300" /> Fork origin
-          </h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">The immediate source of this fork.</p>
+              <Megaphone class="size-4 text-cyan-300" /> Send announcement
+            </h2>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              This appears as a system notification in the recipient's hub.
+            </p>
+          </div>
+          <WorkshopTooltip content="Close">
+            {#snippet trigger(props)}
+              <Button
+                {...props}
+                variant="ghost"
+                size="icon"
+                class="size-7 text-muted-foreground hover:text-white"
+                onclick={() => {
+                  if (!announcementSending) announcementOpen = false;
+                }}
+              >
+                <X class="size-4" />
+              </Button>
+            {/snippet}
+          </WorkshopTooltip>
         </div>
-        <WorkshopTooltip content="Close">
-          {#snippet trigger(props)}
-            <Button
-              {...props}
-              variant="ghost"
-              size="icon"
-              class="size-7 text-muted-foreground hover:text-white"
-              onclick={() => (sourceDialogOpen = false)}
+        <div class="space-y-3 p-4">
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >Title</span
             >
-              <X class="size-4" />
-            </Button>
-          {/snippet}
-        </WorkshopTooltip>
-      </div>
-      <div class="p-4">
-        {#if sourceLoading}
-          <div class="flex h-40 items-center justify-center gap-2 text-xs text-muted-foreground">
-            <LoaderCircle class="size-4 animate-spin text-primary" /> Loading original...
-          </div>
-        {:else if sourceError}
-          <p class="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3 text-[11px] text-amber-200">
-            {sourceError}
-          </p>
-        {:else if sourceTheme}
-          <img
-            src={sourceTheme.previewUrl}
-            alt={sourceTheme.name}
-            class="aspect-video w-full rounded-lg border border-theme-800 object-cover"
-            onerror={(e) => {
-              (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
-            }}
-          />
-          <div class="mt-3 flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <h3 class="truncate text-sm font-semibold text-white">{sourceTheme.name}</h3>
-              <p class="mt-0.5 text-[11px] text-muted-foreground">
-                by {sourceTheme.author.name} · v{sourceTheme.version}
-              </p>
-            </div>
-            <Badge variant="outline" class="shrink-0 text-[10px]">
-              {sourceTheme.apiVersion === '1.0' ? 'Legacy v1' : 'API 2.x'}
-            </Badge>
-          </div>
-          {#if sourceTheme.description}
-            <p class="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              {sourceTheme.description}
+            <Input
+              class="h-8 border-theme-800 bg-theme-900/60 text-[11px]"
+              maxlength={120}
+              placeholder="Workshop maintenance tonight"
+              bind:value={announcementTitle}
+            />
+          </label>
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >Message</span
+            >
+            <textarea
+              class="min-h-28 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+              rows="5"
+              maxlength="1000"
+              placeholder="Share an update with the community..."
+              bind:value={announcementMessage}
+            ></textarea>
+            <span class="block text-right text-[9px] text-muted-foreground">
+              {announcementMessage.trim().length}/1000 · minimum 10
+            </span>
+          </label>
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >Audience</span
+            >
+            <select
+              class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
+              bind:value={announcementAudience}
+            >
+              <option value="all">Everyone</option>
+              <option value="staff">Staff only</option>
+            </select>
+          </label>
+          {#if announcementError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+            >
+              {announcementError}
             </p>
           {/if}
-          {#if sourceTheme.tags.length > 0}
-            <div class="mt-3 flex flex-wrap gap-1">
-              {#each sourceTheme.tags as tag}
-                <span class="rounded bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                  #{tag}
-                </span>
-              {/each}
-            </div>
-          {/if}
-          <p class="mt-4 border-t border-theme-800/60 pt-3 text-[10px] text-muted-foreground">
-            This fork keeps a snapshot of the source at fork time. The original may have changed since.
-          </p>
-        {/if}
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 text-xs"
+            onclick={() => (announcementOpen = false)}
+            disabled={announcementSending}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            class="h-8 gap-1 text-xs"
+            onclick={() => void submitAnnouncement()}
+            disabled={announcementSending}
+          >
+            {#if announcementSending}
+              <LoaderCircle class="size-3 animate-spin" /> Sending...
+            {:else}
+              <Megaphone class="size-3" /> Send announcement
+            {/if}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
 
-{#if tagEditorTarget}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close tag editor"
-      onclick={closeTagEditor}
-    ></button>
-    <div
-      class="relative w-full max-w-md overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="theme-tags-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div class="min-w-0">
-          <h2
-            id="theme-tags-title"
-            class="flex items-center gap-2 text-sm font-semibold text-white"
-          >
-            <Tag class="size-4 text-cyan-300" /> Edit theme tags
-          </h2>
-          <p class="mt-1 truncate text-[11px] text-muted-foreground">{tagEditorTarget.name}</p>
+  {#if sourceDialogOpen}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close fork origin"
+        onclick={() => (sourceDialogOpen = false)}
+      ></button>
+      <div
+        class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fork-source-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div>
+            <h2
+              id="fork-source-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
+            >
+              <GitFork class="size-4 text-cyan-300" /> Fork origin
+            </h2>
+            <p class="mt-1 text-[11px] text-muted-foreground">The immediate source of this fork.</p>
+          </div>
+          <WorkshopTooltip content="Close">
+            {#snippet trigger(props)}
+              <Button
+                {...props}
+                variant="ghost"
+                size="icon"
+                class="size-7 text-muted-foreground hover:text-white"
+                onclick={() => (sourceDialogOpen = false)}
+              >
+                <X class="size-4" />
+              </Button>
+            {/snippet}
+          </WorkshopTooltip>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="size-7 text-muted-foreground hover:text-white"
-          onclick={closeTagEditor}
-          disabled={tagSaving}
-          aria-label="Close tag editor"
-        >
-          <X class="size-4" />
-        </Button>
+        <div class="p-4">
+          {#if sourceLoading}
+            <div class="flex h-40 items-center justify-center gap-2 text-xs text-muted-foreground">
+              <LoaderCircle class="size-4 animate-spin text-primary" /> Loading original...
+            </div>
+          {:else if sourceError}
+            <p
+              class="rounded-lg border border-amber-900/40 bg-amber-950/20 p-3 text-[11px] text-amber-200"
+            >
+              {sourceError}
+            </p>
+          {:else if sourceTheme}
+            <img
+              src={sourceTheme.previewUrl}
+              alt={sourceTheme.name}
+              class="aspect-video w-full rounded-lg border border-theme-800 object-cover"
+              onerror={(e) => {
+                (e.currentTarget as HTMLImageElement).src = DefaultThemePreview;
+              }}
+            />
+            <div class="mt-3 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="truncate text-sm font-semibold text-white">{sourceTheme.name}</h3>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  by {sourceTheme.author.name} · v{sourceTheme.version}
+                </p>
+              </div>
+              <Badge variant="outline" class="shrink-0 text-[10px]">
+                {sourceTheme.apiVersion === '1.0' ? 'Legacy v1' : 'API 2.x'}
+              </Badge>
+            </div>
+            {#if sourceTheme.description}
+              <p class="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                {sourceTheme.description}
+              </p>
+            {/if}
+            {#if sourceTheme.tags.length > 0}
+              <div class="mt-3 flex flex-wrap gap-1">
+                {#each sourceTheme.tags as tag (tag)}
+                  <span
+                    class="rounded bg-theme-800/50 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                  >
+                    #{tag}
+                  </span>
+                {/each}
+              </div>
+            {/if}
+            <p class="mt-4 border-t border-theme-800/60 pt-3 text-[10px] text-muted-foreground">
+              This fork keeps a snapshot of the source at fork time. The original may have changed
+              since.
+            </p>
+          {/if}
+        </div>
       </div>
+    </div>
+  {/if}
 
-      <div class="space-y-3 p-4">
-        <p class="text-[11px] leading-relaxed text-muted-foreground">
-          Tags are saved to the workshop and to the installed theme.json.
-        </p>
-        <div class="flex gap-2">
-          <Input
-            class="h-8 border-theme-800 bg-theme-900/60 text-[11px]"
-            bind:value={tagEditorInput}
-            placeholder="anime, dark, minimal"
-            maxlength={24}
-            disabled={tagSaving}
-            oninput={() => (tagEditorError = null)}
-            onkeydown={(event) => {
-              if (event.key === 'Enter' || event.key === ',') {
-                event.preventDefault();
-                addTagEditorTag();
-              }
-            }}
-          />
+  {#if tagEditorTarget}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close tag editor"
+        onclick={closeTagEditor}
+      ></button>
+      <div
+        class="relative w-full max-w-md overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="theme-tags-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div class="min-w-0">
+            <h2
+              id="theme-tags-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
+            >
+              <Tag class="size-4 text-cyan-300" /> Edit theme tags
+            </h2>
+            <p class="mt-1 truncate text-[11px] text-muted-foreground">{tagEditorTarget.name}</p>
+          </div>
           <Button
-            variant="secondary"
-            size="sm"
-            class="h-8 shrink-0 gap-1 text-xs"
-            onclick={addTagEditorTag}
-            disabled={tagSaving || !tagEditorInput.trim()}
+            variant="ghost"
+            size="icon"
+            class="size-7 text-muted-foreground hover:text-white"
+            onclick={closeTagEditor}
+            disabled={tagSaving}
+            aria-label="Close tag editor"
           >
-            <Plus class="size-3" /> Add
+            <X class="size-4" />
           </Button>
         </div>
 
-        {#if tagEditorTags.length > 0}
-          <div class="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-            {#each tagEditorTags as tag (tag)}
-              <span
-                class="inline-flex items-center gap-1 rounded-full border border-theme-700 bg-theme-900 px-2 py-1 text-[10px] text-theme-100"
-              >
-                #{tag}
-                <button
-                  type="button"
-                  class="rounded-full text-muted-foreground transition-colors hover:text-white disabled:opacity-50"
-                  aria-label={`Remove ${tag} tag`}
-                  onclick={() => removeTagEditorTag(tag)}
-                  disabled={tagSaving}
-                >
-                  <X class="size-3" />
-                </button>
-              </span>
-            {/each}
-          </div>
-        {:else}
-          <p
-            class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
-          >
-            No tags yet. Add a few so people can find this theme.
+        <div class="space-y-3 p-4">
+          <p class="text-[11px] leading-relaxed text-muted-foreground">
+            Tags are saved to the workshop and to the installed theme.json.
           </p>
-        {/if}
-
-        <div class="flex items-center justify-between gap-3 text-[9px] text-muted-foreground">
-          <span>Lowercase letters, numbers, dashes, underscores · max 24</span>
-          <span class="shrink-0 tabular-nums">{tagEditorTags.length}/10</span>
-        </div>
-
-        {#if tagEditorError}
-          <p
-            class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
-          >
-            {tagEditorError}
-          </p>
-        {/if}
-      </div>
-
-      <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 text-xs"
-          onclick={closeTagEditor}
-          disabled={tagSaving}
-        >
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          class="h-8 gap-1 text-xs"
-          onclick={() => void saveTagEditor()}
-          disabled={tagSaving}
-        >
-          {#if tagSaving}
-            <LoaderCircle class="size-3 animate-spin" /> Saving...
-          {:else}
-            <Tag class="size-3" /> Save tags
-          {/if}
-        </Button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-{#if reportTarget}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close report form"
-      onclick={() => {
-        if (!reportSubmitting) reportTarget = null;
-      }}
-    ></button>
-    <div
-      class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="report-theme-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div>
-          <h2 id="report-theme-title" class="flex items-center gap-2 text-sm font-semibold text-white">
-            <Flag class="size-4 text-amber-300" /> Report theme
-          </h2>
-          <p class="mt-1 text-[11px] text-muted-foreground">
-            Reporting <span class="text-white/80">{reportTarget.name}</span> by
-            {reportTarget.author.name}. Reports are visible to moderators only.
-          </p>
-        </div>
-        <WorkshopTooltip content="Close">
-          {#snippet trigger(props)}
-            <Button
-              {...props}
-              variant="ghost"
-              size="icon"
-              class="size-7 text-muted-foreground hover:text-white"
-              onclick={() => {
-                if (!reportSubmitting) reportTarget = null;
+          <div class="flex gap-2">
+            <Input
+              class="h-8 border-theme-800 bg-theme-900/60 text-[11px]"
+              bind:value={tagEditorInput}
+              placeholder="anime, dark, minimal"
+              maxlength={24}
+              disabled={tagSaving}
+              oninput={() => (tagEditorError = null)}
+              onkeydown={(event) => {
+                if (event.key === 'Enter' || event.key === ',') {
+                  event.preventDefault();
+                  addTagEditorTag();
+                }
               }}
-            >
-              <X class="size-4" />
-            </Button>
-          {/snippet}
-        </WorkshopTooltip>
-      </div>
-      <div class="space-y-3 p-4">
-        <label class="block space-y-1.5">
-          <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">Category</span>
-          <select
-            class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
-            bind:value={reportCategory}
-          >
-            {#each REPORT_CATEGORIES as category}
-              <option value={category.id}>{category.label}</option>
-            {/each}
-          </select>
-        </label>
-        <label class="block space-y-1.5">
-          <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase">Details</span>
-          <textarea
-            class="min-h-28 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
-            rows="5"
-            maxlength="500"
-            placeholder="Describe what is wrong (at least 10 characters)..."
-            bind:value={reportDetails}
-          ></textarea>
-          <span class="block text-right text-[9px] text-muted-foreground">
-            {reportDetails.trim().length}/500 · minimum 10
-          </span>
-        </label>
-        {#if reportError}
-          <p class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300">
-            {reportError}
-          </p>
-        {/if}
-      </div>
-      <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 text-xs"
-          onclick={() => (reportTarget = null)}
-          disabled={reportSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          class="h-8 gap-1 text-xs"
-          onclick={() => void submitReport()}
-          disabled={reportSubmitting}
-        >
-          {#if reportSubmitting}
-            <LoaderCircle class="size-3 animate-spin" /> Sending...
-          {:else}
-            <Flag class="size-3" /> Submit report
-          {/if}
-        </Button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-{#if historyOpen && historyTarget}
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <button
-      type="button"
-      class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
-      aria-label="Close moderation history"
-      onclick={() => (historyOpen = false)}
-    ></button>
-    <div
-      class="relative flex max-h-[80vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="theme-history-title"
-    >
-      <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
-        <div>
-          <h2 id="theme-history-title" class="flex items-center gap-2 text-sm font-semibold text-white">
-            <History class="size-4 text-cyan-300" /> Moderation history
-          </h2>
-          <p class="mt-1 truncate text-[11px] text-muted-foreground">{historyTarget.name}</p>
-        </div>
-        <WorkshopTooltip content="Close">
-          {#snippet trigger(props)}
+            />
             <Button
-              {...props}
-              variant="ghost"
-              size="icon"
-              class="size-7 text-muted-foreground hover:text-white"
-              onclick={() => (historyOpen = false)}
+              variant="secondary"
+              size="sm"
+              class="h-8 shrink-0 gap-1 text-xs"
+              onclick={addTagEditorTag}
+              disabled={tagSaving || !tagEditorInput.trim()}
             >
-              <X class="size-4" />
+              <Plus class="size-3" /> Add
             </Button>
-          {/snippet}
-        </WorkshopTooltip>
-      </div>
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
-        {#if historyLoading}
-          <div class="flex h-32 items-center justify-center gap-2 text-xs text-muted-foreground">
-            <LoaderCircle class="size-4 animate-spin text-primary" /> Loading history...
           </div>
-        {:else if historyError}
-          <p class="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-300">
-            {historyError}
-          </p>
-        {:else if historyEvents.length === 0}
-          <p class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground">
-            No moderation events for this theme yet.
-          </p>
-        {:else}
-          <div class="space-y-1.5">
-            {#each historyEvents as event (event.id)}
-              <div class="rounded-lg border border-theme-800/50 bg-theme-900/20 px-3 py-2">
-                <div class="flex items-center justify-between gap-2">
-                  <p class="truncate text-[11px] text-white/80">
-                    <span class="font-semibold text-white">{event.actorName}</span>
-                    {' · '}
-                    {moderationActionLabel(event.action)}
-                  </p>
-                  <span class="shrink-0 text-[9px] text-muted-foreground">
-                    {formatModerationDate(event.createdAt)}
-                  </span>
-                </div>
-                {#if event.reason}
-                  <p class="mt-1 text-[10px] text-muted-foreground">{event.reason}</p>
-                {/if}
-              </div>
-            {/each}
-          </div>
-          {#if historyPage < historyTotalPages}
-            <div class="mt-2 flex justify-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-7 text-[10px] text-muted-foreground hover:text-white"
-                onclick={() => void loadOlderHistory()}
-                disabled={historyLoading}
-              >
-                Load older history
-              </Button>
+
+          {#if tagEditorTags.length > 0}
+            <div class="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+              {#each tagEditorTags as tag (tag)}
+                <span
+                  class="inline-flex items-center gap-1 rounded-full border border-theme-700 bg-theme-900 px-2 py-1 text-[10px] text-theme-100"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    class="rounded-full text-muted-foreground transition-colors hover:text-white disabled:opacity-50"
+                    aria-label={`Remove ${tag} tag`}
+                    onclick={() => removeTagEditorTag(tag)}
+                    disabled={tagSaving}
+                  >
+                    <X class="size-3" />
+                  </button>
+                </span>
+              {/each}
             </div>
+          {:else}
+            <p
+              class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+            >
+              No tags yet. Add a few so people can find this theme.
+            </p>
           {/if}
-        {/if}
+
+          <div class="flex items-center justify-between gap-3 text-[9px] text-muted-foreground">
+            <span>Lowercase letters, numbers, dashes, underscores · max 24</span>
+            <span class="shrink-0 tabular-nums">{tagEditorTags.length}/10</span>
+          </div>
+
+          {#if tagEditorError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+            >
+              {tagEditorError}
+            </p>
+          {/if}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 text-xs"
+            onclick={closeTagEditor}
+            disabled={tagSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            class="h-8 gap-1 text-xs"
+            onclick={() => void saveTagEditor()}
+            disabled={tagSaving}
+          >
+            {#if tagSaving}
+              <LoaderCircle class="size-3 animate-spin" /> Saving...
+            {:else}
+              <Tag class="size-3" /> Save tags
+            {/if}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
+
+  {#if reportTarget}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close report form"
+        onclick={() => {
+          if (!reportSubmitting) reportTarget = null;
+        }}
+      ></button>
+      <div
+        class="relative w-full max-w-lg overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="report-theme-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div>
+            <h2
+              id="report-theme-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
+            >
+              <Flag class="size-4 text-amber-300" /> Report theme
+            </h2>
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Reporting <span class="text-white/80">{reportTarget.name}</span> by
+              {reportTarget.author.name}. Reports are visible to moderators only.
+            </p>
+          </div>
+          <WorkshopTooltip content="Close">
+            {#snippet trigger(props)}
+              <Button
+                {...props}
+                variant="ghost"
+                size="icon"
+                class="size-7 text-muted-foreground hover:text-white"
+                onclick={() => {
+                  if (!reportSubmitting) reportTarget = null;
+                }}
+              >
+                <X class="size-4" />
+              </Button>
+            {/snippet}
+          </WorkshopTooltip>
+        </div>
+        <div class="space-y-3 p-4">
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >Category</span
+            >
+            <select
+              class="h-8 w-full rounded-md border border-theme-800 bg-theme-900/60 px-2 text-[11px] text-white outline-none focus:border-primary/50"
+              bind:value={reportCategory}
+            >
+              {#each REPORT_CATEGORIES as category (category.id)}
+                <option value={category.id}>{category.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="block space-y-1.5">
+            <span class="text-[10px] font-semibold tracking-wide text-white/70 uppercase"
+              >Details</span
+            >
+            <textarea
+              class="min-h-28 w-full resize-y rounded-md border border-theme-800 bg-theme-900/60 p-2.5 text-[11px] leading-relaxed text-white outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+              rows="5"
+              maxlength="500"
+              placeholder="Describe what is wrong (at least 10 characters)..."
+              bind:value={reportDetails}
+            ></textarea>
+            <span class="block text-right text-[9px] text-muted-foreground">
+              {reportDetails.trim().length}/500 · minimum 10
+            </span>
+          </label>
+          {#if reportError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[11px] text-red-300"
+            >
+              {reportError}
+            </p>
+          {/if}
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-theme-800/70 p-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-8 text-xs"
+            onclick={() => (reportTarget = null)}
+            disabled={reportSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            class="h-8 gap-1 text-xs"
+            onclick={() => void submitReport()}
+            disabled={reportSubmitting}
+          >
+            {#if reportSubmitting}
+              <LoaderCircle class="size-3 animate-spin" /> Sending...
+            {:else}
+              <Flag class="size-3" /> Submit report
+            {/if}
+          </Button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if historyOpen && historyTarget}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        class="absolute inset-0 cursor-default bg-black/75 backdrop-blur-sm"
+        aria-label="Close moderation history"
+        onclick={() => (historyOpen = false)}
+      ></button>
+      <div
+        class="relative flex max-h-[80vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-theme-800 bg-theme-950 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="theme-history-title"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-theme-800/70 p-4">
+          <div>
+            <h2
+              id="theme-history-title"
+              class="flex items-center gap-2 text-sm font-semibold text-white"
+            >
+              <History class="size-4 text-cyan-300" /> Moderation history
+            </h2>
+            <p class="mt-1 truncate text-[11px] text-muted-foreground">{historyTarget.name}</p>
+          </div>
+          <WorkshopTooltip content="Close">
+            {#snippet trigger(props)}
+              <Button
+                {...props}
+                variant="ghost"
+                size="icon"
+                class="size-7 text-muted-foreground hover:text-white"
+                onclick={() => (historyOpen = false)}
+              >
+                <X class="size-4" />
+              </Button>
+            {/snippet}
+          </WorkshopTooltip>
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto p-4">
+          {#if historyLoading}
+            <div class="flex h-32 items-center justify-center gap-2 text-xs text-muted-foreground">
+              <LoaderCircle class="size-4 animate-spin text-primary" /> Loading history...
+            </div>
+          {:else if historyError}
+            <p
+              class="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-300"
+            >
+              {historyError}
+            </p>
+          {:else if historyEvents.length === 0}
+            <p
+              class="rounded-lg border border-theme-800/60 bg-theme-900/20 p-3 text-[11px] text-muted-foreground"
+            >
+              No moderation events for this theme yet.
+            </p>
+          {:else}
+            <div class="space-y-1.5">
+              {#each historyEvents as event (event.id)}
+                <div class="rounded-lg border border-theme-800/50 bg-theme-900/20 px-3 py-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="truncate text-[11px] text-white/80">
+                      <span class="font-semibold text-white">{event.actorName}</span>
+                      ·
+                      {moderationActionLabel(event.action)}
+                    </p>
+                    <span class="shrink-0 text-[9px] text-muted-foreground">
+                      {formatModerationDate(event.createdAt)}
+                    </span>
+                  </div>
+                  {#if event.reason}
+                    <p class="mt-1 text-[10px] text-muted-foreground">{event.reason}</p>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+            {#if historyPage < historyTotalPages}
+              <div class="mt-2 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-7 text-[10px] text-muted-foreground hover:text-white"
+                  onclick={() => void loadOlderHistory()}
+                  disabled={historyLoading}
+                >
+                  Load older history
+                </Button>
+              </div>
+            {/if}
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
 </Tooltip.Provider>
