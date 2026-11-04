@@ -393,7 +393,97 @@ pub struct LogBundleEntry {
     pub content: String,
 }
 
-/// List the rotating ZIP bundles, newest first, for the in-app log viewer.
+const MAX_LOG_VIEW_BYTES: u64 = 2 * 1024 * 1024;
+
+fn modified_millis(metadata: &fs::Metadata) -> u64 {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Describe the active session. Unlike archived bundles, these files are still
+/// being written and appear in the viewer without waiting for a rotation.
+fn current_log_bundle(dir: &Path) -> Option<LogBundleInfo> {
+    let mut size = 0;
+    let mut modified = 0;
+    let mut has_logs = false;
+
+    for stream in Stream::ALL {
+        let Ok(metadata) = fs::metadata(dir.join(stream.file_name())) else {
+            continue;
+        };
+        if metadata.len() == 0 {
+            continue;
+        }
+
+        has_logs = true;
+        size += metadata.len();
+        modified = modified.max(modified_millis(&metadata));
+    }
+
+    has_logs.then(|| LogBundleInfo {
+        path: dir.to_string_lossy().into_owned(),
+        name: "Current session".to_string(),
+        size,
+        modified,
+    })
+}
+
+fn read_log_entry(
+    name: String,
+    reader: &mut impl Read,
+    size: u64,
+) -> Result<LogBundleEntry, String> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_LOG_VIEW_BYTES)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("Could not read a log entry: {error}"))?;
+    let mut content = String::from_utf8_lossy(&bytes).into_owned();
+    if size > bytes.len() as u64 {
+        content.push_str("\n… log truncated in the viewer …\n");
+    }
+    Ok(LogBundleEntry { name, content })
+}
+
+fn read_current_logs(root: &Path) -> Result<Vec<LogBundleEntry>, String> {
+    let mut entries = Vec::new();
+
+    for stream in Stream::ALL {
+        let path = root.join(stream.file_name());
+        let metadata = match fs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(format!(
+                    "Could not read the current {}: {error}",
+                    stream.file_name()
+                ));
+            }
+        };
+        if metadata.len() == 0 {
+            continue;
+        }
+
+        let mut file = File::open(&path).map_err(|error| {
+            format!("Could not read the current {}: {error}", stream.file_name())
+        })?;
+        entries.push(read_log_entry(
+            stream.file_name().to_string(),
+            &mut file,
+            metadata.len(),
+        )?);
+    }
+
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(entries)
+}
+
+/// List the active session followed by the rotating ZIP bundles, newest first,
+/// for the in-app log viewer.
 #[tauri::command]
 pub fn list_log_bundles() -> Result<Vec<LogBundleInfo>, String> {
     let dir = logs_directory();
@@ -401,6 +491,7 @@ pub fn list_log_bundles() -> Result<Vec<LogBundleInfo>, String> {
         return Ok(Vec::new());
     }
 
+    let current = current_log_bundle(&dir);
     let mut bundles = fs::read_dir(&dir)
         .map_err(|error| format!("Could not read the logs folder: {error}"))?
         .filter_map(|entry| entry.ok())
@@ -411,26 +502,23 @@ pub fn list_log_bundles() -> Result<Vec<LogBundleInfo>, String> {
                 return None;
             }
             let metadata = entry.metadata().ok()?;
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|duration| duration.as_millis() as u64)
-                .unwrap_or(0);
             Some(LogBundleInfo {
                 path: path.to_string_lossy().into_owned(),
                 name,
                 size: metadata.len(),
-                modified,
+                modified: modified_millis(&metadata),
             })
         })
         .collect::<Vec<_>>();
 
     bundles.sort_by_key(|b| std::cmp::Reverse(b.modified));
+    if let Some(current) = current {
+        bundles.insert(0, current);
+    }
     Ok(bundles)
 }
 
-/// Read the launcher/osu/patcher logs out of one bundle.
+/// Read the active logs or the launcher/osu/patcher logs out of an archive.
 #[tauri::command]
 pub fn read_log_bundle(path: String) -> Result<Vec<LogBundleEntry>, String> {
     let dir = logs_directory();
@@ -440,6 +528,9 @@ pub fn read_log_bundle(path: String) -> Result<Vec<LogBundleEntry>, String> {
         .map_err(|error| format!("Could not resolve the logs folder: {error}"))?;
     if !requested.starts_with(&root) {
         return Err("The log bundle is outside the logs folder".to_string());
+    }
+    if requested == root {
+        return read_current_logs(&root);
     }
 
     let file = File::open(&requested)
@@ -456,20 +547,9 @@ pub fn read_log_bundle(path: String) -> Result<Vec<LogBundleEntry>, String> {
             continue;
         }
 
-        let mut bytes = Vec::new();
-        entry
-            .by_ref()
-            .take(2 * 1024 * 1024)
-            .read_to_end(&mut bytes)
-            .map_err(|error| format!("Could not read a log entry: {error}"))?;
-        let mut content = String::from_utf8_lossy(&bytes).into_owned();
-        if entry.size() > bytes.len() as u64 {
-            content.push_str("\n… log truncated in the viewer …\n");
-        }
-        entries.push(LogBundleEntry {
-            name: entry.name().to_string(),
-            content,
-        });
+        let name = entry.name().to_string();
+        let size = entry.size();
+        entries.push(read_log_entry(name, &mut entry, size)?);
     }
 
     entries.sort_by(|a, b| a.name.cmp(&b.name));
@@ -632,6 +712,33 @@ mod tests {
 
         drop(zip);
         drop(current);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn current_session_includes_active_logs() {
+        let dir = temp_dir("current");
+        let logs = Arc::new(LogSet::new(dir.clone()));
+        write_line(&logs, Stream::Launcher, "launcher current\n");
+        write_line(&logs, Stream::Osu, "osu current\n");
+
+        let current = current_log_bundle(&dir).expect("active logs should have a session");
+        assert_eq!(current.name, "Current session");
+        assert_eq!(current.path, dir.to_string_lossy());
+        assert!(current.size > 0);
+
+        let entries = read_current_logs(&dir).unwrap();
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            ["launcher.log", "osu.log"]
+        );
+        assert_eq!(entries[0].content, "launcher current\n");
+        assert_eq!(entries[1].content, "osu current\n");
+
+        drop(logs);
         fs::remove_dir_all(dir).unwrap();
     }
 }

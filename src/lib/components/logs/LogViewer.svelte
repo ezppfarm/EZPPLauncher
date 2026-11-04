@@ -154,9 +154,9 @@
           <Terminal class="size-4" />
         </div>
         <div class="min-w-0">
-          <h2 id="log-viewer-title" class="text-sm font-semibold">Log bundles</h2>
+          <h2 id="log-viewer-title" class="text-sm font-semibold">Logs</h2>
           <p class="truncate text-[10px] text-muted-foreground">
-            Launcher, osu! and patcher output, grouped by session
+            Current session plus archived launcher, osu! and patcher output
           </p>
         </div>
       </div>
@@ -191,7 +191,7 @@
         <div
           class="flex shrink-0 items-center justify-between border-b border-theme-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          <span>Bundles</span>
+          <span>Sessions</span>
           <span>{bundles.length}</span>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -202,8 +202,8 @@
             </div>
           {:else if bundles.length === 0}
             <div class="p-3 text-[11px] leading-relaxed text-muted-foreground">
-              No bundles yet. Logs are zipped on the next launcher restart or when a log reaches 5
-              MiB.
+              No logs yet. The current session appears once the launcher writes its first line;
+              archived bundles are created when logs rotate.
             </div>
           {:else}
             {#each bundles as bundle (bundle.path)}
@@ -291,14 +291,14 @@
               class="flex h-full items-center justify-center gap-2 text-xs text-muted-foreground"
             >
               <LoaderCircle class="size-4 animate-spin" />
-              Reading bundle…
+              Reading logs…
             </div>
           {:else if !selectedBundle}
             <div
               class="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground"
             >
               <Terminal class="size-8 opacity-40" />
-              <p class="text-xs">Choose a log bundle to inspect it.</p>
+              <p class="text-xs">Choose a log session to inspect it.</p>
             </div>
           {:else if filteredLines.length === 0}
             <div
@@ -328,7 +328,7 @@
           <span>
             {selectedBundle
               ? `${selectedBundle.name} · ${formatBytes(selectedBundle.size)}`
-              : 'No bundle selected'}
+              : 'No session selected'}
           </span>
         </footer>
       </main>
