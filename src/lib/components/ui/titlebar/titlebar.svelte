@@ -16,6 +16,34 @@
 
   const iconSet = $derived($active_custom_theme?.definition?.iconSet ?? DEFAULT_THEME_ICON_SET);
 
+  let volumeOpen = $state(false);
+  let volumeDragging = $state(false);
+  let volumeControl: HTMLDivElement | undefined = $state();
+
+  function openVolume() {
+    volumeOpen = true;
+  }
+
+  function closeVolume() {
+    if (!volumeDragging) volumeOpen = false;
+  }
+
+  function startVolumeDrag(event: PointerEvent) {
+    if (event.button !== 0) return;
+    volumeDragging = true;
+    volumeOpen = true;
+  }
+
+  function endVolumeDrag(event: PointerEvent) {
+    if (!volumeDragging) return;
+    volumeDragging = false;
+
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    if (!element || !volumeControl?.contains(element)) {
+      volumeOpen = false;
+    }
+  }
+
   onMount(() => {
     const appWindow = getCurrentWindow();
 
@@ -26,9 +54,18 @@
   });
 </script>
 
+<svelte:window onpointerup={endVolumeDrag} onpointercancel={endVolumeDrag} />
+
 <div data-tauri-drag-region class="titlebar z-[100]" class:macos-window={$platform === 'macos'}>
   {#if $custom_theme_audio_playing || ($active_custom_theme && $active_custom_theme.name !== 'Default')}
-    <div class="relative flex items-center justify-center group">
+    <div
+      class="relative flex items-center justify-center group"
+      role="group"
+      aria-label="Theme volume"
+      bind:this={volumeControl}
+      onpointerenter={openVolume}
+      onpointerleave={closeVolume}
+    >
       <div class="relative flex items-center justify-center p-1 cursor-pointer">
         <div
           class="absolute inset-0 bg-background rounded
@@ -51,8 +88,9 @@
 
       <div
         class="absolute top-full right-0 translate-x-[7px]
-           opacity-0 invisible pointer-events-none -translate-y-2
-           group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto group-hover:translate-y-0
+           {volumeOpen
+          ? 'opacity-100 visible pointer-events-auto translate-y-0'
+          : 'opacity-0 invisible pointer-events-none -translate-y-2'}
            {$reduceAnimations ? '' : 'transition-all duration-200 ease-out'}
            z-50"
       >
@@ -68,6 +106,7 @@
             max="1"
             step="0.01"
             bind:value={$custom_theme_volume}
+            onpointerdown={startVolumeDrag}
             oninput={() => {
               config.value<number>('volume').set($custom_theme_volume);
             }}

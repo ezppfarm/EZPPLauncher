@@ -162,7 +162,10 @@
     -ms-user-select: none;
     user-select: none;
   }
-  html {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
     overscroll-behavior: none;
   }
   body {
@@ -196,4 +199,32 @@ video::-webkit-media-controls-overlay-enclosure {
   pointer-events: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+/* Crossfade the rendered page when switching themes via the View Transitions API. */
+::view-transition-old(root) {
+  animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both theme-crossfade-out;
+}
+
+::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.4, 0, 0.2, 1) both theme-crossfade-in;
+}
+
+@keyframes theme-crossfade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes theme-crossfade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
 }

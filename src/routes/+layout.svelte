@@ -583,6 +583,7 @@
   </AlertDialog.Root>
 
   <main
+    class="relative h-screen w-full overflow-hidden"
     use:appActivity
     use:themeMediaSuspension
     use:themeParallax={{
