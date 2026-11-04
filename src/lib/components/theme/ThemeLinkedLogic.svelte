@@ -1,6 +1,7 @@
 <script lang="ts">
   import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
+  import { themeEditorSectionOpen } from '$lib/themeEditorUiState';
   import { themeBehaviorSummary, themeGroupInteractiveCount } from '$lib/themeLogic';
   import type {
     ThemeV2Behavior,
@@ -30,8 +31,13 @@
     ondelete: (id: string) => void;
   } = $props();
 
-  let open = $state(false);
+  const sectionKey = 'Logic';
+  let open = $state(themeEditorSectionOpen.get(sectionKey) ?? false);
   let selectedId = $state<string | undefined>(undefined);
+
+  $effect(() => {
+    themeEditorSectionOpen.set(sectionKey, open);
+  });
   let section = $state<HTMLElement>();
   let lastFocusToken = 0;
 

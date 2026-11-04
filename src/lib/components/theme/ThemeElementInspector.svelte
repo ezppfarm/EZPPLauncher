@@ -38,12 +38,15 @@
     Film,
     Gauge,
     Image as ImageIcon,
+    Layers,
     LayoutGrid,
     Megaphone,
     MousePointerClick,
+    Move,
     Play,
     RefreshCw,
     Repeat,
+    Scan,
     Shapes,
     Sparkles,
     Spline,
@@ -221,7 +224,7 @@
     </div>
   </div>
 
-  <ThemeSection title="Position & size" bordered={false} contentClass="space-y-3 pt-2">
+  <ThemeSection title="Position & size" icon={Move} bordered={false} contentClass="space-y-3 pt-2">
     <div class="space-y-1">
       <Label for="element-name" class={label}>Layer name</Label>
       <Input
@@ -290,6 +293,7 @@
 
   <ThemeSection
     title="Layer state"
+    icon={Layers}
     contentClass="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2.5"
   >
     <div class="flex items-center gap-1.5">
@@ -402,7 +406,11 @@
   />
 
   {#if element.type === 'text' || element.type === 'data'}
-    <ThemeSection title={element.type === 'data' ? 'Data' : 'Text'} contentClass="space-y-3 pt-2.5">
+    <ThemeSection
+      title={element.type === 'data' ? 'Data' : 'Text'}
+      icon={Type}
+      contentClass="space-y-3 pt-2.5"
+    >
       {#if element.type === 'data'}
         <div class="space-y-1.5">
           <Label for="element-data-field" class={label}>Value</Label>
@@ -695,7 +703,7 @@
       <ThemeTextStyleControls {element} onchange={(patch) => Object.assign(element, patch)} />
     </ThemeSection>
   {:else if element.type === 'svelte'}
-    <ThemeSection title="Svelte component" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Svelte component" icon={Component} contentClass="space-y-3 pt-2.5">
       <div
         class="rounded-md border border-amber-500/25 bg-amber-500/10 p-2 text-[9px] leading-relaxed text-amber-100"
       >
@@ -721,7 +729,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'image' || element.type === 'video'}
-    <ThemeSection title="Media" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Media" icon={ImageIcon} contentClass="space-y-3 pt-2.5">
       <div class="rounded-md border border-theme-800 bg-black/20 p-2">
         <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Asset</p>
         <p class="mt-1 truncate font-mono text-[10px] text-theme-100">{element.src}</p>
@@ -829,7 +837,7 @@
       {/if}
     </ThemeSection>
   {:else if element.type === 'lottie'}
-    <ThemeSection title="Lottie animation" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Lottie animation" icon={Film} contentClass="space-y-3 pt-2.5">
       <div class="rounded-md border border-theme-800 bg-black/20 p-2">
         <p class="text-[10px] uppercase tracking-wide text-muted-foreground">Animation</p>
         <p class="mt-1 truncate font-mono text-[10px] text-theme-100">{element.src}</p>
@@ -885,7 +893,7 @@
       </p>
     </ThemeSection>
   {:else if element.type === 'shape'}
-    <ThemeSection title="Shape" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Shape" icon={Shapes} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-shape" class={label}>Shape</Label>
         <Select.Root
@@ -1153,7 +1161,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'icon'}
-    <ThemeSection title="Icon" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Icon" icon={Sparkles} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-icon" class={label}>Icon</Label>
         <ThemeIconPicker bind:value={element.icon} {iconSet} />
@@ -1185,7 +1193,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'repeater'}
-    <ThemeSection title="Repeater" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Repeater" icon={Repeat} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-repeater-source" class={label}>Tile</Label>
         <Select.Root
@@ -1307,7 +1315,7 @@
       </p>
     </ThemeSection>
   {:else if element.type === 'gauge'}
-    <ThemeSection title="Gauge" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Gauge" icon={Gauge} contentClass="space-y-3 pt-2.5">
       <div class="grid grid-cols-2 gap-2">
         <div class="space-y-1">
           <Label for="element-gauge-mode" class={label}>Style</Label>
@@ -1423,7 +1431,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'ticker'}
-    <ThemeSection title="Ticker" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Ticker" icon={Type} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-ticker-text" class={label}>Text</Label>
         <Textarea
@@ -1520,7 +1528,7 @@
       {/if}
     </ThemeSection>
   {:else if element.type === 'button'}
-    <ThemeSection title="Button" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Button" icon={MousePointerClick} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-button-label" class={label}>Label</Label>
         <Input id="element-button-label" class={field} bind:value={element.label} />
@@ -1704,7 +1712,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'path'}
-    <ThemeSection title="Vector path" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Vector path" icon={Spline} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-path-data" class={label}>SVG path data</Label>
         <Textarea
@@ -1850,7 +1858,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'particles'}
-    <ThemeSection title="Particles" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Particles" icon={Sparkles} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-particles-preset" class={label}>Preset</Label>
         <Select.Root
@@ -1954,7 +1962,7 @@
       </p>
     </ThemeSection>
   {:else if element.type === 'clock'}
-    <ThemeSection title="Clock" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Clock" icon={Clock} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1">
         <Label for="element-clock-mode" class={label}>Style</Label>
         <Select.Root
@@ -2121,7 +2129,7 @@
       </p>
     </ThemeSection>
   {:else if element.type === 'countdown'}
-    <ThemeSection title="Countdown" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Countdown" icon={Timer} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1.5">
         <Label for="element-countdown-target" class={label}>Target date & time</Label>
         <DatePicker
@@ -2220,7 +2228,7 @@
       </div>
     </ThemeSection>
   {:else if element.type === 'widget'}
-    <ThemeSection title="Widget" contentClass="space-y-3 pt-2.5">
+    <ThemeSection title="Widget" icon={LayoutGrid} contentClass="space-y-3 pt-2.5">
       <div class="space-y-1.5">
         <Label for="element-widget-type" class={label}>Widget Type</Label>
         <Select.Root
@@ -2558,7 +2566,7 @@
     </ThemeSection>
   {/if}
 
-  <ThemeSection title="Mask" contentClass="space-y-3 pt-2.5">
+  <ThemeSection title="Mask" icon={Scan} contentClass="space-y-3 pt-2.5">
     <div class="space-y-1">
       <Label for="element-mask-shape" class={label}>Clip shape</Label>
       <Select.Root

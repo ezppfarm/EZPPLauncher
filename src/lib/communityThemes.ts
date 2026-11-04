@@ -951,11 +951,12 @@ export async function reviewCommunityTheme(
  */
 export async function downloadAndInstallCommunityTheme(
   theme: CommunityTheme,
-  onProgress?: (status: string, percentage: number) => void
+  onProgress?: (status: string, percentage: number) => void,
+  options?: { folderName?: string }
 ): Promise<{ success: boolean; folderName: string }> {
   const { onProgress: reportProgress = () => {} } = { onProgress };
   const baseThemesDir = await themesDirectory();
-  const folderName = theme.id;
+  const folderName = options?.folderName?.trim() || theme.id;
   const targetFolder = await path.join(baseThemesDir, folderName);
 
   reportProgress('Downloading theme package...', 10);

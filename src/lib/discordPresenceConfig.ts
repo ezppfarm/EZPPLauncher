@@ -125,8 +125,8 @@ export const DISCORD_PRESENCE_PRESETS: DiscordPresencePreset[] = [
       },
       button2: {
         enabled: true,
-        label: 'View Profile',
-        url: '{profileUrl}',
+        label: 'Join EZPPFarm',
+        url: 'https://ez-pp.farm/discord',
       },
     },
   },

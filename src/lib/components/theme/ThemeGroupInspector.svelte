@@ -17,7 +17,7 @@
     type ThemeV2Group,
     type ThemeV2MaskShape,
   } from '$lib/themeV2';
-  import { Boxes, RefreshCw, Ungroup } from '@lucide/svelte';
+  import { Boxes, Layers, RefreshCw, Scan, Ungroup } from '@lucide/svelte';
 
   let {
     group = $bindable(),
@@ -58,7 +58,7 @@
     </div>
   </div>
 
-  <ThemeSection title="Group" bordered={false} contentClass="space-y-3 pt-2">
+  <ThemeSection title="Group" icon={Boxes} bordered={false} contentClass="space-y-3 pt-2">
     <div class="space-y-1">
       <Label for="group-name" class={label}>Group name</Label>
       <Input
@@ -96,6 +96,7 @@
 
   <ThemeSection
     title="Group state"
+    icon={Layers}
     contentClass="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2.5"
   >
     <div class="flex items-center gap-1.5">
@@ -167,7 +168,7 @@
     ondelete={ondeleterule}
   />
 
-  <ThemeSection title="Mask" contentClass="space-y-3 pt-2.5">
+  <ThemeSection title="Mask" icon={Scan} contentClass="space-y-3 pt-2.5">
     <div class="space-y-1">
       <Label for="group-mask-shape" class={label}>Clip shape</Label>
       <Select.Root

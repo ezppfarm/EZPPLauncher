@@ -1,8 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import Logo from '$assets/logo.png';
-  import DiscordPresenceEditor from '$lib/components/presence/DiscordPresenceEditor.svelte';
-  import ThemeEditorWindow from '$lib/components/theme/ThemeEditorWindow.svelte';
   import ThemeV2Background from '$lib/components/theme/ThemeV2Background.svelte';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import AnimatedBg from '$lib/components/ui/animated-bg/AnimatedBg.svelte';
@@ -449,9 +447,19 @@
 />
 
 {#if editorWindow}
-  <ThemeEditorWindow />
+  {#await import('$lib/components/theme/ThemeEditorWindow.svelte')}
+    <div class="h-screen w-screen bg-theme-950"></div>
+  {:then editorModule}
+    {@const ThemeEditorWindow = editorModule.default}
+    <ThemeEditorWindow />
+  {/await}
 {:else if presenceEditorWindow}
-  <DiscordPresenceEditor standalone />
+  {#await import('$lib/components/presence/DiscordPresenceEditor.svelte')}
+    <div class="h-screen w-screen bg-theme-950"></div>
+  {:then presenceModule}
+    {@const DiscordPresenceEditor = presenceModule.default}
+    <DiscordPresenceEditor standalone />
+  {/await}
 {:else}
   {#if editorOpen}
     <div

@@ -3,7 +3,7 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import type { ThemeV2ScriptValue } from '$lib/themeV2';
-  import { RotateCcw } from '@lucide/svelte';
+  import { Braces, RotateCcw } from '@lucide/svelte';
 
   let {
     variables,
@@ -38,7 +38,12 @@
   };
 </script>
 
-<ThemeSection title="Variables" badge={variables.length} contentClass="space-y-2 pt-2">
+<ThemeSection
+  title="Variables"
+  icon={Braces}
+  badge={variables.length}
+  contentClass="space-y-2 pt-2"
+>
   <p class="text-[10px] leading-relaxed text-muted-foreground">
     Starting values for
     <code class="rounded bg-theme-900 px-1 py-0.5 text-theme-100">{'{name}'}</code>

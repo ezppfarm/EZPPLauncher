@@ -5,7 +5,7 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
   import type { ThemeV2TextDecoration, ThemeV2TextStyle, ThemeV2TextTransform } from '$lib/themeV2';
-  import { Bold, Italic, RotateCcw, Strikethrough, Underline } from '@lucide/svelte';
+  import { Bold, Italic, RotateCcw, Strikethrough, Type, Underline } from '@lucide/svelte';
 
   let {
     element,
@@ -89,6 +89,7 @@
 
 <ThemeSection
   title="Text style"
+  icon={Type}
   open={false}
   actions={textStyleActions}
   contentClass="space-y-2 pt-2.5"

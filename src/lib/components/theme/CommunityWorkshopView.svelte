@@ -51,6 +51,7 @@
   import { normalizeThemeTags } from '$lib/themeV2';
   import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/themes';
   import { currentUser } from '$lib/userAuthentication';
+  import { reduceAnimations } from '$lib/userSettings';
   import WorkshopTooltip from './WorkshopTooltip.svelte';
   import {
     Archive,
@@ -87,6 +88,7 @@
   import { sileo } from 'sileo';
   import { onDestroy, onMount } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { fade } from 'svelte/transition';
 
   let {
     onApplyTheme,
@@ -2051,7 +2053,7 @@
           </div>
         {:else}
           <div class="grid grid-cols-3 gap-3 pb-4">
-            {#each themes as theme (theme.id)}
+            {#each themes as theme, index (theme.id)}
               {@const localTheme =
                 localThemeMap.get(theme.id.toLowerCase()) ||
                 localThemeMap.get(theme.name.toLowerCase())}
@@ -2077,6 +2079,9 @@
                 class="group flex flex-col overflow-hidden rounded-xl border bg-theme-900/30 {isActive
                   ? 'border-primary/60 ring-1 ring-primary/20'
                   : 'border-theme-800/60'} transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-theme-900/50 hover:shadow-xl hover:shadow-black/30"
+                class:workshop-card-enter={!$reduceAnimations}
+                style="animation-delay: {Math.min(index * 24, 144)}ms"
+                out:fade={{ duration: $reduceAnimations ? 0 : 140 }}
               >
                 <!-- 16:9 Thumbnail -->
                 <div
@@ -4481,3 +4486,20 @@
     </AlertDialog.Content>
   </AlertDialog.Root>
 </Tooltip.Provider>
+
+<style>
+  .workshop-card-enter {
+    animation: workshop-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  @keyframes workshop-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

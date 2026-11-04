@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { themeEditorSectionOpen } from '$lib/themeEditorUiState';
   import { ChevronDown } from '@lucide/svelte';
+  import { untrack } from 'svelte';
   import type { Component, Snippet } from 'svelte';
 
   let {
     title,
-    open = $bindable(true),
+    open: initialOpen = true,
     icon: Icon,
     badge,
     description,
@@ -27,6 +29,12 @@
     headingClass?: string;
     bordered?: boolean;
   } = $props();
+
+  let isOpen = $state(untrack(() => themeEditorSectionOpen.get(title) ?? initialOpen));
+
+  $effect(() => {
+    themeEditorSectionOpen.set(title, isOpen);
+  });
 </script>
 
 <section class="{bordered ? 'border-t border-theme-800 pt-3 ' : ''}{className}">
@@ -34,8 +42,8 @@
     <button
       type="button"
       class="group flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-      aria-expanded={open}
-      onclick={() => (open = !open)}
+      aria-expanded={isOpen}
+      onclick={() => (isOpen = !isOpen)}
     >
       {#if Icon}
         <Icon class="size-3.5 shrink-0 text-primary" />
@@ -49,7 +57,7 @@
         </span>
       {/if}
       <ChevronDown
-        class="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 {open
+        class="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 {isOpen
           ? 'rotate-180'
           : ''}"
       />
@@ -61,7 +69,7 @@
     {/if}
   </div>
 
-  {#if open}
+  {#if isOpen}
     <div class={contentClass}>
       {#if description}
         <p class="text-[10px] leading-relaxed text-muted-foreground">{description}</p>

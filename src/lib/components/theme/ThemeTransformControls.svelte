@@ -112,6 +112,7 @@
 
 <ThemeSection
   title="Transform"
+  icon={RotateCw}
   open={false}
   actions={transformActions}
   contentClass="space-y-2 pt-2.5"

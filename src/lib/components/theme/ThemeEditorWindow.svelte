@@ -110,6 +110,8 @@
   import { formatBytes, openURL } from '$lib/utils';
   import {
     AlertTriangle,
+    AlignCenter,
+    AlignHorizontalSpaceAround,
     Boxes,
     Check,
     CheckCircle2,
@@ -128,12 +130,14 @@
     Download,
     Eye,
     EyeOff,
+    FileText,
     Film,
     Gauge,
     Globe,
     GripVertical,
     Hand,
     Image as ImageIcon,
+    Info,
     Keyboard,
     Layers,
     LayoutGrid,
@@ -5075,7 +5079,12 @@
         </div>
       {:else}
         <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-          <ThemeSection title="Theme details" bordered={false} contentClass="space-y-3 pt-2">
+          <ThemeSection
+            title="Theme details"
+            icon={Info}
+            bordered={false}
+            contentClass="space-y-3 pt-2"
+          >
             <div class="space-y-1.5">
               <Label for="theme-name" class={labelClass}>Name</Label>
               <Input
@@ -5234,7 +5243,11 @@
             onchange={setVariableDefault}
           />
 
-          <ThemeSection title="Launcher Layout & Chrome" contentClass="space-y-3 pt-2.5">
+          <ThemeSection
+            title="Launcher Layout & Chrome"
+            icon={LayoutGrid}
+            contentClass="space-y-3 pt-2.5"
+          >
             <div class="space-y-1.5">
               <Label class={labelClass}>Layout Preset</Label>
               <div class="grid grid-cols-3 gap-1 rounded-md bg-black/30 p-1">
@@ -5419,7 +5432,7 @@
             </div>
           </ThemeSection>
 
-          <ThemeSection title="Background" contentClass="space-y-3 pt-2.5">
+          <ThemeSection title="Background" icon={ImageIcon} contentClass="space-y-3 pt-2.5">
             <div class="grid grid-cols-4 gap-1 rounded-md bg-black/30 p-1">
               {#each backgroundTypes as option (option.value)}
                 <Button
@@ -6230,6 +6243,7 @@
         <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
           <ThemeSection
             title="Align"
+            icon={AlignCenter}
             bordered={false}
             headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
             contentClass="space-y-2 pt-2"
@@ -6275,6 +6289,7 @@
           </ThemeSection>
           <ThemeSection
             title="Distribute"
+            icon={AlignHorizontalSpaceAround}
             headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
             contentClass="space-y-2 pt-2.5"
           >
@@ -6298,6 +6313,7 @@
           </ThemeSection>
           <ThemeSection
             title="Layers"
+            icon={Layers}
             headingClass="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
             contentClass="space-y-2 pt-2.5"
           >
@@ -6621,6 +6637,7 @@
 
           <ThemeSection
             title="Theme summary"
+            icon={FileText}
             class="mt-4"
             bordered={false}
             contentClass="space-y-2 pt-2"
@@ -6649,6 +6666,7 @@
 
           <ThemeSection
             title="Shortcuts"
+            icon={Keyboard}
             class="mt-4"
             bordered={false}
             open={false}

@@ -3,6 +3,7 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import Slider from '$lib/components/ui/slider/slider.svelte';
   import type { ThemeV2Filters } from '$lib/themeV2';
+  import { SlidersHorizontal } from '@lucide/svelte';
 
   let {
     filters,
@@ -67,6 +68,7 @@
 
 <ThemeSection
   title="Filters"
+  icon={SlidersHorizontal}
   open={false}
   actions={filterActions}
   contentClass="space-y-2.5 pt-2.5"

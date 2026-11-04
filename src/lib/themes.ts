@@ -522,6 +522,7 @@ export const reloadThemes = async () => {
         if (ACTIVE_STATUSES.has(storeTheme.status)) return storeTheme;
         const theme = installedMap.get(storeTheme.name);
         if (!theme) return storeTheme;
+        const versionChanged = storeTheme.version !== theme.version;
 
         // Replace the object rather than mutating it so the theme cards see the
         // new values when the list is rendered from a filtered derived array.
@@ -538,8 +539,8 @@ export const reloadThemes = async () => {
           nsfw: theme.nsfw,
           workshopId: theme.workshopId,
           definition: theme.definition,
-          updateAvailable: theme.updateAvailable,
-          availableVersion: theme.availableVersion,
+          updateAvailable: versionChanged ? false : storeTheme.updateAvailable,
+          availableVersion: versionChanged ? undefined : storeTheme.availableVersion,
           cssStyle: theme.cssStyle,
           backups: theme.backups ?? storeTheme.backups,
         };
