@@ -526,7 +526,9 @@
       return;
     }
 
-    loadTheme(theme, $custom_theme_container, $custom_theme_volume);
+    await loadTheme(theme, $custom_theme_container, $custom_theme_volume, {
+      animate: !$reduceAnimations,
+    });
     await config.value<string>('theme').set(theme.name);
   };
 
@@ -4511,9 +4513,6 @@
                                 <div
                                   class="absolute top-1.5 left-1.5 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-1"
                                 >
-                                  {#if isActive}
-                                    <Badge class="text-[9px]">In use</Badge>
-                                  {/if}
                                   {#if theme.name !== 'Default' && theme.folder_name !== 'default' && theme.apiVersion}
                                     <Badge
                                       variant="secondary"

@@ -7,6 +7,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import * as path from '@tauri-apps/api/path';
 import * as fs from '@tauri-apps/plugin-fs';
+import { tick } from 'svelte';
 
 export type Theme = {
   folder_name: string;
@@ -486,34 +487,67 @@ export const downloadTheme = async (
   return { success: true };
 };
 
-export const loadTheme = async (theme: Theme, themeContainer: HTMLElement, volume = 0.15) => {
-  // Theme media is buffered as blob URLs; the previous theme's URLs are no
-  // longer needed once it is replaced.
-  clearThemeMediaCache();
-  active_custom_theme.set(theme);
-  custom_theme_audio_playing.set(false);
-  themeContainer.innerHTML = '';
-  if (theme.definition) {
+type LoadThemeOptions = {
+  /** Crossfade the rendered page when switching themes. */
+  animate?: boolean;
+};
+
+export const loadTheme = async (
+  theme: Theme,
+  themeContainer: HTMLElement,
+  volume = 0.15,
+  options: LoadThemeOptions = {}
+) => {
+  const applyTheme = async () => {
+    // Theme media is buffered as blob URLs; the previous theme's URLs are no
+    // longer needed once it is replaced.
+    clearThemeMediaCache();
+    active_custom_theme.set(theme);
+    custom_theme_audio_playing.set(false);
+    themeContainer.innerHTML = '';
+    if (theme.definition) {
+      setGlobalVolume(volume);
+      disableMediaControls();
+      void invoke('unlock_media_autoplay').catch(() => {});
+      return;
+    }
+    if (theme.scriptUrl.length > 0) {
+      const themeScript = await import(/* @vite-ignore */ theme.scriptUrl);
+      themeScript.mountTheme(themeContainer, { assets: theme.assets });
+    }
     setGlobalVolume(volume);
     disableMediaControls();
+
+    // Ensure all media elements mounted by v1 themes start playback automatically
+    themeContainer.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
+      media.muted = false;
+      media.volume = volume;
+      playThemeMedia(media);
+    });
+
     void invoke('unlock_media_autoplay').catch(() => {});
+  };
+
+  const canAnimate =
+    options.animate &&
+    typeof document !== 'undefined' &&
+    typeof document.startViewTransition === 'function';
+
+  if (!canAnimate) {
+    await applyTheme();
     return;
   }
-  if (theme.scriptUrl.length > 0) {
-    const themeScript = await import(/* @vite-ignore */ theme.scriptUrl);
-    themeScript.mountTheme(themeContainer, { assets: theme.assets });
-  }
-  setGlobalVolume(volume);
-  disableMediaControls();
 
-  // Ensure all media elements mounted by v1 themes start playback automatically
-  themeContainer.querySelectorAll<HTMLMediaElement>('video, audio').forEach((media) => {
-    media.muted = false;
-    media.volume = volume;
-    playThemeMedia(media);
+  const transition = document.startViewTransition(async () => {
+    await applyTheme();
+    // Let Svelte paint the new theme before the transition takes its snapshot.
+    await tick();
   });
 
-  void invoke('unlock_media_autoplay').catch(() => {});
+  // Theme activation must not wait for, or fail because of, the visual
+  // transition. `finished` can reject when a transition is skipped.
+  void transition.finished.catch(() => {});
+  await transition.updateCallbackDone;
 };
 
 export const deleteTheme = async (themeToUninstall: Theme) => {
