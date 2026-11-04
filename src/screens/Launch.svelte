@@ -4379,11 +4379,13 @@
                                       18+
                                     </Badge>
                                   {/if}
-                                  <span
-                                    class="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm"
-                                  >
-                                    v{theme.version}
-                                  </span>
+                                  {#if theme.name !== 'Default'}
+                                    <span
+                                      class="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm"
+                                    >
+                                      v{theme.version}
+                                    </span>
+                                  {/if}
                                 </div>
                                 {#if theme.nsfw && !revealedNsfw.includes(theme.name)}
                                   <button
