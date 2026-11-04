@@ -45,6 +45,7 @@
   } from '$lib/theme/themeMedia';
   import { themeParallax } from '$lib/theme/themeParallax';
   import { isThemeTrusted } from '$lib/theme/themeTrust';
+  import { themeV2Css } from '$lib/theme/themeV2';
   import { getThemes, loadTheme } from '$lib/theme/themes';
   import { currentUser } from '$lib/userAuthentication';
   import {
