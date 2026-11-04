@@ -265,8 +265,7 @@ pub async fn read_file_chunk(path: String, offset: u64, length: u64) -> Result<V
 
 #[tauri::command]
 pub fn get_hwid() -> String {
-    get_id()
-        .unwrap_or("recorderinsandybridge".to_string())
+    get_id().unwrap_or("recorderinsandybridge".to_string())
 }
 
 /// Show the native macOS picker, which can select `osu!.app` bundles as files.
@@ -551,18 +550,19 @@ pub async fn get_skins_count(folder: String) -> Option<u64> {
     if let Ok(mut entries) = fs::read_dir(skins_folder).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             if let Ok(ft) = entry.file_type().await
-                && ft.is_dir() {
-                    let dir_path = entry.path();
-                    let has_ini = tokio::fs::try_exists(dir_path.join("skin.ini"))
+                && ft.is_dir()
+            {
+                let dir_path = entry.path();
+                let has_ini = tokio::fs::try_exists(dir_path.join("skin.ini"))
+                    .await
+                    .unwrap_or(false)
+                    || tokio::fs::try_exists(dir_path.join("Skin.ini"))
                         .await
-                        .unwrap_or(false)
-                        || tokio::fs::try_exists(dir_path.join("Skin.ini"))
-                            .await
-                            .unwrap_or(false);
-                    if has_ini {
-                        count += 1;
-                    }
+                        .unwrap_or(false);
+                if has_ini {
+                    count += 1;
                 }
+            }
         }
     }
     Some(count)
@@ -759,7 +759,7 @@ pub async fn run_osu(
         #[cfg(windows)]
         if optimize {
             #[link(name = "winmm")]
-            extern "system" {
+            unsafe extern "system" {
                 fn timeBeginPeriod(uPeriod: u32) -> u32;
             }
             unsafe {
@@ -906,7 +906,7 @@ pub async fn run_osu(
         #[cfg(windows)]
         if optimize {
             #[link(name = "winmm")]
-            extern "system" {
+            unsafe extern "system" {
                 fn timeEndPeriod(uPeriod: u32) -> u32;
             }
             unsafe {
@@ -1062,7 +1062,10 @@ pub async fn download_ezpp_launcher_update_files(
 
     #[cfg(target_os = "macos")]
     {
-        let patcher_exe = osu_path.join("EZPPLauncher").join("patcher").join("osu!.patcher.exe");
+        let patcher_exe = osu_path
+            .join("EZPPLauncher")
+            .join("patcher")
+            .join("osu!.patcher.exe");
         if patcher_exe.is_file() {
             let _ = crate::utils::ensure_patcher_compatibility(&patcher_exe);
         }
@@ -1938,18 +1941,19 @@ pub(crate) fn theme_root() -> Result<PathBuf, String> {
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 fn loopback_theme_asset_base() -> String {
     if crate::theme_server::base_url().is_none()
-        && let Ok(root) = theme_root() {
-            match crate::theme_server::media_root() {
-                Ok(media) => {
-                    if let Err(error) = crate::theme_server::start(root, media) {
-                        log::warn!(target: "launcher", "Could not start the theme asset server: {error}");
-                    }
-                }
-                Err(error) => {
-                    log::warn!(target: "launcher", "Could not prepare the media cache: {error}");
+        && let Ok(root) = theme_root()
+    {
+        match crate::theme_server::media_root() {
+            Ok(media) => {
+                if let Err(error) = crate::theme_server::start(root, media) {
+                    log::warn!(target: "launcher", "Could not start the theme asset server: {error}");
                 }
             }
+            Err(error) => {
+                log::warn!(target: "launcher", "Could not prepare the media cache: {error}");
+            }
         }
+    }
     crate::theme_server::base_url().unwrap_or_default()
 }
 
@@ -2097,7 +2101,14 @@ pub async fn optimize_theme_media(app: AppHandle, source_url: String) -> Result<
         };
 
         tokio::task::spawn_blocking(move || {
-            optimize_theme_media_blocking(&ffmpeg, &source, &original, &cache_name, &destination, on_progress)
+            optimize_theme_media_blocking(
+                &ffmpeg,
+                &source,
+                &original,
+                &cache_name,
+                &destination,
+                on_progress,
+            )
         })
         .await
         .map_err(|error| format!("Theme media optimizer thread failed: {error}"))?
@@ -2258,17 +2269,20 @@ async fn download_ffmpeg(app: &AppHandle) -> Result<PathBuf, String> {
             .await
             .map_err(|error| format!("Could not write the FFmpeg archive: {error}"))?;
 
-        if let Some(percent) = (received.min(total) * 100).checked_div(total).map(|v| v as u8)
-            && percent != last_percent {
-                last_percent = percent;
-                let _ = app.emit(
-                    "theme-media-progress",
-                    ThemeMediaProgress {
-                        stage: "download".to_string(),
-                        progress: percent as f64 / 100.0,
-                    },
-                );
-            }
+        if let Some(percent) = (received.min(total) * 100)
+            .checked_div(total)
+            .map(|v| v as u8)
+            && percent != last_percent
+        {
+            last_percent = percent;
+            let _ = app.emit(
+                "theme-media-progress",
+                ThemeMediaProgress {
+                    stage: "download".to_string(),
+                    progress: percent as f64 / 100.0,
+                },
+            );
+        }
     }
 
     file.flush()
@@ -2715,15 +2729,18 @@ pub async fn open_presence_editor(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let window =
-        WebviewWindowBuilder::new(&app, "presence-editor", WebviewUrl::App("index.html".into()))
-            .title("EZPPLauncher — Discord Rich Presence Editor")
-            .inner_size(1200.0, 800.0)
-            .min_inner_size(980.0, 650.0)
-            .resizable(true)
-            .center()
-            .build()
-            .map_err(|error| format!("Could not open the presence editor: {error}"))?;
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "presence-editor",
+        WebviewUrl::App("index.html".into()),
+    )
+    .title("EZPPLauncher — Discord Rich Presence Editor")
+    .inner_size(1200.0, 800.0)
+    .min_inner_size(980.0, 650.0)
+    .resizable(true)
+    .center()
+    .build()
+    .map_err(|error| format!("Could not open the presence editor: {error}"))?;
 
     let main_window = app.clone();
     window.on_window_event(move |event| {
@@ -3118,9 +3135,10 @@ fn collect_theme_asset_refs(value: &Value, assets: &mut HashSet<String>) {
             for (key, value) in object {
                 if (key == "src" || key == "preview")
                     && let Some(src) = value.as_str()
-                        && let Some(path) = theme_asset_reference(src) {
-                            assets.insert(path);
-                        }
+                    && let Some(path) = theme_asset_reference(src)
+                {
+                    assets.insert(path);
+                }
                 collect_theme_asset_refs(value, assets);
             }
         }
