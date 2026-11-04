@@ -315,6 +315,7 @@
   let restoringTheme = $state(false);
   let uninstallCandidate = $state<Theme | undefined>(undefined);
   let uninstallingTheme = $state(false);
+  let revertCandidate = $state<Theme | undefined>(undefined);
   let installedReportOpen = $state(false);
   let installedReportTarget = $state<CommunityTheme | null>(null);
   let installedReportLoading = $state(false);
@@ -768,8 +769,8 @@
     }
   };
 
-  const updateInstalledTheme = async (theme: Theme) => {
-    if (theme.status !== 'installed' || updatingThemeFolder) return;
+  const updateInstalledTheme = async (theme: Theme, mode: 'update' | 'revert' = 'update') => {
+    if (theme.status !== 'installed' || updatingThemeFolder) return false;
 
     const wasActive = $active_custom_theme?.folder_name === theme.folder_name;
     updatingThemeFolder = theme.folder_name;
@@ -785,12 +786,19 @@
         try {
           backup = await invoke<string>('backup_theme_folder', { themeFolder });
         } catch (error) {
+          if (mode === 'revert') {
+            throw new Error(
+              'Could not back up the current theme before reverting. Your local changes were left untouched.',
+              { cause: error }
+            );
+          }
           console.warn('Could not back up the theme before updating it', error);
         }
 
         try {
           await downloadAndInstallCommunityTheme(target, () => {}, {
             folderName: theme.folder_name,
+            skipDownloadCount: mode === 'revert',
           });
         } catch (error) {
           if (backup) {
@@ -820,18 +828,37 @@
 
       themeContentHashCache.delete(theme.folder_name);
       communityThemeCache.delete(theme.folder_name);
+      await refreshThemeSyncState(theme.folder_name);
       sileo.success({
-        title: 'Yaay!',
-        description: 'Theme updated successfully!',
+        title: mode === 'revert' ? 'Theme reverted' : 'Yaay!',
+        description:
+          mode === 'revert'
+            ? `"${theme.name}" was restored to the published Workshop version.`
+            : 'Theme updated successfully!',
       });
+      return true;
     } catch (error) {
       console.error(error);
       sileo.error({
-        title: 'Could not update theme',
+        title: mode === 'revert' ? 'Could not revert theme' : 'Could not update theme',
         description: error instanceof Error ? error.message : String(error),
       });
+      return false;
     } finally {
       updatingThemeFolder = undefined;
+    }
+  };
+
+  const requestThemeRevert = (theme: Theme) => {
+    if (theme.status !== 'installed' || !theme.workshopId || updatingThemeFolder) return;
+    revertCandidate = theme;
+  };
+
+  const confirmThemeRevert = async () => {
+    const theme = revertCandidate;
+    if (!theme) return;
+    if (await updateInstalledTheme(theme, 'revert')) {
+      revertCandidate = undefined;
     }
   };
 
@@ -2427,29 +2454,40 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root open={uninstallCandidate !== undefined}>
-  <AlertDialog.Content
-    class="bg-theme-950 border-theme-800 p-0 max-w-xl"
-    escapeKeydownBehavior="ignore"
-    interactOutsideBehavior="ignore"
-  >
-    <div
-      class="flex flex-col items-center justify-center gap-2 border-b border-theme-800 bg-black/40 rounded-t-lg p-4"
-    >
-      <ThemeIcon name="trash" set={iconSet} class="size-7 text-red-300" />
-      <span class="font-semibold text-lg">Uninstall theme?</span>
-    </div>
-    <div
-      class="mx-3 mt-3 rounded-lg border border-theme-800 bg-theme-900 p-3 text-xs leading-relaxed text-muted-foreground"
-    >
-      Remove <strong class="text-theme-100">{uninstallCandidate?.name}</strong> from your library? This
-      deletes the local theme files and any unpublished changes. If the theme is published to the Workshop,
-      that copy is not affected.
-    </div>
-    <div class="flex items-center justify-center gap-3 p-4">
+<AlertDialog.Root
+  open={uninstallCandidate !== undefined}
+  onOpenChange={(open) => {
+    if (!open && !uninstallingTheme) uninstallCandidate = undefined;
+  }}
+>
+  <AlertDialog.Content class="max-w-md border-theme-800 bg-theme-950 text-white">
+    <AlertDialog.Header>
+      <AlertDialog.Title class="flex items-center gap-2 text-base">
+        <ThemeIcon name="trash" set={iconSet} class="size-4 text-red-400" />
+        Uninstall theme?
+      </AlertDialog.Title>
+      <AlertDialog.Description class="text-[11px] leading-relaxed text-muted-foreground">
+        Remove <span class="font-medium text-theme-100">{uninstallCandidate?.name}</span> from your library?
+        This deletes the local theme files from this computer.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+
+    {#if uninstallCandidate && uninstallCandidate.workshopId && isOwnInstalledTheme(uninstallCandidate)}
+      <p
+        class="flex items-start gap-2 rounded-md border border-theme-800 bg-theme-900/50 p-2.5 text-[11px] leading-relaxed text-muted-foreground"
+      >
+        <Globe class="mt-0.5 size-3.5 shrink-0 text-cyan-300" />
+        <span>
+          Your published Workshop copy stays online. Only this local copy and any unpublished
+          changes are removed.
+        </span>
+      </p>
+    {/if}
+
+    <AlertDialog.Footer class="gap-2">
       <Button
-        variant="outline"
-        class="min-w-28"
+        variant="ghost"
+        size="sm"
         disabled={uninstallingTheme}
         onclick={() => (uninstallCandidate = undefined)}
       >
@@ -2457,18 +2495,66 @@
       </Button>
       <Button
         variant="destructive"
-        class="min-w-28"
+        size="sm"
+        class="gap-1.5"
         disabled={uninstallingTheme}
         onclick={confirmThemeUninstall}
       >
         {#if uninstallingTheme}
-          <ThemeIcon name="loader" set={iconSet} class="animate-spin" />
+          <ThemeIcon name="loader" set={iconSet} class="size-3.5 animate-spin" />
+          Uninstalling...
         {:else}
-          <ThemeIcon name="trash" set={iconSet} class="size-4" />
+          <ThemeIcon name="trash" set={iconSet} class="size-3.5" />
+          Uninstall theme
         {/if}
-        {uninstallingTheme ? 'Uninstalling...' : 'Uninstall theme'}
       </Button>
-    </div>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root
+  open={revertCandidate !== undefined}
+  onOpenChange={(open) => {
+    if (!open && updatingThemeFolder !== revertCandidate?.folder_name) revertCandidate = undefined;
+  }}
+>
+  <AlertDialog.Content class="max-w-md border-theme-800 bg-theme-950 text-white">
+    <AlertDialog.Header>
+      <AlertDialog.Title class="flex items-center gap-2 text-base">
+        <ThemeIcon name="rotate" set={iconSet} class="size-4 text-amber-300" />
+        Revert unsynced changes?
+      </AlertDialog.Title>
+      <AlertDialog.Description class="text-[11px] leading-relaxed text-muted-foreground">
+        Replace the local files for <span class="font-medium text-theme-100"
+          >{revertCandidate?.name}</span
+        > with the published Workshop version? Any unpublished changes will be removed. A backup of the
+        current local copy will be created first.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer class="gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={updatingThemeFolder === revertCandidate?.folder_name}
+        onclick={() => (revertCandidate = undefined)}
+      >
+        Cancel
+      </Button>
+      <Button
+        size="sm"
+        class="gap-1.5"
+        disabled={updatingThemeFolder === revertCandidate?.folder_name}
+        onclick={confirmThemeRevert}
+      >
+        {#if updatingThemeFolder === revertCandidate?.folder_name}
+          <ThemeIcon name="loader" set={iconSet} class="size-3.5 animate-spin" />
+          Reverting...
+        {:else}
+          <ThemeIcon name="rotate" set={iconSet} class="size-3.5" />
+          Revert changes
+        {/if}
+      </Button>
+    </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>
 
@@ -4343,6 +4429,10 @@
                               workshopVersion !== localVersion}
                             {@const isNotSynced =
                               isOwnTheme && (theme.isNotSynced === true || versionMismatch)}
+                            {@const canRevertTheme =
+                              isNotSynced &&
+                              theme.status === 'installed' &&
+                              Boolean(theme.workshopId)}
                             {@const canReportTheme =
                               Boolean($currentUser && ownedWorkshopLoaded) &&
                               !isOwnTheme &&
@@ -4357,6 +4447,7 @@
                               canEditTheme ||
                               canRestoreTheme ||
                               canUpdateTheme ||
+                              canRevertTheme ||
                               canReportTheme ||
                               canUninstallTheme}
                             <div
@@ -4633,7 +4724,7 @@
                                               Restore previous version
                                             </DropdownMenu.Item>
                                           {/if}
-                                          {#if canUpdateTheme}
+                                          {#if canUpdateTheme && !canRevertTheme}
                                             <DropdownMenu.Item
                                               class="gap-2 text-[11px]"
                                               disabled={updatingThemeFolder === theme.folder_name}
@@ -4647,6 +4738,20 @@
                                               Update theme
                                             </DropdownMenu.Item>
                                           {/if}
+                                          {#if canRevertTheme}
+                                            <DropdownMenu.Item
+                                              class="gap-2 text-[11px] text-amber-200 data-[highlighted]:bg-amber-500/10 data-[highlighted]:text-amber-100"
+                                              disabled={updatingThemeFolder === theme.folder_name}
+                                              onclick={() => requestThemeRevert(theme)}
+                                            >
+                                              <ThemeIcon
+                                                name="rotate"
+                                                set={iconSet}
+                                                class="size-3.5"
+                                              />
+                                              Revert unsynced changes
+                                            </DropdownMenu.Item>
+                                          {/if}
                                           {#if canReportTheme}
                                             <DropdownMenu.Item
                                               class="gap-2 text-[11px]"
@@ -4658,7 +4763,7 @@
                                             </DropdownMenu.Item>
                                           {/if}
                                           {#if canUninstallTheme}
-                                            {#if canEditTheme || canRestoreTheme || canUpdateTheme || canReportTheme}
+                                            {#if canEditTheme || canRestoreTheme || canUpdateTheme || canRevertTheme || canReportTheme}
                                               <DropdownMenu.Separator class="my-1 bg-theme-800" />
                                             {/if}
                                             <DropdownMenu.Item

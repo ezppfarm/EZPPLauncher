@@ -953,12 +953,27 @@ export async function reviewCommunityTheme(
 export async function downloadAndInstallCommunityTheme(
   theme: CommunityTheme,
   onProgress?: (status: string, percentage: number) => void,
-  options?: { folderName?: string }
+  options?: { folderName?: string; skipDownloadCount?: boolean }
 ): Promise<{ success: boolean; folderName: string }> {
   const { onProgress: reportProgress = () => {} } = { onProgress };
   const baseThemesDir = await themesDirectory();
   const folderName = options?.folderName?.trim() || theme.id;
   const targetFolder = await path.join(baseThemesDir, folderName);
+  const skipDownloadCount = options?.skipDownloadCount === true;
+  const downloadUrl = skipDownloadCount
+    ? (() => {
+        const url = new URL(theme.downloadUrl);
+        url.searchParams.set('skipDownloadCount', '1');
+        return url.toString();
+      })()
+    : theme.downloadUrl;
+  let requestHeaders: Record<string, string> | undefined;
+  if (skipDownloadCount) {
+    requestHeaders = await getAuthHeaders();
+    if (!requestHeaders['X-Username'] || !requestHeaders['X-Password']) {
+      throw new Error('Please log in again before reverting this theme.');
+    }
+  }
 
   reportProgress('Downloading theme package...', 10);
 
@@ -987,9 +1002,10 @@ export async function downloadAndInstallCommunityTheme(
   try {
     try {
       await invoke('download_and_extract_community_theme', {
-        downloadUrl: theme.downloadUrl,
+        downloadUrl,
         themeFolder: targetFolder,
         themeName: theme.name,
+        ...(requestHeaders ? { requestHeaders } : {}),
       });
     } catch (err) {
       // Fallback for legacy themes directly to git repo

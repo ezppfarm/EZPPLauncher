@@ -3,7 +3,7 @@ use hardware_id::get_id;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 #[cfg(not(target_os = "macos"))]
@@ -1688,14 +1688,19 @@ pub async fn download_and_extract_community_theme(
     download_url: String,
     theme_folder: String,
     theme_name: String,
+    request_headers: Option<HashMap<String, String>>,
 ) -> Result<(), String> {
     let client = reqwest::Client::new();
-    let response = client
-        .get(&download_url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-        )
+    let mut request = client.get(&download_url).header(
+        "User-Agent",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+    );
+    if let Some(headers) = request_headers {
+        for (name, value) in headers {
+            request = request.header(name.as_str(), value.as_str());
+        }
+    }
+    let response = request
         .send()
         .await
         .map_err(|e| format!("Failed to download theme: {}", e))?;
