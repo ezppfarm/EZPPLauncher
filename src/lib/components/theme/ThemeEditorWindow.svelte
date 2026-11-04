@@ -1,6 +1,6 @@
 <script lang="ts">
   import Logo from '$assets/logo.png';
-  import { fetchCommunityThemeDetails, publishThemeToWorkshop } from '$lib/communityThemes';
+  import { fetchCommunityThemeDetails, publishThemeToWorkshop } from '$lib/theme/communityThemes';
   import FontPreview from '$lib/components/theme/FontPreview.svelte';
   import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import ThemeElementInspector from '$lib/components/theme/ThemeElementInspector.svelte';
@@ -44,31 +44,31 @@
     THEME_CLOCK_VARIABLE_NAMES,
     isThemeClockVariable,
     themeClockValues,
-  } from '$lib/themeClock';
+  } from '$lib/theme/themeClock';
   import {
     BUNDLED_THEME_FONTS,
     bundledThemeFontFamily,
     fontStack,
     type ThemeFontChoice,
-  } from '$lib/themeFonts';
-  import { THEME_ICON_PREVIEW_NAMES, THEME_ICON_SETS } from '$lib/themeIcons';
+  } from '$lib/theme/themeFonts';
+  import { THEME_ICON_PREVIEW_NAMES, THEME_ICON_SETS } from '$lib/theme/themeIcons';
   import {
     themeBehaviorSummary,
     themeBehaviorTargetLabel,
     themeElementLabel,
     themeGroupContainsElement,
     themeGroupInteractiveCount,
-  } from '$lib/themeLogic';
-  import { themeParallax } from '$lib/themeParallax';
-  import { renderThemePreview } from '$lib/themePreview';
-  import { themeScriptInitialVariables, themeScriptVariableNames } from '$lib/themeScript';
+  } from '$lib/theme/themeLogic';
+  import { themeParallax } from '$lib/theme/themeParallax';
+  import { renderThemePreview } from '$lib/theme/themePreview';
+  import { themeScriptInitialVariables, themeScriptVariableNames } from '$lib/theme/themeScript';
   import {
     formatThemeScriptError,
     parseThemeScript,
     themeScriptProgramCanLeaveLauncher,
     themeScriptProgramReferences,
-  } from '$lib/themeScriptLang';
-  import { analyzeThemeSvelteSource } from '$lib/themeSvelte';
+  } from '$lib/theme/themeScriptLang';
+  import { analyzeThemeSvelteSource } from '$lib/theme/themeSvelte';
   import {
     createDefaultThemeV2,
     createThemeV2Behavior,
@@ -96,7 +96,7 @@
     type ThemeV2VideoElement,
     type ThemeV2WidgetElement,
     type ThemeV2WidgetKind,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import {
     exportThemeFolder,
     markThemeSynced,
@@ -105,7 +105,7 @@
     themesDirectory,
     toSafeName,
     updateInstalledThemeWorkshopId,
-  } from '$lib/themes';
+  } from '$lib/theme/themes';
   import type { EZPPUser, EZPPUserInfo } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import { osuInstallationPath } from '$lib/userSettings';

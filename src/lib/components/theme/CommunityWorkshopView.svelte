@@ -1,6 +1,6 @@
 <script lang="ts">
   import DefaultThemePreview from '$assets/default_preview.png';
-  import { activeThemeDownloads, themeDownloadProgress } from '$lib/communityThemeDownloads';
+  import { activeThemeDownloads, themeDownloadProgress } from '$lib/theme/communityThemeDownloads';
   import {
     fetchCommunityTags,
     fetchCommunityThemes,
@@ -31,7 +31,7 @@
     type ThemeReportCategory,
     type ThemeReportQuery,
     type ThemeReportStatus,
-  } from '$lib/communityThemes';
+  } from '$lib/theme/communityThemes';
   import * as AlertDialog from '$lib/components/ui/alert-dialog';
   import Badge from '$lib/components/ui/badge/badge.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -47,9 +47,9 @@
   import * as Tooltip from '$lib/components/ui/tooltip';
   import { active_custom_theme, custom_themes } from '$lib/global';
   import { sendSystemAnnouncement } from '$lib/notifications';
-  import { isThemeTrusted } from '$lib/themeTrust';
-  import { normalizeThemeTags } from '$lib/themeV2';
-  import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/themes';
+  import { isThemeTrusted } from '$lib/theme/themeTrust';
+  import { normalizeThemeTags } from '$lib/theme/themeV2';
+  import { reloadThemes, updateInstalledThemeTags, type Theme } from '$lib/theme/themes';
   import { currentUser } from '$lib/userAuthentication';
   import { reduceAnimations } from '$lib/userSettings';
   import WorkshopTooltip from './WorkshopTooltip.svelte';

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { custom_theme_volume } from '$lib/global';
-  import { playThemeMedia, themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
-  import { themeParallax } from '$lib/themeParallax';
-  import type { ThemeV2Definition } from '$lib/themeV2';
-  import { themeAssetUrl } from '$lib/themeV2';
+  import { playThemeMedia, themeMediaSource, themeVideoLifecycle } from '$lib/theme/themeMedia';
+  import { themeParallax } from '$lib/theme/themeParallax';
+  import type { ThemeV2Definition } from '$lib/theme/themeV2';
+  import { themeAssetUrl } from '$lib/theme/themeV2';
   import { reduceAnimations } from '$lib/userSettings';
   import { trackMediaContainer } from '$lib/utils';
   import { onDestroy } from 'svelte';

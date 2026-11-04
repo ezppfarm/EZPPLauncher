@@ -16,7 +16,7 @@
     type ThemeV2Element,
     type ThemeV2Group,
     type ThemeV2MaskShape,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { Boxes, Layers, RefreshCw, Scan, Ungroup } from '@lucide/svelte';
 
   let {

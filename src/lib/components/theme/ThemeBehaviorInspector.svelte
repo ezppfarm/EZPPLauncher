@@ -6,18 +6,18 @@
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
-  import { isThemeClockVariable, THEME_CLOCK_VARIABLE_NAMES } from '$lib/themeClock';
+  import { isThemeClockVariable, THEME_CLOCK_VARIABLE_NAMES } from '$lib/theme/themeClock';
   import {
     themeBehaviorTargetLabel,
     themeElementLabel,
     themeGroupInteractiveCount,
     themeGroupLabel,
-  } from '$lib/themeLogic';
+  } from '$lib/theme/themeLogic';
   import {
     formatThemeScriptError,
     parseThemeScript,
     themeScriptProgramCanLeaveLauncher,
-  } from '$lib/themeScriptLang';
+  } from '$lib/theme/themeScriptLang';
   import type {
     ThemeV2Behavior,
     ThemeV2BehaviorAction,
@@ -29,7 +29,7 @@
     ThemeV2Group,
     ThemeV2ScriptScreen,
     ThemeV2ScriptValue,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { Link2, Plus, Trash2 } from '@lucide/svelte';
   import { SvelteSet } from 'svelte/reactivity';
 

@@ -5,9 +5,9 @@
   import ThemeV2Elements from '$lib/components/theme/ThemeV2Elements.svelte';
   import * as Avatar from '$lib/components/ui/avatar';
   import { currentUserInfo } from '$lib/data';
-  import { scopeThemeCss } from '$lib/themeCssScope';
-  import { fontStack, monoFontStack } from '$lib/themeFonts';
-  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
+  import { scopeThemeCss } from '$lib/theme/themeCssScope';
+  import { fontStack, monoFontStack } from '$lib/theme/themeFonts';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/theme/themeIcons';
   import {
     normalizeChrome,
     readableTextColor,
@@ -18,7 +18,7 @@
     type ThemeV2Group,
     type ThemeV2ScriptValue,
     type ThemeV2WidgetKind,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { currentUser } from '$lib/userAuthentication';
   import { countryCodeToEmoji } from '$lib/utils';
   import { Clock, Trophy } from '@lucide/svelte';

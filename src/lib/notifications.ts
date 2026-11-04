@@ -1,4 +1,4 @@
-import { getAuthHeaders, getThemesServiceUrl } from './communityThemes';
+import { getAuthHeaders, getThemesServiceUrl } from './theme/communityThemes';
 
 export type NotificationType =
   | 'theme_hidden'

@@ -1,14 +1,14 @@
 <script lang="ts">
   import ThemeBehaviorInspector from '$lib/components/theme/ThemeBehaviorInspector.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
-  import { themeEditorSectionOpen } from '$lib/themeEditorUiState';
-  import { themeBehaviorSummary, themeGroupInteractiveCount } from '$lib/themeLogic';
+  import { themeEditorSectionOpen } from '$lib/theme/themeEditorUiState';
+  import { themeBehaviorSummary, themeGroupInteractiveCount } from '$lib/theme/themeLogic';
   import type {
     ThemeV2Behavior,
     ThemeV2BehaviorTarget,
     ThemeV2Element,
     ThemeV2Group,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { AlertTriangle, ChevronDown, Plus, Zap } from '@lucide/svelte';
 
   let {

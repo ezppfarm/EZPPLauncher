@@ -6,8 +6,8 @@
     getFullIconCatalog,
     type IconPackKey,
     type ThemeIconCatalogItem,
-  } from '$lib/themeIconCatalog';
-  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
+  } from '$lib/theme/themeIconCatalog';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/theme/themeIcons';
   import ThemeIcon from './ThemeIcon.svelte';
   import { Check, ChevronsUpDown, LayoutGrid, List, Search, X } from '@lucide/svelte';
 

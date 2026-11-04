@@ -1,14 +1,14 @@
 <script lang="ts">
-  import {
-    reportCommunityTheme,
-    type CommunityTheme,
-    type ThemeReportCategory,
-  } from '$lib/communityThemes';
   import { Button } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Label } from '$lib/components/ui/label';
   import * as Select from '$lib/components/ui/select';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import {
+    reportCommunityTheme,
+    type CommunityTheme,
+    type ThemeReportCategory,
+  } from '$lib/theme/communityThemes';
   import { Flag, LoaderCircle, X } from '@lucide/svelte';
   import { sileo } from 'sileo';
 

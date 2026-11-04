@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { isThemeClockVariable, THEME_CLOCK_VARIABLE_NAMES } from '$lib/themeClock';
-  import { parseThemeScript } from '$lib/themeScriptLang';
-  import type { ThemeV2Element, ThemeV2Group, ThemeV2ScriptScreen } from '$lib/themeV2';
+  import { isThemeClockVariable, THEME_CLOCK_VARIABLE_NAMES } from '$lib/theme/themeClock';
+  import { parseThemeScript } from '$lib/theme/themeScriptLang';
+  import type { ThemeV2Element, ThemeV2Group, ThemeV2ScriptScreen } from '$lib/theme/themeV2';
   import { Braces, CircleAlert, Maximize2, Minimize2, X } from '@lucide/svelte';
   import type * as Monaco from 'monaco-editor';
   import { onMount } from 'svelte';

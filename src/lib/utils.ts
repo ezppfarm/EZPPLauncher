@@ -1,5 +1,5 @@
 import { custom_theme_audio_playing } from './global';
-import { playThemeMedia } from './themeMedia';
+import { playThemeMedia } from './theme/themeMedia';
 import { invoke } from '@tauri-apps/api/core';
 import { type ClassValue, clsx } from 'clsx';
 import * as crypto from 'crypto-js';

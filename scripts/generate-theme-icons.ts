@@ -1,4 +1,8 @@
-import { THEME_ICON_NAMES, type ThemeIconName, type ThemeIconSet } from '../src/lib/themeIcons';
+import {
+  THEME_ICON_NAMES,
+  type ThemeIconName,
+  type ThemeIconSet,
+} from '../src/lib/theme/themeIcons';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -135,7 +139,7 @@ export const THEME_ICON_BODIES: Record<ThemeIconSet, Record<ThemeIconName, Theme
 )};
 `;
 
-const outputPath = fileURLToPath(new URL('../src/lib/themeIconData.ts', import.meta.url));
+const outputPath = fileURLToPath(new URL('../src/lib/theme/themeIconData.ts', import.meta.url));
 writeFileSync(outputPath, output);
 console.log(
   `Generated ${THEME_ICON_NAMES.length} semantic icons for ${Object.keys(collectionPaths).length} sets.`

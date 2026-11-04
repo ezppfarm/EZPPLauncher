@@ -6,9 +6,9 @@
   import DownloadButton from '$lib/components/ui/download-button/DownloadButton.svelte';
   import { currentUserInfo } from '$lib/data';
   import { launching as launchingStore } from '$lib/global';
-  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
-  import { fontStack } from '$lib/themeFonts';
-  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
+  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/theme/themeData';
+  import { fontStack } from '$lib/theme/themeFonts';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/theme/themeIcons';
   import {
     themeArcGeometry,
     themeClockDate,
@@ -16,9 +16,9 @@
     themeCountdownText,
     themeParticleSeeds,
     themeSvgGradientVector,
-  } from '$lib/themeLayers';
-  import { themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
-  import { interpolateThemeText } from '$lib/themeTextVariables';
+  } from '$lib/theme/themeLayers';
+  import { themeMediaSource, themeVideoLifecycle } from '$lib/theme/themeMedia';
+  import { interpolateThemeText } from '$lib/theme/themeTextVariables';
   import {
     themeAssetUrl,
     themeClassNames,
@@ -42,7 +42,7 @@
     type ThemeV2Group,
     type ThemeV2Point,
     type ThemeV2ScriptValue,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { currentUser } from '$lib/userAuthentication';
   import { countryCodeToEmoji, formatRelativeTime, openURL } from '$lib/utils';
   import { Boxes, ChevronRight, Clock, Move, RotateCw, Trophy } from '@lucide/svelte';

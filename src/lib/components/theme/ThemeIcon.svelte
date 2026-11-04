@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { getThemeIconBody } from '$lib/themeIconCatalog';
-  import { DEFAULT_THEME_ICON_SET, type ThemeIconName, type ThemeIconSet } from '$lib/themeIcons';
+  import { getThemeIconBody } from '$lib/theme/themeIconCatalog';
+  import {
+    DEFAULT_THEME_ICON_SET,
+    type ThemeIconName,
+    type ThemeIconSet,
+  } from '$lib/theme/themeIcons';
 
   let {
     name,

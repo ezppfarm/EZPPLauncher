@@ -2,12 +2,6 @@
   import DefaultThemePreview from '$assets/default_preview.png';
   import Logo from '$assets/logo.png';
   import { ezppfarm } from '$lib/api/ezpp';
-  import {
-    downloadAndInstallCommunityTheme,
-    fetchCommunityThemeDetails,
-    fetchCommunityThemes,
-    type CommunityTheme,
-  } from '$lib/communityThemes';
   import NotificationHub from '$lib/components/notifications/NotificationHub.svelte';
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
   import ThemeReportDialog from '$lib/components/theme/ThemeReportDialog.svelte';
@@ -97,8 +91,14 @@
     stopOpenTabletDriver,
   } from '$lib/osuUtil';
   import * as presence from '$lib/presence';
-  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
-  import { themeMediaSuspended } from '$lib/themeMedia';
+  import {
+    downloadAndInstallCommunityTheme,
+    fetchCommunityThemeDetails,
+    fetchCommunityThemes,
+    type CommunityTheme,
+  } from '$lib/theme/communityThemes';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/theme/themeIcons';
+  import { themeMediaSuspended } from '$lib/theme/themeMedia';
   import {
     loadThemeScript,
     setThemeScriptHandlers,
@@ -106,8 +106,8 @@
     stopThemeScript,
     themeScriptState,
     triggerThemeScriptElement,
-  } from '$lib/themeScript';
-  import { isThemeTrusted, themeCodeKind, trustTheme } from '$lib/themeTrust';
+  } from '$lib/theme/themeScript';
+  import { isThemeTrusted, themeCodeKind, trustTheme } from '$lib/theme/themeTrust';
   import {
     normalizeChrome,
     normalizeThemeVersion,
@@ -117,7 +117,7 @@
     type ThemeV2Chrome,
     type ThemeV2Definition,
     type ThemeV2ScriptScreen,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import {
     checkThemeFromFile,
     deleteTheme,
@@ -133,7 +133,7 @@
     type Theme,
     type ThemeBackup,
     type ThemeInfo,
-  } from '$lib/themes';
+  } from '$lib/theme/themes';
   import { EZPPActionStatus, type LaunchView } from '$lib/types';
   import { currentUser } from '$lib/userAuthentication';
   import {

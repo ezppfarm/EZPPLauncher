@@ -1,4 +1,4 @@
-import type { Theme } from '$lib/themes';
+import type { Theme } from '$lib/theme/themes';
 
 /**
  * API 1.0 themes are executable bundles: loading one imports its entry script

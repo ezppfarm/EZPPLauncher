@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { ezppfarm } from './api/ezpp';
-import type { Theme } from './themes';
+import type { Theme } from './theme/themes';
 import type { Release } from './types';
 import { setGlobalVolume } from './utils';
 import type { Component } from 'svelte';

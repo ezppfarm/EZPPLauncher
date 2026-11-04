@@ -2,7 +2,7 @@
   import ThemeSection from '$lib/components/theme/ThemeSection.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
-  import type { ThemeV2ScriptValue } from '$lib/themeV2';
+  import type { ThemeV2ScriptValue } from '$lib/theme/themeV2';
   import { Braces, RotateCcw } from '@lucide/svelte';
 
   let {

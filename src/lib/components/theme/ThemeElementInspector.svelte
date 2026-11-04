@@ -15,9 +15,9 @@
   import * as Select from '$lib/components/ui/select';
   import Slider from '$lib/components/ui/slider/slider.svelte';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/themeData';
-  import type { ThemeFontChoice } from '$lib/themeFonts';
-  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
+  import { getThemeDataSampleValue, resolveThemeDataValue, themeGlobalData } from '$lib/theme/themeData';
+  import type { ThemeFontChoice } from '$lib/theme/themeFonts';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/theme/themeIcons';
   import {
     THEME_DATA_FIELDS,
     THEME_PARTICLE_PRESETS,
@@ -29,7 +29,7 @@
     type ThemeV2MaskShape,
     type ThemeV2WidgetKind,
     type ThemeV2WidgetVariant,
-  } from '$lib/themeV2';
+  } from '$lib/theme/themeV2';
   import { openURL } from '$lib/utils';
   import {
     CircleUser,

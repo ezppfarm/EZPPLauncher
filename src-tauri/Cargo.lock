@@ -1266,7 +1266,7 @@ dependencies = [
 
 [[package]]
 name = "ezpplauncher"
-version = "3.2.7"
+version = "3.3.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

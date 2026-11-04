@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { themeEditorSectionOpen } from '$lib/themeEditorUiState';
+  import { themeEditorSectionOpen } from '$lib/theme/themeEditorUiState';
   import { ChevronDown } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import type { Component, Snippet } from 'svelte';

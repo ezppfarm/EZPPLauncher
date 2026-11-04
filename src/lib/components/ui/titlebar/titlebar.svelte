@@ -7,7 +7,7 @@
     custom_theme_volume,
     platform,
   } from '$lib/global';
-  import { DEFAULT_THEME_ICON_SET } from '$lib/themeIcons';
+  import { DEFAULT_THEME_ICON_SET } from '$lib/theme/themeIcons';
   import { reduceAnimations } from '$lib/userSettings';
   import Minimize from '@lucide/svelte/icons/minus';
   import Close from '@lucide/svelte/icons/x';

@@ -3,7 +3,7 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
-  import { themeClassTokens } from '$lib/themeV2';
+  import { themeClassTokens } from '$lib/theme/themeV2';
   import { Code2, RotateCcw } from '@lucide/svelte';
 
   let {

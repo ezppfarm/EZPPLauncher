@@ -42,11 +42,10 @@
     themeMediaStatus,
     themeMediaSuspended,
     themeMediaSuspension,
-  } from '$lib/themeMedia';
-  import { themeParallax } from '$lib/themeParallax';
-  import { isThemeTrusted } from '$lib/themeTrust';
-  import { themeV2Css } from '$lib/themeV2';
-  import { getThemes, loadTheme } from '$lib/themes';
+  } from '$lib/theme/themeMedia';
+  import { themeParallax } from '$lib/theme/themeParallax';
+  import { isThemeTrusted } from '$lib/theme/themeTrust';
+  import { getThemes, loadTheme } from '$lib/theme/themes';
   import { currentUser } from '$lib/userAuthentication';
   import {
     cursorSmoothening,

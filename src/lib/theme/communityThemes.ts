@@ -1,4 +1,4 @@
-import { config } from './config';
+import { config } from '../config';
 import { normalizeThemeVersion } from './themeV2';
 import {
   markThemeSynced,

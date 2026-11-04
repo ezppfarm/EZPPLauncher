@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { compileThemeSvelte } from '$lib/themeSvelte';
-  import { themeAssetUrl, type ThemeV2ScriptValue } from '$lib/themeV2';
+  import { compileThemeSvelte } from '$lib/theme/themeSvelte';
+  import { themeAssetUrl, type ThemeV2ScriptValue } from '$lib/theme/themeV2';
   import { TriangleAlert } from '@lucide/svelte';
   import { mount, unmount } from 'svelte';
 

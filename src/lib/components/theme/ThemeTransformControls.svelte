@@ -4,7 +4,7 @@
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import Slider from '$lib/components/ui/slider/slider.svelte';
-  import type { ThemeV2Transform } from '$lib/themeV2';
+  import type { ThemeV2Transform } from '$lib/theme/themeV2';
   import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw } from '@lucide/svelte';
 
   type TransformTarget = ThemeV2Transform & { offsetX?: number; offsetY?: number };

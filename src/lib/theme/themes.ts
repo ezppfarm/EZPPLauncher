@@ -1,7 +1,7 @@
-import { active_custom_theme, custom_theme_audio_playing, custom_themes } from './global';
+import { active_custom_theme, custom_theme_audio_playing, custom_themes } from '../global';
+import { disableMediaControls, setGlobalVolume } from '../utils';
 import { clearThemeMediaCache, playThemeMedia } from './themeMedia';
 import { isThemeV2, normalizeThemeV2, type ThemeV2Asset, type ThemeV2Definition } from './themeV2';
-import { disableMediaControls, setGlobalVolume } from './utils';
 import { betterFetch } from '@better-fetch/fetch';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';

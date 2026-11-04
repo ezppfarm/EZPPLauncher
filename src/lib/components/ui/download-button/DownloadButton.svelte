@@ -1,6 +1,6 @@
 <script lang="ts">
   import ThemeIcon from '$lib/components/theme/ThemeIcon.svelte';
-  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/themeIcons';
+  import { DEFAULT_THEME_ICON_SET, type ThemeIconSet } from '$lib/theme/themeIcons';
 
   const prop: {
     downloading: boolean;

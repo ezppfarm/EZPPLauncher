@@ -3,11 +3,11 @@
     analyzeThemeSvelteSource,
     type ThemeSvelteAnalysis,
     type ThemeSvelteDiagnostic,
-  } from '$lib/themeSvelte';
+  } from '$lib/theme/themeSvelte';
   import {
     THEME_SVELTE_COMPONENT_PLACEHOLDER,
     THEME_SVELTE_COMPONENT_SKELETON,
-  } from '$lib/themeSvelteSnippets';
+  } from '$lib/theme/themeSvelteSnippets';
   import { Component, CircleAlert, Maximize2, Minimize2, X } from '@lucide/svelte';
   import type * as Monaco from 'monaco-editor';
   import { onMount } from 'svelte';

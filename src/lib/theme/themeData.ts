@@ -1,8 +1,8 @@
-import { currentUserInfo } from './data';
-import { launcherVersion, onlineFriends, osuBuild, osuStream, serverPing } from './global';
+import { currentUserInfo } from '../data';
+import { launcherVersion, onlineFriends, osuBuild, osuStream, serverPing } from '../global';
+import { currentUser } from '../userAuthentication';
 import { themeClockValues } from './themeClock';
 import type { ThemeV2DataField, ThemeV2DataMode } from './themeV2';
-import { currentUser } from './userAuthentication';
 import { derived } from 'svelte/store';
 
 export type ThemeDataStats = {

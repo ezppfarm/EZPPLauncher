@@ -2,7 +2,7 @@
   import ThemeSection from '$lib/components/theme/ThemeSection.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
   import Slider from '$lib/components/ui/slider/slider.svelte';
-  import type { ThemeV2Filters } from '$lib/themeV2';
+  import type { ThemeV2Filters } from '$lib/theme/themeV2';
   import { SlidersHorizontal } from '@lucide/svelte';
 
   let {
