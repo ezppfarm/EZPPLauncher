@@ -122,8 +122,10 @@
     checkThemeFromFile,
     deleteTheme,
     downloadTheme,
+    hashThemeContent,
     importThemeFromFile,
     loadTheme,
+    markThemeSynced,
     openThemesFolder,
     reloadThemes,
     restoreThemeBackup,
@@ -317,6 +319,7 @@
   let ownedWorkshopThemeIds = $state<string[]>([]);
   let ownedWorkshopThemeNames = $state<string[]>([]);
   let ownedWorkshopLoaded = $state(false);
+  const themeContentHashCache = new SvelteMap<string, string>();
   let ownedThemesRequestId = 0;
   let logViewerOpen = $state(false);
   let presenceEditorOpen = $state(false);
@@ -326,6 +329,9 @@
 
   const communityThemeCache = new SvelteMap<string, CommunityTheme>();
   let lastThemeUpdateCheck = 0;
+  let lastSyncUserId: number | undefined;
+  let lastSyncThemeCount = -1;
+  let lastSyncOwnedCount = -1;
 
   const themeFilterOptions = [
     { id: 'all', label: 'All themes', icon: 'all-themes' },
@@ -410,6 +416,7 @@
 
   const isOwnInstalledTheme = (theme: Theme) => {
     if (!$currentUser) return false;
+    if (theme.authorId === $currentUser.id) return true;
 
     const folderName = theme.folder_name.trim().toLowerCase();
     const workshopId = theme.workshopId?.trim().toLowerCase();
@@ -543,6 +550,117 @@
     }
   };
 
+  const getThemeContentHash = async (theme: Theme) => {
+    const cached = themeContentHashCache.get(theme.folder_name);
+    if (cached) return cached;
+    const hash = await hashThemeContent(theme.folder_name);
+    themeContentHashCache.set(theme.folder_name, hash);
+    return hash;
+  };
+
+  /**
+   * Themes installed before content hashes were introduced have no baseline.
+   * Their preview is regenerated on every editor save, so a preview newer than
+   * the Workshop record means the local copy was edited after publication.
+   * The folder creation check keeps fresh downloads from being flagged.
+   */
+  const legacyThemeChangedAfterPublish = (theme: Theme, remote: CommunityTheme) => {
+    const publishedAt = Date.parse(remote.updatedAt);
+    if (!Number.isFinite(publishedAt)) return false;
+
+    const createdAt = theme.folderCreatedAt;
+    const previewModifiedAt = theme.previewModifiedAt;
+    return (
+      createdAt !== undefined &&
+      previewModifiedAt !== undefined &&
+      createdAt < publishedAt &&
+      previewModifiedAt > publishedAt + 1_000
+    );
+  };
+
+  type ThemeSyncState = {
+    syncedContentHash?: string;
+    syncedVersion?: string;
+    isNotSynced: boolean;
+  };
+
+  const resolveThemeSyncState = async (
+    theme: Theme,
+    remote: CommunityTheme,
+    localVersion: string
+  ): Promise<ThemeSyncState> => {
+    const versionMismatch = remote.version !== localVersion;
+    let contentHash: string | undefined;
+    try {
+      contentHash = await getThemeContentHash(theme);
+    } catch (error) {
+      console.warn(`[Themes] Could not hash "${theme.name}":`, error);
+    }
+
+    if (theme.syncedContentHash) {
+      const contentMismatch = contentHash !== undefined && contentHash !== theme.syncedContentHash;
+      return {
+        syncedContentHash: theme.syncedContentHash,
+        syncedVersion: theme.syncedVersion,
+        isNotSynced:
+          versionMismatch ||
+          contentMismatch ||
+          (theme.syncedVersion !== undefined && theme.syncedVersion !== localVersion),
+      };
+    }
+
+    if (versionMismatch || legacyThemeChangedAfterPublish(theme, remote)) {
+      return { isNotSynced: true };
+    }
+
+    try {
+      const sync = await markThemeSynced(theme.folder_name, {
+        workshopId: remote.id,
+        version: localVersion,
+      });
+      themeContentHashCache.set(theme.folder_name, sync.contentHash);
+      return {
+        syncedContentHash: sync.contentHash,
+        syncedVersion: sync.version,
+        isNotSynced: false,
+      };
+    } catch (error) {
+      console.warn(`[Themes] Could not record sync state for "${theme.name}":`, error);
+      return { isNotSynced: false };
+    }
+  };
+
+  const refreshThemeSyncState = async (folderName: string) => {
+    themeContentHashCache.delete(folderName);
+    const theme = get(custom_themes).find((candidate) => candidate.folder_name === folderName);
+    if (!theme || !theme.workshopId) return;
+
+    let contentHash: string;
+    try {
+      contentHash = await getThemeContentHash(theme);
+    } catch (error) {
+      console.warn(`[Themes] Could not hash "${theme.name}" after saving:`, error);
+      return;
+    }
+
+    const localVersion = normalizeThemeVersion(theme.version);
+    const workshopVersion = theme.workshopVersion
+      ? normalizeThemeVersion(theme.workshopVersion)
+      : undefined;
+    const baseline = theme.syncedContentHash;
+    const isNotSynced = baseline
+      ? baseline !== contentHash ||
+        (theme.syncedVersion !== undefined && theme.syncedVersion !== localVersion) ||
+        (workshopVersion !== undefined && localVersion !== workshopVersion)
+      : true;
+
+    custom_themes.update((themes) =>
+      themes.map((candidate) =>
+        candidate.folder_name === folderName ? { ...candidate, isNotSynced } : candidate
+      )
+    );
+  };
+
   const checkInstalledThemeUpdates = async (force = false) => {
     if (checkingThemeUpdates) return;
     const now = Date.now();
@@ -590,6 +708,20 @@
       const workers = Math.min(4, installed.length);
       await Promise.all(Array.from({ length: workers }, () => checkNext()));
 
+      const syncStates = new SvelteMap<string, ThemeSyncState>();
+      for (const theme of installed) {
+        const remote = remoteThemes.get(theme.folder_name);
+        if (!remote) continue;
+        const localVersion = normalizeThemeVersion(theme.version);
+        if (!localVersion) continue;
+        if (isOwnInstalledTheme(theme)) {
+          syncStates.set(
+            theme.folder_name,
+            await resolveThemeSyncState(theme, remote.theme, remote.version)
+          );
+        }
+      }
+
       custom_themes.update((themes) =>
         themes.map((theme) => {
           const remote = remoteThemes.get(theme.folder_name);
@@ -598,10 +730,13 @@
           if (!localVersion) return theme;
 
           const updateAvailable = semver.gt(remote.version, localVersion);
+          const sync = syncStates.get(theme.folder_name);
           return {
             ...theme,
+            workshopVersion: remote.version,
             updateAvailable,
             availableVersion: updateAvailable ? remote.version : undefined,
+            ...(sync ?? {}),
           };
         })
       );
@@ -660,6 +795,7 @@
         }
       }
 
+      themeContentHashCache.delete(theme.folder_name);
       communityThemeCache.delete(theme.folder_name);
       sileo.success({
         title: 'Yaay!',
@@ -677,6 +813,24 @@
   };
 
   $effect(() => {
+    const userId = $currentUser?.id;
+    const themeCount = $custom_themes.length;
+    const ownedCount = ownedWorkshopThemeIds.length + ownedWorkshopThemeNames.length;
+
+    // Themes and the signed-in creator load asynchronously. Reset the check
+    // throttle when they change so the first badge is not missed by an early
+    // check that ran against an empty library or an unknown user.
+    if (
+      userId !== lastSyncUserId ||
+      themeCount !== lastSyncThemeCount ||
+      ownedCount !== lastSyncOwnedCount
+    ) {
+      lastSyncUserId = userId;
+      lastSyncThemeCount = themeCount;
+      lastSyncOwnedCount = ownedCount;
+      lastThemeUpdateCheck = 0;
+    }
+
     if (selectedView === 'THEMES') {
       untrack(() => void checkInstalledThemeUpdates());
     }
@@ -760,6 +914,7 @@
     // copy when the saved theme was already the active one.
     const wasActive = $active_custom_theme?.folder_name === folderName;
     await reloadThemes();
+    await refreshThemeSyncState(folderName);
     if (!wasActive) return;
 
     const savedTheme = get(custom_themes).find((theme) => theme.folder_name === folderName);
@@ -848,8 +1003,10 @@
 
     try {
       const themeFolder = await path.join(await themesDirectory(), theme.folder_name);
+      themeContentHashCache.delete(theme.folder_name);
       await restoreThemeBackup(themeFolder, backup.path);
       await reloadThemes();
+      await refreshThemeSyncState(theme.folder_name);
 
       const restoredTheme = get(custom_themes).find((candidate) => candidate.name === theme.name);
       if (wasActive && restoredTheme) {
@@ -885,6 +1042,7 @@
   const refreshThemes = async () => {
     refreshingThemes = true;
     try {
+      themeContentHashCache.clear();
       await reloadThemes();
       void checkInstalledThemeUpdates(true);
     } catch (error) {
@@ -1836,6 +1994,18 @@
       } catch (error) {
         console.error(error);
       }
+
+      // The publish succeeded, so the local version is now the workshop
+      // version. Clear the stale "Not synced" badge before the next check.
+      custom_themes.update((themes) =>
+        themes.map((candidate) => {
+          const matchesId = themeId && candidate.workshopId?.trim().toLowerCase() === themeId;
+          const matchesName = themeName && candidate.name.trim().toLowerCase() === themeName;
+          return matchesId || matchesName
+            ? { ...candidate, workshopVersion: candidate.version, isNotSynced: false }
+            : candidate;
+        })
+      );
     }).then((unlisten) => (themePublishedUnlisten = unlisten));
 
     return () => {
@@ -4096,9 +4266,18 @@
                               theme.status === 'installed' && (theme.backups?.length ?? 0) > 0}
                             {@const canUpdateTheme =
                               theme.status === 'installed' && theme.updateAvailable}
+                            {@const isOwnTheme = isOwnInstalledTheme(theme)}
+                            {@const localVersion = normalizeThemeVersion(theme.version)}
+                            {@const workshopVersion = theme.workshopVersion}
+                            {@const versionMismatch =
+                              localVersion !== undefined &&
+                              workshopVersion !== undefined &&
+                              workshopVersion !== localVersion}
+                            {@const isNotSynced =
+                              isOwnTheme && (theme.isNotSynced === true || versionMismatch)}
                             {@const canReportTheme =
                               Boolean($currentUser && ownedWorkshopLoaded) &&
-                              !isOwnInstalledTheme(theme) &&
+                              !isOwnTheme &&
                               theme.status === 'installed' &&
                               theme.name !== 'Default' &&
                               theme.folder_name !== 'default'}
@@ -4176,6 +4355,17 @@
                                       class="bg-black/50 px-1.5 py-0 text-[9px] backdrop-blur-sm"
                                     >
                                       API {theme.apiVersion.startsWith('2') ? '2.0' : '1.0'}
+                                    </Badge>
+                                  {/if}
+                                  {#if isNotSynced}
+                                    <Badge
+                                      variant="outline"
+                                      class="border-amber-500/40 bg-amber-950/70 px-1.5 py-0 text-[9px] text-amber-200 backdrop-blur-sm"
+                                      title={versionMismatch
+                                        ? `Local v${theme.version} · Workshop v${workshopVersion}`
+                                        : 'Local content differs from the published Workshop version'}
+                                    >
+                                      Not synced
                                     </Badge>
                                   {/if}
                                 </div>

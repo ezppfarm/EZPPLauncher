@@ -196,6 +196,26 @@
       ]
     },
     {
+      "identifier": "fs:allow-stat",
+      "allow": [
+        {
+          "path": "$HOME/.ezpplauncher"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*"
+        },
+        {
+          "path": "$HOME/.ezpplauncher/**/.*/**"
+        }
+      ]
+    },
+    {
       "identifier": "fs:allow-mkdir",
       "allow": [
         {

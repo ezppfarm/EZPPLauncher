@@ -3,6 +3,7 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
+  import Slider from '$lib/components/ui/slider/slider.svelte';
   import type { ThemeV2Transform } from '$lib/themeV2';
   import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw } from '@lucide/svelte';
 
@@ -267,14 +268,13 @@
       <span class="text-[9px] text-muted-foreground">3D cursor perspective</span>
     </div>
     <div class="flex items-center gap-2">
-      <input
-        type="range"
-        min="-1"
-        max="1"
-        step="0.05"
+      <Slider
+        min={-1}
+        max={1}
+        step={0.05}
         value={transform.parallax ?? 0}
-        oninput={(e) => onchange({ parallax: Number((e.target as HTMLInputElement).value) })}
-        class="h-1.5 w-24 cursor-pointer appearance-none rounded-lg bg-theme-800 accent-primary"
+        onValueChange={(value) => onchange({ parallax: value })}
+        class="w-24"
       />
       <span class="w-8 font-mono text-[10px] text-right text-muted-foreground">
         {Math.round((transform.parallax ?? 0) * 100)}%

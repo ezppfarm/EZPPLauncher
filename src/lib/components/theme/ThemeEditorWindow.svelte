@@ -59,6 +59,7 @@
     themeGroupContainsElement,
     themeGroupInteractiveCount,
   } from '$lib/themeLogic';
+  import { themeParallax } from '$lib/themeParallax';
   import { renderThemePreview } from '$lib/themePreview';
   import { themeScriptInitialVariables, themeScriptVariableNames } from '$lib/themeScript';
   import {
@@ -98,6 +99,7 @@
   } from '$lib/themeV2';
   import {
     exportThemeFolder,
+    markThemeSynced,
     saveThemeProject,
     themeAssetBase,
     themesDirectory,
@@ -3545,9 +3547,13 @@
         publishThemeId = result.themeId;
         try {
           await updateInstalledThemeWorkshopId(savedFolder, result.themeId);
+          await markThemeSynced(savedFolder, {
+            workshopId: result.themeId,
+            version: versionCheck.version,
+          });
           lastSavedKey = snapshotKey(captureSnapshot());
         } catch (err) {
-          console.warn('[Workshop] Could not store the theme ID in theme.json:', err);
+          console.warn('[Workshop] Could not store the theme sync metadata:', err);
         }
 
         // The launcher window owns the installed-theme list. Tell it about the
@@ -6131,26 +6137,34 @@
                 <div
                   style="width:{CANVAS_WIDTH}px;height:{CANVAS_HEIGHT}px;transform:scale({canvasScale});transform-origin:top left;"
                 >
-                  <ThemeStage
-                    {definition}
-                    assets={assetBase}
-                    assetOverrides={previewAssets}
-                    {selectedIds}
-                    {selectedGroupId}
-                    interactive
-                    scale={canvasScale}
-                    variables={previewScriptVariables}
-                    onselect={(id, additive) => selectElement(id, additive)}
-                    onselectmany={(ids, additive) => selectMany(ids, additive)}
-                    onselectgroup={(id) => selectGroup(id)}
-                    onmove={moveElements}
-                    onpatch={(id, patch) => patchElement(id, patch)}
-                    onpatchgroup={(id, patch) => patchGroup(id, patch)}
-                    oncontext={(id) => prepareContextMenu(id)}
-                    oncontextgroup={(id) => prepareGroupContextMenu(id)}
-                    ondetach={handleDetachWidget}
-                    onbuttonaction={handleTestButtonAction}
-                  />
+                  <div
+                    class="contents"
+                    use:themeParallax={{
+                      enabled: definition.parallax?.enabled === true,
+                      intensity: definition.parallax?.intensity ?? 0.25,
+                    }}
+                  >
+                    <ThemeStage
+                      {definition}
+                      assets={assetBase}
+                      assetOverrides={previewAssets}
+                      {selectedIds}
+                      {selectedGroupId}
+                      interactive
+                      scale={canvasScale}
+                      variables={previewScriptVariables}
+                      onselect={(id, additive) => selectElement(id, additive)}
+                      onselectmany={(ids, additive) => selectMany(ids, additive)}
+                      onselectgroup={(id) => selectGroup(id)}
+                      onmove={moveElements}
+                      onpatch={(id, patch) => patchElement(id, patch)}
+                      onpatchgroup={(id, patch) => patchGroup(id, patch)}
+                      oncontext={(id) => prepareContextMenu(id)}
+                      oncontextgroup={(id) => prepareGroupContextMenu(id)}
+                      ondetach={handleDetachWidget}
+                      onbuttonaction={handleTestButtonAction}
+                    />
+                  </div>
                 </div>
               </ContextMenu.Trigger>
 

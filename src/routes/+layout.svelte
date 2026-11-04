@@ -43,6 +43,7 @@
     themeMediaSuspended,
     themeMediaSuspension,
   } from '$lib/themeMedia';
+  import { themeParallax } from '$lib/themeParallax';
   import { isThemeTrusted } from '$lib/themeTrust';
   import { themeV2Css } from '$lib/themeV2';
   import { getThemes, loadTheme } from '$lib/themes';
@@ -550,7 +551,13 @@
     </AlertDialog.Content>
   </AlertDialog.Root>
 
-  <main use:themeMediaSuspension>
+  <main
+    use:themeMediaSuspension
+    use:themeParallax={{
+      enabled: $active_custom_theme?.definition?.parallax?.enabled === true,
+      intensity: $active_custom_theme?.definition?.parallax?.intensity ?? 0.25,
+    }}
+  >
     <div class:hidden={!!$active_custom_theme?.definition}>
       <div class="opacity-30">
         <div transition:fade={{ duration: $reduceAnimations ? 0 : 500 }}>

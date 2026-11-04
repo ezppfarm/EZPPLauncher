@@ -27,6 +27,18 @@ export type Theme = {
   status: 'installed' | 'downloading' | 'extracting' | 'deleting' | 'not-installed';
   progress: number;
   updateAvailable: boolean;
+  /** The latest Workshop version, when the theme has been published. */
+  workshopVersion?: string;
+  /** Hash of the theme files when this copy was last known to match the Workshop. */
+  syncedContentHash?: string;
+  /** Local version current when the sync baseline was written. */
+  syncedVersion?: string;
+  /** True when the local theme differs from its published Workshop package. */
+  isNotSynced?: boolean;
+  /** Modification time of the generated preview, used to migrate existing installs. */
+  previewModifiedAt?: number;
+  /** Creation time of the theme folder, used to migrate existing installs. */
+  folderCreatedAt?: number;
   /** The version available in the repository when an update is pending. */
   availableVersion?: string;
   definition?: ThemeV2Definition;
@@ -95,6 +107,75 @@ const encodeThemePath = (value: string) =>
 export const themesDirectory = async () =>
   await path.join(await path.homeDir(), '.ezpplauncher', 'themes');
 
+const THEME_SYNC_FILENAME = '.workshop-sync.json';
+const CONTENT_HASH_PATTERN = /^[a-f0-9]{64}$/i;
+
+export type ThemeWorkshopSync = {
+  contentHash: string;
+  version?: string;
+  workshopId?: string;
+  syncedAt?: number;
+};
+
+const readThemeWorkshopSyncFile = async (
+  folderPath: string
+): Promise<ThemeWorkshopSync | undefined> => {
+  const syncPath = await path.join(folderPath, THEME_SYNC_FILENAME);
+  if (!(await fs.exists(syncPath))) return undefined;
+
+  try {
+    const parsed = JSON.parse(await fs.readTextFile(syncPath)) as Partial<ThemeWorkshopSync>;
+    if (!parsed || typeof parsed !== 'object') return undefined;
+    const contentHash =
+      typeof parsed.contentHash === 'string' && CONTENT_HASH_PATTERN.test(parsed.contentHash)
+        ? parsed.contentHash.toLowerCase()
+        : undefined;
+    if (!contentHash) return undefined;
+
+    return {
+      contentHash,
+      version: typeof parsed.version === 'string' ? parsed.version : undefined,
+      workshopId: typeof parsed.workshopId === 'string' ? parsed.workshopId : undefined,
+      syncedAt: typeof parsed.syncedAt === 'number' ? parsed.syncedAt : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+export const readThemeWorkshopSync = async (folderName: string) =>
+  readThemeWorkshopSyncFile(await path.join(await themesDirectory(), folderName));
+
+export const writeThemeWorkshopSync = async (
+  folderName: string,
+  sync: ThemeWorkshopSync
+): Promise<void> => {
+  const folderPath = await path.join(await themesDirectory(), folderName);
+  const syncPath = await path.join(folderPath, THEME_SYNC_FILENAME);
+  await fs.writeFile(syncPath, new TextEncoder().encode(`${JSON.stringify(sync, null, 2)}\n`));
+};
+
+export const hashThemeContent = async (folderName: string) => {
+  const themeFolder = await path.join(await themesDirectory(), folderName);
+  return await invoke<string>('hash_theme_content', { themeFolder });
+};
+
+/** Record the current local files as the published Workshop baseline. */
+export const markThemeSynced = async (
+  folderName: string,
+  options: { version?: string; workshopId?: string } = {}
+): Promise<ThemeWorkshopSync> => {
+  const contentHash = await hashThemeContent(folderName);
+  const sync: ThemeWorkshopSync = {
+    contentHash,
+    version: options.version,
+    workshopId: options.workshopId,
+    syncedAt: Date.now(),
+  };
+  await writeThemeWorkshopSync(folderName, sync);
+  return sync;
+};
+
 /**
  * Replace a theme in the store instead of mutating it. The theme list is
  * rendered from a filtered derived list, and Svelte treats each item as
@@ -132,6 +213,8 @@ const themeFromFolder = async (
     const definition = isV2
       ? normalizeThemeV2(parsed as unknown as Partial<ThemeV2Definition>)
       : undefined;
+    const sync = await readThemeWorkshopSyncFile(folderPath);
+    const folderStat = await fs.stat(folderPath).catch(() => undefined);
 
     const httpBase = await themeAssetBase();
     const httpFolder = httpBase ? `${httpBase}/${encodeURIComponent(folderName)}` : '';
@@ -158,9 +241,11 @@ const themeFromFolder = async (
       : convertFileSrc(await path.normalize(await path.join(folderPath, 'assets')));
     const previewName = parsed.preview || (isV2 ? 'preview.png' : '');
     let preview = '';
+    let previewModifiedAt: number | undefined;
     if (previewName) {
       const previewPath = await path.join(folderPath, 'assets', previewName);
       if (await fs.exists(previewPath)) {
+        previewModifiedAt = (await fs.stat(previewPath).catch(() => undefined))?.mtime?.getTime();
         // The editor rewrites preview.png on every save. A cache-busting query
         // makes the WebView pick up the new file instead of its cached asset.
         preview = httpFolder
@@ -190,6 +275,10 @@ const themeFromFolder = async (
       status: 'installed',
       progress: 0,
       updateAvailable: false,
+      syncedContentHash: sync?.contentHash,
+      syncedVersion: sync?.version,
+      previewModifiedAt,
+      folderCreatedAt: folderStat?.birthtime?.getTime(),
       cssStyle,
       definition,
     };
@@ -539,6 +628,11 @@ export const reloadThemes = async () => {
           nsfw: theme.nsfw,
           workshopId: theme.workshopId,
           definition: theme.definition,
+          syncedContentHash: theme.syncedContentHash,
+          syncedVersion: theme.syncedVersion,
+          previewModifiedAt: theme.previewModifiedAt,
+          folderCreatedAt: theme.folderCreatedAt,
+          isNotSynced: versionChanged ? false : storeTheme.isNotSynced,
           updateAvailable: versionChanged ? false : storeTheme.updateAvailable,
           availableVersion: versionChanged ? undefined : storeTheme.availableVersion,
           cssStyle: theme.cssStyle,

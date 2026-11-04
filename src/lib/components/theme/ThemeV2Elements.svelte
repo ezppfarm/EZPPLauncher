@@ -141,6 +141,15 @@
     );
   const elementFilter = (element: ThemeV2Element) =>
     themeFilterCss(element.filters, ...ancestorsOf(element).map((group) => group.filters));
+  /** Layer depth plus every ancestor group's depth; negative follows the background. */
+  const elementParallaxCss = (element: ThemeV2Element) => {
+    const depth =
+      (element.parallax ?? 0) +
+      ancestorsOf(element).reduce((total, group) => total + (group.parallax ?? 0), 0);
+    if (depth === 0) return '';
+    const offset = depth * 30;
+    return ` translate3d(calc(var(--mouse-px, 0) * ${offset}px), calc(var(--mouse-py, 0) * ${offset}px), 0)`;
+  };
   const elementClassNames = (element: ThemeV2Element) =>
     themeClassNames(
       [...ancestorsOf(element).map((group) => group.cssClasses), element.cssClasses]
@@ -1227,9 +1236,7 @@
         element,
         elements,
         groups
-      )}{element.parallax
-        ? ` translate3d(calc(var(--mouse-px, 0) * ${element.parallax * 30}px), calc(var(--mouse-py, 0) * ${element.parallax * 30}px), 0)`
-        : ''};transform-origin:0 0;touch-action:none;outline:{selected
+      )}{elementParallaxCss(element)};transform-origin:0 0;touch-action:none;outline:{selected
         ? `${selectedIds.length > 1 ? 1 : 2}px solid #ff006e`
         : 'none'};outline-offset:2px;"
       role={interactive || element.interactive ? 'button' : undefined}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { custom_theme_volume } from '$lib/global';
   import { playThemeMedia, themeMediaSource, themeVideoLifecycle } from '$lib/themeMedia';
+  import { themeParallax } from '$lib/themeParallax';
   import type { ThemeV2Definition } from '$lib/themeV2';
   import { themeAssetUrl } from '$lib/themeV2';
   import { reduceAnimations } from '$lib/userSettings';
@@ -20,50 +21,8 @@
   } = $props();
 
   let audioElement = $state<HTMLAudioElement | undefined>(undefined);
-  let mousePx = $state(0);
-  let mousePy = $state(0);
-  let targetPx = 0;
-  let targetPy = 0;
-  let animFrame: number | undefined;
-
-  function onWindowMouseMove(e: MouseEvent) {
-    if ($reduceAnimations || !definition.parallax?.enabled) return;
-    const intensity = definition.parallax.intensity ?? 0.25;
-    const w = window.innerWidth || 1000;
-    const h = window.innerHeight || 650;
-    targetPx = (e.clientX / w - 0.5) * 2 * intensity;
-    targetPy = (e.clientY / h - 0.5) * 2 * intensity;
-    if (animFrame === undefined) {
-      animFrame = requestAnimationFrame(updateParallax);
-    }
-  }
-
-  function updateParallax() {
-    animFrame = undefined;
-    mousePx += (targetPx - mousePx) * 0.12;
-    mousePy += (targetPy - mousePy) * 0.12;
-    if (Math.abs(targetPx - mousePx) > 0.001 || Math.abs(targetPy - mousePy) > 0.001) {
-      animFrame = requestAnimationFrame(updateParallax);
-    }
-  }
-
-  $effect(() => {
-    if (!definition.parallax?.enabled) {
-      mousePx = 0;
-      mousePy = 0;
-      targetPx = 0;
-      targetPy = 0;
-      if (animFrame !== undefined) {
-        cancelAnimationFrame(animFrame);
-        animFrame = undefined;
-      }
-    }
-  });
 
   onDestroy(() => {
-    if (animFrame !== undefined) {
-      cancelAnimationFrame(animFrame);
-    }
     if (audioElement) {
       try {
         audioElement.pause();
@@ -140,64 +99,68 @@
   });
 </script>
 
-<svelte:window onmousemove={onWindowMouseMove} />
-
-<div
-  class="theme-v2 absolute inset-0 overflow-hidden"
-  use:trackMedia
-  style="--mouse-px:{mousePx};--mouse-py:{mousePy};"
->
-  {#if background.type === 'color'}
-    <div
-      class="absolute inset-0"
-      style="background-color:{background.color};opacity:{background.opacity ?? 1}"
-    ></div>
-  {:else if background.type === 'gradient'}
-    <div
-      class="absolute inset-0"
-      style="background-image:linear-gradient({background.angle ??
-        135}deg, {background.from}, {background.to});opacity:{background.opacity ?? 1}"
-    ></div>
-  {:else if background.type === 'image'}
-    {#if background.src}
-      <img
-        class="absolute inset-0 h-full w-full"
-        src={assetUrl(background.src)}
-        alt=""
-        aria-hidden="true"
-        style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
-          1};filter:{background.blur
-          ? `blur(${background.blur}px)`
-          : 'none'};transform:{background.blur
-          ? 'scale(1.08)'
-          : definition.parallax?.enabled
-            ? 'scale(1.06)'
-            : 'none'} translate3d({mousePx * -18}px, {mousePy * -18}px, 0);"
-      />
+<div class="theme-v2 absolute inset-0 overflow-hidden" use:trackMedia>
+  <div
+    class="absolute inset-0"
+    use:themeParallax={{
+      enabled: definition.parallax?.enabled === true,
+      intensity: definition.parallax?.intensity ?? 0.25,
+    }}
+    style="transform:translate3d(calc(var(--mouse-px, 0) * -18px), calc(var(--mouse-py, 0) * -18px), 0);"
+  >
+    {#if background.type === 'color'}
+      <div
+        class="absolute inset-0"
+        style="background-color:{background.color};opacity:{background.opacity ?? 1}"
+      ></div>
+    {:else if background.type === 'gradient'}
+      <div
+        class="absolute inset-0"
+        style="background-image:linear-gradient({background.angle ??
+          135}deg, {background.from}, {background.to});opacity:{background.opacity ??
+          1};transform:{definition.parallax?.enabled ? 'scale(1.06)' : 'none'}"
+      ></div>
+    {:else if background.type === 'image'}
+      {#if background.src}
+        <img
+          class="absolute inset-0 h-full w-full"
+          src={assetUrl(background.src)}
+          alt=""
+          aria-hidden="true"
+          style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
+            1};filter:{background.blur
+            ? `blur(${background.blur}px)`
+            : 'none'};transform:{background.blur
+            ? 'scale(1.08)'
+            : definition.parallax?.enabled
+              ? 'scale(1.06)'
+              : 'none'};"
+        />
+      {/if}
+    {:else if background.type === 'video'}
+      {#if background.src}
+        <video
+          class="absolute inset-0 h-full w-full object-cover"
+          use:themeMediaSource={assetUrl(background.src)}
+          use:themeVideoLifecycle
+          autoplay
+          loop
+          muted={background.muted !== false}
+          use:applyMuted={background.muted !== false}
+          playsinline
+          disablepictureinpicture
+          style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
+            1};filter:{background.blur
+            ? `blur(${background.blur}px)`
+            : 'none'};transform:{background.blur
+            ? 'scale(1.08)'
+            : definition.parallax?.enabled
+              ? 'scale(1.06)'
+              : 'none'};"
+        ></video>
+      {/if}
     {/if}
-  {:else if background.type === 'video'}
-    {#if background.src}
-      <video
-        class="absolute inset-0 h-full w-full object-cover"
-        use:themeMediaSource={assetUrl(background.src)}
-        use:themeVideoLifecycle
-        autoplay
-        loop
-        muted={background.muted !== false}
-        use:applyMuted={background.muted !== false}
-        playsinline
-        disablepictureinpicture
-        style="object-fit:{background.fit ?? 'cover'};opacity:{background.opacity ??
-          1};filter:{background.blur
-          ? `blur(${background.blur}px)`
-          : 'none'};transform:{background.blur
-          ? 'scale(1.08)'
-          : definition.parallax?.enabled
-            ? 'scale(1.06)'
-            : 'none'} translate3d({mousePx * -18}px, {mousePy * -18}px, 0);"
-      ></video>
-    {/if}
-  {/if}
+  </div>
 
   {#if overlay && (overlay.opacity ?? 0) > 0}
     <div

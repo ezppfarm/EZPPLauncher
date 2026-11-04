@@ -112,6 +112,136 @@ pub async fn hash_file_sha256(path: String) -> Result<String, String> {
     .map_err(|e| format!("Thread error: {e}"))?
 }
 
+/// Hash the files that make up a theme package. This ignores archive metadata
+/// and the local workshop-sync sidecar, so it can be compared before and after
+/// editing the theme folder.
+#[tauri::command]
+pub async fn hash_theme_content(theme_folder: String) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+
+    let folder = checked_theme_folder(&theme_folder)?;
+    tokio::task::spawn_blocking(move || {
+        let asset_filter = referenced_theme_assets(&folder.join("theme.json"));
+        let mut files = Vec::new();
+        collect_theme_content_files(&folder, &folder, asset_filter.as_ref(), &mut files)?;
+        files.sort_by_key(|path| path.to_string_lossy().to_lowercase());
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"ezpplauncher-theme-content-v1\0");
+
+        for relative in files {
+            let path = folder.join(&relative);
+            let metadata = std::fs::metadata(&path)
+                .map_err(|e| format!("Failed to inspect theme file {}: {e}", path.display()))?;
+            if !metadata.is_file() {
+                continue;
+            }
+
+            let name = relative.to_string_lossy().replace('\\', "/");
+            hasher.update((name.len() as u64).to_le_bytes());
+            hasher.update(name.as_bytes());
+
+            // Workshop metadata is not theme content. Ignore it so syncing
+            // tags or the server-assigned ID does not look like a local edit.
+            if name == "theme.json" {
+                let text = std::fs::read_to_string(&path).map_err(|e| {
+                    format!("Failed to read theme manifest {}: {e}", path.display())
+                })?;
+                let mut config: Value = serde_json::from_str(&text)
+                    .map_err(|e| format!("Failed to parse theme manifest: {e}"))?;
+                if let Some(object) = config.as_object_mut() {
+                    object.remove("workshopId");
+                    object.remove("tags");
+                }
+                let bytes = serde_json::to_vec(&config)
+                    .map_err(|e| format!("Failed to serialize theme manifest: {e}"))?;
+                hasher.update((bytes.len() as u64).to_le_bytes());
+                hasher.update(&bytes);
+                continue;
+            }
+
+            hasher.update(metadata.len().to_le_bytes());
+            let mut file = std::fs::File::open(&path)
+                .map_err(|e| format!("Failed to open theme file {}: {e}", path.display()))?;
+            let mut buffer = [0u8; 65536];
+            loop {
+                let bytes_read = file
+                    .read(&mut buffer)
+                    .map_err(|e| format!("Failed to read theme file {}: {e}", path.display()))?;
+                if bytes_read == 0 {
+                    break;
+                }
+                hasher.update(&buffer[..bytes_read]);
+            }
+        }
+
+        Ok::<_, String>(hex::encode(hasher.finalize()))
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))?
+}
+
+fn collect_theme_content_files(
+    root: &Path,
+    directory: &Path,
+    asset_filter: Option<&HashSet<String>>,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    let entries = std::fs::read_dir(directory)
+        .map_err(|e| format!("Failed to read {}: {e}", directory.display()))?;
+    let assets_root = root.join("assets");
+
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read theme entry: {e}"))?;
+        let file_name = entry.file_name();
+        if file_name.to_string_lossy().starts_with('.') {
+            continue;
+        }
+
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("Failed to inspect theme entry: {e}"))?;
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        let entry_path = entry.path();
+        let relative = entry_path
+            .strip_prefix(root)
+            .map_err(|e| format!("Failed to build theme path: {e}"))?
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        if file_type.is_dir() {
+            if asset_filter.is_some() && directory == root && relative != "assets" {
+                continue;
+            }
+            collect_theme_content_files(root, &entry_path, asset_filter, files)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+
+        if asset_filter.is_some() && directory == root && relative != "theme.json" {
+            continue;
+        }
+
+        if let Some(filter) = asset_filter
+            && let Ok(asset_path) = entry_path.strip_prefix(&assets_root)
+        {
+            let key = asset_path.to_string_lossy().replace('\\', "/");
+            if !filter.contains(&key) {
+                continue;
+            }
+        }
+
+        files.push(PathBuf::from(relative));
+    }
+
+    Ok(())
+}
+
 /// Read a chunk of a file on disk starting at `offset` for `length` bytes.
 #[tauri::command]
 pub async fn read_file_chunk(path: String, offset: u64, length: u64) -> Result<Vec<u8>, String> {
@@ -3080,6 +3210,9 @@ fn add_theme_folder_to_zip(
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read theme entry: {e}"))?;
+        if entry.file_name().to_string_lossy().starts_with('.') {
+            continue;
+        }
         let file_type = entry
             .file_type()
             .map_err(|e| format!("Failed to inspect theme entry: {e}"))?;

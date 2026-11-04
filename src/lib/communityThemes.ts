@@ -1,6 +1,7 @@
 import { config } from './config';
 import { normalizeThemeVersion } from './themeV2';
 import {
+  markThemeSynced,
   reloadThemes,
   themesDirectory,
   updateInstalledThemeTags,
@@ -1008,6 +1009,7 @@ export async function downloadAndInstallCommunityTheme(
       // Keep the installed manifest aligned with the workshop record.
       await updateInstalledThemeTags(folderName, theme.tags);
       await updateInstalledThemeWorkshopId(folderName, theme.id);
+      await markThemeSynced(folderName, { workshopId: theme.id, version: theme.version });
     } catch (err) {
       console.warn('[Workshop] Could not write workshop metadata into the installed theme:', err);
     }
