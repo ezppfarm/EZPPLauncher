@@ -34,6 +34,7 @@
   let velocityAccumX = 0;
   let velocityAccumY = 0;
   let rotateSpringAnim: ReturnType<typeof animate> | null = null;
+  let scheduleCursorFrame = () => {};
 
   let cursor: HTMLElement;
   let cursorRotateWrapper: HTMLDivElement;
@@ -41,20 +42,15 @@
   let cursorAdditive: HTMLImageElement;
 
   function isInteractive(el: Element | null): boolean {
-    while (el) {
-      const tag = el.tagName.toLowerCase();
-      const role = el.getAttribute('role');
-      const computed = getComputedStyle(el);
-      if (
-        ['button', 'a', 'input', 'select', 'textarea', 'label', 'option'].includes(tag) ||
-        (role && ['button', 'link', 'checkbox', 'combobox', 'menuitem', 'option'].includes(role)) ||
-        computed.cursor === 'pointer'
-      ) {
-        return true;
-      }
-      el = el.parentElement;
+    if (!el) return false;
+    if (
+      el.closest(
+        'button, a, input, select, textarea, label, option, [role="button"], [role="link"], [role="checkbox"], [role="combobox"], [role="menuitem"], [role="option"]'
+      )
+    ) {
+      return true;
     }
-    return false;
+    return getComputedStyle(el).cursor === 'pointer';
   }
 
   function dampContinuously(current: number, target: number, halfLife: number, dt: number): number {
@@ -133,6 +129,7 @@
       }
     }
 
+    scheduleCursorFrame();
     lastMouseX = targetX;
     lastMouseY = targetY;
   };
@@ -147,6 +144,7 @@
     lastVelocityTime = performance.now();
 
     isMouseDown = true;
+    scheduleCursorFrame();
 
     if (rotateSpringAnim) {
       rotateSpringAnim.pause();
@@ -213,12 +211,17 @@
     document.addEventListener('mouseleave', handleMouseLeave);
     document.addEventListener('mouseenter', handleMouseEnter);
 
-    let animationFrameId: number;
+    let animationFrameId: number | undefined;
     let lastFrameTime = performance.now();
+    let paused = false;
 
     const tick = (now: number) => {
+      animationFrameId = undefined;
+      if (paused) return;
+
       const dt = Math.min(Math.max(now - lastFrameTime, 0), 64);
       lastFrameTime = now;
+      let needsAnotherFrame = false;
 
       if (hasMoved && cursor) {
         if (!smoothCursor) {
@@ -229,6 +232,8 @@
           const halfLife = $cursorSmoothness > 50 ? 14 : Math.max(1, $cursorSmoothness || 14);
           currentX = dampContinuously(currentX, targetX, halfLife, dt);
           currentY = dampContinuously(currentY, targetY, halfLife, dt);
+          needsAnotherFrame =
+            Math.abs(targetX - currentX) >= 0.05 || Math.abs(targetY - currentY) >= 0.05;
         }
 
         if (Math.abs(targetX - currentX) < 0.05) currentX = targetX;
@@ -244,19 +249,62 @@
           const rotFactor = 1 - Math.pow(0.5, dt / 25);
           currentDegrees += (targetDegrees - currentDegrees) * rotFactor;
           cursorRotateWrapper.style.transform = `rotate(${currentDegrees}deg)`;
+          needsAnotherFrame = true;
         }
       }
 
+      if (needsAnotherFrame) {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    };
+
+    scheduleCursorFrame = () => {
+      if (paused || animationFrameId !== undefined) return;
+      lastFrameTime = performance.now();
       animationFrameId = requestAnimationFrame(tick);
     };
 
-    animationFrameId = requestAnimationFrame(tick);
+    const suspendCursor = () => {
+      paused = true;
+      if (animationFrameId !== undefined) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = undefined;
+      }
+      if (cursor) cursor.style.opacity = '0';
+    };
+
+    const resumeCursor = () => {
+      if (!paused) return;
+      paused = false;
+      lastFrameTime = performance.now();
+      if (!hasMoved) return;
+      if (cursor) cursor.style.opacity = '1';
+      scheduleCursorFrame();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') suspendCursor();
+      else if (document.hasFocus()) resumeCursor();
+    };
+    const onWindowBlur = () => suspendCursor();
+    const onWindowFocus = () => {
+      if (document.visibilityState !== 'hidden') resumeCursor();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('focus', onWindowFocus);
+    onVisibilityChange();
 
     return () => {
       document.documentElement.classList.remove('hiddenCursor');
       document.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('mouseenter', handleMouseEnter);
-      cancelAnimationFrame(animationFrameId);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('focus', onWindowFocus);
+      scheduleCursorFrame = () => {};
+      suspendCursor();
       if (rotateSpringAnim) {
         rotateSpringAnim.pause();
       }

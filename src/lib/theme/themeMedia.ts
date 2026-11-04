@@ -532,12 +532,13 @@ export function themeMediaSuspension(node: HTMLElement) {
 
 /**
  * Manage background video playback across document visibility changes.
- * Videos continue playing when the launcher window loses focus. Muted background
- * videos pause only when the document is hidden/minimized to save GPU decoding
- * cycles without interrupting theme music or audio.
+ * Muted background videos pause when the document is hidden/minimized or the
+ * launcher loses focus, which saves GPU decoding cycles behind a running game
+ * without interrupting unmuted theme music or audio.
  */
 export function themeVideoLifecycle(node: HTMLVideoElement) {
   let pausedByLifecycle = false;
+  let focused = true;
 
   const pause = () => {
     if (node.paused) return;
@@ -551,12 +552,22 @@ export function themeVideoLifecycle(node: HTMLVideoElement) {
     playThemeMedia(node);
   };
 
+  const onBlur = () => {
+    focused = false;
+    sync();
+  };
+  const onFocus = () => {
+    focused = true;
+    sync();
+  };
   const sync = () => {
     if (!node.isConnected) {
       document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
       return;
     }
-    if (document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible' && focused) {
       resume();
     } else if (node.muted || node.volume === 0) {
       pause();
@@ -564,11 +575,15 @@ export function themeVideoLifecycle(node: HTMLVideoElement) {
   };
 
   document.addEventListener('visibilitychange', sync);
+  window.addEventListener('blur', onBlur);
+  window.addEventListener('focus', onFocus);
   sync();
 
   return {
     destroy() {
       document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
     },
   };
 }

@@ -48,6 +48,7 @@
         opacity:{$reduceAnimations ? 0 : s.opacity};
         animation-duration:{s.duration}s;
         animation-delay:-{s.delay}s;
+        animation-play-state:{$reduceAnimations ? 'paused' : 'running'};
       "
     ></div>
   {/each}

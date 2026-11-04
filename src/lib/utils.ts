@@ -133,7 +133,7 @@ export const urlIsValidImage = async (url: string) => {
     const request = await fetch(url);
     if (!request.ok) return false;
     const contentType = request.headers.get('content-type');
-    return contentType?.startsWith('image/');
+    return contentType?.startsWith('image/') === true;
   } catch {
     return false;
   }

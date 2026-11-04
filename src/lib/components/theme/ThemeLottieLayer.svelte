@@ -17,11 +17,37 @@
   let container = $state<HTMLDivElement | undefined>(undefined);
   let animation: AnimationItem | undefined;
   let reducedMotion = false;
+  let windowActive = true;
+
+  function syncPlayback() {
+    if (!animation) return;
+    animation.loop = loop;
+    animation.setSpeed(speed);
+    if (autoplay && !reducedMotion && windowActive && document.visibilityState === 'visible') {
+      animation.play();
+    } else {
+      animation.pause();
+    }
+  }
 
   onMount(() => {
     if (!container || !src) return;
     reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let cancelled = false;
+
+    const onBlur = () => {
+      windowActive = false;
+      syncPlayback();
+    };
+    const onFocus = () => {
+      windowActive = true;
+      syncPlayback();
+    };
+    const onVisibilityChange = () => syncPlayback();
+
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const start = (animationData?: unknown) => {
       if (cancelled || !container) return;
@@ -30,7 +56,8 @@
           container,
           renderer: 'svg',
           loop,
-          autoplay: autoplay && !reducedMotion,
+          autoplay:
+            autoplay && !reducedMotion && windowActive && document.visibilityState === 'visible',
           ...(animationData ? { animationData } : { path: src }),
           rendererSettings: { preserveAspectRatio: 'xMidYMid meet' },
         });
@@ -52,15 +79,14 @@
 
     return () => {
       cancelled = true;
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   });
 
   $effect(() => {
-    if (!animation) return;
-    animation.loop = loop;
-    animation.setSpeed(speed);
-    if (autoplay && !reducedMotion) animation.play();
-    else animation.pause();
+    syncPlayback();
   });
 
   onDestroy(() => {

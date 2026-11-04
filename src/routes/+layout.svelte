@@ -71,6 +71,37 @@
 
   let { children } = $props();
 
+  function appActivity(node: HTMLElement) {
+    let focused = true;
+
+    const sync = () => {
+      node.classList.toggle('app-inactive', document.hidden || !focused);
+    };
+    const onBlur = () => {
+      focused = false;
+      sync();
+    };
+    const onFocus = () => {
+      focused = true;
+      sync();
+    };
+    const onVisibilityChange = () => sync();
+
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    sync();
+
+    return {
+      destroy() {
+        window.removeEventListener('blur', onBlur);
+        window.removeEventListener('focus', onFocus);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        node.classList.remove('app-inactive');
+      },
+    };
+  }
+
   let unlistenEditorState: (() => void) | undefined;
   let unlistenRequestEditorData: (() => void) | undefined;
   let unlistenPresenceEditorState: (() => void) | undefined;
@@ -552,6 +583,7 @@
   </AlertDialog.Root>
 
   <main
+    use:appActivity
     use:themeMediaSuspension
     use:themeParallax={{
       enabled: $active_custom_theme?.definition?.parallax?.enabled === true,

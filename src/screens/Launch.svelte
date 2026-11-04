@@ -1580,6 +1580,7 @@
       await getCurrentWindow().hide();
 
       let presenceUpdater: number | undefined = undefined;
+      const beatmapCoverValidity = new SvelteMap<string, boolean>();
 
       const isPresenceConnected = await presence.isConnected();
 
@@ -1592,8 +1593,10 @@
             return;
           }
           if ($currentUser) {
-            const userStats = await ezppfarm.getUserInfo($currentUser.id, 'stats');
-            const userStatus = await ezppfarm.getUserStatus($currentUser.id);
+            const [userStats, userStatus] = await Promise.all([
+              ezppfarm.getUserInfo($currentUser.id, 'stats'),
+              ezppfarm.getUserStatus($currentUser.id),
+            ]);
             if (userStatus?.player_status.online) {
               let actionName = 'Idle...';
               const gamemode = getModeAndTypeFromGamemode(userStatus.player_status.status.mode);
@@ -1648,7 +1651,15 @@
               if (beatmap !== null) {
                 beatmapString = `${beatmap.artist} - ${beatmap.title} [${beatmap.version}]`;
                 const coverCandidate = `https://assets.ppy.sh/beatmaps/${beatmap.set_id}/covers/list@2x.jpg`;
-                const isValidImage = await urlIsValidImage(coverCandidate);
+                const cachedCoverValidity = beatmapCoverValidity.get(coverCandidate);
+                let isValidImage: boolean;
+                if (cachedCoverValidity === undefined) {
+                  isValidImage = await urlIsValidImage(coverCandidate);
+                  if (beatmapCoverValidity.size >= 32) beatmapCoverValidity.clear();
+                  beatmapCoverValidity.set(coverCandidate, isValidImage);
+                } else {
+                  isValidImage = cachedCoverValidity;
+                }
                 if (isValidImage) beatmapCoverImage = coverCandidate;
               }
 
@@ -1678,7 +1689,7 @@
               }
             }
           }
-        }, 1000 * 2);
+        }, 5000);
       }
 
       await runOsu(osuPath, $patch, $gameOptimization);
