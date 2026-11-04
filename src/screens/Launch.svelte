@@ -3602,11 +3602,6 @@
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
                     <h1 class="text-lg font-semibold tracking-tight">Settings</h1>
-                    {#if activeSettingsTab === 'logging'}
-                      <Badge variant={$loggingEnabled ? 'secondary' : 'outline'} class="text-[9px]">
-                        {$loggingEnabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    {/if}
                   </div>
                   <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
                     {#if $reduceAnimations}
