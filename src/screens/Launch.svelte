@@ -313,6 +313,8 @@
   };
   let restoreCandidate = $state<{ theme: Theme; backup: ThemeBackup } | undefined>(undefined);
   let restoringTheme = $state(false);
+  let uninstallCandidate = $state<Theme | undefined>(undefined);
+  let uninstallingTheme = $state(false);
   let installedReportOpen = $state(false);
   let installedReportTarget = $state<CommunityTheme | null>(null);
   let installedReportLoading = $state(false);
@@ -528,6 +530,9 @@
   };
 
   const uninstallInstalledTheme = async (theme: Theme) => {
+    if (uninstallingTheme) return false;
+    uninstallingTheme = true;
+
     try {
       const deleteResult = await deleteTheme(theme);
       if (deleteResult) {
@@ -535,18 +540,36 @@
           title: 'Theme uninstalled',
           description: `"${theme.name}" was removed from your library.`,
         });
-      } else {
-        sileo.error({
-          title: 'Could not uninstall theme',
-          description: 'The theme files could not be removed.',
-        });
+        return true;
       }
+
+      sileo.error({
+        title: 'Could not uninstall theme',
+        description: 'The theme files could not be removed.',
+      });
+      return false;
     } catch (err) {
       console.error(err);
       sileo.error({
         title: 'Could not uninstall theme',
         description: err instanceof Error ? err.message : String(err),
       });
+      return false;
+    } finally {
+      uninstallingTheme = false;
+    }
+  };
+
+  const requestThemeUninstall = (theme: Theme) => {
+    if (theme.status !== 'installed' || theme.name === 'Default' || uninstallingTheme) return;
+    uninstallCandidate = theme;
+  };
+
+  const confirmThemeUninstall = async () => {
+    const theme = uninstallCandidate;
+    if (!theme) return;
+    if (await uninstallInstalledTheme(theme)) {
+      uninstallCandidate = undefined;
     }
   };
 
@@ -2404,6 +2427,51 @@
   </AlertDialog.Content>
 </AlertDialog.Root>
 
+<AlertDialog.Root open={uninstallCandidate !== undefined}>
+  <AlertDialog.Content
+    class="bg-theme-950 border-theme-800 p-0 max-w-xl"
+    escapeKeydownBehavior="ignore"
+    interactOutsideBehavior="ignore"
+  >
+    <div
+      class="flex flex-col items-center justify-center gap-2 border-b border-theme-800 bg-black/40 rounded-t-lg p-4"
+    >
+      <ThemeIcon name="trash" set={iconSet} class="size-7 text-red-300" />
+      <span class="font-semibold text-lg">Uninstall theme?</span>
+    </div>
+    <div
+      class="mx-3 mt-3 rounded-lg border border-theme-800 bg-theme-900 p-3 text-xs leading-relaxed text-muted-foreground"
+    >
+      Remove <strong class="text-theme-100">{uninstallCandidate?.name}</strong> from your library? This
+      deletes the local theme files and any unpublished changes. If the theme is published to the Workshop,
+      that copy is not affected.
+    </div>
+    <div class="flex items-center justify-center gap-3 p-4">
+      <Button
+        variant="outline"
+        class="min-w-28"
+        disabled={uninstallingTheme}
+        onclick={() => (uninstallCandidate = undefined)}
+      >
+        Cancel
+      </Button>
+      <Button
+        variant="destructive"
+        class="min-w-28"
+        disabled={uninstallingTheme}
+        onclick={confirmThemeUninstall}
+      >
+        {#if uninstallingTheme}
+          <ThemeIcon name="loader" set={iconSet} class="animate-spin" />
+        {:else}
+          <ThemeIcon name="trash" set={iconSet} class="size-4" />
+        {/if}
+        {uninstallingTheme ? 'Uninstalling...' : 'Uninstall theme'}
+      </Button>
+    </div>
+  </AlertDialog.Content>
+</AlertDialog.Root>
+
 <AlertDialog.Root open={pendingExternalUrl !== undefined}>
   <AlertDialog.Content
     class="bg-theme-950 border-theme-800 p-0 max-w-xl"
@@ -4225,10 +4293,10 @@
               {/if}
             </header>
 
-            <div class="relative min-h-0 flex-1 px-5 pt-4 pb-1">
+            <div class="relative min-h-0 flex-1">
               {#if activeThemesTab === 'workshop'}
                 <div
-                  class="absolute inset-0"
+                  class="absolute inset-0 px-5 pt-4 pb-1"
                   in:fly={{ duration: $reduceAnimations ? 0 : 240, y: 8, opacity: 0 }}
                   out:fade={{ duration: $reduceAnimations ? 0 : 160 }}
                 >
@@ -4249,7 +4317,7 @@
                 </div>
               {:else}
                 <div
-                  class="absolute inset-0"
+                  class="absolute inset-0 px-5 pt-4 pb-1"
                   in:fly={{ duration: $reduceAnimations ? 0 : 240, y: 8, opacity: 0 }}
                   out:fade={{ duration: $reduceAnimations ? 0 : 160 }}
                 >
@@ -4590,11 +4658,13 @@
                                             </DropdownMenu.Item>
                                           {/if}
                                           {#if canUninstallTheme}
-                                            <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                            {#if canEditTheme || canRestoreTheme || canUpdateTheme || canReportTheme}
+                                              <DropdownMenu.Separator class="my-1 bg-theme-800" />
+                                            {/if}
                                             <DropdownMenu.Item
                                               class="gap-2 text-[11px] text-red-300 data-[highlighted]:bg-red-500/15 data-[highlighted]:text-red-200"
                                               disabled={theme.status !== 'installed'}
-                                              onclick={() => void uninstallInstalledTheme(theme)}
+                                              onclick={() => requestThemeUninstall(theme)}
                                             >
                                               {#if theme.status === 'deleting'}
                                                 <ThemeIcon
