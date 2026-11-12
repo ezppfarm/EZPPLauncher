@@ -12,13 +12,11 @@
     DISCORD_PRESENCE_PRESETS,
     interpolatePresenceString,
     loadDiscordPresenceConfig,
-    pushIdlePresenceFromConfig,
     saveDiscordPresenceConfig,
     type DiscordPresenceConfig,
     type PresenceVariableContext,
   } from '$lib/discordPresenceConfig';
   import { discordPresence, launcherVersion } from '$lib/global';
-  import * as presence from '$lib/presence';
   import { currentUser } from '$lib/userAuthentication';
   import {
     Check,
@@ -206,10 +204,14 @@
           user?: Parameters<typeof currentUser.set>[0];
           info?: Parameters<typeof currentUserInfo.set>[0];
           launcherVersion?: string;
+          discordPresence?: boolean;
         }>('sync-theme-editor-global-data', (event) => {
           if (event.payload?.user) currentUser.set(event.payload.user);
           if (event.payload?.info) currentUserInfo.set(event.payload.info);
           if (event.payload?.launcherVersion) launcherVersion.set(event.payload.launcherVersion);
+          if (typeof event.payload?.discordPresence === 'boolean') {
+            discordPresence.set(event.payload.discordPresence);
+          }
         });
         await emit('request-theme-editor-global-data');
       } catch (err) {
@@ -469,18 +471,9 @@
     try {
       await saveDiscordPresenceConfig(workingConfig);
       initialConfigJson = JSON.stringify(workingConfig);
-      if ($discordPresence && (await presence.isConnected())) {
-        await pushIdlePresenceFromConfig(
-          {
-            user: $currentUser,
-            version: $launcherVersion || undefined,
-            rank: simRank,
-            pp: simPp,
-            accuracy: simAccuracy,
-          },
-          workingConfig
-        );
-      }
+      // The main window owns the live player stats and its presence config
+      // store, so let it refresh and push the updated activity immediately.
+      await emit('discord-presence-config-saved');
       sileo.success({ title: 'Discord Rich Presence Saved', description: 'Activity updated' });
       await handleClose();
     } catch (err) {

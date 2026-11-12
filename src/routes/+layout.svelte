@@ -248,6 +248,7 @@
           osuStream: get(osuStream),
           serverPing: get(serverPing),
           launcherVersion: get(launcherVersion),
+          discordPresence: get(discordPresence),
         });
       } catch {}
     };

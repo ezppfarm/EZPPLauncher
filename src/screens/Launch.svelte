@@ -21,6 +21,7 @@
   import { config } from '$lib/config';
   import { currentUserInfo } from '$lib/data';
   import {
+    discordPresenceCustomConfig,
     loadDiscordPresenceConfig,
     pushIdlePresenceFromConfig,
     pushPlayingPresenceFromConfig,
@@ -90,7 +91,6 @@
     startOpenTabletDriver,
     stopOpenTabletDriver,
   } from '$lib/osuUtil';
-  import * as presence from '$lib/presence';
   import {
     downloadAndInstallCommunityTheme,
     fetchCommunityThemeDetails,
@@ -297,6 +297,10 @@
   let activeThemesTab = $state<'library' | 'workshop'>('library');
   let themeSavedUnlisten: (() => void) | undefined;
   let themePublishedUnlisten: (() => void) | undefined;
+  let presenceConfigUnlisten: (() => void) | undefined;
+  let presenceConfigReady = $state(false);
+  let idlePresenceTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastIdlePresenceSignature = '';
   let refreshingThemes = $state(false);
   let reloadingActiveTheme = $state(false);
   let revealedNsfw = $state<string[]>([]);
@@ -1125,6 +1129,46 @@
   };
 
   const currentStats = $derived($currentUserInfo?.stats?.[selectedGamemode]);
+  const currentPresenceContext = () => ({
+    rank: currentStats?.rank,
+    pp: currentStats?.pp,
+    accuracy: currentStats ? `${currentStats.acc.toFixed(2)}%` : undefined,
+    mode: getGamemodeName(modeIntToStr(selectedMode), typeIntToStr(selectedType)),
+    action: 'In Launcher',
+  });
+
+  $effect(() => {
+    if (!$discordPresence || !presenceConfigReady || $launching) {
+      lastIdlePresenceSignature = '';
+      return;
+    }
+
+    const user = $currentUser;
+    const version = $launcherVersion || undefined;
+    const context = currentPresenceContext();
+    const cfg = $discordPresenceCustomConfig;
+    const signature = JSON.stringify({
+      userId: user?.id,
+      username: user?.name,
+      version,
+      context,
+      config: cfg,
+    });
+    if (signature === lastIdlePresenceSignature) return;
+
+    idlePresenceTimer = setTimeout(() => {
+      idlePresenceTimer = undefined;
+      lastIdlePresenceSignature = signature;
+      void pushIdlePresenceFromConfig({ user, version, ...context }, cfg);
+    }, 100);
+
+    return () => {
+      if (idlePresenceTimer !== undefined) {
+        clearTimeout(idlePresenceTimer);
+        idlePresenceTimer = undefined;
+      }
+    };
+  });
   let recentActivityIndex = $state(0);
   const userEvents = $derived($currentUserInfo?.events ?? []);
   const safeEventIndex = $derived(
@@ -1584,9 +1628,7 @@
       let presenceUpdater: number | undefined = undefined;
       const beatmapCoverValidity = new SvelteMap<string, boolean>();
 
-      const isPresenceConnected = await presence.isConnected();
-
-      if ($discordPresence && isPresenceConnected) {
+      if ($discordPresence) {
         let osuDetected = false;
         presenceUpdater = window.setInterval(async () => {
           if (!osuDetected) {
@@ -1709,14 +1751,6 @@
       fadeGlobalVolume(0, $custom_theme_volume, 1500);
       if (presenceUpdater) {
         window.clearInterval(presenceUpdater);
-        try {
-          await pushIdlePresenceFromConfig({
-            user: $currentUser,
-            version: $launcherVersion || undefined,
-          });
-        } catch (err) {
-          console.log(err);
-        }
       }
       await new Promise((res) => setTimeout(res, 1000));
       /* await replaceUIFiles(osuPath, true); */
@@ -2009,17 +2043,13 @@
       }
     })();
 
-    loadDiscordPresenceConfig().then((cfg) => {
-      if ($discordPresence) {
-        pushIdlePresenceFromConfig(
-          {
-            user: $currentUser,
-            version: $launcherVersion || undefined,
-          },
-          cfg
-        ).catch(() => {});
-      }
+    loadDiscordPresenceConfig().then(() => {
+      presenceConfigReady = true;
     });
+
+    listen('discord-presence-config-saved', async () => {
+      await loadDiscordPresenceConfig();
+    }).then((unlisten) => (presenceConfigUnlisten = unlisten));
 
     animate(ezppLogo, {
       opacity: [0, 1],
@@ -2075,6 +2105,7 @@
       window.clearInterval(animateInterval);
       themeSavedUnlisten?.();
       themePublishedUnlisten?.();
+      presenceConfigUnlisten?.();
       stopThemeScript();
     };
   });

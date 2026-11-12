@@ -4,6 +4,7 @@ use std::sync::Mutex as StdMutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, RunEvent};
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tokio::time::{Duration, interval};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -57,19 +58,15 @@ enum PresenceCommand {
     IsConnected(oneshot::Sender<bool>),
 }
 
-enum ReconnectResult {
-    Connected(Box<AsyncDiscordIpcClient>),
-    Failed,
-}
-
 struct PresenceActor {
     receiver: mpsc::Receiver<PresenceCommand>,
-    reconnect_rx: mpsc::Receiver<ReconnectResult>,
-    reconnect_tx: mpsc::Sender<ReconnectResult>,
+    reconnect_rx: mpsc::Receiver<Box<AsyncDiscordIpcClient>>,
+    reconnect_tx: mpsc::Sender<Box<AsyncDiscordIpcClient>>,
+    reconnect_task: Option<JoinHandle<()>>,
     client: Option<AsyncDiscordIpcClient>,
     data: PresenceData,
     start_timestamp: i64,
-    reconnecting: bool,
+    should_connect: bool,
 }
 
 impl PresenceActor {
@@ -85,10 +82,11 @@ impl PresenceActor {
             receiver,
             reconnect_rx,
             reconnect_tx,
+            reconnect_task: None,
             client: None,
             data: PresenceData::default(),
             start_timestamp: start,
-            reconnecting: false,
+            should_connect: false,
         }
     }
 
@@ -112,17 +110,12 @@ impl PresenceActor {
                     }
                 }
 
-                Some(result) = self.reconnect_rx.recv() => {
-                    self.reconnecting = false;
-                    match result {
-                        ReconnectResult::Connected(client) => {
-                            log::info!(target: "launcher", "Presence: reconnect succeeded");
-                            self.client = Some(*client);
-                            self.push_presence().await;
-                        }
-                        ReconnectResult::Failed => {
-                            log::warn!(target: "launcher", "Presence: all reconnect attempts exhausted");
-                        }
+                Some(client) = self.reconnect_rx.recv() => {
+                    self.reconnect_task = None;
+                    if self.should_connect {
+                        log::info!(target: "launcher", "Presence: reconnect succeeded");
+                        self.client = Some(*client);
+                        self.push_presence().await;
                     }
                 }
 
@@ -134,15 +127,19 @@ impl PresenceActor {
     }
 
     async fn cmd_connect(&mut self, resp: oneshot::Sender<bool>) {
+        self.should_connect = true;
         if self.client.is_some() {
             let _ = resp.send(true);
+            return;
+        }
+        if self.reconnect_task.is_some() {
+            let _ = resp.send(false);
             return;
         }
 
         match try_connect_once().await {
             Some(client) => {
                 self.client = Some(client);
-                self.reconnecting = false;
                 self.push_presence().await;
                 let _ = resp.send(true);
             }
@@ -158,6 +155,10 @@ impl PresenceActor {
     }
 
     async fn cmd_disconnect(&mut self, resp: oneshot::Sender<()>) {
+        self.should_connect = false;
+        if let Some(task) = self.reconnect_task.take() {
+            task.abort();
+        }
         if let Some(mut client) = self.client.take() {
             let _ = client.clear_activity().await;
             log::info!(target: "launcher", "Presence: disconnected");
@@ -206,37 +207,37 @@ impl PresenceActor {
                 e
             );
             self.client = None;
+            self.should_connect = true;
             self.spawn_reconnect_task();
         }
     }
 
     fn spawn_reconnect_task(&mut self) {
-        if self.reconnecting {
+        if self.reconnect_task.is_some() || !self.should_connect {
             return;
         }
-        self.reconnecting = true;
 
         let tx = self.reconnect_tx.clone();
-        tokio::spawn(async move {
-            const MAX_ATTEMPTS: u32 = 5;
-            for attempt in 1..=MAX_ATTEMPTS {
-                let delay = Duration::from_secs(5 * attempt as u64);
+        let task = tokio::spawn(async move {
+            let mut attempt: u32 = 0;
+            loop {
+                attempt = attempt.saturating_add(1);
+                let delay = Duration::from_secs((5 * u64::from(attempt)).min(30));
                 log::info!(
                     target: "launcher",
-                    "Presence: reconnect attempt {}/{} in {:?}…",
+                    "Presence: reconnect attempt {} in {:?}…",
                     attempt,
-                    MAX_ATTEMPTS,
                     delay
                 );
                 tokio::time::sleep(delay).await;
 
                 if let Some(client) = try_connect_once().await {
-                    let _ = tx.send(ReconnectResult::Connected(Box::new(client))).await;
+                    let _ = tx.send(Box::new(client)).await;
                     return;
                 }
             }
-            let _ = tx.send(ReconnectResult::Failed).await;
         });
+        self.reconnect_task = Some(task);
     }
 }
 
@@ -302,45 +303,27 @@ pub async fn has_presence() -> bool {
 
 #[allow(clippy::too_many_arguments)]
 pub fn update_activity(
-    state: Option<&str>,
-    details: Option<&str>,
-    large_image_key: Option<&str>,
-    large_image_text: Option<&str>,
-    small_image_key: Option<Option<String>>,
-    small_image_text: Option<Option<String>>,
-    button1: Option<Option<PresenceButton>>,
-    button2: Option<Option<PresenceButton>>,
-    show_timestamp: Option<bool>,
+    state: &str,
+    details: &str,
+    large_image_key: &str,
+    large_image_text: &str,
+    small_image_key: Option<String>,
+    small_image_text: Option<String>,
+    button1: Option<PresenceButton>,
+    button2: Option<PresenceButton>,
+    show_timestamp: bool,
 ) {
     let data = {
         let mut guard = PRESENCE_DATA.lock().unwrap();
-        if let Some(s) = state {
-            guard.state = s.to_string();
-        }
-        if let Some(d) = details {
-            guard.details = d.to_string();
-        }
-        if let Some(img) = large_image_key {
-            guard.large_image_key = img.to_string();
-        }
-        if let Some(txt) = large_image_text {
-            guard.large_image_text = txt.to_string();
-        }
-        if let Some(key) = small_image_key {
-            guard.small_image_key = key;
-        }
-        if let Some(text) = small_image_text {
-            guard.small_image_text = text;
-        }
-        if let Some(b1) = button1 {
-            guard.dynamic_button = b1;
-        }
-        if let Some(b2) = button2 {
-            guard.secondary_button = b2;
-        }
-        if let Some(ts) = show_timestamp {
-            guard.show_timestamp = ts;
-        }
+        guard.state = state.to_string();
+        guard.details = details.to_string();
+        guard.large_image_key = large_image_key.to_string();
+        guard.large_image_text = large_image_text.to_string();
+        guard.small_image_key = small_image_key;
+        guard.small_image_text = small_image_text;
+        guard.dynamic_button = button1;
+        guard.secondary_button = button2;
+        guard.show_timestamp = show_timestamp;
         guard.clone()
     };
 

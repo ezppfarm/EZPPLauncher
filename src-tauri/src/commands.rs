@@ -1329,24 +1329,24 @@ pub struct PresenceButton {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresenceActivityPayload {
-    pub state: Option<String>,
-    pub details: Option<String>,
-    pub large_image_key: Option<String>,
-    pub large_image_text: Option<String>,
-    pub small_image_key: Option<Option<String>>,
-    pub small_image_text: Option<Option<String>>,
-    pub button1: Option<Option<presence::PresenceButton>>,
-    pub button2: Option<Option<presence::PresenceButton>>,
-    pub show_timestamp: Option<bool>,
+    pub state: String,
+    pub details: String,
+    pub large_image_key: String,
+    pub large_image_text: String,
+    pub small_image_key: Option<String>,
+    pub small_image_text: Option<String>,
+    pub button1: Option<presence::PresenceButton>,
+    pub button2: Option<presence::PresenceButton>,
+    pub show_timestamp: bool,
 }
 
 #[tauri::command]
 pub async fn presence_update_activity(activity: PresenceActivityPayload) {
     presence::update_activity(
-        activity.state.as_deref(),
-        activity.details.as_deref(),
-        activity.large_image_key.as_deref(),
-        activity.large_image_text.as_deref(),
+        &activity.state,
+        &activity.details,
+        &activity.large_image_key,
+        &activity.large_image_text,
         activity.small_image_key,
         activity.small_image_text,
         activity.button1,

@@ -6,15 +6,15 @@ export type PresenceButtonPayload = {
 };
 
 export type PresenceActivityPayload = {
-  state?: string;
-  details?: string;
-  largeImageKey?: string;
-  largeImageText?: string;
-  smallImageKey?: string | null;
-  smallImageText?: string | null;
-  button1?: PresenceButtonPayload | null;
-  button2?: PresenceButtonPayload | null;
-  showTimestamp?: boolean;
+  state: string;
+  details: string;
+  largeImageKey: string;
+  largeImageText: string;
+  smallImageKey: string | null;
+  smallImageText: string | null;
+  button1: PresenceButtonPayload | null;
+  button2: PresenceButtonPayload | null;
+  showTimestamp: boolean;
 };
 
 export const connect = async () => await invoke('presence_connect');

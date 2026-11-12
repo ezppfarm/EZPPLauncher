@@ -247,6 +247,8 @@ export type IdlePresenceParams = {
   rank?: number | string;
   pp?: number | string;
   accuracy?: number | string;
+  mode?: string;
+  action?: string;
 };
 
 export type PlayingPresenceParams = {
@@ -282,6 +284,8 @@ export const pushIdlePresenceFromConfig = async (
     rank: params?.rank,
     pp: params?.pp,
     accuracy: params?.accuracy,
+    mode: params?.mode,
+    action: params?.action ?? 'In Launcher',
     version: params?.version,
     profileUrl: params?.user?.id ? `https://ez-pp.farm/u/${params.user.id}` : 'https://ez-pp.farm',
   };
