@@ -397,6 +397,8 @@ pub async fn installation_diagnostics(app: AppHandle, folder: String) -> Install
         .map(patcher_file_stats)
         .unwrap_or_default();
 
+    // macOS fills in the Wine and FFmpeg fields below.
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
     let mut diagnostics = InstallationDiagnostics {
         platform: std::env::consts::OS.to_string(),
         os_version: System::long_os_version(),

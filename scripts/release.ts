@@ -63,6 +63,13 @@ function selectRustupToolchain(env: NodeJS.ProcessEnv) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     env.PATH = `${path.dirname(cargo)}${path.delimiter}${env.PATH ?? ''}`;
+
+    if (process.platform === 'darwin') {
+      const libDir = path.join(path.dirname(path.dirname(cargo)), 'lib');
+      env.DYLD_FALLBACK_LIBRARY_PATH = [libDir, env.DYLD_FALLBACK_LIBRARY_PATH]
+        .filter(Boolean)
+        .join(path.delimiter);
+    }
   } catch {
     // Fall back to the cargo already on PATH.
   }
@@ -79,6 +86,14 @@ function hasRustTarget(target: string, env: NodeJS.ProcessEnv): boolean {
   } catch {
     return false;
   }
+}
+
+function configureCrossWindowsLinker(env: NodeJS.ProcessEnv) {
+  // Microsoft's prebuilt CRT libraries reference PDBs that are not shipped
+  // with cargo-xwin, so lld-link emits LNK4099 for every library. The debug
+  // info is unavailable either way, so suppress only that specific warning.
+  const key = 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS';
+  env[key] = [env[key], '-C', 'link-arg=/ignore:4099'].filter(Boolean).join(' ');
 }
 
 function windowsPrerequisites(env: NodeJS.ProcessEnv): string[] {
@@ -161,8 +176,7 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<v
 
 /**
  * Vite's static-adapter build can leave the process alive after writing the
- * output. Stop it once the adapter confirms the build is complete, matching
- * the behavior of scripts/build.ts.
+ * output. Stop it once the adapter confirms the build is complete.
  */
 function buildFrontend(command: string, env: NodeJS.ProcessEnv): Promise<void> {
   console.log(`\n$ ${command} x --bun vite build`);
@@ -259,6 +273,8 @@ if (target === 'windows' && host !== 'windows') {
     for (const requirement of missing) console.error(`  - ${requirement}`);
     process.exit(1);
   }
+
+  configureCrossWindowsLinker(env);
 }
 
 const tauriArgs = ['x', 'tauri', 'build'];
