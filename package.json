@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "debug": "bun run tauri dev",
-    "build": "bun ./scripts/build.ts",
     "release": "bun ./scripts/release.ts",
     "release:macos": "bun ./scripts/release.ts macos",
     "release:windows": "bun ./scripts/release.ts windows",
