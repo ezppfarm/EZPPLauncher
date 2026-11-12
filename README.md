@@ -183,6 +183,30 @@ src-tauri/target/release/bundle/deb/
 src-tauri/target/release/bundle/appimage/
 ```
 
+### Cross-platform Releases
+
+Use the release scripts to build a specific platform:
+
+```bash
+bun run release:macos
+bun run release:windows
+bun run release:linux
+```
+
+Windows installers can be cross-compiled from macOS with NSIS and `cargo-xwin`:
+
+```bash
+brew install nsis llvm cmake nasm ninja
+rustup target add x86_64-pc-windows-msvc
+cargo install --locked cargo-xwin
+bun run release:windows
+```
+
+The Windows installer is written to
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`. Cross-compiled
+Windows builds are unsigned. macOS releases must be built on macOS, and Linux
+releases must be built on Linux.
+
 ---
 
 ## 📁 Project Structure (Overview)
